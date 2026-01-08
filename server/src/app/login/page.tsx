@@ -66,7 +66,7 @@ export default function LoginPage() {
       <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
         <div className="space-y-1 text-center">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            ViralPilot
+            Bap
           </p>
           <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
           <p className="text-sm text-muted-foreground">Enter your email to get a magic link.</p>

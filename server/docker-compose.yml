@@ -1,17 +1,17 @@
-name: viralpilot-local
+name: bap-local
 
 services:
   database:
     image: postgres
-    container_name: viralpilot-postgres-local
+    container_name: bap-postgres-local
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: viralpilot
+      POSTGRES_DB: bap
     ports:
       - "5432:5432"
     volumes:
-      - viralpilot_postgres_data:/var/lib/postgresql/data
+      - bap_postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -21,11 +21,11 @@ services:
 
   redis:
     image: redis:8-alpine
-    container_name: viralpilot-redis-local
+    container_name: bap-redis-local
     ports:
       - "6379:6379"
     volumes:
-      - viralpilot_redis_data:/data
+      - bap_redis_data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -34,5 +34,5 @@ services:
       retries: 5
 
 volumes:
-  viralpilot_postgres_data:
-  viralpilot_redis_data:
+  bap_postgres_data:
+  bap_redis_data:

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:orpc.unnoq.com)",
+      "WebFetch(domain:orpc.dev)",
+      "WebSearch",
+      "Bash(bun add:*)",
+      "Bash(bun remove:*)",
+      "Bash(bun db:generate:*)",
+      "Bash(bun db:push:*)",
+      "Bash(bun typecheck:*)",
+      "Bash(timeout 30 bun dev:*)",
+      "Bash(bun run build:*)"
+    ]
+  }
+}

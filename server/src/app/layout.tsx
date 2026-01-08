@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
-import { AppShell } from "@/components/app-shell";
-import { TrpcProvider } from "@/trpc/provider";
+import { ORPCProvider } from "@/orpc/provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ViralPilot",
-  description: "Navigation prototype with Animate UI sidebar",
+  title: "Bap",
+  description: "AI Assistant with integrations",
 };
 
 export default function RootLayout({
@@ -30,9 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <TrpcProvider>
-          <AppShell>{children}</AppShell>
-        </TrpcProvider>
+        <ORPCProvider>{children}</ORPCProvider>
       </body>
     </html>
   );

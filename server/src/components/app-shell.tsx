@@ -86,10 +86,10 @@ export function AppShell({ children }: AppShellProps) {
             aria-label="Go to dashboard"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-              VP
+              B
             </div>
             <div className="space-y-0.5">
-              <p className="text-sm font-semibold leading-none">ViralPilot</p>
+              <p className="text-sm font-semibold leading-none">Bap</p>
               <p className="text-xs text-muted-foreground">Navigate</p>
             </div>
           </Link>

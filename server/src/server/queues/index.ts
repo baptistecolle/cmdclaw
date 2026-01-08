@@ -1,7 +1,7 @@
 import { QueueEvents, Worker, type Processor } from "bullmq";
 import IORedis from "ioredis";
 
-const queueName = process.env.BULLMQ_QUEUE_NAME ?? "viralpilot:default";
+const queueName = process.env.BULLMQ_QUEUE_NAME ?? "bap:default";
 const redisUrl = process.env.BULLMQ_REDIS_URL ?? process.env.REDIS_URL ?? "redis://localhost:6379";
 const redisOptions = { maxRetriesPerRequest: null, enableReadyCheck: false };
 
@@ -27,7 +27,8 @@ const processor: Processor<JobPayload, unknown, string> = async (job) => {
 };
 
 export const startQueues = () => {
-  const connection = new IORedis(redisUrl, redisOptions);
+  // Cast to any due to ioredis version mismatch with bullmq's bundled version
+  const connection = new IORedis(redisUrl, redisOptions) as any;
 
   const worker = new Worker(queueName, processor, {
     connection,
@@ -35,7 +36,7 @@ export const startQueues = () => {
   });
 
   const queueEvents = new QueueEvents(queueName, {
-    connection: new IORedis(redisUrl, redisOptions),
+    connection: new IORedis(redisUrl, redisOptions) as any,
   });
 
   queueEvents.on("completed", ({ jobId }) => {

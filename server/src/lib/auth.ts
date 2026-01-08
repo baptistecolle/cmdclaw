@@ -13,7 +13,7 @@ const appUrl =
   (env.VERCEL_URL ? `https://${env.VERCEL_URL}` : "http://localhost:3000");
 
 export const auth = betterAuth({
-  appName: "ViralPilot",
+  appName: "Bap",
   baseURL: appUrl,
   database: drizzleAdapter(db, {
     provider: "pg",
