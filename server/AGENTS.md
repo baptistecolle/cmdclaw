@@ -49,11 +49,11 @@ Guide for ViralPilot's Next.js codebase.
 ```
 
 ## 4. Build, Test, and Development Commands
-- **Dev/Prod**: `pnpm dev`, `pnpm build`, `pnpm start`.
-- **Quality**: `pnpm lint`, `pnpm lint:fix`, `pnpm format:check`, `pnpm format:write`, `pnpm typecheck`.
-- **Database**: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `pnpm db:recreate`.
+- **Dev/Prod**: `bun dev`, `bun build`, `bun start`.
+- **Quality**: `bun lint`, `bun lint:fix`, `bun format:check`, `bun format:write`, `bun typecheck`.
+- **Database**: `bun db:generate`, `bun db:migrate`, `bun db:push`, `bun db:seed`, `bun db:reset`, `bun db:recreate`.
 - **Workers**: keep `scripts/bullmq-worker.ts` thin; move processors/queues to `src/server/queues`.
-- **Testing**: `pnpm test` (Vitest) and `pnpm test:e2e` (Playwright).
+- **Testing**: `bun test` (Vitest) and `bun test:e2e` (Playwright).
 
 ## 5. Coding Style & Naming Conventions
 - TypeScript + React 19; components in `PascalCase`, hooks in `useCamelCase`, files mirror exports.
@@ -67,9 +67,9 @@ Guide for ViralPilot's Next.js codebase.
 - **Consistency**: Use CSS variables for all colors
 
 ## 7. Pre-commit Process
-1. Run `pnpm typecheck` to check for type errors
-2. Run `pnpm lint` to check code quality
-3. Run `pnpm check` to check compilation errors
+1. Run `bun typecheck` to check for type errors
+2. Run `bun lint` to check code quality
+3. Run `bun check` to check compilation errors
 4. Fix all errors and warnings before committing
 
 ## 8. Commit & Pull Request Guidelines
@@ -100,7 +100,7 @@ Guide for ViralPilot's Next.js codebase.
 
 When creating components:
 1. Check if similar component exists in `components/`
-2. **Always prefer animate-ui components** - Before using native browser APIs or custom implementations, check if a shadcn component exists (e.g., use `AlertDialog` instead of `confirm()`, `Dialog` instead of modals, `Select` instead of native select). Feel free to install new components from the animate-ui CLI and use those as a starting point. All the animate-ui components are in the src/components/animate-ui folder. If the component you want does not exist in animate-ui, fall back to shadcn. Always ask the user to install any required shadcn components; they will run `pnpm dlx shadcn@latest add ...` as needed.
+2. **Always prefer animate-ui components** - Before using native browser APIs or custom implementations, check if a shadcn component exists (e.g., use `AlertDialog` instead of `confirm()`, `Dialog` instead of modals, `Select` instead of native select). Feel free to install new components from the animate-ui CLI and use those as a starting point. All the animate-ui components are in the src/components/animate-ui folder. If the component you want does not exist in animate-ui, fall back to shadcn. Always ask the user to install any required shadcn components; they will run `bunx shadcn@latest add ...` as needed.
 
 ## 11. API Usage
 
