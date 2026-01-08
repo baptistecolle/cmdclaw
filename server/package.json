@@ -25,6 +25,7 @@
     "docker-up:local": "docker compose up"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.1",
     "@base-ui-components/react": "1.0.0-beta.7",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
