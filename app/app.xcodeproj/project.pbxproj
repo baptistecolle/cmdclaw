@@ -6,14 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F45F5C812F0FCCFF00F3F71A /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = F45F5C802F0FCA7100F3F71A /* WhisperKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
-		F45F5C662F0FCA6F00F3F71A /* bap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bap.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F45F5C662F0FCA6F00F3F71A /* Bap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		F45F5C682F0FCA6F00F3F71A /* bap */ = {
+		F45F5C682F0FCA6F00F3F71A /* app */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = bap;
+			path = app;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F45F5C812F0FCCFF00F3F71A /* WhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -32,7 +37,7 @@
 		F45F5C5D2F0FCA6F00F3F71A = {
 			isa = PBXGroup;
 			children = (
-				F45F5C682F0FCA6F00F3F71A /* bap */,
+				F45F5C682F0FCA6F00F3F71A /* app */,
 				F45F5C672F0FCA6F00F3F71A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -40,7 +45,7 @@
 		F45F5C672F0FCA6F00F3F71A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F45F5C662F0FCA6F00F3F71A /* bap.app */,
+				F45F5C662F0FCA6F00F3F71A /* Bap.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -61,13 +66,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				F45F5C682F0FCA6F00F3F71A /* bap */,
+				F45F5C682F0FCA6F00F3F71A /* app */,
 			);
 			name = bap;
 			packageProductDependencies = (
+				F45F5C802F0FCA7100F3F71A /* WhisperKit */,
 			);
 			productName = bap;
-			productReference = F45F5C662F0FCA6F00F3F71A /* bap.app */;
+			productReference = F45F5C662F0FCA6F00F3F71A /* Bap.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -94,6 +100,9 @@
 			);
 			mainGroup = F45F5C5D2F0FCA6F00F3F71A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F45F5C7E2F0FCA7100F3F71A /* XCRemoteSwiftPackageReference "WhisperKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F45F5C672F0FCA6F00F3F71A /* Products */;
 			projectDirPath = "";
@@ -248,22 +257,25 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = app/app.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = app/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Bap needs access to your microphone to record voice for transcription.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = baptiste.bap;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
+				PRODUCT_NAME = Bap;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -278,22 +290,25 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = app/app.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = app/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Bap needs access to your microphone to record voice for transcription.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = baptiste.bap;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
+				PRODUCT_NAME = Bap;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -325,6 +340,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F45F5C7E2F0FCA7100F3F71A /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F45F5C802F0FCA7100F3F71A /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F45F5C7E2F0FCA7100F3F71A /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F45F5C5E2F0FCA6F00F3F71A /* Project object */;
 }
