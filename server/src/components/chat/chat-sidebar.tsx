@@ -91,6 +91,7 @@ export function ChatSidebar() {
                       asChild
                       isActive={pathname === `/chat/${conv.id}`}
                       tooltip={conv.title || "Untitled"}
+                      highlightValue={conv.id}
                     >
                       <Link
                         href={`/chat/${conv.id}`}
@@ -123,7 +124,7 @@ export function ChatSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Settings">
+            <SidebarMenuButton asChild tooltip="Settings" highlightValue="settings">
               <Link href="/settings/integrations">
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>

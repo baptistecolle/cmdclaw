@@ -8,13 +8,19 @@ const handler = new RPCHandler(appRouter);
 
 async function handleRequest(request: Request) {
   const context = await createORPCContext({ headers: request.headers });
-  const result = await handler.handle(request, { context });
+  const { response } = await handler.handle(request, {
+    prefix: "/api/rpc",
+    context,
+  });
 
-  if (!result.matched) {
-    return new Response("Not found", { status: 404 });
-  }
-
-  return result.response;
+  return response ?? new Response("Not found", { status: 404 });
 }
 
-export { handleRequest as GET, handleRequest as POST };
+export {
+  handleRequest as HEAD,
+  handleRequest as GET,
+  handleRequest as POST,
+  handleRequest as PUT,
+  handleRequest as PATCH,
+  handleRequest as DELETE,
+};

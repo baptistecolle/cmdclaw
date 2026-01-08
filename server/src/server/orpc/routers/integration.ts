@@ -1,5 +1,4 @@
-// @ts-nocheck - oRPC type inference is complex with middleware contexts
-import { os, ORPCError } from "@orpc/server";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
 import { integration, integrationToken } from "@/server/db/schema";
@@ -15,237 +14,243 @@ const integrationTypeSchema = z.enum([
   "slack",
 ]);
 
-export const integrationRouter = os.router({
-  // List user's integrations
-  list: protectedProcedure.handler(async ({ context }) => {
-    const integrations = await context.db.query.integration.findMany({
-      where: eq(integration.userId, context.user.id),
+// List user's integrations
+const list = protectedProcedure.handler(async ({ context }) => {
+  const integrations = await context.db.query.integration.findMany({
+    where: eq(integration.userId, context.user.id),
+  });
+
+  return integrations.map((i) => ({
+    id: i.id,
+    type: i.type,
+    displayName: i.displayName,
+    enabled: i.enabled,
+    scopes: i.scopes,
+    createdAt: i.createdAt,
+  }));
+});
+
+// Get OAuth authorization URL
+const getAuthUrl = protectedProcedure
+  .input(
+    z.object({
+      type: integrationTypeSchema,
+      redirectUrl: z.string().url(),
+    })
+  )
+  .handler(async ({ input, context }) => {
+    const config = getOAuthConfig(input.type as IntegrationType);
+
+    const state = Buffer.from(
+      JSON.stringify({
+        userId: context.user.id,
+        type: input.type,
+        redirectUrl: input.redirectUrl,
+      })
+    ).toString("base64url");
+
+    const params = new URLSearchParams({
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
+      response_type: "code",
+      scope: config.scopes.join(" "),
+      state,
     });
 
-    return integrations.map((i) => ({
-      id: i.id,
-      type: i.type,
-      displayName: i.displayName,
-      enabled: i.enabled,
-      scopes: i.scopes,
-      createdAt: i.createdAt,
-    }));
-  }),
+    // Add provider-specific params
+    if (input.type === "gmail") {
+      params.set("access_type", "offline");
+      params.set("prompt", "consent");
+    }
 
-  // Get OAuth authorization URL
-  getAuthUrl: protectedProcedure
-    .input(
-      z.object({
-        type: integrationTypeSchema,
-        redirectUrl: z.string().url(),
-      })
-    )
-    .handler(async ({ input, context }) => {
-      const config = getOAuthConfig(input.type as IntegrationType);
+    if (input.type === "notion") {
+      params.set("owner", "user");
+    }
 
-      const state = Buffer.from(
-        JSON.stringify({
-          userId: context.user.id,
-          type: input.type,
-          redirectUrl: input.redirectUrl,
-        })
-      ).toString("base64url");
+    return { authUrl: `${config.authUrl}?${params}` };
+  });
 
-      const params = new URLSearchParams({
-        client_id: config.clientId,
-        redirect_uri: config.redirectUri,
-        response_type: "code",
-        scope: config.scopes.join(" "),
-        state,
-      });
+// Handle OAuth callback (called from callback route)
+const handleCallback = protectedProcedure
+  .input(
+    z.object({
+      code: z.string(),
+      state: z.string(),
+    })
+  )
+  .handler(async ({ input, context }) => {
+    let stateData: { userId: string; type: IntegrationType; redirectUrl: string };
 
-      // Add provider-specific params
-      if (input.type === "gmail") {
-        params.set("access_type", "offline");
-        params.set("prompt", "consent");
-      }
+    try {
+      stateData = JSON.parse(
+        Buffer.from(input.state, "base64url").toString()
+      );
+    } catch {
+      throw new ORPCError("BAD_REQUEST", { message: "Invalid state parameter" });
+    }
 
-      if (input.type === "notion") {
-        params.set("owner", "user");
-      }
+    // Verify user matches
+    if (stateData.userId !== context.user.id) {
+      throw new ORPCError("FORBIDDEN", { message: "User mismatch" });
+    }
 
-      return { authUrl: `${config.authUrl}?${params}` };
-    }),
+    const config = getOAuthConfig(stateData.type);
 
-  // Handle OAuth callback (called from callback route)
-  handleCallback: protectedProcedure
-    .input(
-      z.object({
-        code: z.string(),
-        state: z.string(),
-      })
-    )
-    .handler(async ({ input, context }) => {
-      let stateData: { userId: string; type: IntegrationType; redirectUrl: string };
+    // Exchange code for tokens
+    const tokenBody = new URLSearchParams({
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      code: input.code,
+      grant_type: "authorization_code",
+      redirect_uri: config.redirectUri,
+    });
 
-      try {
-        stateData = JSON.parse(
-          Buffer.from(input.state, "base64url").toString()
-        );
-      } catch {
-        throw new ORPCError("BAD_REQUEST", { message: "Invalid state parameter" });
-      }
+    // Notion requires Basic auth header
+    const headers: Record<string, string> = {
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
 
-      // Verify user matches
-      if (stateData.userId !== context.user.id) {
-        throw new ORPCError("FORBIDDEN", { message: "User mismatch" });
-      }
+    if (stateData.type === "notion") {
+      headers["Authorization"] = `Basic ${Buffer.from(
+        `${config.clientId}:${config.clientSecret}`
+      ).toString("base64")}`;
+      tokenBody.delete("client_id");
+      tokenBody.delete("client_secret");
+    }
 
-      const config = getOAuthConfig(stateData.type);
+    // GitHub needs Accept header
+    if (stateData.type === "github") {
+      headers["Accept"] = "application/json";
+    }
 
-      // Exchange code for tokens
-      const tokenBody = new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        code: input.code,
-        grant_type: "authorization_code",
-        redirect_uri: config.redirectUri,
-      });
+    const tokenResponse = await fetch(config.tokenUrl, {
+      method: "POST",
+      headers,
+      body: tokenBody,
+    });
 
-      // Notion requires Basic auth header
-      const headers: Record<string, string> = {
-        "Content-Type": "application/x-www-form-urlencoded",
-      };
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.text();
+      console.error("Token exchange failed:", error);
+      throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Failed to exchange code for tokens" });
+    }
 
-      if (stateData.type === "notion") {
-        headers["Authorization"] = `Basic ${Buffer.from(
-          `${config.clientId}:${config.clientSecret}`
-        ).toString("base64")}`;
-        tokenBody.delete("client_id");
-        tokenBody.delete("client_secret");
-      }
+    const tokens = await tokenResponse.json();
 
-      // GitHub needs Accept header
-      if (stateData.type === "github") {
-        headers["Accept"] = "application/json";
-      }
+    // Handle Notion's different response format
+    const accessToken = stateData.type === "notion"
+      ? tokens.access_token
+      : tokens.access_token;
 
-      const tokenResponse = await fetch(config.tokenUrl, {
-        method: "POST",
-        headers,
-        body: tokenBody,
-      });
+    // Get user info from provider
+    const userInfo = await config.getUserInfo(accessToken);
 
-      if (!tokenResponse.ok) {
-        const error = await tokenResponse.text();
-        console.error("Token exchange failed:", error);
-        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Failed to exchange code for tokens" });
-      }
+    // Create or update integration
+    const existingIntegration = await context.db.query.integration.findFirst({
+      where: and(
+        eq(integration.userId, context.user.id),
+        eq(integration.type, stateData.type)
+      ),
+    });
 
-      const tokens = await tokenResponse.json();
+    let integId: string;
 
-      // Handle Notion's different response format
-      const accessToken = stateData.type === "notion"
-        ? tokens.access_token
-        : tokens.access_token;
-
-      // Get user info from provider
-      const userInfo = await config.getUserInfo(accessToken);
-
-      // Create or update integration
-      const existingIntegration = await context.db.query.integration.findFirst({
-        where: and(
-          eq(integration.userId, context.user.id),
-          eq(integration.type, stateData.type)
-        ),
-      });
-
-      let integId: string;
-
-      if (existingIntegration) {
-        await context.db
-          .update(integration)
-          .set({
-            providerAccountId: userInfo.id,
-            displayName: userInfo.displayName,
-            metadata: userInfo.metadata,
-            enabled: true,
-          })
-          .where(eq(integration.id, existingIntegration.id));
-        integId = existingIntegration.id;
-      } else {
-        const [newInteg] = await context.db
-          .insert(integration)
-          .values({
-            userId: context.user.id,
-            type: stateData.type,
-            providerAccountId: userInfo.id,
-            displayName: userInfo.displayName,
-            scopes: config.scopes,
-            metadata: userInfo.metadata,
-          })
-          .returning();
-        integId = newInteg.id;
-      }
-
-      // Delete old tokens and store new ones
+    if (existingIntegration) {
       await context.db
-        .delete(integrationToken)
-        .where(eq(integrationToken.integrationId, integId));
-
-      await context.db.insert(integrationToken).values({
-        integrationId: integId,
-        accessToken: accessToken,
-        refreshToken: tokens.refresh_token,
-        expiresAt: tokens.expires_in
-          ? new Date(Date.now() + tokens.expires_in * 1000)
-          : null,
-        idToken: tokens.id_token,
-      });
-
-      return { success: true, integrationId: integId, redirectUrl: stateData.redirectUrl };
-    }),
-
-  // Toggle integration enabled/disabled
-  toggle: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        enabled: z.boolean(),
-      })
-    )
-    .handler(async ({ input, context }) => {
-      const result = await context.db
         .update(integration)
-        .set({ enabled: input.enabled })
-        .where(
-          and(
-            eq(integration.id, input.id),
-            eq(integration.userId, context.user.id)
-          )
+        .set({
+          providerAccountId: userInfo.id,
+          displayName: userInfo.displayName,
+          metadata: userInfo.metadata,
+          enabled: true,
+        })
+        .where(eq(integration.id, existingIntegration.id));
+      integId = existingIntegration.id;
+    } else {
+      const [newInteg] = await context.db
+        .insert(integration)
+        .values({
+          userId: context.user.id,
+          type: stateData.type,
+          providerAccountId: userInfo.id,
+          displayName: userInfo.displayName,
+          scopes: config.scopes,
+          metadata: userInfo.metadata,
+        })
+        .returning();
+      integId = newInteg.id;
+    }
+
+    // Delete old tokens and store new ones
+    await context.db
+      .delete(integrationToken)
+      .where(eq(integrationToken.integrationId, integId));
+
+    await context.db.insert(integrationToken).values({
+      integrationId: integId,
+      accessToken: accessToken,
+      refreshToken: tokens.refresh_token,
+      expiresAt: tokens.expires_in
+        ? new Date(Date.now() + tokens.expires_in * 1000)
+        : null,
+      idToken: tokens.id_token,
+    });
+
+    return { success: true, integrationId: integId, redirectUrl: stateData.redirectUrl };
+  });
+
+// Toggle integration enabled/disabled
+const toggle = protectedProcedure
+  .input(
+    z.object({
+      id: z.string(),
+      enabled: z.boolean(),
+    })
+  )
+  .handler(async ({ input, context }) => {
+    const result = await context.db
+      .update(integration)
+      .set({ enabled: input.enabled })
+      .where(
+        and(
+          eq(integration.id, input.id),
+          eq(integration.userId, context.user.id)
         )
-        .returning({ id: integration.id });
+      )
+      .returning({ id: integration.id });
 
-      if (result.length === 0) {
-        throw new ORPCError("NOT_FOUND", { message: "Integration not found" });
-      }
+    if (result.length === 0) {
+      throw new ORPCError("NOT_FOUND", { message: "Integration not found" });
+    }
 
-      return { success: true };
-    }),
+    return { success: true };
+  });
 
-  // Disconnect integration
-  disconnect: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .handler(async ({ input, context }) => {
-      const result = await context.db
-        .delete(integration)
-        .where(
-          and(
-            eq(integration.id, input.id),
-            eq(integration.userId, context.user.id)
-          )
+// Disconnect integration
+const disconnect = protectedProcedure
+  .input(z.object({ id: z.string() }))
+  .handler(async ({ input, context }) => {
+    const result = await context.db
+      .delete(integration)
+      .where(
+        and(
+          eq(integration.id, input.id),
+          eq(integration.userId, context.user.id)
         )
-        .returning({ id: integration.id });
+      )
+      .returning({ id: integration.id });
 
-      if (result.length === 0) {
-        throw new ORPCError("NOT_FOUND", { message: "Integration not found" });
-      }
+    if (result.length === 0) {
+      throw new ORPCError("NOT_FOUND", { message: "Integration not found" });
+    }
 
-      return { success: true };
-    }),
-});
+    return { success: true };
+  });
+
+export const integrationRouter = {
+  list,
+  getAuthUrl,
+  handleCallback,
+  toggle,
+  disconnect,
+};

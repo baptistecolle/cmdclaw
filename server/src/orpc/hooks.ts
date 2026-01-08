@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useORPC } from "./provider";
 import { client } from "./client";
 import type { ChatEvent } from "@/server/orpc/routers/chat";
 
@@ -48,7 +47,6 @@ export function useChatStream() {
                 event.messageId,
                 event.usage
               );
-              // Invalidate conversation queries
               queryClient.invalidateQueries({ queryKey: ["conversation"] });
               break;
             case "error":
@@ -67,21 +65,17 @@ export function useChatStream() {
 
 // Hook for listing conversations
 export function useConversationList(options?: { limit?: number }) {
-  const orpc = useORPC();
-  return useQuery(
-    orpc.conversation.list.queryOptions({
-      input: { limit: options?.limit ?? 50 },
-    })
-  );
+  return useQuery({
+    queryKey: ["conversation", "list", options?.limit],
+    queryFn: () => client.conversation.list({ limit: options?.limit ?? 50 }),
+  });
 }
 
 // Hook for getting a single conversation
 export function useConversation(id: string | undefined) {
-  const orpc = useORPC();
   return useQuery({
-    ...orpc.conversation.get.queryOptions({
-      input: { id: id ?? "" },
-    }),
+    queryKey: ["conversation", "get", id],
+    queryFn: () => client.conversation.get({ id: id! }),
     enabled: !!id,
   });
 }
@@ -91,9 +85,7 @@ export function useDeleteConversation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      return client.conversation.delete({ id });
-    },
+    mutationFn: (id: string) => client.conversation.delete({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conversation"] });
     },
@@ -105,9 +97,8 @@ export function useUpdateConversationTitle() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, title }: { id: string; title: string }) => {
-      return client.conversation.updateTitle({ id, title });
-    },
+    mutationFn: ({ id, title }: { id: string; title: string }) =>
+      client.conversation.updateTitle({ id, title }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conversation"] });
     },
@@ -116,8 +107,10 @@ export function useUpdateConversationTitle() {
 
 // Hook for listing integrations
 export function useIntegrationList() {
-  const orpc = useORPC();
-  return useQuery(orpc.integration.list.queryOptions({ input: undefined }));
+  return useQuery({
+    queryKey: ["integration", "list"],
+    queryFn: () => client.integration.list(),
+  });
 }
 
 // Hook for toggling integration
@@ -125,9 +118,8 @@ export function useToggleIntegration() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
-      return client.integration.toggle({ id, enabled });
-    },
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      client.integration.toggle({ id, enabled }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integration"] });
     },
@@ -139,9 +131,7 @@ export function useDisconnectIntegration() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      return client.integration.disconnect({ id });
-    },
+    mutationFn: (id: string) => client.integration.disconnect({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integration"] });
     },
@@ -151,14 +141,12 @@ export function useDisconnectIntegration() {
 // Hook for getting OAuth URL
 export function useGetAuthUrl() {
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       type,
       redirectUrl,
     }: {
       type: "gmail" | "notion" | "linear" | "github" | "airtable" | "slack";
       redirectUrl: string;
-    }) => {
-      return client.integration.getAuthUrl({ type, redirectUrl });
-    },
+    }) => client.integration.getAuthUrl({ type, redirectUrl }),
   });
 }

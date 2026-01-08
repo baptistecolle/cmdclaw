@@ -106,6 +106,7 @@ export function AppShell({ children }: AppShellProps) {
                       asChild
                       isActive={pathname === item.href}
                       tooltip={item.label}
+                      highlightValue={item.href}
                     >
                       <Link href={item.href} className="flex items-center gap-2">
                         <item.icon className="size-4" />
@@ -129,6 +130,7 @@ export function AppShell({ children }: AppShellProps) {
                   tooltip="Sign out"
                   onClick={handleSignOut}
                   className="justify-between group-data-[collapsible=icon]:justify-center"
+                  highlightValue="user-signout"
                 >
                   <div className="flex size-10 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8">
                     {avatarInitial}
@@ -141,7 +143,7 @@ export function AppShell({ children }: AppShellProps) {
                   </div>
                 </SidebarMenuButton>
               ) : (
-                <SidebarMenuButton asChild size="lg" tooltip="Log in">
+                <SidebarMenuButton asChild size="lg" tooltip="Log in" highlightValue="user-login">
                   <Link
                     href="/login"
                     className="flex w-full items-center justify-between group-data-[collapsible=icon]:justify-center"

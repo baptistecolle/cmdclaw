@@ -10,7 +10,8 @@
       "Bash(bun db:push:*)",
       "Bash(bun typecheck:*)",
       "Bash(timeout 30 bun dev:*)",
-      "Bash(bun run build:*)"
+      "Bash(bun run build:*)",
+      "Bash(bun run typecheck:*)"
     ]
   }
 }

@@ -574,6 +574,7 @@ type SidebarMenuButtonProps = React.ComponentProps<'button'> & {
   asChild?: boolean;
   isActive?: boolean;
   tooltip?: string | React.ComponentProps<typeof TooltipContent>;
+  highlightValue?: string;
 } & VariantProps<typeof sidebarMenuButtonVariants>;
 
 function SidebarMenuButton({
@@ -583,6 +584,7 @@ function SidebarMenuButton({
   size = 'default',
   tooltip,
   className,
+  highlightValue,
   ...props
 }: SidebarMenuButtonProps) {
   const Comp = asChild ? Slot.Root : 'button';
@@ -591,6 +593,7 @@ function SidebarMenuButton({
   const button = (
     <HighlightItem
       activeClassName={sidebarMenuButtonActiveVariants({ variant })}
+      value={highlightValue}
     >
       <Comp
         data-slot="sidebar-menu-button"

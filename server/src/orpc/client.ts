@@ -1,15 +1,18 @@
+import type { RouterClient } from "@orpc/server";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
+import type { AppRouter } from "@/server/orpc";
+
+function getBaseUrl() {
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "http://localhost:3000";
+}
 
 const link = new RPCLink({
-  url:
-    typeof window !== "undefined" ? "/api/rpc" : "http://localhost:3000/api/rpc",
-  headers: () => {
-    // Include cookies for authentication
-    return {};
-  },
+  url: `${getBaseUrl()}/api/rpc`,
+  headers: () => ({}),
 });
 
-// Use any type to avoid complex oRPC type inference issues
-// Runtime typing still works correctly
-export const client: any = createORPCClient(link);
+export const client: RouterClient<AppRouter> = createORPCClient(link);
