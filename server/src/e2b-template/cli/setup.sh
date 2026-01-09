@@ -7,7 +7,7 @@ for tool in /app/cli/*.ts; do
   name=$(basename "$tool" .ts)
   cat > ~/.local/bin/"$name" << EOF
 #!/bin/bash
-exec bun $tool "\$@"
+exec npx tsx $tool "\$@"
 EOF
   chmod +x ~/.local/bin/"$name"
 done
