@@ -22,7 +22,9 @@
     "test:e2e": "playwright test",
     "worker": "tsx --require dotenv/config scripts/bullmq-worker.ts",
     "auth:generate": "npx @better-auth/cli generate",
-    "docker-up:local": "docker compose up"
+    "docker-up:local": "docker compose up",
+    "e2b:build:dev": "tsx src/e2b-template/build.dev.ts",
+    "e2b:build:prod": "tsx src/e2b-template/build.prod.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.1",
@@ -48,10 +50,12 @@
     "lucide-react": "^0.555.0",
     "motion": "^12.23.24",
     "next": "16.1.1",
+    "openai": "^6.15.0",
     "pg": "^8.16.3",
     "radix-ui": "^1.4.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-hotkeys-hook": "^5.2.1",
     "superjson": "^2.2.6",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.1.13",

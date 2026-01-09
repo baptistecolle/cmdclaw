@@ -150,3 +150,11 @@ export function useGetAuthUrl() {
     }) => client.integration.getAuthUrl({ type, redirectUrl }),
   });
 }
+
+// Hook for voice transcription
+export function useTranscribe() {
+  return useMutation({
+    mutationFn: ({ audio, mimeType }: { audio: string; mimeType: string }) =>
+      client.voice.transcribe({ audio, mimeType }),
+  });
+}

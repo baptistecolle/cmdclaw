@@ -3,7 +3,8 @@ import fs from "fs/promises";
 import path from "path";
 import { env } from "@/env";
 
-const TEMPLATE_NAME = "anthropic-claude-code";
+// Use custom template with bun + claude CLI pre-installed
+const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-agent-dev";
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 // Agent config directory (local)
@@ -12,6 +13,7 @@ const AGENT_CONFIG_DIR = "claude-agent";
 // Sandbox paths
 const SANDBOX_CLAUDE_DIR = "/home/user/.claude";
 const SANDBOX_SKILLS_DIR = `${SANDBOX_CLAUDE_DIR}/skills`;
+const SANDBOX_CLI_DIR = "/home/user/cli";
 
 // Cache of active sandboxes by conversation ID
 const activeSandboxes = new Map<string, Sandbox>();
@@ -67,7 +69,8 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
 
   // Create new sandbox
   const hasApiKey = !!config.anthropicApiKey;
-  console.log("[E2B] Creating sandbox with API key:", hasApiKey ? "present" : "MISSING");
+  console.log("[E2B] Creating sandbox from template:", TEMPLATE_NAME);
+  console.log("[E2B] API key:", hasApiKey ? "present" : "MISSING");
 
   sandbox = await Sandbox.create(TEMPLATE_NAME, {
     envs: {
@@ -81,7 +84,15 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   const checkEnv = await sandbox.commands.run("echo $ANTHROPIC_API_KEY | head -c 20", { timeoutMs: 5000 });
   console.log("[E2B] API key in sandbox:", checkEnv.stdout ? "set" : "NOT SET");
 
-  // Setup skills directory
+  // Verify CLI tools are available (pre-installed in template)
+  const checkCli = await sandbox.commands.run(`ls ${SANDBOX_CLI_DIR} 2>/dev/null || echo "NOT FOUND"`, { timeoutMs: 5000 });
+  console.log("[E2B] CLI tools:", checkCli.stdout?.trim() || "NOT FOUND");
+
+  // Verify bun is available
+  const checkBun = await sandbox.commands.run("bun --version 2>/dev/null || echo 'NOT FOUND'", { timeoutMs: 5000 });
+  console.log("[E2B] Bun version:", checkBun.stdout?.trim() || "NOT FOUND");
+
+  // Setup skills directory (CLI tools are pre-installed in template)
   await setupSkillsInSandbox(sandbox);
 
   // Cache the sandbox
@@ -207,8 +218,14 @@ export async function* runClaudeInSandbox(
   };
 
   // Write prompt to a temp file to avoid shell escaping issues
-  const promptFile = "/tmp/prompt.txt";
+  // Use a unique filename to avoid permission issues on multi-turn conversations
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).slice(2);
+  const promptFile = `/tmp/prompt-${timestamp}-${randomId}.txt`;
   await sandbox.files.write(promptFile, prompt);
+
+  // Debug: Log prompt
+  console.log("[E2B] User prompt:", prompt.slice(0, 500));
 
   // Build the command
   let command = `cat ${promptFile} | claude -p --dangerously-skip-permissions --output-format stream-json --verbose`;
@@ -220,6 +237,16 @@ export async function* runClaudeInSandbox(
   if (options?.resume) {
     command += ` --resume ${options.resume}`;
   }
+
+  // Add system prompt if provided
+  if (options?.systemPrompt) {
+    const systemPromptFile = `/tmp/system-${timestamp}-${randomId}.txt`;
+    await sandbox.files.write(systemPromptFile, options.systemPrompt);
+    command += ` --system-prompt "$(cat ${systemPromptFile})"`;
+    console.log("[E2B] System prompt:", options.systemPrompt.slice(0, 500));
+  }
+
+  console.log("[E2B] Running command:", command.slice(0, 300));
 
   // Start the command (don't await - we want to stream)
   const runPromise = sandbox.commands.run(command, {

@@ -158,10 +158,17 @@ async function* handleE2BExecution(
     let finalUsage = { inputTokens: 0, outputTokens: 0, totalCostUsd: 0 };
     let sessionId: string | undefined;
 
+    // Build system prompt with CLI instructions
+    const systemPrompt = cliInstructions || undefined;
+
+    // Debug: Log what we're sending
+    console.log("[E2B] Enabled integrations CLI instructions:", cliInstructions ? "present" : "none");
+
     // Run Claude in sandbox
     const claudeStream = runClaudeInSandbox(sandbox, input.content, {
       model: input.model ?? conv.model ?? "claude-sonnet-4-20250514",
       resume: conv.claudeSessionId ?? undefined,
+      systemPrompt,
     });
 
     for await (const event of claudeStream) {

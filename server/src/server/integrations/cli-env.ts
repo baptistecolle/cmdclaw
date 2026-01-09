@@ -38,73 +38,75 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
 export function getCliInstructions(enabledIntegrations: IntegrationType[]): string {
   const instructions: string[] = [];
 
+  const CLI = "/home/user/cli";
+
   if (enabledIntegrations.includes("gmail")) {
     instructions.push(`
-## Gmail CLI (bun run src/cli/gmail.ts)
-- list [-q query] [-l limit] - List emails
-- get <messageId> - Get full email content
-- unread - Count unread emails
-- send --to <email> --subject <subject> --body <body>
-- Example: bun run src/cli/gmail.ts list -q "is:unread" -l 5`);
+## Gmail CLI (${CLI}/gmail)
+- ${CLI}/gmail list [-q query] [-l limit] - List emails
+- ${CLI}/gmail get <messageId> - Get full email content
+- ${CLI}/gmail unread - Count unread emails
+- ${CLI}/gmail send --to <email> --subject <subject> --body <body>
+- Example: ${CLI}/gmail list -q "is:unread" -l 5`);
   }
 
   if (enabledIntegrations.includes("notion")) {
     instructions.push(`
-## Notion CLI (bun run src/cli/notion.ts)
-- search [-q query] [--type page|database] - Search pages/databases
-- get <pageId> - Get page content
-- create --parent <id> --title <title> [--content <text>]
-- append <pageId> --content <text> - Append to page
-- databases - List all databases
-- query <databaseId> - Query database entries`);
+## Notion CLI (${CLI}/notion)
+- ${CLI}/notion search [-q query] [--type page|database] - Search pages/databases
+- ${CLI}/notion get <pageId> - Get page content
+- ${CLI}/notion create --parent <id> --title <title> [--content <text>]
+- ${CLI}/notion append <pageId> --content <text> - Append to page
+- ${CLI}/notion databases - List all databases
+- ${CLI}/notion query <databaseId> - Query database entries`);
   }
 
   if (enabledIntegrations.includes("linear")) {
     instructions.push(`
-## Linear CLI (bun run src/cli/linear.ts)
-- list [-t team] [-s state] [-l limit] - List issues
-- get <identifier> - Get issue (e.g., ENG-123)
-- create --team <key> --title <title> [-d description] [-p priority]
-- update <identifier> [--title] [--state] [--priority]
-- teams - List teams
-- mine - My assigned issues`);
+## Linear CLI (${CLI}/linear)
+- ${CLI}/linear list [-t team] [-s state] [-l limit] - List issues
+- ${CLI}/linear get <identifier> - Get issue (e.g., ENG-123)
+- ${CLI}/linear create --team <key> --title <title> [-d description] [-p priority]
+- ${CLI}/linear update <identifier> [--title] [--state] [--priority]
+- ${CLI}/linear teams - List teams
+- ${CLI}/linear mine - My assigned issues`);
   }
 
   if (enabledIntegrations.includes("github")) {
     instructions.push(`
-## GitHub CLI (bun run src/cli/github.ts)
-- repos - List my repositories
-- prs -o <owner> -r <repo> - List pull requests
-- pr <number> -o <owner> -r <repo> - Get PR details
-- my-prs [-f created|assigned|review] - My pull requests
-- issues -o <owner> -r <repo> - List issues
-- create-issue -o <owner> -r <repo> -t <title> [-b body]
-- search -q <query> - Search code`);
+## GitHub CLI (${CLI}/github)
+- ${CLI}/github repos - List my repositories
+- ${CLI}/github prs -o <owner> -r <repo> - List pull requests
+- ${CLI}/github pr <number> -o <owner> -r <repo> - Get PR details
+- ${CLI}/github my-prs [-f created|assigned|review] - My pull requests
+- ${CLI}/github issues -o <owner> -r <repo> - List issues
+- ${CLI}/github create-issue -o <owner> -r <repo> -t <title> [-b body]
+- ${CLI}/github search -q <query> - Search code`);
   }
 
   if (enabledIntegrations.includes("airtable")) {
     instructions.push(`
-## Airtable CLI (bun run src/cli/airtable.ts)
-- bases - List all bases
-- schema -b <baseId> - Get base schema
-- list -b <baseId> -t <table> - List records
-- get -b <baseId> -t <table> -r <recordId> - Get record
-- create -b <baseId> -t <table> --fields '{"Name":"value"}'
-- update -b <baseId> -t <table> -r <recordId> --fields '{"Name":"new"}'
-- delete -b <baseId> -t <table> -r <recordId>`);
+## Airtable CLI (${CLI}/airtable)
+- ${CLI}/airtable bases - List all bases
+- ${CLI}/airtable schema -b <baseId> - Get base schema
+- ${CLI}/airtable list -b <baseId> -t <table> - List records
+- ${CLI}/airtable get -b <baseId> -t <table> -r <recordId> - Get record
+- ${CLI}/airtable create -b <baseId> -t <table> --fields '{"Name":"value"}'
+- ${CLI}/airtable update -b <baseId> -t <table> -r <recordId> --fields '{"Name":"new"}'
+- ${CLI}/airtable delete -b <baseId> -t <table> -r <recordId>`);
   }
 
   if (enabledIntegrations.includes("slack")) {
     instructions.push(`
-## Slack CLI (bun run src/cli/slack.ts)
-- channels - List channels
-- history -c <channelId> - Get channel messages
-- send -c <channelId> -t <text> [--thread <ts>] - Send message
-- search -q <query> - Search messages
-- users - List users
-- user -u <userId> - Get user info
-- thread -c <channelId> --thread <ts> - Get thread replies
-- react -c <channelId> --ts <messageTs> -e <emoji>`);
+## Slack CLI (${CLI}/slack)
+- ${CLI}/slack channels - List channels
+- ${CLI}/slack history -c <channelId> - Get channel messages
+- ${CLI}/slack send -c <channelId> -t <text> [--thread <ts>] - Send message
+- ${CLI}/slack search -q <query> - Search messages
+- ${CLI}/slack users - List users
+- ${CLI}/slack user -u <userId> - Get user info
+- ${CLI}/slack thread -c <channelId> --thread <ts> - Get thread replies
+- ${CLI}/slack react -c <channelId> --ts <messageTs> -e <emoji>`);
   }
 
   if (instructions.length === 0) {
@@ -114,9 +116,10 @@ export function getCliInstructions(enabledIntegrations: IntegrationType[]): stri
   return `
 # Available Integration CLIs
 
-You have access to the following CLI tools to interact with the user's connected integrations.
-Run them using \`bun run src/cli/<integration>.ts <command>\`.
+You have access to the following CLI tools located at /home/user/cli/.
 The authentication tokens are already configured in the environment.
+
+IMPORTANT: Run tools using their full path, e.g.: /home/user/cli/gmail list
 
 ${instructions.join("\n")}
 `;

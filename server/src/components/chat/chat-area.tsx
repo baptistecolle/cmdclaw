@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { MessageList, type Message } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { StreamingMessage } from "./streaming-message";
-import { useChatStream, useConversation } from "@/orpc/hooks";
+import { VoiceIndicator, VoiceHint } from "./voice-indicator";
+import { useChatStream, useConversation, useTranscribe } from "@/orpc/hooks";
+import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
+import { useHotkeys, isHotkeyPressed } from "react-hotkeys-hook";
 
 type Props = {
   conversationId?: string;
@@ -25,8 +28,14 @@ export function ChatArea({ conversationId }: Props) {
   const [toolCalls, setToolCalls] = useState<
     { name: string; input: unknown; result?: unknown }[]
   >([]);
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isRecordingRef = useRef(false);
+
+  // Voice recording
+  const { isRecording, error: voiceError, startRecording, stopRecording } = useVoiceRecording();
+  const { mutateAsync: transcribe } = useTranscribe();
 
   // Load existing messages
   useEffect(() => {
@@ -65,7 +74,7 @@ export function ChatArea({ conversationId }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
 
-  const handleSend = async (content: string) => {
+  const handleSend = useCallback(async (content: string) => {
     const userMessage: Message = {
       id: `temp-${Date.now()}`,
       role: "user",
@@ -140,7 +149,60 @@ export function ChatArea({ conversationId }: Props) {
         },
       }
     );
-  };
+  }, [conversationId, router, sendMessage]);
+
+  // Voice recording: stop and transcribe
+  const stopRecordingAndTranscribe = useCallback(async () => {
+    if (!isRecordingRef.current) return;
+    isRecordingRef.current = false;
+
+    const audioBlob = await stopRecording();
+    if (!audioBlob || audioBlob.size === 0) return;
+
+    setIsProcessingVoice(true);
+    try {
+      const base64Audio = await blobToBase64(audioBlob);
+      const result = await transcribe({
+        audio: base64Audio,
+        mimeType: audioBlob.type || "audio/webm",
+      });
+
+      if (result.text && result.text.trim()) {
+        handleSend(result.text.trim());
+      }
+    } catch (err) {
+      console.error("Transcription error:", err);
+    } finally {
+      setIsProcessingVoice(false);
+    }
+  }, [stopRecording, transcribe, handleSend]);
+
+  // Push-to-talk: Ctrl/Cmd + M using react-hotkeys-hook
+  useHotkeys(
+    "mod+m",
+    () => {
+      // Start recording on keydown
+      if (!isRecordingRef.current && !isStreaming && !isProcessingVoice) {
+        isRecordingRef.current = true;
+        startRecording();
+      }
+    },
+    { keydown: true, keyup: false, preventDefault: true },
+    [startRecording, isStreaming, isProcessingVoice]
+  );
+
+  // Poll for key release when recording
+  useEffect(() => {
+    if (!isRecording) return;
+
+    const checkKeyRelease = setInterval(() => {
+      if (!isHotkeyPressed("mod+m")) {
+        stopRecordingAndTranscribe();
+      }
+    }, 50);
+
+    return () => clearInterval(checkKeyRelease);
+  }, [isRecording, stopRecordingAndTranscribe]);
 
   if (conversationId && isLoading) {
     return (
@@ -184,12 +246,20 @@ export function ChatArea({ conversationId }: Props) {
       </div>
 
       <div className="border-t bg-background p-4">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-3xl space-y-2">
+          {(isRecording || isProcessingVoice || voiceError) && (
+            <VoiceIndicator
+              isRecording={isRecording}
+              isProcessing={isProcessingVoice}
+              error={voiceError}
+            />
+          )}
           <ChatInput
             onSend={handleSend}
-            disabled={isStreaming}
+            disabled={isStreaming || isRecording || isProcessingVoice}
             isStreaming={isStreaming}
           />
+          <VoiceHint className="text-center" />
         </div>
       </div>
     </div>
