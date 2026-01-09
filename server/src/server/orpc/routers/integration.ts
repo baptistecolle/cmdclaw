@@ -53,9 +53,15 @@ const getAuthUrl = protectedProcedure
       client_id: config.clientId,
       redirect_uri: config.redirectUri,
       response_type: "code",
-      scope: config.scopes.join(" "),
       state,
     });
+
+    // For Slack, use user_scope to get user tokens instead of bot tokens
+    if (input.type === "slack") {
+      params.set("user_scope", config.scopes.join(" "));
+    } else {
+      params.set("scope", config.scopes.join(" "));
+    }
 
     // Add provider-specific params
     if (input.type === "gmail") {
@@ -137,10 +143,18 @@ const handleCallback = protectedProcedure
 
     const tokens = await tokenResponse.json();
 
-    // Handle Notion's different response format
-    const accessToken = stateData.type === "notion"
-      ? tokens.access_token
-      : tokens.access_token;
+    // Handle different response formats per provider
+    // Slack user tokens are in authed_user.access_token
+    let accessToken: string;
+    if (stateData.type === "slack") {
+      accessToken = tokens.authed_user?.access_token;
+      if (!accessToken) {
+        console.error("Slack token response:", JSON.stringify(tokens, null, 2));
+        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Failed to get Slack user token" });
+      }
+    } else {
+      accessToken = tokens.access_token;
+    }
 
     // Get user info from provider
     const userInfo = await config.getUserInfo(accessToken);

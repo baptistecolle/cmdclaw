@@ -138,6 +138,11 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
       "users:read.email",
       "im:read",
       "im:history",
+      "groups:read",
+      "groups:history",
+      "mpim:read",
+      "mpim:history",
+      "search:read",
     ],
     getUserInfo: async (accessToken) => {
       const res = await fetch("https://slack.com/api/auth.test", {

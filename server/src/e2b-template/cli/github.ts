@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { parseArgs } from "util";
 
 const TOKEN = process.env.GITHUB_ACCESS_TOKEN;

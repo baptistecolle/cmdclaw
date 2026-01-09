@@ -1,8 +1,8 @@
 import { db } from "@/server/db/client";
-import { integration, integrationToken } from "@/server/db/schema";
+import { integration } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
-
-type IntegrationType = "gmail" | "notion" | "linear" | "github" | "airtable" | "slack";
+import { getValidTokensForUser } from "./token-refresh";
+import type { IntegrationType } from "@/server/oauth/config";
 
 const ENV_VAR_MAP: Record<IntegrationType, string> = {
   gmail: "GMAIL_ACCESS_TOKEN",
@@ -16,19 +16,14 @@ const ENV_VAR_MAP: Record<IntegrationType, string> = {
 export async function getCliEnvForUser(userId: string): Promise<Record<string, string>> {
   const env: Record<string, string> = {};
 
-  const results = await db
-    .select({
-      type: integration.type,
-      accessToken: integrationToken.accessToken,
-    })
-    .from(integration)
-    .innerJoin(integrationToken, eq(integration.id, integrationToken.integrationId))
-    .where(and(eq(integration.userId, userId), eq(integration.enabled, true)));
+  // Get valid tokens, refreshing any that are expired or about to expire
+  // This already filters by enabled integrations
+  const tokens = await getValidTokensForUser(userId);
 
-  for (const row of results) {
-    const envVar = ENV_VAR_MAP[row.type];
+  for (const [type, accessToken] of tokens) {
+    const envVar = ENV_VAR_MAP[type];
     if (envVar) {
-      env[envVar] = row.accessToken;
+      env[envVar] = accessToken;
     }
   }
 

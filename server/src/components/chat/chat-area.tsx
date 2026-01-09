@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageList, type Message } from "./message-list";
+import { MessageList, type Message, type MessagePart } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { StreamingMessage } from "./streaming-message";
 import { VoiceIndicator, VoiceHint } from "./voice-indicator";
@@ -9,7 +9,7 @@ import { useChatStream, useConversation, useTranscribe } from "@/orpc/hooks";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
-import { useHotkeys, isHotkeyPressed } from "react-hotkeys-hook";
+import { useHotkeys } from "react-hotkeys-hook";
 
 type Props = {
   conversationId?: string;
@@ -23,11 +23,8 @@ export function ChatArea({ conversationId }: Props) {
   const { sendMessage } = useChatStream();
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [streamingContent, setStreamingContent] = useState("");
+  const [streamingParts, setStreamingParts] = useState<MessagePart[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [toolCalls, setToolCalls] = useState<
-    { name: string; input: unknown; result?: unknown }[]
-  >([]);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -64,15 +61,14 @@ export function ChatArea({ conversationId }: Props) {
   useEffect(() => {
     if (!conversationId) {
       setMessages([]);
-      setStreamingContent("");
-      setToolCalls([]);
+      setStreamingParts([]);
     }
   }, [conversationId]);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent]);
+  }, [messages, streamingParts]);
 
   const handleSend = useCallback(async (content: string) => {
     const userMessage: Message = {
@@ -82,34 +78,52 @@ export function ChatArea({ conversationId }: Props) {
     };
     setMessages((prev) => [...prev, userMessage]);
     setIsStreaming(true);
-    setStreamingContent("");
-    setToolCalls([]);
+    setStreamingParts([]);
 
-    let fullContent = "";
-    const allToolCalls: { name: string; input: unknown; result?: unknown }[] =
-      [];
+    const allParts: MessagePart[] = [];
+    let toolCallCounter = 0;
 
     await sendMessage(
       { conversationId, content },
       {
         onText: (text) => {
-          fullContent += text;
-          setStreamingContent(fullContent);
+          // Check if the last part is a text part - if so, append to it
+          const lastPart = allParts[allParts.length - 1];
+          if (lastPart && lastPart.type === "text") {
+            lastPart.content += text;
+          } else {
+            // Create a new text part
+            allParts.push({ type: "text", content: text });
+          }
+          setStreamingParts([...allParts]);
         },
         onToolUse: (toolName, input) => {
-          allToolCalls.push({ name: toolName, input });
-          setToolCalls([...allToolCalls]);
+          allParts.push({
+            type: "tool_call",
+            id: `tc-${toolCallCounter++}`,
+            name: toolName,
+            input,
+          });
+          setStreamingParts([...allParts]);
         },
         onToolResult: (toolName, result) => {
-          const idx = allToolCalls.findIndex(
-            (tc) => tc.name === toolName && !tc.result
-          );
-          if (idx !== -1) {
-            allToolCalls[idx].result = result;
-            setToolCalls([...allToolCalls]);
+          // Find the last tool call with this name that doesn't have a result
+          for (let i = allParts.length - 1; i >= 0; i--) {
+            const part = allParts[i];
+            if (part.type === "tool_call" && part.name === toolName && part.result === undefined) {
+              part.result = result;
+              break;
+            }
           }
+          setStreamingParts([...allParts]);
         },
         onDone: (newConversationId, messageId) => {
+          // Compute full content from text parts
+          const fullContent = allParts
+            .filter((p): p is MessagePart & { type: "text" } => p.type === "text")
+            .map((p) => p.content)
+            .join("");
+
           // Add assistant message to list
           setMessages((prev) => [
             ...prev,
@@ -117,16 +131,10 @@ export function ChatArea({ conversationId }: Props) {
               id: messageId,
               role: "assistant",
               content: fullContent,
-              toolCalls: allToolCalls.map((tc, i) => ({
-                id: `tc-${i}`,
-                name: tc.name,
-                input: tc.input as Record<string, unknown>,
-                result: tc.result,
-              })),
+              parts: allParts,
             },
           ]);
-          setStreamingContent("");
-          setToolCalls([]);
+          setStreamingParts([]);
           setIsStreaming(false);
 
           // Navigate to new conversation if this was a new chat
@@ -177,11 +185,10 @@ export function ChatArea({ conversationId }: Props) {
     }
   }, [stopRecording, transcribe, handleSend]);
 
-  // Push-to-talk: Ctrl/Cmd + M using react-hotkeys-hook
+  // Push-to-talk: Ctrl/Cmd + M - start recording on keydown
   useHotkeys(
     "mod+m",
     () => {
-      // Start recording on keydown
       if (!isRecordingRef.current && !isStreaming && !isProcessingVoice) {
         isRecordingRef.current = true;
         startRecording();
@@ -191,17 +198,19 @@ export function ChatArea({ conversationId }: Props) {
     [startRecording, isStreaming, isProcessingVoice]
   );
 
-  // Poll for key release when recording
+  // Push-to-talk: stop recording on keyup of M key
   useEffect(() => {
     if (!isRecording) return;
 
-    const checkKeyRelease = setInterval(() => {
-      if (!isHotkeyPressed("mod+m")) {
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Stop when M key is released (regardless of modifier state)
+      if (e.key === "m" || e.key === "M") {
         stopRecordingAndTranscribe();
       }
-    }, 50);
+    };
 
-    return () => clearInterval(checkKeyRelease);
+    document.addEventListener("keyup", handleKeyUp);
+    return () => document.removeEventListener("keyup", handleKeyUp);
   }, [isRecording, stopRecordingAndTranscribe]);
 
   if (conversationId && isLoading) {
@@ -233,10 +242,7 @@ export function ChatArea({ conversationId }: Props) {
               <MessageList messages={messages} />
 
               {isStreaming && (
-                <StreamingMessage
-                  content={streamingContent}
-                  toolCalls={toolCalls}
-                />
+                <StreamingMessage parts={streamingParts} />
               )}
             </>
           )}

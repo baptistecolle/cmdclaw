@@ -105,10 +105,10 @@ export async function GET(request: NextRequest) {
     let expiresIn: number | undefined;
 
     if (stateData.type === "slack") {
-      // Slack has a different response format
-      accessToken = tokens.access_token;
-      refreshToken = tokens.refresh_token;
-      // Slack tokens don't expire by default
+      // Slack user tokens are in authed_user object
+      accessToken = tokens.authed_user?.access_token;
+      refreshToken = tokens.authed_user?.refresh_token;
+      // Slack user tokens don't expire by default
     } else {
       accessToken = tokens.access_token;
       refreshToken = tokens.refresh_token;

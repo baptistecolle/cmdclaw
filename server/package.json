@@ -24,7 +24,8 @@
     "auth:generate": "npx @better-auth/cli generate",
     "docker-up:local": "docker compose up",
     "e2b:build:dev": "tsx src/e2b-template/build.dev.ts",
-    "e2b:build:prod": "tsx src/e2b-template/build.prod.ts"
+    "e2b:build:prod": "tsx src/e2b-template/build.prod.ts",
+    "e2b:sandbox": "bun scripts/test-sandbox.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.1",

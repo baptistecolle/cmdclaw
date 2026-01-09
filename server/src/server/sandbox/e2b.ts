@@ -1,19 +1,9 @@
 import { Sandbox } from "e2b";
-import fs from "fs/promises";
-import path from "path";
 import { env } from "@/env";
 
-// Use custom template with bun + claude CLI pre-installed
+// Use custom template with npm + claude CLI pre-installed
 const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-agent-dev";
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
-
-// Agent config directory (local)
-const AGENT_CONFIG_DIR = "claude-agent";
-
-// Sandbox paths
-const SANDBOX_CLAUDE_DIR = "/app/.claude";
-const SANDBOX_SKILLS_DIR = `${SANDBOX_CLAUDE_DIR}/skills`;
-const SANDBOX_CLI_DIR = "/app/cli";
 
 // Cache of active sandboxes by conversation ID
 const activeSandboxes = new Map<string, Sandbox>();
@@ -80,93 +70,10 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
     timeoutMs: SANDBOX_TIMEOUT_MS,
   });
 
-  // Verify the env var is set in the sandbox
-  const checkEnv = await sandbox.commands.run("echo $ANTHROPIC_API_KEY | head -c 20", { timeoutMs: 5000 });
-  console.log("[E2B] API key in sandbox:", checkEnv.stdout ? "set" : "NOT SET");
-
-  // Verify CLI tools are available (pre-installed in template)
-  const checkCli = await sandbox.commands.run(`ls ${SANDBOX_CLI_DIR} 2>/dev/null || echo "NOT FOUND"`, { timeoutMs: 5000 });
-  console.log("[E2B] CLI tools:", checkCli.stdout?.trim() || "NOT FOUND");
-
-  // Verify bun is available
-  const checkBun = await sandbox.commands.run("bun --version 2>/dev/null || echo 'NOT FOUND'", { timeoutMs: 5000 });
-  console.log("[E2B] Bun version:", checkBun.stdout?.trim() || "NOT FOUND");
-
-  // Setup skills directory (CLI tools are pre-installed in template)
-  await setupSkillsInSandbox(sandbox);
-
   // Cache the sandbox
   activeSandboxes.set(config.conversationId, sandbox);
 
   return sandbox;
-}
-
-/**
- * Setup agent config (settings and skills) in the sandbox
- */
-async function setupSkillsInSandbox(sandbox: Sandbox): Promise<void> {
-  const agentDir = path.join(process.cwd(), AGENT_CONFIG_DIR);
-  const skillsDir = path.join(agentDir, "skills");
-
-  try {
-    // Create the .claude directory structure
-    await sandbox.commands.run(`mkdir -p ${SANDBOX_SKILLS_DIR}`, { timeoutMs: 10000 });
-
-    // Sync settings.local.json if it exists
-    const settingsPath = path.join(agentDir, "settings.local.json");
-    try {
-      const settingsContent = await fs.readFile(settingsPath, "utf-8");
-      await sandbox.files.write(`${SANDBOX_CLAUDE_DIR}/settings.local.json`, settingsContent);
-      console.log("[E2B] Settings synced to sandbox");
-    } catch {
-      // Settings file doesn't exist, skip
-    }
-
-    // Read local skills directory
-    const skillEntries = await fs.readdir(skillsDir, { withFileTypes: true });
-
-    for (const entry of skillEntries) {
-      if (entry.isDirectory()) {
-        const skillName = entry.name;
-        const skillPath = path.join(skillsDir, skillName);
-        const sandboxSkillPath = `${SANDBOX_SKILLS_DIR}/${skillName}`;
-
-        // Create skill directory in sandbox
-        await sandbox.commands.run(`mkdir -p ${sandboxSkillPath}`, { timeoutMs: 10000 });
-
-        // Sync skill files
-        await syncDirectoryToSandbox(sandbox, skillPath, sandboxSkillPath);
-      }
-    }
-
-    console.log("[E2B] Skills synced to sandbox");
-  } catch (error) {
-    console.error("[E2B] Failed to setup agent config in sandbox:", error);
-  }
-}
-
-/**
- * Recursively sync a local directory to the sandbox
- */
-async function syncDirectoryToSandbox(
-  sandbox: Sandbox,
-  localPath: string,
-  sandboxPath: string
-): Promise<void> {
-  const entries = await fs.readdir(localPath, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const localEntryPath = path.join(localPath, entry.name);
-    const sandboxEntryPath = `${sandboxPath}/${entry.name}`;
-
-    if (entry.isDirectory()) {
-      await sandbox.commands.run(`mkdir -p "${sandboxEntryPath}"`, { timeoutMs: 10000 });
-      await syncDirectoryToSandbox(sandbox, localEntryPath, sandboxEntryPath);
-    } else if (entry.isFile()) {
-      const content = await fs.readFile(localEntryPath, "utf-8");
-      await sandbox.files.write(sandboxEntryPath, content);
-    }
-  }
 }
 
 export interface RunClaudeOptions {
