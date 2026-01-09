@@ -30,6 +30,10 @@ const { positionals, values } = parseArgs({
     user: { type: "string", short: "u" },
     emoji: { type: "string", short: "e" },
     ts: { type: "string" },
+    oldest: { type: "string" },
+    latest: { type: "string" },
+    cursor: { type: "string" },
+    inclusive: { type: "boolean", default: false },
   },
 });
 
@@ -85,14 +89,43 @@ async function searchMessages() {
   const data = await api("search.messages", {
     query: values.query,
     count: parseInt(values.limit || "10"),
+    sort: "timestamp",
+    sort_dir: "desc",
   });
 
   const messages = data.messages.matches.map((m: any) => ({
     text: m.text, user: m.user, channel: m.channel?.name,
-    permalink: m.permalink,
+    permalink: m.permalink, ts: m.ts,
   }));
 
   console.log(JSON.stringify({ total: data.messages.total, messages }, null, 2));
+}
+
+async function getRecentMessages() {
+  const limit = parseInt(values.limit || "20");
+
+  // Use search with time filter to get recent messages across all channels
+  // "after:today" gets today's messages, or we can use "*" with sort
+  const query = values.query || "*";
+
+  const data = await api("search.messages", {
+    query,
+    count: limit,
+    sort: "timestamp",
+    sort_dir: "desc",
+  });
+
+  const messages = data.messages.matches.map((m: any) => ({
+    ts: m.ts,
+    user: m.user,
+    username: m.username,
+    channel: m.channel?.name,
+    channelId: m.channel?.id,
+    text: m.text,
+    permalink: m.permalink,
+  }));
+
+  console.log(JSON.stringify({ total: data.messages.total, returned: messages.length, messages }, null, 2));
 }
 
 async function listUsers() {
@@ -156,6 +189,7 @@ async function main() {
       case "history": await getHistory(); break;
       case "send": await sendMessage(); break;
       case "search": await searchMessages(); break;
+      case "recent": await getRecentMessages(); break;
       case "users": await listUsers(); break;
       case "user": await getUserInfo(); break;
       case "thread": await getThread(); break;
@@ -164,6 +198,7 @@ async function main() {
         console.log(`Slack CLI - Commands:
   channels [-l limit]                                   List channels
   history -c <channelId> [-l limit]                     Get channel messages
+  recent [-l limit] [-q filter]                         Get latest messages across all channels
   send -c <channelId> -t <text> [--thread <ts>]         Send message
   search -q <query> [-l limit]                          Search messages
   users [-l limit]                                      List users

@@ -198,20 +198,28 @@ export function ChatArea({ conversationId }: Props) {
     [startRecording, isStreaming, isProcessingVoice]
   );
 
-  // Push-to-talk: stop recording on keyup of M key
+  // Push-to-talk: stop recording when any part of the hotkey combo is released
+  // On Mac, releasing M while Cmd is held doesn't always fire keyup for M,
+  // so we also stop when Meta/Ctrl is released
   useEffect(() => {
-    if (!isRecording) return;
-
     const handleKeyUp = (e: KeyboardEvent) => {
-      // Stop when M key is released (regardless of modifier state)
-      if (e.key === "m" || e.key === "M") {
+      if (!isRecordingRef.current) return;
+
+      const isHotkeyRelease =
+        e.key === "m" ||
+        e.key === "M" ||
+        e.code === "KeyM" ||
+        e.key === "Meta" ||
+        e.key === "Control";
+
+      if (isHotkeyRelease) {
         stopRecordingAndTranscribe();
       }
     };
 
     document.addEventListener("keyup", handleKeyUp);
     return () => document.removeEventListener("keyup", handleKeyUp);
-  }, [isRecording, stopRecordingAndTranscribe]);
+  }, [stopRecordingAndTranscribe]);
 
   if (conversationId && isLoading) {
     return (
