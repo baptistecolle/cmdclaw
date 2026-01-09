@@ -5,7 +5,6 @@ import {
   Tooltip as TooltipPrimitive,
   TooltipTrigger as TooltipTriggerPrimitive,
   TooltipContent as TooltipContentPrimitive,
-  TooltipArrow as TooltipArrowPrimitive,
   TooltipPortal as TooltipPortalPrimitive,
   type TooltipProviderProps as TooltipProviderPrimitiveProps,
   type TooltipProps as TooltipPrimitiveProps,
@@ -67,10 +66,7 @@ function TooltipContent({
         )}
         {...props}
       >
-        <>
-          {children}
-          <TooltipArrowPrimitive className="bg-primary fill-primary z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
-        </>
+        {children}
       </TooltipContentPrimitive>
     </TooltipPortalPrimitive>
   );

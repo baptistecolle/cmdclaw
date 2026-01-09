@@ -11,7 +11,11 @@
       "Bash(bun typecheck:*)",
       "Bash(timeout 30 bun dev:*)",
       "Bash(bun run build:*)",
-      "Bash(bun run typecheck:*)"
+      "Bash(bun run typecheck:*)",
+      "Bash(wc:*)",
+      "WebFetch(domain:e2b.dev)",
+      "Bash(ln:*)",
+      "Bash(tree:*)"
     ]
   }
 }

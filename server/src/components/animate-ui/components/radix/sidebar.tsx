@@ -19,12 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/animate-ui/components/radix/sheet';
-import {
-  TooltipProvider,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/animate-ui/components/radix/tooltip';
+import { TooltipProvider } from '@/components/animate-ui/components/radix/tooltip';
 import {
   Highlight,
   HighlightItem,
@@ -573,7 +568,7 @@ const sidebarMenuButtonVariants = cva(
 type SidebarMenuButtonProps = React.ComponentProps<'button'> & {
   asChild?: boolean;
   isActive?: boolean;
-  tooltip?: string | React.ComponentProps<typeof TooltipContent>;
+  tooltip?: string | Record<string, unknown>;
   highlightValue?: string;
 } & VariantProps<typeof sidebarMenuButtonVariants>;
 
@@ -582,15 +577,14 @@ function SidebarMenuButton({
   isActive = false,
   variant = 'default',
   size = 'default',
-  tooltip,
+  tooltip: _tooltip,
   className,
   highlightValue,
   ...props
 }: SidebarMenuButtonProps) {
   const Comp = asChild ? Slot.Root : 'button';
-  const { isMobile, state } = useSidebar();
 
-  const button = (
+  return (
     <HighlightItem
       activeClassName={sidebarMenuButtonActiveVariants({ variant })}
       value={highlightValue}
@@ -604,28 +598,6 @@ function SidebarMenuButton({
         {...props}
       />
     </HighlightItem>
-  );
-
-  if (!tooltip) {
-    return button;
-  }
-
-  if (typeof tooltip === 'string') {
-    tooltip = {
-      children: tooltip,
-    };
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
-      <TooltipContent
-        side="right"
-        align="center"
-        hidden={state !== 'collapsed' || isMobile}
-        {...tooltip}
-      />
-    </Tooltip>
   );
 }
 

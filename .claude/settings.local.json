@@ -4,7 +4,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(xcodebuild:*)",
       "Bash(mkdir:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "WebFetch(domain:localhost)"
     ]
   }
 }
