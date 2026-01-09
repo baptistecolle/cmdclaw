@@ -15,7 +15,8 @@
       "Bash(wc:*)",
       "WebFetch(domain:e2b.dev)",
       "Bash(ln:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(chmod:*)"
     ]
   }
 }

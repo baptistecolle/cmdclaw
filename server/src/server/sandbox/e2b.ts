@@ -11,9 +11,9 @@ const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const AGENT_CONFIG_DIR = "claude-agent";
 
 // Sandbox paths
-const SANDBOX_CLAUDE_DIR = "/home/user/.claude";
+const SANDBOX_CLAUDE_DIR = "/app/.claude";
 const SANDBOX_SKILLS_DIR = `${SANDBOX_CLAUDE_DIR}/skills`;
-const SANDBOX_CLI_DIR = "/home/user/cli";
+const SANDBOX_CLI_DIR = "/app/cli";
 
 // Cache of active sandboxes by conversation ID
 const activeSandboxes = new Map<string, Sandbox>();
