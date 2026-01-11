@@ -19,6 +19,18 @@ export const auth = betterAuth({
     provider: "pg",
     schema: authSchema,
   }),
+  socialProviders: {
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID as string,
+      clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+    },
+    apple: {
+      clientId: env.APPLE_CLIENT_ID as string,
+      clientSecret: env.APPLE_CLIENT_SECRET as string,
+      appBundleIdentifier: env.APPLE_APP_BUNDLE_IDENTIFIER,
+    },
+  },
+  trustedOrigins: ["https://appleid.apple.com"],
   plugins: [
     nextCookies(),
     magicLink({

@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, MessageSquare, Settings, Trash2 } from "lucide-react";
+import { Plus, MessageSquare, Settings, Trash2, LogOut, ChevronUp } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,9 +18,19 @@ import {
   SidebarMenuAction,
   SidebarRail,
 } from "@/components/animate-ui/components/radix/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useConversationList, useDeleteConversation } from "@/orpc/hooks";
 import { formatDistanceToNow } from "date-fns";
+import { authClient } from "@/lib/auth-client";
+
+type SessionData = Awaited<ReturnType<typeof authClient.getSession>>["data"];
 
 type ConversationListData = {
   conversations: Array<{
@@ -37,6 +48,34 @@ export function ChatSidebar() {
   const { data: rawData, isLoading } = useConversationList();
   const data = rawData as ConversationListData | undefined;
   const deleteConversation = useDeleteConversation();
+  const [session, setSession] = useState<SessionData>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    authClient
+      .getSession()
+      .then((res) => {
+        if (!mounted) return;
+        const hasSession = res?.data?.session && res?.data?.user;
+        setSession(hasSession ? res.data : null);
+      })
+      .catch(() => {
+        if (mounted) setSession(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    const { error } = await authClient.signOut();
+    if (!error) {
+      setSession(null);
+      router.push("/login");
+    }
+  };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -46,6 +85,10 @@ export function ChatSidebar() {
       router.push("/chat");
     }
   };
+
+  const displayName = session?.user?.name ?? session?.user?.email ?? "";
+  const userEmail = session?.user?.email ?? "";
+  const avatarInitial = userEmail ? userEmail.charAt(0).toUpperCase() : "";
 
   return (
     <Sidebar collapsible="icon" className="border-r">
@@ -125,12 +168,56 @@ export function ChatSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Settings" highlightValue="settings">
-              <Link href="/settings/integrations">
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  tooltip={session?.user ? userEmail : "Account"}
+                  className="justify-between group-data-[collapsible=icon]:justify-center"
+                >
+                  <div className="flex size-8 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold text-sidebar-accent-foreground">
+                    {avatarInitial}
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col items-start text-left group-data-[collapsible=icon]:hidden">
+                    <span className="truncate text-sm font-medium">
+                      {displayName}
+                    </span>
+                    {userEmail && (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {userEmail}
+                      </span>
+                    )}
+                  </div>
+                  <ChevronUp className="ml-auto h-4 w-4 group-data-[collapsible=icon]:hidden" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="top"
+                align="start"
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
+              >
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/integrations" className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {session?.user ? (
+                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+                    <LogOut className="h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem asChild>
+                    <Link href="/login" className="flex items-center gap-2">
+                      <LogOut className="h-4 w-4" />
+                      <span>Log in</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

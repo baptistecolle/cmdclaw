@@ -70,6 +70,10 @@ export const env = createEnv({
     AIRTABLE_CLIENT_SECRET: z.string().optional(),
     SLACK_CLIENT_ID: z.string().optional(),
     SLACK_CLIENT_SECRET: z.string().optional(),
+    // Apple Sign In
+    APPLE_CLIENT_ID: z.string().optional(),
+    APPLE_CLIENT_SECRET: z.string().optional(),
+    APPLE_APP_BUNDLE_IDENTIFIER: z.string().optional(),
     // Fal.ai
     FAL_KEY: z.string().optional(),
   },
@@ -129,6 +133,9 @@ export const env = createEnv({
     AIRTABLE_CLIENT_SECRET: process.env.AIRTABLE_CLIENT_SECRET,
     SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID,
     SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET,
+    APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
+    APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
+    APPLE_APP_BUNDLE_IDENTIFIER: process.env.APPLE_APP_BUNDLE_IDENTIFIER,
     FAL_KEY: process.env.FAL_KEY,
     NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
