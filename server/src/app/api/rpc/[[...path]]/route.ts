@@ -4,11 +4,7 @@ import { createORPCContext } from "@/server/orpc/context";
 
 export const runtime = "nodejs";
 
-const handler = new RPCHandler(appRouter, {
-  onError: ({ error, path }) => {
-    console.error(`[oRPC Error] ${path}:`, error);
-  },
-});
+const handler = new RPCHandler(appRouter);
 
 async function handleRequest(request: Request) {
   try {
