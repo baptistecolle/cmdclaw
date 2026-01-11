@@ -74,9 +74,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		F45F5C652F0FCA6F00F3F71A /* bap */ = {
+		F45F5C652F0FCA6F00F3F71A /* Bap-macOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F45F5C712F0FCA7100F3F71A /* Build configuration list for PBXNativeTarget "bap" */;
+			buildConfigurationList = F45F5C712F0FCA7100F3F71A /* Build configuration list for PBXNativeTarget "Bap-macOS" */;
 			buildPhases = (
 				F45F5C622F0FCA6F00F3F71A /* Sources */,
 				F45F5C632F0FCA6F00F3F71A /* Frameworks */,
@@ -90,17 +90,17 @@
 				F45F5C682F0FCA6F00F3F71A /* macOS */,
 				F4A1B0032F100000000001A3 /* Shared */,
 			);
-			name = bap;
+			name = "Bap-macOS";
 			packageProductDependencies = (
 				F45F5C802F0FCA7100F3F71A /* WhisperKit */,
 			);
-			productName = bap;
+			productName = "Bap-macOS";
 			productReference = F45F5C662F0FCA6F00F3F71A /* Bap.app */;
 			productType = "com.apple.product-type.application";
 		};
-		F4A1B0052F100000000001A5 /* BapIOS */ = {
+		F4A1B0052F100000000001A5 /* Bap-iOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F4A1B0062F100000000001A6 /* Build configuration list for PBXNativeTarget "BapIOS" */;
+			buildConfigurationList = F4A1B0062F100000000001A6 /* Build configuration list for PBXNativeTarget "Bap-iOS" */;
 			buildPhases = (
 				F4A1B0072F100000000001A7 /* Sources */,
 				F4A1B0042F100000000001A4 /* Frameworks */,
@@ -114,8 +114,8 @@
 				F4A1B0022F100000000001A2 /* iOS */,
 				F4A1B0032F100000000001A3 /* Shared */,
 			);
-			name = BapIOS;
-			productName = BapIOS;
+			name = "Bap-iOS";
+			productName = "Bap-iOS";
 			productReference = F4A1B0012F100000000001A1 /* BapIOS.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -154,8 +154,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				F45F5C652F0FCA6F00F3F71A /* bap */,
-				F4A1B0052F100000000001A5 /* BapIOS */,
+				F45F5C652F0FCA6F00F3F71A /* Bap-macOS */,
+				F4A1B0052F100000000001A5 /* Bap-iOS */,
 			);
 		};
 /* End PBXProject section */
@@ -402,15 +402,17 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = baptiste.bap.ios;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Bap-iOS";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -437,15 +439,17 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = baptiste.bap.ios;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Bap-iOS";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -462,7 +466,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F45F5C712F0FCA7100F3F71A /* Build configuration list for PBXNativeTarget "bap" */ = {
+		F45F5C712F0FCA7100F3F71A /* Build configuration list for PBXNativeTarget "Bap-macOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F45F5C722F0FCA7100F3F71A /* Debug */,
@@ -471,7 +475,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F4A1B0062F100000000001A6 /* Build configuration list for PBXNativeTarget "BapIOS" */ = {
+		F4A1B0062F100000000001A6 /* Build configuration list for PBXNativeTarget "Bap-iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F4A1B0092F100000000001A9 /* Debug */,
