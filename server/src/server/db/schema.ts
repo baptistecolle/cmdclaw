@@ -88,6 +88,7 @@ export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   conversations: many(conversation),
   integrations: many(integration),
+  skills: many(skill),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -268,6 +269,70 @@ export const integrationTokenRelations = relations(integrationToken, ({ one }) =
   integration: one(integration, {
     fields: [integrationToken.integrationId],
     references: [integration.id],
+  }),
+}));
+
+// ========== SKILL SCHEMA ==========
+
+export const skill = pgTable(
+  "skill",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Skill slug (lowercase, numbers, hyphens only)
+    name: text("name").notNull(),
+    // Human-readable display name
+    displayName: text("display_name").notNull(),
+    // Description from SKILL.md frontmatter
+    description: text("description").notNull(),
+    enabled: boolean("enabled").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("skill_user_id_idx").on(table.userId),
+  ]
+);
+
+export const skillFile = pgTable(
+  "skill_file",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    skillId: text("skill_id")
+      .notNull()
+      .references(() => skill.id, { onDelete: "cascade" }),
+    // File path within skill directory (e.g., "SKILL.md", "reference.md", "scripts/helper.py")
+    path: text("path").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("skill_file_skill_id_idx").on(table.skillId),
+  ]
+);
+
+export const skillRelations = relations(skill, ({ one, many }) => ({
+  user: one(user, { fields: [skill.userId], references: [user.id] }),
+  files: many(skillFile),
+}));
+
+export const skillFileRelations = relations(skillFile, ({ one }) => ({
+  skill: one(skill, {
+    fields: [skillFile.skillId],
+    references: [skill.id],
   }),
 }));
 

@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ExternalLink, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const integrationConfig = {
   gmail: {
@@ -178,12 +179,12 @@ function IntegrationsPageContent() {
             return (
               <div
                 key={type}
-                className="flex items-center justify-between rounded-lg border p-4"
+                className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                   <div
                     className={cn(
-                      "flex items-center justify-center rounded-lg p-2 shadow-sm border",
+                      "flex shrink-0 items-center justify-center rounded-lg p-2 shadow-sm border",
                       config.bgColor
                     )}
                   >
@@ -194,10 +195,10 @@ function IntegrationsPageContent() {
                       height={24}
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="font-medium">{config.name}</h3>
                     {integration ? (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="truncate text-sm text-muted-foreground">
                         Connected as{" "}
                         <span className="font-medium">
                           {integration.displayName}
@@ -211,17 +212,15 @@ function IntegrationsPageContent() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   {integration ? (
                     <>
                       <label className="flex cursor-pointer items-center gap-2">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={integration.enabled}
-                          onChange={(e) =>
-                            handleToggle(integration.id, e.target.checked)
+                          onCheckedChange={(checked) =>
+                            handleToggle(integration.id, checked === true)
                           }
-                          className="h-4 w-4 rounded border-gray-300"
                         />
                         <span className="text-sm">Enabled</span>
                       </label>

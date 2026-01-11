@@ -1,5 +1,8 @@
 import { Sandbox } from "e2b";
 import { env } from "@/env";
+import { db } from "@/server/db/client";
+import { skill } from "@/server/db/schema";
+import { eq, and } from "drizzle-orm";
 
 // Use custom template with npm + claude CLI pre-installed
 const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-agent-dev";
@@ -257,4 +260,76 @@ export async function cleanupAllSandboxes(): Promise<void> {
  */
 export function isE2BConfigured(): boolean {
   return !!env.E2B_API_KEY;
+}
+
+/**
+ * Write user's skills to the sandbox
+ * Skills are written to /app/.claude/skills/<skill-name>/
+ */
+export async function writeSkillsToSandbox(
+  sandbox: Sandbox,
+  userId: string
+): Promise<string[]> {
+  // Fetch all enabled skills for user with their files
+  const skills = await db.query.skill.findMany({
+    where: and(eq(skill.userId, userId), eq(skill.enabled, true)),
+    with: {
+      files: true,
+    },
+  });
+
+  if (skills.length === 0) {
+    return [];
+  }
+
+  console.log(`[E2B] Writing ${skills.length} skills to sandbox`);
+
+  // Create skills directory
+  await sandbox.commands.run("mkdir -p /app/.claude/skills");
+
+  const writtenSkills: string[] = [];
+
+  for (const s of skills) {
+    const skillDir = `/app/.claude/skills/${s.name}`;
+    await sandbox.commands.run(`mkdir -p "${skillDir}"`);
+
+    for (const file of s.files) {
+      const filePath = `${skillDir}/${file.path}`;
+
+      // Create parent directories if needed (for nested paths like scripts/helper.py)
+      const lastSlash = filePath.lastIndexOf("/");
+      const parentDir = filePath.substring(0, lastSlash);
+      if (parentDir !== skillDir) {
+        await sandbox.commands.run(`mkdir -p "${parentDir}"`);
+      }
+
+      // Write the file
+      await sandbox.files.write(filePath, file.content);
+    }
+
+    writtenSkills.push(s.name);
+    console.log(`[E2B] Written skill: ${s.name} (${s.files.length} files)`);
+  }
+
+  return writtenSkills;
+}
+
+/**
+ * Get the system prompt addition for skills
+ */
+export function getSkillsSystemPrompt(skillNames: string[]): string {
+  if (skillNames.length === 0) {
+    return "";
+  }
+
+  return `
+# Custom Skills
+
+You have access to custom skills in /app/.claude/skills/. Each skill directory contains a SKILL.md file with instructions.
+
+Available skills:
+${skillNames.map((name) => `- ${name}`).join("\n")}
+
+Read the SKILL.md file in each skill directory when relevant to the user's request.
+`;
 }

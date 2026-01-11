@@ -1,17 +1,29 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Square } from "lucide-react";
+import { Send, Square, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type Props = {
   onSend: (content: string) => void;
   onStop?: () => void;
   disabled?: boolean;
   isStreaming?: boolean;
+  isRecording?: boolean;
+  onStartRecording?: () => void;
+  onStopRecording?: () => void;
 };
 
-export function ChatInput({ onSend, onStop, disabled, isStreaming }: Props) {
+export function ChatInput({
+  onSend,
+  onStop,
+  disabled,
+  isStreaming,
+  isRecording,
+  onStartRecording,
+  onStopRecording,
+}: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -50,6 +62,36 @@ export function ChatInput({ onSend, onStop, disabled, isStreaming }: Props) {
         rows={1}
         className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm focus:outline-none disabled:opacity-50"
       />
+      {onStartRecording && onStopRecording && (
+        <Button
+          onMouseDown={(e) => {
+            e.preventDefault();
+            if (!disabled && !isStreaming) onStartRecording();
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            if (isRecording) onStopRecording();
+          }}
+          onMouseLeave={(e) => {
+            e.preventDefault();
+            if (isRecording) onStopRecording();
+          }}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            if (!disabled && !isStreaming) onStartRecording();
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            if (isRecording) onStopRecording();
+          }}
+          disabled={disabled && !isRecording}
+          size="icon"
+          variant={isRecording ? "destructive" : "outline"}
+          className={cn("h-9 w-9 touch-none", isRecording && "animate-pulse")}
+        >
+          <Mic className="h-4 w-4" />
+        </Button>
+      )}
       {isStreaming ? (
         <Button
           onClick={onStop}

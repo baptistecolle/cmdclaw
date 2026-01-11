@@ -158,3 +158,116 @@ export function useTranscribe() {
       client.voice.transcribe({ audio, mimeType }),
   });
 }
+
+// ========== SKILL HOOKS ==========
+
+// Hook for listing skills
+export function useSkillList() {
+  return useQuery({
+    queryKey: ["skill", "list"],
+    queryFn: () => client.skill.list(),
+  });
+}
+
+// Hook for getting a single skill
+export function useSkill(id: string | undefined) {
+  return useQuery({
+    queryKey: ["skill", "get", id],
+    queryFn: () => client.skill.get({ id: id! }),
+    enabled: !!id,
+  });
+}
+
+// Hook for creating a skill
+export function useCreateSkill() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ displayName, description }: { displayName: string; description: string }) =>
+      client.skill.create({ displayName, description }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["skill"] });
+    },
+  });
+}
+
+// Hook for updating a skill
+export function useUpdateSkill() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      name,
+      displayName,
+      description,
+      enabled,
+    }: {
+      id: string;
+      name?: string;
+      displayName?: string;
+      description?: string;
+      enabled?: boolean;
+    }) => client.skill.update({ id, name, displayName, description, enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["skill"] });
+    },
+  });
+}
+
+// Hook for deleting a skill
+export function useDeleteSkill() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => client.skill.delete({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["skill"] });
+    },
+  });
+}
+
+// Hook for adding a file to a skill
+export function useAddSkillFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      skillId,
+      path,
+      content,
+    }: {
+      skillId: string;
+      path: string;
+      content: string;
+    }) => client.skill.addFile({ skillId, path, content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["skill"] });
+    },
+  });
+}
+
+// Hook for updating a file
+export function useUpdateSkillFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, content }: { id: string; content: string }) =>
+      client.skill.updateFile({ id, content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["skill"] });
+    },
+  });
+}
+
+// Hook for deleting a file
+export function useDeleteSkillFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => client.skill.deleteFile({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["skill"] });
+    },
+  });
+}

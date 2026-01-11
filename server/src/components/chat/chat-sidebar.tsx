@@ -50,11 +50,11 @@ export function ChatSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader>
-        <Link href="/chat" className="flex items-center gap-3 p-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <MessageSquare className="h-5 w-5" />
+        <Link href="/chat" className="flex items-center gap-3 p-2 overflow-hidden group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
+            <MessageSquare className="h-5 w-5 group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4" />
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-0.5 group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-semibold">AI Assistant</p>
             <p className="text-xs text-muted-foreground">Chat</p>
           </div>
@@ -62,11 +62,11 @@ export function ChatSidebar() {
         <Button
           asChild
           variant="outline"
-          className="w-full justify-start gap-2"
+          className="w-full justify-start gap-2 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
         >
           <Link href="/chat">
-            <Plus className="h-4 w-4" />
-            <span>New chat</span>
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className="group-data-[collapsible=icon]:hidden">New chat</span>
           </Link>
         </Button>
       </SidebarHeader>
@@ -92,15 +92,16 @@ export function ChatSidebar() {
                       isActive={pathname === `/chat/${conv.id}`}
                       tooltip={conv.title || "Untitled"}
                       highlightValue={conv.id}
+                      className="h-auto py-2"
                     >
                       <Link
                         href={`/chat/${conv.id}`}
-                        className="flex flex-col items-start"
+                        className="flex min-w-0 flex-1 flex-col items-start gap-0.5"
                       >
-                        <span className="truncate">
+                        <span className="w-full truncate">
                           {conv.title || "Untitled"}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="w-full truncate text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(conv.updatedAt), {
                             addSuffix: true,
                           })}

@@ -55,6 +55,8 @@ function SheetClose(props: SheetCloseProps) {
 
 type SheetContentProps = SheetContentPrimitiveProps & {
   showCloseButton?: boolean;
+  title?: string;
+  description?: string;
 };
 
 function SheetContent({
@@ -62,6 +64,8 @@ function SheetContent({
   children,
   side = 'right',
   showCloseButton = true,
+  title = 'Sheet',
+  description,
   ...props
 }: SheetContentProps) {
   return (
@@ -77,8 +81,11 @@ function SheetContent({
           className,
         )}
         side={side}
+        {...(!description && { 'aria-describedby': undefined })}
         {...props}
       >
+        <SheetTitlePrimitive className="sr-only">{title}</SheetTitlePrimitive>
+        {description && <SheetDescriptionPrimitive className="sr-only">{description}</SheetDescriptionPrimitive>}
         {children}
         {showCloseButton && (
           <SheetClose className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">

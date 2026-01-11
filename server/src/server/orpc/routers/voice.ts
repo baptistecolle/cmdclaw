@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
 import { env } from "@/env";
-import OpenAI from "openai";
+import { fal } from "@fal-ai/client";
 
 const transcribeInputSchema = z.object({
   audio: z.string(), // Base64 encoded audio data
@@ -12,20 +12,26 @@ const transcribeOutputSchema = z.object({
   text: z.string(),
 });
 
+interface WizperResult {
+  text: string;
+  chunks: Array<{ text: string }>;
+}
+
 const transcribe = protectedProcedure
   .input(transcribeInputSchema)
   .output(transcribeOutputSchema)
   .handler(async ({ input }) => {
-    if (!env.OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY is not configured");
+    if (!env.FAL_KEY) {
+      throw new Error("FAL_KEY is not configured");
     }
 
-    const openai = new OpenAI({
-      apiKey: env.OPENAI_API_KEY,
+    fal.config({
+      credentials: env.FAL_KEY,
     });
 
-    // Convert base64 to Buffer
+    // Convert base64 to Buffer then to Blob
     const audioBuffer = Buffer.from(input.audio, "base64");
+    const audioBlob = new Blob([audioBuffer], { type: input.mimeType });
 
     // Determine file extension from mimeType
     const extension = input.mimeType.includes("webm")
@@ -34,21 +40,28 @@ const transcribe = protectedProcedure
         ? "mp4"
         : input.mimeType.includes("wav")
           ? "wav"
-          : "webm";
+          : input.mimeType.includes("mp3")
+            ? "mp3"
+            : "webm";
 
-    // Create a File object for the OpenAI API
-    const file = new File([audioBuffer], `audio.${extension}`, {
+    // Create a File object for upload
+    const audioFile = new File([audioBlob], `audio.${extension}`, {
       type: input.mimeType,
     });
 
-    const transcription = await openai.audio.transcriptions.create({
-      file,
-      model: "whisper-1",
-      response_format: "json",
+    // Upload to fal.ai storage
+    const audioUrl = await fal.storage.upload(audioFile);
+
+    // Call Wizper API
+    const result = await fal.subscribe("fal-ai/wizper", {
+      input: {
+        audio_url: audioUrl,
+        task: "transcribe",
+      },
     });
 
     return {
-      text: transcription.text,
+      text: (result.data as WizperResult).text,
     };
   });
 

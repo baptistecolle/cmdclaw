@@ -185,17 +185,20 @@ export function ChatArea({ conversationId }: Props) {
     }
   }, [stopRecording, transcribe, handleSend]);
 
+  // Start recording handler (for both keyboard and button)
+  const handleStartRecording = useCallback(() => {
+    if (!isRecordingRef.current && !isStreaming && !isProcessingVoice) {
+      isRecordingRef.current = true;
+      startRecording();
+    }
+  }, [startRecording, isStreaming, isProcessingVoice]);
+
   // Push-to-talk: Ctrl/Cmd + M - start recording on keydown
   useHotkeys(
     "mod+m",
-    () => {
-      if (!isRecordingRef.current && !isStreaming && !isProcessingVoice) {
-        isRecordingRef.current = true;
-        startRecording();
-      }
-    },
+    handleStartRecording,
     { keydown: true, keyup: false, preventDefault: true },
-    [startRecording, isStreaming, isProcessingVoice]
+    [handleStartRecording]
   );
 
   // Push-to-talk: stop recording when any part of the hotkey combo is released
@@ -272,6 +275,9 @@ export function ChatArea({ conversationId }: Props) {
             onSend={handleSend}
             disabled={isStreaming || isRecording || isProcessingVoice}
             isStreaming={isStreaming}
+            isRecording={isRecording}
+            onStartRecording={handleStartRecording}
+            onStopRecording={stopRecordingAndTranscribe}
           />
           <VoiceHint className="text-center" />
         </div>

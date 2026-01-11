@@ -70,6 +70,8 @@ export const env = createEnv({
     AIRTABLE_CLIENT_SECRET: z.string().optional(),
     SLACK_CLIENT_ID: z.string().optional(),
     SLACK_CLIENT_SECRET: z.string().optional(),
+    // Fal.ai
+    FAL_KEY: z.string().optional(),
   },
 
   /**
@@ -127,6 +129,7 @@ export const env = createEnv({
     AIRTABLE_CLIENT_SECRET: process.env.AIRTABLE_CLIENT_SECRET,
     SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID,
     SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET,
+    FAL_KEY: process.env.FAL_KEY,
     NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,

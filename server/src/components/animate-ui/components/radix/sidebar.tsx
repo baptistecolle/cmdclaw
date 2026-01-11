@@ -15,9 +15,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
 } from '@/components/animate-ui/components/radix/sheet';
 import { TooltipProvider } from '@/components/animate-ui/components/radix/tooltip';
 import {
@@ -206,11 +203,9 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
+          title="Sidebar"
+          description="Navigation sidebar"
         >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-          </SheetHeader>
           <Highlight
             enabled={animateOnHover}
             hover

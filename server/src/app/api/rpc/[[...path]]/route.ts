@@ -4,16 +4,28 @@ import { createORPCContext } from "@/server/orpc/context";
 
 export const runtime = "nodejs";
 
-const handler = new RPCHandler(appRouter);
+const handler = new RPCHandler(appRouter, {
+  onError: ({ error, path }) => {
+    console.error(`[oRPC Error] ${path}:`, error);
+  },
+});
 
 async function handleRequest(request: Request) {
-  const context = await createORPCContext({ headers: request.headers });
-  const { response } = await handler.handle(request, {
-    prefix: "/api/rpc",
-    context,
-  });
+  try {
+    const context = await createORPCContext({ headers: request.headers });
+    const { response } = await handler.handle(request, {
+      prefix: "/api/rpc",
+      context,
+    });
 
-  return response ?? new Response("Not found", { status: 404 });
+    return response ?? new Response("Not found", { status: 404 });
+  } catch (error) {
+    console.error("[RPC Handler Error]", error);
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 }
 
 export {

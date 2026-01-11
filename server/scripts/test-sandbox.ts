@@ -190,8 +190,8 @@ Commands:
       try {
         const result = await sandbox.commands.run(cmd, {
           timeoutMs: 60000,
-          onStdout: (data) => process.stdout.write(data),
-          onStderr: (data) => process.stderr.write(data),
+          onStdout: (data) => { process.stdout.write(data); },
+          onStderr: (data) => { process.stderr.write(data); },
         });
 
         if (result.exitCode !== 0) {

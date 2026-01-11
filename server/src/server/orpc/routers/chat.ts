@@ -12,8 +12,10 @@ import { env } from "@/env";
 import {
   getOrCreateSandbox,
   runClaudeInSandbox,
-  type ClaudeStreamEvent,
+  writeSkillsToSandbox,
+  getSkillsSystemPrompt,
 } from "@/server/sandbox/e2b";
+import { generateConversationTitle } from "@/server/utils/generate-title";
 
 // Schema for streaming chat events
 const chatEventSchema = z.discriminatedUnion("type", [
@@ -63,6 +65,9 @@ const sendMessage = protectedProcedure
     const userId = context.user.id;
     const db = context.db;
 
+    // Track if this is a new conversation (for title generation)
+    let isNewConversation = false;
+
     // Get or create conversation
     let conv: typeof conversation.$inferSelect;
 
@@ -80,7 +85,8 @@ const sendMessage = protectedProcedure
       }
       conv = existing;
     } else {
-      // Create new conversation
+      // Create new conversation with temporary title
+      isNewConversation = true;
       const title =
         input.content.slice(0, 50) + (input.content.length > 50 ? "..." : "");
       const [newConv] = await db
@@ -116,6 +122,8 @@ const sendMessage = protectedProcedure
       cliEnv,
       cliInstructions,
       db,
+      isNewConversation,
+      userId,
     });
   });
 
@@ -125,6 +133,8 @@ interface ExecutionContext {
   cliEnv: Record<string, string>;
   cliInstructions: string;
   db: any;
+  isNewConversation: boolean;
+  userId: string;
 }
 
 /**
@@ -133,7 +143,7 @@ interface ExecutionContext {
 async function* handleE2BExecution(
   ctx: ExecutionContext
 ): AsyncGenerator<ChatEvent, void, unknown> {
-  const { input, conv, cliEnv, cliInstructions, db } = ctx;
+  const { input, conv, cliEnv, cliInstructions, db, isNewConversation, userId } = ctx;
 
   try {
     // Check API key
@@ -148,6 +158,10 @@ async function* handleE2BExecution(
       integrationEnvs: cliEnv,
     });
 
+    // Write user's skills to the sandbox
+    const writtenSkills = await writeSkillsToSandbox(sandbox, userId);
+    const skillsInstructions = getSkillsSystemPrompt(writtenSkills);
+
     let assistantContent = "";
     let toolCalls: {
       id: string;
@@ -158,11 +172,13 @@ async function* handleE2BExecution(
     let finalUsage = { inputTokens: 0, outputTokens: 0, totalCostUsd: 0 };
     let sessionId: string | undefined;
 
-    // Build system prompt with CLI instructions
-    const systemPrompt = cliInstructions || undefined;
+    // Build system prompt with CLI instructions and skills
+    const systemPromptParts = [cliInstructions, skillsInstructions].filter(Boolean);
+    const systemPrompt = systemPromptParts.length > 0 ? systemPromptParts.join("\n\n") : undefined;
 
     // Debug: Log what we're sending
     console.log("[E2B] Enabled integrations CLI instructions:", cliInstructions ? "present" : "none");
+    console.log("[E2B] Skills written:", writtenSkills.length > 0 ? writtenSkills.join(", ") : "none");
 
     // Run Claude in sandbox
     const claudeStream = runClaudeInSandbox(sandbox, input.content, {
@@ -242,6 +258,22 @@ async function* handleE2BExecution(
         outputTokens: finalUsage.outputTokens,
       })
       .returning();
+
+    // Generate title for new conversations (await so sidebar updates)
+    if (isNewConversation && assistantContent) {
+      try {
+        const title = await generateConversationTitle(input.content, assistantContent);
+        if (title) {
+          await db
+            .update(conversation)
+            .set({ title })
+            .where(eq(conversation.id, conv.id));
+          console.log("[Title] Generated title:", title);
+        }
+      } catch (err) {
+        console.error("[Title] Failed to generate title:", err);
+      }
+    }
 
     yield {
       type: "done" as const,
