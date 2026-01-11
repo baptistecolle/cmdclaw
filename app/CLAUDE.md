@@ -1,1 +1,0 @@
-at localhost:3000/api/openapi you can view the latest openapi doc
