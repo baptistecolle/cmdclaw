@@ -2,7 +2,8 @@
 
 import type React from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +42,10 @@ function AppleIcon() {
   );
 }
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/chat";
+
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +70,8 @@ export default function LoginPage() {
 
     const { error: signInError } = await authClient.signIn.magicLink({
       email,
-      callbackURL: "/accounts",
-      newUserCallbackURL: "/accounts",
+      callbackURL: callbackUrl,
+      newUserCallbackURL: callbackUrl,
       errorCallbackURL: "/login?error=magic-link",
     });
 
@@ -95,113 +99,131 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/accounts",
+      callbackURL: callbackUrl,
     });
   };
 
   const handleAppleSignIn = async () => {
     await authClient.signIn.social({
       provider: "apple",
-      callbackURL: "/accounts",
+      callbackURL: callbackUrl,
     });
   };
 
   return (
-    <div className="min-h-screen bg-background px-4 py-12">
-      <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
-        <div className="space-y-1 text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Bap
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-          <p className="text-sm text-muted-foreground">Enter your email to get a magic link.</p>
-        </div>
-
-        {session?.user ? (
-          <div className="space-y-3">
-            <div className="rounded-xl border bg-muted/60 p-3">
-              <p className="text-sm font-medium">Signed in</p>
-              <p className="text-sm text-muted-foreground">
-                {session.user.name || session.user.email}
-              </p>
-              {session.user.email && (
-                <p className="text-xs text-muted-foreground">{session.user.email}</p>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button asChild className="flex-1">
-                <Link href="/accounts">Continue</Link>
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={handleSignOut}>
-                Sign out
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleGoogleSignIn}
-              >
-                <GoogleIcon />
-                <span className="ml-2">Continue with Google</span>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleAppleSignIn}
-              >
-                <AppleIcon />
-                <span className="ml-2">Continue with Apple</span>
-              </Button>
-            </div>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-              </div>
-            </div>
-
-            <form onSubmit={requestMagicLink} className="space-y-3">
-              <label className="text-sm font-medium text-muted-foreground" htmlFor="email">
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-                aria-invalid={status === "error"}
-              />
-              <Button type="submit" className="w-full" disabled={!email || status === "sending"}>
-                {status === "sending" ? "Sending…" : "Send magic link"}
-              </Button>
-            </form>
-          </div>
-        )}
-
-        {message && !session?.user && (
-          <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">
-            {message}
-          </div>
-        )}
-
-        {error && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
+      <div className="space-y-1 text-center">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          Bap
+        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
+        <p className="text-sm text-muted-foreground">Enter your email to get a magic link.</p>
       </div>
+
+      {session?.user ? (
+        <div className="space-y-3">
+          <div className="rounded-xl border bg-muted/60 p-3">
+            <p className="text-sm font-medium">Signed in</p>
+            <p className="text-sm text-muted-foreground">
+              {session.user.name || session.user.email}
+            </p>
+            {session.user.email && (
+              <p className="text-xs text-muted-foreground">{session.user.email}</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild className="flex-1">
+              <Link href={callbackUrl}>Continue</Link>
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={handleSignOut}>
+              Sign out
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleGoogleSignIn}
+            >
+              <GoogleIcon />
+              <span className="ml-2">Continue with Google</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleAppleSignIn}
+            >
+              <AppleIcon />
+              <span className="ml-2">Continue with Apple</span>
+            </Button>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+            </div>
+          </div>
+
+          <form onSubmit={requestMagicLink} className="space-y-3">
+            <label className="text-sm font-medium text-muted-foreground" htmlFor="email">
+              Email
+            </label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              aria-invalid={status === "error"}
+            />
+            <Button type="submit" className="w-full" disabled={!email || status === "sending"}>
+              {status === "sending" ? "Sending..." : "Send magic link"}
+            </Button>
+          </form>
+        </div>
+      )}
+
+      {message && !session?.user && (
+        <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">
+          {message}
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <div className="min-h-screen bg-background px-4 py-12">
+      <Suspense fallback={
+        <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
+          <div className="space-y-1 text-center">
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Bap
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      }>
+        <LoginContent />
+      </Suspense>
     </div>
   );
 }

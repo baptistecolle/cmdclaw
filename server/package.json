@@ -30,7 +30,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.1",
     "@anthropic-ai/sdk": "^0.71.2",
-    "@base-ui-components/react": "1.0.0-beta.7",
+    "@base-ui/react": "^1.0.0-beta.7",
     "@fal-ai/client": "^1.8.3",
     "@orpc/client": "^1.13.2",
     "@orpc/openapi": "^1.13.2",

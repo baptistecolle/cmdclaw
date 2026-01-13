@@ -36,10 +36,6 @@ export const env = createEnv({
       process.env.NODE_ENV === "production"
         ? z.string().email()
         : z.string().email().optional(),
-    MINIO_ENDPOINT: z.string(),
-    MINIO_ROOT_USER: z.string(),
-    MINIO_ROOT_PASSWORD: z.string(),
-    MINIO_USE_SSL: z.string().transform((val) => val === "true"),
     REDIS_URL: z.string().url().optional(),
     REDIS_HOST: z.string().default("localhost"),
     REDIS_PORT: z.string().default("6379"),
@@ -106,10 +102,6 @@ export const env = createEnv({
     EMAIL_SERVER_USER: process.env.EMAIL_SERVER_USER,
     EMAIL_SERVER_PASSWORD: process.env.EMAIL_SERVER_PASSWORD,
     EMAIL_FROM: process.env.EMAIL_FROM,
-    MINIO_ENDPOINT: process.env.MINIO_ENDPOINT,
-    MINIO_ROOT_USER: process.env.MINIO_ROOT_USER,
-    MINIO_ROOT_PASSWORD: process.env.MINIO_ROOT_PASSWORD,
-    MINIO_USE_SSL: process.env.MINIO_USE_SSL,
     REDIS_URL: process.env.REDIS_URL,
     REDIS_HOST: process.env.REDIS_HOST,
     REDIS_PORT: process.env.REDIS_PORT,
