@@ -23,8 +23,10 @@ export async function proxy(request: NextRequest) {
   );
 
   if (isProtectedRoute) {
-    // Check for better-auth session cookie
-    const sessionCookie = request.cookies.get("better-auth.session_token");
+    // Check for better-auth session cookie (with __Secure- prefix in production HTTPS)
+    const sessionCookie =
+      request.cookies.get("__Secure-better-auth.session_token") ||
+      request.cookies.get("better-auth.session_token");
 
     if (!sessionCookie?.value) {
       const loginUrl = new URL("/login", request.url);

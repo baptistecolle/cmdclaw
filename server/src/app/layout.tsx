@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Bap",
-  description: "AI Assistant with integrations",
+  description: "Your AI Assistant",
   icons: {
     icon: [
       { url: "/favicon.ico" },
