@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import Combine
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -13,20 +12,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var recordingManager: RecordingManager?
     private var whisperTranscriber: WhisperTranscriber?
     private var isRecording = false
-    private var authCancellable: AnyCancellable?
+    private var authObservationTask: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
         setupManagers()
         setupAuthObserver()
 
-        // Check initial auth state
-        if !AuthManager.shared.isLoading && !AuthManager.shared.isAuthenticated {
-            showLoginWindow()
+        // Initialize auth and check state
+        Task {
+            await AuthManager.shared.initialize()
+            handleAuthStateChange()
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        authObservationTask?.cancel()
         if let globalMonitor = globalMonitor {
             NSEvent.removeMonitor(globalMonitor)
         }
@@ -36,18 +37,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupAuthObserver() {
-        authCancellable = AuthManager.shared.$isAuthenticated
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isAuthenticated in
-                guard let self = self else { return }
-                if isAuthenticated {
-                    self.hideLoginWindow()
-                    self.enableFullFunctionality()
-                } else if !AuthManager.shared.isLoading {
-                    self.disableFunctionality()
-                    self.showLoginWindow()
+        authObservationTask = Task { @MainActor in
+            var previousAuthState = AuthManager.shared.isAuthenticated
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                let currentAuthState = AuthManager.shared.isAuthenticated
+                if currentAuthState != previousAuthState {
+                    previousAuthState = currentAuthState
+                    handleAuthStateChange()
                 }
             }
+        }
+    }
+
+    private func handleAuthStateChange() {
+        if AuthManager.shared.isAuthenticated {
+            hideLoginWindow()
+            enableFullFunctionality()
+        } else if !AuthManager.shared.isLoading {
+            disableFunctionality()
+            showLoginWindow()
+        }
     }
 
     private func enableFullFunctionality() {

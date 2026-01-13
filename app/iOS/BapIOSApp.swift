@@ -9,18 +9,20 @@ import SwiftUI
 
 @main
 struct BapIOSApp: App {
-    @StateObject private var authManager = AuthManager.shared
+    @State private var authManager = AuthManager.shared
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(authManager)
+            RootView(authManager: authManager)
+                .task {
+                    await authManager.initialize()
+                }
         }
     }
 }
 
 struct RootView: View {
-    @EnvironmentObject private var authManager: AuthManager
+    @Bindable var authManager: AuthManager
 
     var body: some View {
         Group {

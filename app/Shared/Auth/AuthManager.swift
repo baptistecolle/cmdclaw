@@ -8,15 +8,17 @@
 import Foundation
 import AuthenticationServices
 import SwiftUI
+import Observation
 
 @MainActor
-class AuthManager: ObservableObject {
+@Observable
+final class AuthManager {
     static let shared = AuthManager()
 
-    @Published var isAuthenticated = false
-    @Published var isLoading = true
-    @Published var currentUser: AuthUser?
-    @Published var errorMessage: String?
+    var isAuthenticated = false
+    var isLoading = true
+    var currentUser: AuthUser?
+    var errorMessage: String?
 
     private let baseURL: URL
     private let keychainService = "com.bap.auth"
@@ -28,10 +30,10 @@ class AuthManager: ObservableObject {
         #else
         self.baseURL = URL(string: "https://www.heybap.com")!
         #endif
+    }
 
-        Task {
-            await checkSession()
-        }
+    func initialize() async {
+        await checkSession()
     }
 
     // MARK: - Session Management
@@ -319,30 +321,30 @@ class AuthManager: ObservableObject {
 
 // MARK: - Models
 
-struct AuthUser: Codable, Identifiable {
+struct AuthUser: Codable, Identifiable, Sendable {
     let id: String
     let email: String
     let name: String?
     let image: String?
 }
 
-struct AuthResponse: Codable {
+struct AuthResponse: Codable, Sendable {
     let token: String
     let user: AuthUser
 }
 
-struct SessionResponse: Codable {
+struct SessionResponse: Codable, Sendable {
     let session: SessionInfo
     let user: AuthUser
 }
 
-struct SessionInfo: Codable {
+struct SessionInfo: Codable, Sendable {
     let id: String
     let userId: String
     let expiresAt: String
 }
 
-enum AuthError: LocalizedError {
+enum AuthError: LocalizedError, Sendable {
     case magicLinkFailed
     case invalidCallback
     case invalidToken

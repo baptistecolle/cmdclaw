@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @ObservedObject private var authManager = AuthManager.shared
+    private var authManager = AuthManager.shared
     @State private var isTestingConnection = false
     @State private var connectionStatus: ConnectionStatus?
     @State private var showSignOutConfirmation = false

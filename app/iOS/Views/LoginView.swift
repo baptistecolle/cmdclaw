@@ -9,7 +9,7 @@ import SwiftUI
 import AuthenticationServices
 
 struct LoginView: View {
-    @ObservedObject private var authManager = AuthManager.shared
+    private var authManager = AuthManager.shared
 
     @State private var email = ""
     @State private var isLoading = false
