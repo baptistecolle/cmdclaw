@@ -1,22 +1,29 @@
 import AppKit
 import SwiftUI
+import Combine
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var recordingWindow: NSPanel?
     private var resultWindow: NSPanel?
+    private var loginWindow: NSWindow?
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var recordingManager: RecordingManager?
     private var whisperTranscriber: WhisperTranscriber?
     private var isRecording = false
+    private var authCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
-        checkAccessibilityPermissions()
-        setupGlobalHotKey()
         setupManagers()
+        setupAuthObserver()
+
+        // Check initial auth state
+        if !AuthManager.shared.isLoading && !AuthManager.shared.isAuthenticated {
+            showLoginWindow()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -28,17 +35,74 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func setupAuthObserver() {
+        authCancellable = AuthManager.shared.$isAuthenticated
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isAuthenticated in
+                guard let self = self else { return }
+                if isAuthenticated {
+                    self.hideLoginWindow()
+                    self.enableFullFunctionality()
+                } else if !AuthManager.shared.isLoading {
+                    self.disableFunctionality()
+                    self.showLoginWindow()
+                }
+            }
+    }
+
+    private func enableFullFunctionality() {
+        checkAccessibilityPermissions()
+        setupGlobalHotKey()
+        updateMenuForAuthenticatedState()
+    }
+
+    private func disableFunctionality() {
+        // Remove hotkey monitors when signed out
+        if let globalMonitor = globalMonitor {
+            NSEvent.removeMonitor(globalMonitor)
+            self.globalMonitor = nil
+        }
+        if let localMonitor = localMonitor {
+            NSEvent.removeMonitor(localMonitor)
+            self.localMonitor = nil
+        }
+        updateMenuForUnauthenticatedState()
+    }
+
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Bap")
+            button.image = NSImage(named: "MenuBarIcon")
         }
 
+        updateMenuForUnauthenticatedState()
+    }
+
+    private func updateMenuForAuthenticatedState() {
         let menu = NSMenu()
+
+        if let user = AuthManager.shared.currentUser {
+            let userItem = NSMenuItem(title: user.email, action: nil, keyEquivalent: "")
+            userItem.isEnabled = false
+            menu.addItem(userItem)
+            menu.addItem(NSMenuItem.separator())
+        }
+
         menu.addItem(NSMenuItem(title: "Record (⌥ Space)", action: #selector(toggleRecording), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Check Accessibility...", action: #selector(openAccessibilityPrefs), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Sign Out", action: #selector(signOut), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
+
+        statusItem.menu = menu
+    }
+
+    private func updateMenuForUnauthenticatedState() {
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "Sign In...", action: #selector(showLoginWindowAction), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
 
         statusItem.menu = menu
@@ -50,6 +114,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         Task {
             await whisperTranscriber?.loadModel()
+        }
+    }
+
+    // MARK: - Login Window
+
+    @objc private func showLoginWindowAction() {
+        showLoginWindow()
+    }
+
+    private func showLoginWindow() {
+        if loginWindow != nil { return }
+
+        let loginView = LoginView()
+        let hostingController = NSHostingController(rootView: loginView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Sign in to Bap"
+        window.styleMask = [.titled, .closable]
+        window.level = .floating
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        // Activate the app so the window comes to front
+        NSApp.activate(ignoringOtherApps: true)
+
+        loginWindow = window
+    }
+
+    private func hideLoginWindow() {
+        loginWindow?.close()
+        loginWindow = nil
+    }
+
+    // MARK: - Sign Out
+
+    @objc private func signOut() {
+        Task {
+            await AuthManager.shared.signOut()
         }
     }
 
@@ -92,6 +194,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @discardableResult
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
+        // Only handle if authenticated
+        guard AuthManager.shared.isAuthenticated else { return false }
+
         // Option + Space: keyCode 49 = Space, modifierFlags contains .option
         let isOptionPressed = event.modifierFlags.contains(.option)
         let isSpaceKey = event.keyCode == 49
@@ -112,6 +217,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Recording
 
     @objc func toggleRecording() {
+        guard AuthManager.shared.isAuthenticated else {
+            showLoginWindow()
+            return
+        }
+
         if isRecording {
             stopRecording()
         } else {
@@ -160,9 +270,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateMenuBarIcon(recording: Bool) {
         if let button = statusItem.button {
-            let symbolName = recording ? "waveform.circle.fill" : "waveform"
-            button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Bap")
-            button.contentTintColor = recording ? .systemRed : nil
+            button.image = NSImage(named: "MenuBarIcon")
         }
     }
 

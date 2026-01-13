@@ -12,12 +12,25 @@
 
 /* Begin PBXFileReference section */
 		F45F5C662F0FCA6F00F3F71A /* Bap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bap.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F4A1B0012F100000000001A1 /* BapIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BapIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4A1B0012F100000000001A1 /* BapIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = BapIOS.app; path = "Bap-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F4A086892F16807C00E0D8CD /* Exceptions for "macOS" folder in "Bap-macOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F45F5C652F0FCA6F00F3F71A /* Bap-macOS */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F45F5C682F0FCA6F00F3F71A /* macOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F4A086892F16807C00E0D8CD /* Exceptions for "macOS" folder in "Bap-macOS" target */,
+			);
 			path = macOS;
 			sourceTree = "<group>";
 		};
@@ -137,7 +150,7 @@
 					};
 				};
 			};
-			buildConfigurationList = F45F5C612F0FCA6F00F3F71A /* Build configuration list for PBXProject "bap" */;
+			buildConfigurationList = F45F5C612F0FCA6F00F3F71A /* Build configuration list for PBXProject "Bap" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -315,9 +328,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = macOS/macOS.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H4LAG3Q6BJ;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -332,7 +347,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = baptiste.bap;
+				PRODUCT_BUNDLE_IDENTIFIER = com.baptistecolle.bap;
 				PRODUCT_NAME = Bap;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -350,9 +365,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = macOS/macOS.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H4LAG3Q6BJ;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -367,7 +384,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = baptiste.bap;
+				PRODUCT_BUNDLE_IDENTIFIER = com.baptistecolle.bap;
 				PRODUCT_NAME = Bap;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -457,7 +474,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		F45F5C612F0FCA6F00F3F71A /* Build configuration list for PBXProject "bap" */ = {
+		F45F5C612F0FCA6F00F3F71A /* Build configuration list for PBXProject "Bap" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F45F5C6F2F0FCA7100F3F71A /* Debug */,

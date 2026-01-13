@@ -5,7 +5,8 @@
       "Bash(xcodebuild:*)",
       "Bash(mkdir:*)",
       "Bash(mv:*)",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "Bash(find:*)"
     ]
   }
 }
