@@ -30,7 +30,8 @@
       "Bash(xargs cat:*)",
       "mcp__ide__getDiagnostics",
       "Bash(ls:*)",
-      "Bash(bun install:*)"
+      "Bash(bun install:*)",
+      "Bash(git rm:*)"
     ]
   }
 }
