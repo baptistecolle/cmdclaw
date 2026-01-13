@@ -33,7 +33,11 @@ export const auth = betterAuth({
       appBundleIdentifier: env.APPLE_APP_BUNDLE_IDENTIFIER,
     },
   },
-  trustedOrigins: ["https://appleid.apple.com"],
+  trustedOrigins: [
+    "https://appleid.apple.com",
+    "https://heybap.com",
+    "https://www.heybap.com",
+  ],
   plugins: [
     nextCookies(),
     magicLink({

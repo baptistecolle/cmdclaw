@@ -1,9 +1,8 @@
 'use client';
 
 import type React from "react";
-import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,22 +43,23 @@ function AppleIcon() {
 
 function LoginContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const callbackUrl = searchParams.get("callbackUrl") || "/chat";
 
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<SignInState>("idle");
-  const [session, setSession] = useState<{ user?: { email?: string; name?: string } } | null>(null);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
     authClient.getSession().then((res) => {
       if (res?.data?.session && res?.data?.user) {
-        setSession(res.data);
+        router.replace(callbackUrl);
       } else {
-        setSession(null);
+        setIsCheckingSession(false);
       }
     });
-  }, []);
+  }, [router, callbackUrl]);
 
   const requestMagicLink = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -82,14 +82,6 @@ function LoginContent() {
     setStatus("sent");
   };
 
-  const handleSignOut = async () => {
-    const { error: signOutError } = await authClient.signOut();
-    if (!signOutError) {
-      setSession(null);
-      setStatus("idle");
-    }
-  };
-
   const handleGoogleSignIn = async () => {
     await authClient.signIn.social({
       provider: "google",
@@ -104,6 +96,20 @@ function LoginContent() {
     });
   };
 
+  if (isCheckingSession) {
+    return (
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
+        <div className="space-y-1 text-center">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Bap
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
       <div className="space-y-1 text-center">
@@ -114,28 +120,7 @@ function LoginContent() {
         <p className="text-sm text-muted-foreground">Enter your email to get a magic link.</p>
       </div>
 
-      {session?.user ? (
-        <div className="space-y-3">
-          <div className="rounded-xl border bg-muted/60 p-3">
-            <p className="text-sm font-medium">Signed in</p>
-            <p className="text-sm text-muted-foreground">
-              {session.user.name || session.user.email}
-            </p>
-            {session.user.email && (
-              <p className="text-xs text-muted-foreground">{session.user.email}</p>
-            )}
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button asChild className="flex-1">
-              <Link href={callbackUrl}>Continue</Link>
-            </Button>
-            <Button variant="outline" className="flex-1" onClick={handleSignOut}>
-              Sign out
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
+      <div className="space-y-4">
           <div className="flex flex-col gap-2">
             <Button
               type="button"
@@ -184,9 +169,7 @@ function LoginContent() {
               {status === "sending" ? "Sending..." : status === "sent" ? "Email sent, check your inbox" : "Send magic link"}
             </Button>
           </form>
-        </div>
-      )}
-
+      </div>
 
       {error && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
