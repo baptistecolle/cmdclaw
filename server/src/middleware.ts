@@ -4,8 +4,17 @@ import type { NextRequest } from "next/server";
 const protectedRoutes = ["/chat", "/settings"];
 const publicRoutes = ["/login", "/api/auth"];
 
-export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export function middleware(request: NextRequest) {
+  const url = request.nextUrl;
+  const host = request.headers.get("host") || "";
+  const { pathname } = url;
+
+  // Redirect www to non-www
+  if (host.startsWith("www.")) {
+    const newHost = host.replace("www.", "");
+    url.host = newHost;
+    return NextResponse.redirect(url, 301);
+  }
 
   // Allow public routes and static assets
   if (
@@ -40,13 +49,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
