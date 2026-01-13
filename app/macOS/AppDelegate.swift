@@ -4,10 +4,14 @@ import SwiftUI
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
+    private var recordingMenuItem: NSMenuItem?
     private var loginWindow: NSWindow?
     private var chatWindow: NSPanel?
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
+    private var globalKeyDownMonitor: Any?
+    private var localKeyDownMonitor: Any?
+    private var globalKeyUpMonitor: Any?
+    private var localKeyUpMonitor: Any?
+    private var isHoldingHotkey = false
     private var recordingManager: RecordingManager?
     private var whisperTranscriber: WhisperTranscriber?
     private var isRecording = false
@@ -77,11 +81,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let dismissObserver = dismissObserver {
             NotificationCenter.default.removeObserver(dismissObserver)
         }
-        if let globalMonitor = globalMonitor {
-            NSEvent.removeMonitor(globalMonitor)
+        removeAllHotkeyMonitors()
+    }
+
+    private func removeAllHotkeyMonitors() {
+        if let monitor = globalKeyDownMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalKeyDownMonitor = nil
         }
-        if let localMonitor = localMonitor {
-            NSEvent.removeMonitor(localMonitor)
+        if let monitor = localKeyDownMonitor {
+            NSEvent.removeMonitor(monitor)
+            localKeyDownMonitor = nil
+        }
+        if let monitor = globalKeyUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalKeyUpMonitor = nil
+        }
+        if let monitor = localKeyUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            localKeyUpMonitor = nil
         }
     }
 
@@ -117,14 +135,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func disableFunctionality() {
         // Remove hotkey monitors when signed out
-        if let globalMonitor = globalMonitor {
-            NSEvent.removeMonitor(globalMonitor)
-            self.globalMonitor = nil
-        }
-        if let localMonitor = localMonitor {
-            NSEvent.removeMonitor(localMonitor)
-            self.localMonitor = nil
-        }
+        removeAllHotkeyMonitors()
         updateMenuForUnauthenticatedState()
     }
 
@@ -148,7 +159,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(NSMenuItem.separator())
         }
 
-        menu.addItem(NSMenuItem(title: "Record (⌥ Space)", action: #selector(toggleRecording), keyEquivalent: ""))
+        let recordItem = NSMenuItem(title: "Record (⌥ Space)", action: #selector(toggleRecording), keyEquivalent: "")
+        recordingMenuItem = recordItem
+        menu.addItem(recordItem)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Check Accessibility...", action: #selector(openAccessibilityPrefs), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
@@ -232,41 +245,84 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(url)
     }
 
-    // MARK: - Global Hot Key (Option + Space)
+    // MARK: - Global Hot Key (Option + Space) - Push to Talk
 
     private func setupGlobalHotKey() {
-        // Global monitor for when app is not focused
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
+        // Global monitors for when app is not focused
+        globalKeyDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleKeyDown(event)
+        }
+        globalKeyUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            self?.handleKeyUp(event)
+        }
+        // Also monitor flagsChanged to detect when Option is released while holding Space
+        NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.handleFlagsChanged(event)
         }
 
-        // Local monitor for when app is focused
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if self?.handleKeyEvent(event) == true {
+        // Local monitors for when app is focused
+        localKeyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if self?.handleKeyDown(event) == true {
                 return nil // Consume the event
             }
             return event
         }
+        localKeyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            if self?.handleKeyUp(event) == true {
+                return nil // Consume the event
+            }
+            return event
+        }
+        NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.handleFlagsChanged(event)
+            return event
+        }
 
-        print("Global hotkey registered: Option + Space")
+        print("Global hotkey registered: Option + Space (push-to-talk)")
+    }
+
+    private func isHotkeyCombo(_ event: NSEvent) -> Bool {
+        // Option + Space: keyCode 49 = Space, modifierFlags contains .option
+        return event.modifierFlags.contains(.option) && event.keyCode == 49
     }
 
     @discardableResult
-    private func handleKeyEvent(_ event: NSEvent) -> Bool {
-        // Only handle if authenticated
+    private func handleKeyDown(_ event: NSEvent) -> Bool {
+        guard AuthManager.shared.isAuthenticated else { return false }
+        guard isHotkeyCombo(event) else { return false }
+
+        // Ignore repeated keyDown events while holding
+        guard !isHoldingHotkey else { return true }
+
+        isHoldingHotkey = true
+        Task { @MainActor in
+            self.startRecording()
+        }
+        return true
+    }
+
+    @discardableResult
+    private func handleKeyUp(_ event: NSEvent) -> Bool {
         guard AuthManager.shared.isAuthenticated else { return false }
 
-        // Option + Space: keyCode 49 = Space, modifierFlags contains .option
-        let isOptionPressed = event.modifierFlags.contains(.option)
-        let isSpaceKey = event.keyCode == 49
+        // Check if Space was released (keyCode 49)
+        guard event.keyCode == 49 && isHoldingHotkey else { return false }
 
-        if isOptionPressed && isSpaceKey {
-            Task { @MainActor in
-                self.toggleRecording()
-            }
-            return true
+        isHoldingHotkey = false
+        Task { @MainActor in
+            self.stopRecording()
         }
-        return false
+        return true
+    }
+
+    private func handleFlagsChanged(_ event: NSEvent) {
+        // If Option was released while holding the hotkey, stop recording
+        if isHoldingHotkey && !event.modifierFlags.contains(.option) {
+            isHoldingHotkey = false
+            Task { @MainActor in
+                self.stopRecording()
+            }
+        }
     }
 
     static var shared: AppDelegate? {
@@ -292,7 +348,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard !isRecording else { return }
         isRecording = true
 
-        updateMenuBarIcon(recording: true)
+        updateMenuBarForRecordingState(recording: true)
 
         // Show chat overlay with recording state
         chatOverlayManager.setRecording()
@@ -305,7 +361,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard isRecording else { return }
         isRecording = false
 
-        updateMenuBarIcon(recording: false)
+        updateMenuBarForRecordingState(recording: false)
 
         guard let audioURL = recordingManager?.stopRecording() else {
             chatOverlayManager.handleError("No audio recorded")
@@ -368,7 +424,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func updateMenuBarIcon(recording: Bool) {
+    private func updateMenuBarForRecordingState(recording: Bool) {
+        // Update menu item text
+        if recording {
+            recordingMenuItem?.title = "Stop Recording (⌥ Space)"
+        } else {
+            recordingMenuItem?.title = "Record (⌥ Space)"
+        }
+
+        // Update icon (can be customized for recording state if needed)
         if let button = statusItem.button {
             button.image = NSImage(named: "MenuBarIcon")
         }

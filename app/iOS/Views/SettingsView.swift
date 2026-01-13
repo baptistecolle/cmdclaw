@@ -100,7 +100,7 @@ struct SettingsView: View {
                     throw URLError(.badURL)
                 }
 
-                let healthURL = url.appendingPathComponent("api/rpc/health.ping")
+                let healthURL = url.appendingPathComponent("api/rpc/health/ping")
                 let (_, response) = try await URLSession.shared.data(from: healthURL)
 
                 if let httpResponse = response as? HTTPURLResponse,

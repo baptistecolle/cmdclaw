@@ -127,11 +127,6 @@ struct LoginView: View {
         } message: {
             Text("We've sent a magic link to \(email). Click the link in the email to sign in.")
         }
-        .onOpenURL { url in
-            Task {
-                await handleDeepLink(url: url)
-            }
-        }
     }
 
     // MARK: - Actions
@@ -184,21 +179,6 @@ struct LoginView: View {
             if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
                 errorMessage = error.localizedDescription
             }
-        }
-
-        isLoading = false
-    }
-
-    private func handleDeepLink(url: URL) async {
-        guard url.scheme == "bap", url.host == "auth" else { return }
-
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            try await authManager.handleMagicLinkCallback(url: url)
-        } catch {
-            errorMessage = error.localizedDescription
         }
 
         isLoading = false

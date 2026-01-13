@@ -25,10 +25,14 @@ struct ChatUsage: Sendable {
 
 // MARK: - Request/Response Models
 
-private struct AgentMessageRequest: Encodable {
+private struct AgentMessageInput: Encodable {
     let conversationId: String?
     let content: String
     let model: String?
+}
+
+private struct AgentMessageRequest: Encodable {
+    let json: AgentMessageInput
 }
 
 // MARK: - Agent Client
@@ -52,44 +56,73 @@ actor AgentClient {
         conversationId: String? = nil,
         onEvent: @MainActor @escaping (ChatEvent) -> Void
     ) async throws {
-        let url = baseURL.appendingPathComponent("api/rpc/chat.sendMessage")
+        let url = baseURL.appendingPathComponent("api/rpc/chat/sendMessage")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 120 // 2 minutes for long responses
 
+        print("[AgentClient] Sending request to: \(url.absoluteString)")
+
         // Add auth token from keychain
         if let token = await MainActor.run(body: { AuthManager.shared.getSessionToken() }) {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("[AgentClient] Auth token present: \(token.prefix(20))...")
+        } else {
+            print("[AgentClient] WARNING: No auth token found")
         }
 
-        let body = AgentMessageRequest(
+        let input = AgentMessageInput(
             conversationId: conversationId,
             content: content,
             model: nil
         )
+        let body = AgentMessageRequest(json: input)
         request.httpBody = try JSONEncoder().encode(body)
+
+        if let bodyString = String(data: request.httpBody!, encoding: .utf8) {
+            print("[AgentClient] Request body: \(bodyString)")
+        }
 
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            print("[AgentClient] ERROR: Invalid response type")
             await onEvent(.error(message: "Invalid response"))
             return
         }
 
+        print("[AgentClient] Response status: \(httpResponse.statusCode)")
+        print("[AgentClient] Response headers: \(httpResponse.allHeaderFields)")
+
         if httpResponse.statusCode == 401 {
+            print("[AgentClient] ERROR: Not authenticated (401)")
             await onEvent(.error(message: "Not authenticated"))
             return
         }
 
         if httpResponse.statusCode != 200 {
-            await onEvent(.error(message: "Server error: \(httpResponse.statusCode)"))
+            // Try to read the error response body
+            var errorBody = ""
+            for try await byte in bytes {
+                errorBody.append(Character(UnicodeScalar(byte)))
+            }
+            print("[AgentClient] ERROR: Server error \(httpResponse.statusCode)")
+            print("[AgentClient] Error body: \(errorBody)")
+            await onEvent(.error(message: "Server error: \(httpResponse.statusCode) - \(errorBody)"))
             return
         }
 
         // Parse streaming JSON events line by line
         var buffer = ""
+        var byteCount = 0
+        print("[AgentClient] Starting to read stream...")
+
         for try await byte in bytes {
+            byteCount += 1
+            if byteCount == 1 {
+                print("[AgentClient] First byte received")
+            }
             let char = Character(UnicodeScalar(byte))
             buffer.append(char)
 
@@ -98,18 +131,32 @@ actor AgentClient {
                 let line = String(buffer[..<newlineIndex])
                 buffer = String(buffer[buffer.index(after: newlineIndex)...])
 
+                if !line.trimmingCharacters(in: .whitespaces).isEmpty {
+                    print("[AgentClient] Line received: \(line.prefix(200))")
+                }
+
                 if let event = parseEvent(line) {
+                    print("[AgentClient] Parsed event: \(event)")
                     await onEvent(event)
 
                     // Stop processing on terminal events
-                    if case .done = event { return }
-                    if case .error = event { return }
+                    if case .done = event {
+                        print("[AgentClient] Stream complete (done event)")
+                        return
+                    }
+                    if case .error = event {
+                        print("[AgentClient] Stream complete (error event)")
+                        return
+                    }
                 }
             }
         }
 
+        print("[AgentClient] Stream ended. Total bytes: \(byteCount), remaining buffer: \(buffer.prefix(200))")
+
         // Process any remaining buffer
         if !buffer.isEmpty, let event = parseEvent(buffer) {
+            print("[AgentClient] Parsed final buffer event: \(event)")
             await onEvent(event)
         }
     }
@@ -118,9 +165,37 @@ actor AgentClient {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        guard let data = trimmed.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = json["type"] as? String else {
+        // Handle SSE format - strip "data: " prefix
+        var jsonLine = trimmed
+        if jsonLine.hasPrefix("data: ") {
+            jsonLine = String(jsonLine.dropFirst(6))
+        } else if jsonLine.hasPrefix("data:") {
+            jsonLine = String(jsonLine.dropFirst(5))
+        }
+
+        // Skip SSE comments and empty data
+        guard !jsonLine.isEmpty, !jsonLine.hasPrefix(":") else { return nil }
+
+        guard let data = jsonLine.data(using: .utf8) else {
+            print("[AgentClient] Failed to convert line to data: \(jsonLine.prefix(100))")
+            return nil
+        }
+
+        guard let rawJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            print("[AgentClient] Failed to parse JSON: \(jsonLine.prefix(100))")
+            return nil
+        }
+
+        // Server wraps events in {"json": {...}} - unwrap if present
+        let json: [String: Any]
+        if let wrapped = rawJson["json"] as? [String: Any] {
+            json = wrapped
+        } else {
+            json = rawJson
+        }
+
+        guard let type = json["type"] as? String else {
+            print("[AgentClient] No 'type' field in JSON: \(json.keys)")
             return nil
         }
 
@@ -173,6 +248,7 @@ actor AgentClient {
             return .error(message: message)
 
         default:
+            print("[AgentClient] Unhandled event type: \(type)")
             return nil
         }
     }
