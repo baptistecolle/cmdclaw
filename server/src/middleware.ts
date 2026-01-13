@@ -5,16 +5,7 @@ const protectedRoutes = ["/chat", "/settings"];
 const publicRoutes = ["/login", "/api/auth"];
 
 export function middleware(request: NextRequest) {
-  const url = request.nextUrl;
-  const host = request.headers.get("host") || "";
-  const { pathname } = url;
-
-  // Redirect www to non-www
-  if (host.startsWith("www.")) {
-    const newHost = host.replace("www.", "");
-    url.host = newHost;
-    return NextResponse.redirect(url, 301);
-  }
+  const { pathname } = request.nextUrl;
 
   // Allow public routes and static assets
   if (
