@@ -43,17 +43,21 @@ final class AuthManager {
         defer { isLoading = false }
 
         guard let token = getSessionToken() else {
+            print("[Auth] No session token found in keychain")
             isAuthenticated = false
             currentUser = nil
             return
         }
 
+        print("[Auth] Found session token, verifying with server...")
+
         do {
             let user = try await fetchCurrentUser(token: token)
             currentUser = user
             isAuthenticated = true
+            print("[Auth] Session verified, user: \(user.email)")
         } catch {
-            // Token invalid or expired
+            print("[Auth] Session verification failed: \(error)")
             deleteSessionToken()
             isAuthenticated = false
             currentUser = nil
@@ -77,49 +81,84 @@ final class AuthManager {
     // MARK: - Magic Link
 
     func sendMagicLink(email: String) async throws {
-        let url = baseURL.appendingPathComponent("api/auth/magic-link")
+        let url = baseURL.appendingPathComponent("api/auth/sign-in/magic-link")
+        print("[Auth] Sending magic link to \(email) via \(url)")
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body = ["email": email]
+        // Use native-callback endpoint to get the session token passed to the app
+        let nativeCallbackURL = baseURL.appendingPathComponent("api/auth/native-callback")
+        var callbackComponents = URLComponents(url: nativeCallbackURL, resolvingAgainstBaseURL: false)!
+        callbackComponents.queryItems = [URLQueryItem(name: "redirect", value: "bap://auth/callback")]
+
+        let body: [String: String] = [
+            "email": email,
+            "callbackURL": callbackComponents.url!.absoluteString
+        ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            print("[Auth] Network error sending magic link: \(error)")
+            throw AuthError.magicLinkFailed
+        }
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("[Auth] Invalid response type")
+            throw AuthError.magicLinkFailed
+        }
+
+        print("[Auth] Magic link response: \(httpResponse.statusCode)")
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if let responseBody = String(data: data, encoding: .utf8) {
+                print("[Auth] Magic link error response: \(responseBody)")
+            }
             throw AuthError.magicLinkFailed
         }
     }
 
     func handleMagicLinkCallback(url: URL) async throws {
-        // Extract token from callback URL
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
+        print("[Auth] Handling magic link callback: \(url)")
+
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            print("[Auth] Failed to parse callback URL")
             throw AuthError.invalidCallback
         }
 
-        // Verify the magic link token with the server
-        let verifyURL = baseURL.appendingPathComponent("api/auth/magic-link/verify")
-        var request = URLRequest(url: verifyURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body = ["token": token]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw AuthError.invalidToken
+        // Check for error in callback
+        if let error = components.queryItems?.first(where: { $0.name == "error" })?.value {
+            print("[Auth] Callback error: \(error)")
+            throw AuthError.invalidCallback
         }
 
-        let authResponse = try JSONDecoder().decode(AuthResponse.self, from: data)
-        saveSessionToken(authResponse.token)
-        currentUser = authResponse.user
-        isAuthenticated = true
+        // Extract session token from callback URL (passed by native-callback endpoint)
+        guard let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
+            print("[Auth] No token found in callback URL")
+            throw AuthError.invalidCallback
+        }
+
+        print("[Auth] Received session token, saving and fetching user...")
+
+        // Save the session token
+        saveSessionToken(token)
+
+        // Fetch user info with the new token
+        do {
+            let user = try await fetchCurrentUser(token: token)
+            currentUser = user
+            isAuthenticated = true
+            print("[Auth] Successfully authenticated: \(user.email)")
+        } catch {
+            print("[Auth] Failed to fetch user after magic link: \(error)")
+            deleteSessionToken()
+            throw error
+        }
     }
 
     // MARK: - OAuth (Google/Apple)
@@ -246,14 +285,26 @@ final class AuthManager {
 
     private func fetchCurrentUser(token: String) async throws -> AuthUser {
         let url = baseURL.appendingPathComponent("api/auth/get-session")
+        print("[Auth] Fetching user from: \(url)")
+
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("[Auth] Invalid response type")
+            throw AuthError.unauthorized
+        }
+
+        print("[Auth] get-session response status: \(httpResponse.statusCode)")
+
+        if let responseBody = String(data: data, encoding: .utf8) {
+            print("[Auth] get-session response: \(responseBody)")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
             throw AuthError.unauthorized
         }
 

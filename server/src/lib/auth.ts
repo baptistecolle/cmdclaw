@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { magicLink } from "better-auth/plugins";
+import { bearer, magicLink } from "better-auth/plugins";
 import { Resend } from "resend";
 
 import { env } from "@/env";
@@ -37,9 +37,12 @@ export const auth = betterAuth({
     "https://appleid.apple.com",
     "https://heybap.com",
     "https://www.heybap.com",
+    "http://localhost:3000",
+    "bap://",
   ],
   plugins: [
     nextCookies(),
+    bearer(),
     magicLink({
       async sendMagicLink({ email, url }) {
         if (resend && env.EMAIL_FROM) {

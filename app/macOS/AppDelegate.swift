@@ -4,20 +4,23 @@ import SwiftUI
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
-    private var recordingWindow: NSPanel?
-    private var resultWindow: NSPanel?
     private var loginWindow: NSWindow?
+    private var chatWindow: NSPanel?
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var recordingManager: RecordingManager?
     private var whisperTranscriber: WhisperTranscriber?
     private var isRecording = false
     private var authObservationTask: Task<Void, Never>?
+    private var dismissObserver: NSObjectProtocol?
+    private let chatOverlayManager = ChatOverlayManager.shared
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
         setupManagers()
         setupAuthObserver()
+        setupDismissObserver()
+        registerURLHandler()
 
         // Initialize auth and check state
         Task {
@@ -26,8 +29,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func registerURLHandler() {
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleURLEvent(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+    }
+
+    @objc private func handleURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
+        guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
+              let url = URL(string: urlString) else {
+            print("[Auth] Failed to parse URL from event")
+            return
+        }
+
+        print("[Auth] Received URL: \(url)")
+
+        // Handle auth callback
+        if url.scheme == "bap" && url.host == "auth" {
+            Task {
+                do {
+                    try await AuthManager.shared.handleMagicLinkCallback(url: url)
+                    handleAuthStateChange()
+                } catch {
+                    print("[Auth] Magic link callback failed: \(error)")
+                }
+            }
+        }
+    }
+
+    private func setupDismissObserver() {
+        dismissObserver = NotificationCenter.default.addObserver(
+            forName: .dismissChatOverlay,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.hideChatOverlay()
+            }
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         authObservationTask?.cancel()
+        if let dismissObserver = dismissObserver {
+            NotificationCenter.default.removeObserver(dismissObserver)
+        }
         if let globalMonitor = globalMonitor {
             NSEvent.removeMonitor(globalMonitor)
         }
@@ -244,7 +293,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isRecording = true
 
         updateMenuBarIcon(recording: true)
-        showRecordingWindow()
+
+        // Show chat overlay with recording state
+        chatOverlayManager.setRecording()
+        showChatOverlay()
 
         recordingManager?.startRecording()
     }
@@ -256,7 +308,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateMenuBarIcon(recording: false)
 
         guard let audioURL = recordingManager?.stopRecording() else {
-            hideRecordingWindow()
+            chatOverlayManager.handleError("No audio recorded")
             return
         }
 
@@ -266,15 +318,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func transcribeAudio(url: URL) async {
-        updateRecordingWindowState(.transcribing)
+        chatOverlayManager.setTranscribing()
 
         do {
             let transcription = try await whisperTranscriber?.transcribe(audioURL: url) ?? ""
-            hideRecordingWindow()
-            showResultWindow(text: transcription)
+
+            guard !transcription.isEmpty else {
+                chatOverlayManager.handleError("No speech detected")
+                return
+            }
+
+            // Add user message and send to agent
+            chatOverlayManager.addUserMessage(transcription)
+            await sendToAgent(content: transcription)
+
         } catch {
-            hideRecordingWindow()
-            showResultWindow(text: "Transcription failed: \(error.localizedDescription)")
+            chatOverlayManager.handleError("Transcription failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func sendToAgent(content: String) async {
+        do {
+            try await AgentClient.shared.sendMessage(
+                content: content,
+                conversationId: chatOverlayManager.currentConversationId
+            ) { [weak self] event in
+                guard let self = self else { return }
+
+                switch event {
+                case .text(let text):
+                    if self.chatOverlayManager.state != ChatOverlayManager.OverlayState.streaming {
+                        self.chatOverlayManager.startStreaming()
+                    }
+                    self.chatOverlayManager.appendStreamingContent(text)
+
+                case .toolUse, .toolResult:
+                    // Tool events can be displayed optionally
+                    break
+
+                case .done(let conversationId, _, _):
+                    self.chatOverlayManager.finishStreaming(conversationId: conversationId)
+
+                case .error(let message):
+                    self.chatOverlayManager.handleError(message)
+                }
+            }
+        } catch {
+            chatOverlayManager.handleError("Connection failed: \(error.localizedDescription)")
         }
     }
 
@@ -284,57 +374,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Windows
+    // MARK: - Chat Overlay
 
-    private func showRecordingWindow() {
-        let contentView = FloatingRecordingView(state: .recording) { [weak self] in
-            self?.toggleRecording()
-        }
+    private func showChatOverlay() {
+        // If overlay already exists, just update it (SwiftUI handles the rest)
+        if chatWindow != nil { return }
 
-        let hostingView = NSHostingView(rootView: contentView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
-
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
+        let contentView = AgentChatOverlayView(
+            manager: chatOverlayManager,
+            onDismiss: { [weak self] in
+                self?.hideChatOverlay()
+            },
+            onRecordAgain: { [weak self] in
+                self?.chatOverlayManager.cancelAutoDismiss()
+                self?.startRecording()
+            }
         )
-
-        panel.contentView = hostingView
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = true
-        panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-
-        positionWindowAtCenter(panel)
-        panel.orderFrontRegardless()
-
-        recordingWindow = panel
-    }
-
-    private func updateRecordingWindowState(_ state: RecordingState) {
-        guard let panel = recordingWindow else { return }
-
-        let contentView = FloatingRecordingView(state: state) { [weak self] in
-            self?.toggleRecording()
-        }
-
-        let hostingView = NSHostingView(rootView: contentView)
-        hostingView.frame = panel.contentView?.frame ?? NSRect(x: 0, y: 0, width: 200, height: 100)
-        panel.contentView = hostingView
-    }
-
-    private func hideRecordingWindow() {
-        recordingWindow?.close()
-        recordingWindow = nil
-    }
-
-    private func showResultWindow(text: String) {
-        let contentView = TranscriptionResultView(text: text) { [weak self] in
-            self?.hideResultWindow()
-        }
 
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 200)
@@ -356,12 +411,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         positionWindowAtCenter(panel)
         panel.orderFrontRegardless()
 
-        resultWindow = panel
+        chatWindow = panel
     }
 
-    private func hideResultWindow() {
-        resultWindow?.close()
-        resultWindow = nil
+    private func hideChatOverlay() {
+        chatWindow?.close()
+        chatWindow = nil
+        chatOverlayManager.reset()
     }
 
     private func positionWindowAtCenter(_ window: NSPanel) {

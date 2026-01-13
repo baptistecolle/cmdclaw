@@ -6,7 +6,8 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)",
       "WebFetch(domain:localhost)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:www.better-auth.com)"
     ]
   }
 }
