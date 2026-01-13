@@ -47,7 +47,6 @@ function LoginContent() {
   const callbackUrl = searchParams.get("callbackUrl") || "/chat";
 
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<SignInState>("idle");
   const [session, setSession] = useState<{ user?: { email?: string; name?: string } } | null>(null);
@@ -66,7 +65,6 @@ function LoginContent() {
     event.preventDefault();
     setStatus("sending");
     setError(null);
-    setMessage(null);
 
     const { error: signInError } = await authClient.signIn.magicLink({
       email,
@@ -82,9 +80,6 @@ function LoginContent() {
     }
 
     setStatus("sent");
-    setMessage(
-      "We sent a magic link to your inbox. In development the link is also printed in the server logs."
-    );
   };
 
   const handleSignOut = async () => {
@@ -92,7 +87,6 @@ function LoginContent() {
     if (!signOutError) {
       setSession(null);
       setStatus("idle");
-      setMessage(null);
     }
   };
 
@@ -186,18 +180,13 @@ function LoginContent() {
               required
               aria-invalid={status === "error"}
             />
-            <Button type="submit" className="w-full" disabled={!email || status === "sending"}>
-              {status === "sending" ? "Sending..." : "Send magic link"}
+            <Button type="submit" className="w-full" disabled={!email || status === "sending" || status === "sent"}>
+              {status === "sending" ? "Sending..." : status === "sent" ? "Email sent, check your inbox" : "Send magic link"}
             </Button>
           </form>
         </div>
       )}
 
-      {message && !session?.user && (
-        <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">
-          {message}
-        </div>
-      )}
 
       {error && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
@@ -210,7 +199,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-background px-4 py-12">
+    <div className="min-h-screen bg-background px-4 py-12 flex items-center justify-center">
       <Suspense fallback={
         <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
           <div className="space-y-1 text-center">

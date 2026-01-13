@@ -16,19 +16,7 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    EMAIL_SERVER_HOST:
-      process.env.NODE_ENV === "production"
-        ? z.string()
-        : z.string().optional(),
-    EMAIL_SERVER_PORT:
-      process.env.NODE_ENV === "production"
-        ? z.string()
-        : z.string().optional(),
-    EMAIL_SERVER_USER:
-      process.env.NODE_ENV === "production"
-        ? z.string()
-        : z.string().optional(),
-    EMAIL_SERVER_PASSWORD:
+    RESEND_API_KEY:
       process.env.NODE_ENV === "production"
         ? z.string()
         : z.string().optional(),
@@ -97,10 +85,7 @@ export const env = createEnv({
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
-    EMAIL_SERVER_HOST: process.env.EMAIL_SERVER_HOST,
-    EMAIL_SERVER_PORT: process.env.EMAIL_SERVER_PORT,
-    EMAIL_SERVER_USER: process.env.EMAIL_SERVER_USER,
-    EMAIL_SERVER_PASSWORD: process.env.EMAIL_SERVER_PASSWORD,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
     REDIS_URL: process.env.REDIS_URL,
     REDIS_HOST: process.env.REDIS_HOST,

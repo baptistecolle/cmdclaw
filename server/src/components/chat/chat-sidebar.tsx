@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, MessageSquare, Settings, Trash2, LogOut, ChevronUp } from "lucide-react";
+import { Plus, Settings, Trash2, LogOut, ChevronUp } from "lucide-react";
+import Image from "next/image";
 import {
   Sidebar,
   SidebarContent,
@@ -94,11 +95,11 @@ export function ChatSidebar() {
     <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader>
         <Link href="/chat" className="flex items-center gap-3 p-2 overflow-hidden group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
-            <MessageSquare className="h-5 w-5 group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
+            <Image src="/logo.png" alt="Bap" width={36} height={36} className="object-contain" />
           </div>
           <div className="space-y-0.5 group-data-[collapsible=icon]:hidden">
-            <p className="text-sm font-semibold">AI Assistant</p>
+            <p className="text-sm font-semibold">Bap</p>
             <p className="text-xs text-muted-foreground">Chat</p>
           </div>
         </Link>
