@@ -7,11 +7,16 @@ import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 
 const integrationTypeSchema = z.enum([
   "gmail",
+  "google_calendar",
+  "google_docs",
+  "google_sheets",
+  "google_drive",
   "notion",
   "linear",
   "github",
   "airtable",
   "slack",
+  "hubspot",
 ]);
 
 // List user's integrations
@@ -64,7 +69,8 @@ const getAuthUrl = protectedProcedure
     }
 
     // Add provider-specific params
-    if (input.type === "gmail") {
+    const googleTypes = ["gmail", "google_calendar", "google_docs", "google_sheets", "google_drive"];
+    if (googleTypes.includes(input.type)) {
       params.set("access_type", "offline");
       params.set("prompt", "consent");
     }

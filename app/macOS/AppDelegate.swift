@@ -184,6 +184,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         recordingManager = RecordingManager()
         whisperTranscriber = WhisperTranscriber()
 
+        // Wire up audio level updates to the chat overlay manager
+        recordingManager?.onAudioLevelUpdate = { [weak self] level in
+            self?.chatOverlayManager.updateAudioLevel(level)
+        }
+
         Task {
             await whisperTranscriber?.loadModel()
         }

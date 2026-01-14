@@ -120,7 +120,7 @@ async function main() {
       case "unread": await countUnread(); break;
       case "send": await sendEmail(); break;
       default:
-        console.log(`Gmail CLI - Commands:
+        console.log(`Google Gmail CLI - Commands:
   list [-q query] [-l limit]  List emails
   get <messageId>             Get email content
   unread                      Count unread emails

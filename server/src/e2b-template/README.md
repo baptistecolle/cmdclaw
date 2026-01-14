@@ -37,12 +37,17 @@ The template includes:
 - **Bun** runtime
 - **Claude Agent SDK** (`@anthropic-ai/claude_agent_sdk`)
 - **Integration CLI tools** at `/home/user/cli/`:
-  - `gmail` - Gmail integration
+  - `google-gmail` - Google Gmail integration
+  - `google-calendar` - Google Calendar integration
+  - `google-docs` - Google Docs integration
+  - `google-sheets` - Google Sheets integration
+  - `google-drive` - Google Drive integration
   - `github` - GitHub integration
   - `notion` - Notion integration
   - `linear` - Linear integration
   - `slack` - Slack integration
   - `airtable` - Airtable integration
+  - `hubspot` - HubSpot integration
 
 ## Configuration
 

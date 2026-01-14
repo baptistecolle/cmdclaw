@@ -1,6 +1,6 @@
 import { env } from "@/env";
 
-export type IntegrationType = "gmail" | "notion" | "linear" | "github" | "airtable" | "slack";
+export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot";
 
 export type OAuthConfig = {
   clientId: string;
@@ -28,7 +28,91 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     scopes: [
       "https://www.googleapis.com/auth/gmail.readonly",
       "https://www.googleapis.com/auth/gmail.send",
-      "https://www.googleapis.com/auth/gmail.modify",
+      "openid",
+      "email",
+      "profile",
+    ],
+    getUserInfo: async (accessToken) => {
+      const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      return { id: data.id, displayName: data.email };
+    },
+  }),
+
+  google_calendar: () => ({
+    clientId: env.GOOGLE_CLIENT_ID ?? "",
+    clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "https://www.googleapis.com/auth/calendar",
+      "openid",
+      "email",
+      "profile",
+    ],
+    getUserInfo: async (accessToken) => {
+      const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      return { id: data.id, displayName: data.email };
+    },
+  }),
+
+  google_docs: () => ({
+    clientId: env.GOOGLE_CLIENT_ID ?? "",
+    clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "https://www.googleapis.com/auth/documents",
+      "openid",
+      "email",
+      "profile",
+    ],
+    getUserInfo: async (accessToken) => {
+      const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      return { id: data.id, displayName: data.email };
+    },
+  }),
+
+  google_sheets: () => ({
+    clientId: env.GOOGLE_CLIENT_ID ?? "",
+    clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "openid",
+      "email",
+      "profile",
+    ],
+    getUserInfo: async (accessToken) => {
+      const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      return { id: data.id, displayName: data.email };
+    },
+  }),
+
+  google_drive: () => ({
+    clientId: env.GOOGLE_CLIENT_ID ?? "",
+    clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/drive.file",
       "openid",
       "email",
       "profile",
@@ -153,6 +237,35 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
         id: data.user_id,
         displayName: data.user ?? data.team ?? "Slack User",
         metadata: { teamId: data.team_id, teamName: data.team },
+      };
+    },
+  }),
+
+  hubspot: () => ({
+    clientId: env.HUBSPOT_CLIENT_ID ?? "",
+    clientSecret: env.HUBSPOT_CLIENT_SECRET ?? "",
+    authUrl: "https://app.hubspot.com/oauth/authorize",
+    tokenUrl: "https://api.hubapi.com/oauth/v1/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "crm.objects.contacts.read",
+      "crm.objects.contacts.write",
+      "crm.objects.companies.read",
+      "crm.objects.companies.write",
+      "crm.objects.deals.read",
+      "crm.objects.deals.write",
+      "tickets",
+      "crm.objects.owners.read",
+    ],
+    getUserInfo: async (accessToken) => {
+      const res = await fetch("https://api.hubapi.com/account-info/v3/details", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      return {
+        id: String(data.portalId),
+        displayName: data.accountType ? `${data.accountType} (${data.portalId})` : String(data.portalId),
+        metadata: { portalId: data.portalId, timeZone: data.timeZone },
       };
     },
   }),

@@ -55,10 +55,20 @@ struct AgentChatOverlayView: View {
         HStack(spacing: 8) {
             switch manager.state {
             case .recording:
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 12, height: 12)
-                    .modifier(PulseAnimation())
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 10, height: 10)
+                        .modifier(PulseAnimation())
+                    AudioWaveformView(
+                        audioLevel: manager.audioLevel,
+                        barCount: 5,
+                        barSpacing: 3,
+                        minBarHeight: 4,
+                        maxBarHeight: 20,
+                        barColor: .red
+                    )
+                }
                 Text("Listening...")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.white)
@@ -77,20 +87,12 @@ struct AgentChatOverlayView: View {
                     .progressViewStyle(.circular)
                     .controlSize(.small)
                     .tint(.white)
-                Text("Connecting...")
+                Text("Working on it...")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.white)
 
-            case .streaming:
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .controlSize(.small)
-                    .tint(.white)
-                Text("Thinking...")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white)
-
-            case .complete:
+            case .streaming, .complete:
+                // Show same indicator for both states to avoid flashing
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                 Text("Done")

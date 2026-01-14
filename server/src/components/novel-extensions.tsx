@@ -123,7 +123,7 @@ export const defaultExtensions = [
       }
       return "Type '/' for commands...";
     },
-    includeChildren: true,
+    includeChildren: false,
   }),
   SlashCommand,
 ];

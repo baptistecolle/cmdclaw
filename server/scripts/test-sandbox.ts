@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Test script for E2B sandbox with Gmail and Slack integration
+ * Test script for E2B sandbox with Google Gmail and Slack integration
  *
  * Usage:
  *   bun e2b:sandbox
@@ -110,9 +110,9 @@ async function main() {
 
   // Log which integrations are enabled
   if (integrationEnvs.GMAIL_ACCESS_TOKEN) {
-    console.log("✓ Gmail integration enabled");
+    console.log("✓ Google Gmail integration enabled");
   } else {
-    console.log("○ Gmail integration not found in database");
+    console.log("○ Google Gmail integration not found in database");
   }
 
   if (integrationEnvs.SLACK_ACCESS_TOKEN) {
@@ -146,7 +146,7 @@ async function main() {
 
   console.log(`✓ Sandbox created: ${sandbox.sandboxId}`);
   console.log("\nAvailable CLI commands in sandbox:");
-  console.log("  gmail list|get|unread|send  - Gmail operations");
+  console.log("  google-gmail list|get|unread|send  - Gmail operations");
   console.log("  slack channels|history|send|search|users - Slack operations");
   console.log("  claude -p <prompt>          - Run Claude Code\n");
 
@@ -177,7 +177,7 @@ async function main() {
         console.log(`
 Commands:
   <any bash command>   - Run command in sandbox
-  gmail <cmd>          - Gmail CLI (list, get, unread, send)
+  google-gmail <cmd>   - Gmail CLI (list, get, unread, send)
   slack <cmd>          - Slack CLI (channels, history, send, search, users)
   claude -p <prompt>   - Run Claude Code
   env                  - Show environment variables

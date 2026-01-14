@@ -177,11 +177,16 @@ export const message = pgTable(
 
 export const integrationTypeEnum = pgEnum("integration_type", [
   "gmail",
+  "google_calendar",
+  "google_docs",
+  "google_sheets",
+  "google_drive",
   "notion",
   "linear",
   "github",
   "airtable",
   "slack",
+  "hubspot",
 ]);
 
 export const integration = pgTable(
@@ -289,6 +294,8 @@ export const skill = pgTable(
     displayName: text("display_name").notNull(),
     // Description from SKILL.md frontmatter
     description: text("description").notNull(),
+    // Icon: emoji (e.g., "🚀") or Lucide icon name (e.g., "lucide:rocket")
+    icon: text("icon"),
     enabled: boolean("enabled").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -324,14 +331,50 @@ export const skillFile = pgTable(
   ]
 );
 
+export const skillDocument = pgTable(
+  "skill_document",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    skillId: text("skill_id")
+      .notNull()
+      .references(() => skill.id, { onDelete: "cascade" }),
+    // Original filename uploaded by user
+    filename: text("filename").notNull(),
+    // MIME type (e.g., "application/pdf", "image/png")
+    mimeType: text("mime_type").notNull(),
+    // File size in bytes
+    sizeBytes: integer("size_bytes").notNull(),
+    // S3/MinIO object key (path in bucket)
+    storageKey: text("storage_key").notNull(),
+    // Optional description/notes about the document
+    description: text("description"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("skill_document_skill_id_idx").on(table.skillId)]
+);
+
 export const skillRelations = relations(skill, ({ one, many }) => ({
   user: one(user, { fields: [skill.userId], references: [user.id] }),
   files: many(skillFile),
+  documents: many(skillDocument),
 }));
 
 export const skillFileRelations = relations(skillFile, ({ one }) => ({
   skill: one(skill, {
     fields: [skillFile.skillId],
+    references: [skill.id],
+  }),
+}));
+
+export const skillDocumentRelations = relations(skillDocument, ({ one }) => ({
+  skill: one(skill, {
+    fields: [skillDocument.skillId],
     references: [skill.id],
   }),
 }));

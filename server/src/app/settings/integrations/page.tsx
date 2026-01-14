@@ -11,15 +11,42 @@ import {
   useDisconnectIntegration,
 } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ExternalLink, CheckCircle2, XCircle, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 
+type FilterTab = "all" | "connected" | "not_connected";
+
 const integrationConfig = {
   gmail: {
-    name: "Gmail",
+    name: "Google Gmail",
     description: "Read and send emails",
-    icon: "/integrations/gmail.svg",
+    icon: "/integrations/google-gmail.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
+  google_calendar: {
+    name: "Google Calendar",
+    description: "Manage events and calendars",
+    icon: "/integrations/google-calendar.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
+  google_docs: {
+    name: "Google Docs",
+    description: "Read and edit documents",
+    icon: "/integrations/google-docs.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
+  google_sheets: {
+    name: "Google Sheets",
+    description: "Read and edit spreadsheets",
+    icon: "/integrations/google-sheets.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
+  google_drive: {
+    name: "Google Drive",
+    description: "Access and manage files",
+    icon: "/integrations/google-drive.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
   notion: {
@@ -28,18 +55,18 @@ const integrationConfig = {
     icon: "/integrations/notion.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
-  linear: {
-    name: "Linear",
-    description: "Manage issues and projects",
-    icon: "/integrations/linear.svg",
-    bgColor: "bg-white dark:bg-gray-800",
-  },
-  github: {
-    name: "GitHub",
-    description: "Access repositories and PRs",
-    icon: "/integrations/github.svg",
-    bgColor: "bg-white dark:bg-gray-800",
-  },
+  // linear: {
+  //   name: "Linear",
+  //   description: "Manage issues and projects",
+  //   icon: "/integrations/linear.svg",
+  //   bgColor: "bg-white dark:bg-gray-800",
+  // },
+  // github: {
+  //   name: "GitHub",
+  //   description: "Access repositories and PRs",
+  //   icon: "/integrations/github.svg",
+  //   bgColor: "bg-white dark:bg-gray-800",
+  // },
   airtable: {
     name: "Airtable",
     description: "Read and update bases",
@@ -50,6 +77,12 @@ const integrationConfig = {
     name: "Slack",
     description: "Send messages and read channels",
     icon: "/integrations/slack.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
+  hubspot: {
+    name: "HubSpot",
+    description: "Manage CRM contacts, deals, and tickets",
+    icon: "/integrations/hubspot.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
 } as const;
@@ -67,6 +100,8 @@ function IntegrationsPageContent() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
   // Handle URL params for success/error
   useEffect(() => {
@@ -139,6 +174,27 @@ function IntegrationsPageContent() {
     integrationsList.map((i) => [i.type, i])
   );
 
+  // Filter integrations based on search and tab
+  const filteredIntegrations = (Object.entries(integrationConfig) as [IntegrationType, (typeof integrationConfig)[IntegrationType]][]).filter(
+    ([type, config]) => {
+      const integration = connectedIntegrations.get(type);
+      const matchesSearch = config.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        config.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      if (activeTab === "connected") return !!integration;
+      if (activeTab === "not_connected") return !integration;
+      return true;
+    }
+  );
+
+  const tabs: { id: FilterTab; label: string; count: number }[] = [
+    { id: "all", label: "All", count: Object.keys(integrationConfig).length },
+    { id: "connected", label: "Connected", count: connectedIntegrations.size },
+    { id: "not_connected", label: "Not Connected", count: Object.keys(integrationConfig).length - connectedIntegrations.size },
+  ];
+
   return (
     <div>
       <div className="mb-6">
@@ -166,13 +222,58 @@ function IntegrationsPageContent() {
         </div>
       )}
 
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-1 rounded-lg bg-muted p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                activeTab === tab.id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+              <span className={cn(
+                "ml-1.5 rounded-full px-1.5 py-0.5 text-xs",
+                activeTab === tab.id
+                  ? "bg-muted text-muted-foreground"
+                  : "bg-muted-foreground/20 text-muted-foreground"
+              )}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search integrations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="text-sm text-muted-foreground">
           Loading integrations...
         </div>
+      ) : filteredIntegrations.length === 0 ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          {searchQuery
+            ? "No integrations found matching your search."
+            : activeTab === "connected"
+              ? "No connected integrations yet."
+              : "All integrations are connected."}
+        </div>
       ) : (
         <div className="space-y-4">
-          {(Object.entries(integrationConfig) as [IntegrationType, (typeof integrationConfig)[IntegrationType]][]).map(([type, config]) => {
+          {filteredIntegrations.map(([type, config]) => {
             const integration = connectedIntegrations.get(type);
             const isConnecting = connectingType === type;
 
@@ -234,7 +335,7 @@ function IntegrationsPageContent() {
                     </>
                   ) : (
                     <Button
-                      onClick={() => handleConnect(type as IntegrationType)}
+                      onClick={() => handleConnect(type)}
                       disabled={isConnecting}
                     >
                       {isConnecting ? "Connecting..." : "Connect"}

@@ -6,11 +6,16 @@ import type { IntegrationType } from "@/server/oauth/config";
 
 const ENV_VAR_MAP: Record<IntegrationType, string> = {
   gmail: "GMAIL_ACCESS_TOKEN",
+  google_calendar: "GOOGLE_CALENDAR_ACCESS_TOKEN",
+  google_docs: "GOOGLE_DOCS_ACCESS_TOKEN",
+  google_sheets: "GOOGLE_SHEETS_ACCESS_TOKEN",
+  google_drive: "GOOGLE_DRIVE_ACCESS_TOKEN",
   notion: "NOTION_ACCESS_TOKEN",
   linear: "LINEAR_ACCESS_TOKEN",
   github: "GITHUB_ACCESS_TOKEN",
   airtable: "AIRTABLE_ACCESS_TOKEN",
   slack: "SLACK_ACCESS_TOKEN",
+  hubspot: "HUBSPOT_ACCESS_TOKEN",
 };
 
 export async function getCliEnvForUser(userId: string): Promise<Record<string, string>> {
@@ -35,12 +40,55 @@ export function getCliInstructions(enabledIntegrations: IntegrationType[]): stri
 
   if (enabledIntegrations.includes("gmail")) {
     instructions.push(`
-## Gmail CLI
-- gmail list [-q query] [-l limit] - List emails
-- gmail get <messageId> - Get full email content
-- gmail unread - Count unread emails
-- gmail send --to <email> --subject <subject> --body <body>
-- Example: gmail list -q "is:unread" -l 5`);
+## Google Gmail CLI
+- google-gmail list [-q query] [-l limit] - List emails
+- google-gmail get <messageId> - Get full email content
+- google-gmail unread - Count unread emails
+- google-gmail send --to <email> --subject <subject> --body <body>
+- Example: google-gmail list -q "is:unread" -l 5`);
+  }
+
+  if (enabledIntegrations.includes("google_calendar")) {
+    instructions.push(`
+## Google Calendar CLI
+- gcalendar list [-t timeMin] [-m timeMax] [-l limit] - List events
+- gcalendar get <eventId> - Get event details
+- gcalendar create --summary <title> --start <datetime> --end <datetime> [--description <text>]
+- gcalendar delete <eventId> - Delete an event
+- gcalendar calendars - List available calendars
+- Example: gcalendar list -l 10`);
+  }
+
+  if (enabledIntegrations.includes("google_docs")) {
+    instructions.push(`
+## Google Docs CLI
+- gdocs get <documentId> - Get document content
+- gdocs create --title <title> [--content <text>] - Create a document
+- gdocs append <documentId> --text <text> - Append text to document
+- gdocs list - List recent documents
+- Example: gdocs get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms`);
+  }
+
+  if (enabledIntegrations.includes("google_sheets")) {
+    instructions.push(`
+## Google Sheets CLI
+- gsheets get <spreadsheetId> [--range <A1:B10>] - Get spreadsheet data
+- gsheets create --title <title> - Create a spreadsheet
+- gsheets append <spreadsheetId> --range <A:B> --values '[[...]]' - Append rows
+- gsheets update <spreadsheetId> --range <A1:B2> --values '[[...]]' - Update cells
+- gsheets list - List recent spreadsheets
+- Example: gsheets get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms --range Sheet1!A1:D10`);
+  }
+
+  if (enabledIntegrations.includes("google_drive")) {
+    instructions.push(`
+## Google Drive CLI
+- gdrive list [-q query] [-l limit] - List files
+- gdrive get <fileId> - Get file metadata
+- gdrive download <fileId> [--output <path>] - Download file
+- gdrive search -q <query> - Search files
+- gdrive upload --file <path> [--name <name>] [--folder <folderId>] - Upload file
+- Example: gdrive list -l 20`);
   }
 
   if (enabledIntegrations.includes("notion")) {
@@ -100,6 +148,31 @@ export function getCliInstructions(enabledIntegrations: IntegrationType[]): stri
 - slack user -u <userId> - Get user info
 - slack thread -c <channelId> --thread <ts> - Get thread replies
 - slack react -c <channelId> --ts <messageTs> -e <emoji>`);
+  }
+
+  if (enabledIntegrations.includes("hubspot")) {
+    instructions.push(`
+## HubSpot CLI
+- hubspot contacts list [-l limit] [-q query] - List contacts
+- hubspot contacts get <id> - Get contact details
+- hubspot contacts create --email <email> [--firstname] [--lastname] [--company] [--phone]
+- hubspot contacts update <id> --properties '{"firstname":"John"}'
+- hubspot contacts search -q <query> - Search contacts
+- hubspot companies list [-l limit] - List companies
+- hubspot companies get <id> - Get company details
+- hubspot companies create --name <name> [--domain] [--industry]
+- hubspot deals list [-l limit] - List deals
+- hubspot deals get <id> - Get deal details
+- hubspot deals create --name <name> --pipeline <id> --stage <id> [--amount]
+- hubspot tickets list [-l limit] - List tickets
+- hubspot tickets get <id> - Get ticket details
+- hubspot tickets create --subject <subject> --pipeline <id> --stage <id>
+- hubspot tasks list [-l limit] - List tasks
+- hubspot tasks create --subject <subject> [--body] [--due]
+- hubspot notes create --body <text> [--contact <id>] [--company <id>] [--deal <id>]
+- hubspot pipelines deals - List deal pipelines and stages
+- hubspot pipelines tickets - List ticket pipelines and stages
+- hubspot owners - List owners (sales reps)`);
   }
 
   if (instructions.length === 0) {

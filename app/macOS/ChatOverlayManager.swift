@@ -64,6 +64,7 @@ final class ChatOverlayManager {
     var streamingContent: String = ""
     var currentConversationId: String?
     var userTranscription: String = ""
+    var audioLevel: Float = 0.0
 
     // MARK: - Private
 
@@ -80,16 +81,23 @@ final class ChatOverlayManager {
         streamingContent = ""
         currentConversationId = nil
         userTranscription = ""
+        audioLevel = 0.0
         dismissTask?.cancel()
     }
 
     func setRecording() {
         state = .recording
+        audioLevel = 0.0
         cancelAutoDismiss()
+    }
+
+    func updateAudioLevel(_ level: Float) {
+        audioLevel = level
     }
 
     func setTranscribing() {
         state = .transcribing
+        audioLevel = 0.0
     }
 
     func addUserMessage(_ content: String) {
@@ -108,16 +116,13 @@ final class ChatOverlayManager {
     }
 
     func finishStreaming(conversationId: String) {
-        // Convert streaming content to final message
+        // Keep streamingContent visible - don't clear it
+        // This ensures the answer stays on screen after completion
         if !streamingContent.isEmpty {
             messages.append(ChatMessage(role: .assistant, content: streamingContent, timestamp: Date()))
         }
-        streamingContent = ""
         currentConversationId = conversationId
         state = .complete
-
-        // Start auto-dismiss timer
-        startAutoDismissTimer()
     }
 
     func handleError(_ message: String) {

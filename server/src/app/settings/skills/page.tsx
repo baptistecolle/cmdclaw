@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
+import { IconDisplay } from "@/components/ui/icon-picker";
 
 function SkillsPageContent() {
   const router = useRouter();
@@ -152,8 +153,8 @@ function SkillsPageContent() {
               className="flex items-center justify-between rounded-lg border p-4"
             >
               <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-muted">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
+                <div className="flex h-10 w-10 items-center justify-center">
+                  <IconDisplay icon={skill.icon} />
                 </div>
                 <div>
                   <h3 className="font-medium">{skill.displayName}</h3>

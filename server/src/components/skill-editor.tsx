@@ -134,7 +134,7 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
           "[&_h3]:text-lg [&_h3]:font-medium [&_h3]:mb-2 [&_h3]:mt-0",
           "[&_p]:mb-3 [&_p]:leading-relaxed",
           "[&_ul]:mb-3 [&_ol]:mb-3",
-          "[&_.is-empty]:before:content-[attr(data-placeholder)] [&_.is-empty]:before:text-muted-foreground [&_.is-empty]:before:float-left [&_.is-empty]:before:pointer-events-none [&_.is-empty]:before:h-0",
+          "[&_.is-empty.is-editor-empty]:before:content-[attr(data-placeholder)] [&_.is-empty.is-editor-empty]:before:text-muted-foreground [&_.is-empty.is-editor-empty]:before:float-left [&_.is-empty.is-editor-empty]:before:pointer-events-none [&_.is-empty.is-editor-empty]:before:h-0",
           className
         )}
         extensions={defaultExtensions}
@@ -315,9 +315,21 @@ export function parseMarkdownToJSON(markdown: string): JSONContent | undefined {
       continue;
     }
 
-    // Empty line
+    // Empty line(s) - preserve multiple consecutive blank lines as empty paragraphs
     if (!line.trim()) {
-      i++;
+      let emptyCount = 0;
+      while (i < lines.length && !lines[i].trim()) {
+        emptyCount++;
+        i++;
+      }
+      // If more than one consecutive empty line, add empty paragraphs to preserve spacing
+      // (one empty line is a standard paragraph break, additional ones create extra spacing)
+      for (let j = 1; j < emptyCount; j++) {
+        content.push({
+          type: "paragraph",
+          content: [],
+        });
+      }
       continue;
     }
 

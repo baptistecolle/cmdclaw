@@ -1,8 +1,16 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import { skill, skillFile } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { skill, skillFile, skillDocument } from "@/server/db/schema";
+import { eq, and, count } from "drizzle-orm";
+import {
+  uploadToS3,
+  deleteFromS3,
+  getPresignedDownloadUrl,
+  generateStorageKey,
+  ensureBucket,
+} from "@/server/storage/s3-client";
+import { validateFileUpload } from "@/server/storage/validation";
 
 // Helper to generate a valid skill slug (lowercase, numbers, hyphens only)
 function toSkillSlug(name: string): string {
@@ -42,6 +50,7 @@ const list = protectedProcedure.handler(async ({ context }) => {
     name: s.name,
     displayName: s.displayName,
     description: s.description,
+    icon: s.icon,
     enabled: s.enabled,
     fileCount: s.files.length,
     createdAt: s.createdAt,
@@ -49,7 +58,7 @@ const list = protectedProcedure.handler(async ({ context }) => {
   }));
 });
 
-// Get a single skill with all files
+// Get a single skill with all files and documents
 const get = protectedProcedure
   .input(z.object({ id: z.string() }))
   .handler(async ({ input, context }) => {
@@ -60,6 +69,7 @@ const get = protectedProcedure
       ),
       with: {
         files: true,
+        documents: true,
       },
     });
 
@@ -72,6 +82,7 @@ const get = protectedProcedure
       name: result.name,
       displayName: result.displayName,
       description: result.description,
+      icon: result.icon,
       enabled: result.enabled,
       files: result.files.map((f) => ({
         id: f.id,
@@ -79,6 +90,14 @@ const get = protectedProcedure
         content: f.content,
         createdAt: f.createdAt,
         updatedAt: f.updatedAt,
+      })),
+      documents: result.documents.map((d) => ({
+        id: d.id,
+        filename: d.filename,
+        mimeType: d.mimeType,
+        sizeBytes: d.sizeBytes,
+        description: d.description,
+        createdAt: d.createdAt,
       })),
       createdAt: result.createdAt,
       updatedAt: result.updatedAt,
@@ -91,6 +110,7 @@ const create = protectedProcedure
     z.object({
       displayName: z.string().min(1).max(128),
       description: z.string().min(1).max(1024),
+      icon: z.string().max(64).optional(),
     })
   )
   .handler(async ({ input, context }) => {
@@ -108,6 +128,7 @@ const create = protectedProcedure
         name: slug,
         displayName: input.displayName,
         description: input.description,
+        icon: input.icon,
       })
       .returning();
 
@@ -123,6 +144,7 @@ const create = protectedProcedure
       name: newSkill.name,
       displayName: newSkill.displayName,
       description: newSkill.description,
+      icon: newSkill.icon,
     };
   });
 
@@ -134,6 +156,7 @@ const update = protectedProcedure
       name: z.string().min(1).max(64).optional(), // slug
       displayName: z.string().min(1).max(128).optional(),
       description: z.string().min(1).max(1024).optional(),
+      icon: z.string().max(64).nullish(),
       enabled: z.boolean().optional(),
     })
   )
@@ -151,6 +174,9 @@ const update = protectedProcedure
     }
     if (input.description !== undefined) {
       updates.description = input.description;
+    }
+    if (input.icon !== undefined) {
+      updates.icon = input.icon;
     }
     if (input.enabled !== undefined) {
       updates.enabled = input.enabled;
@@ -281,6 +307,119 @@ const deleteFile = protectedProcedure
     return { success: true };
   });
 
+// ========== DOCUMENT ROUTES ==========
+
+// Upload a document
+const uploadDocument = protectedProcedure
+  .input(
+    z.object({
+      skillId: z.string(),
+      filename: z.string().min(1).max(256),
+      mimeType: z.string(),
+      content: z.string(), // Base64-encoded file content
+      description: z.string().max(1024).optional(),
+    })
+  )
+  .handler(async ({ input, context }) => {
+    // Verify skill ownership
+    const existingSkill = await context.db.query.skill.findFirst({
+      where: and(
+        eq(skill.id, input.skillId),
+        eq(skill.userId, context.user.id)
+      ),
+    });
+
+    if (!existingSkill) {
+      throw new ORPCError("NOT_FOUND", { message: "Skill not found" });
+    }
+
+    // Decode base64 content
+    const fileBuffer = Buffer.from(input.content, "base64");
+    const sizeBytes = fileBuffer.length;
+
+    // Get current document count
+    const [{ value: docCount }] = await context.db
+      .select({ value: count() })
+      .from(skillDocument)
+      .where(eq(skillDocument.skillId, input.skillId));
+
+    // Validate
+    validateFileUpload(input.filename, input.mimeType, sizeBytes, docCount);
+
+    // Ensure bucket exists and upload to S3
+    await ensureBucket();
+    const storageKey = generateStorageKey(
+      context.user.id,
+      input.skillId,
+      input.filename
+    );
+    await uploadToS3(storageKey, fileBuffer, input.mimeType);
+
+    // Save metadata to database
+    const [newDocument] = await context.db
+      .insert(skillDocument)
+      .values({
+        skillId: input.skillId,
+        filename: input.filename,
+        mimeType: input.mimeType,
+        sizeBytes,
+        storageKey,
+        description: input.description,
+      })
+      .returning();
+
+    return {
+      id: newDocument.id,
+      filename: newDocument.filename,
+      mimeType: newDocument.mimeType,
+      sizeBytes: newDocument.sizeBytes,
+    };
+  });
+
+// Get download URL for a document
+const getDocumentUrl = protectedProcedure
+  .input(z.object({ id: z.string() }))
+  .handler(async ({ input, context }) => {
+    // Get document and verify ownership through skill
+    const document = await context.db.query.skillDocument.findFirst({
+      where: eq(skillDocument.id, input.id),
+      with: { skill: true },
+    });
+
+    if (!document || document.skill.userId !== context.user.id) {
+      throw new ORPCError("NOT_FOUND", { message: "Document not found" });
+    }
+
+    const url = await getPresignedDownloadUrl(document.storageKey);
+
+    return { url, filename: document.filename };
+  });
+
+// Delete a document
+const deleteDocument = protectedProcedure
+  .input(z.object({ id: z.string() }))
+  .handler(async ({ input, context }) => {
+    // Get document and verify ownership through skill
+    const document = await context.db.query.skillDocument.findFirst({
+      where: eq(skillDocument.id, input.id),
+      with: { skill: true },
+    });
+
+    if (!document || document.skill.userId !== context.user.id) {
+      throw new ORPCError("NOT_FOUND", { message: "Document not found" });
+    }
+
+    // Delete from S3
+    await deleteFromS3(document.storageKey);
+
+    // Delete from database
+    await context.db
+      .delete(skillDocument)
+      .where(eq(skillDocument.id, input.id));
+
+    return { success: true };
+  });
+
 export const skillRouter = {
   list,
   get,
@@ -290,4 +429,7 @@ export const skillRouter = {
   addFile,
   updateFile,
   deleteFile,
+  uploadDocument,
+  getDocumentUrl,
+  deleteDocument,
 };

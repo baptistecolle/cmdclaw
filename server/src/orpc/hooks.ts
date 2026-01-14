@@ -145,7 +145,7 @@ export function useGetAuthUrl() {
       type,
       redirectUrl,
     }: {
-      type: "gmail" | "notion" | "linear" | "github" | "airtable" | "slack";
+      type: "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot";
       redirectUrl: string;
     }) => client.integration.getAuthUrl({ type, redirectUrl }),
   });
@@ -201,14 +201,16 @@ export function useUpdateSkill() {
       name,
       displayName,
       description,
+      icon,
       enabled,
     }: {
       id: string;
       name?: string;
       displayName?: string;
       description?: string;
+      icon?: string | null;
       enabled?: boolean;
-    }) => client.skill.update({ id, name, displayName, description, enabled }),
+    }) => client.skill.update({ id, name, displayName, description, icon, enabled }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["skill"] });
     },
@@ -266,6 +268,58 @@ export function useDeleteSkillFile() {
 
   return useMutation({
     mutationFn: (id: string) => client.skill.deleteFile({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["skill"] });
+    },
+  });
+}
+
+// ========== SKILL DOCUMENT HOOKS ==========
+
+// Hook for uploading a document
+export function useUploadSkillDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      skillId,
+      filename,
+      mimeType,
+      content,
+      description,
+    }: {
+      skillId: string;
+      filename: string;
+      mimeType: string;
+      content: string; // base64
+      description?: string;
+    }) =>
+      client.skill.uploadDocument({
+        skillId,
+        filename,
+        mimeType,
+        content,
+        description,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["skill"] });
+    },
+  });
+}
+
+// Hook for getting document download URL
+export function useGetDocumentUrl() {
+  return useMutation({
+    mutationFn: (id: string) => client.skill.getDocumentUrl({ id }),
+  });
+}
+
+// Hook for deleting a document
+export function useDeleteSkillDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => client.skill.deleteDocument({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["skill"] });
     },
