@@ -15,7 +15,7 @@ async function api(method: string, body?: Record<string, unknown>) {
     method: "POST", headers, body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json();
-  if (!data.ok) throw new Error(data.error);
+  if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
   return data;
 }
 
@@ -26,7 +26,7 @@ async function apiFormData(method: string, formData: FormData) {
     body: formData,
   });
   const data = await res.json();
-  if (!data.ok) throw new Error(data.error);
+  if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
   return data;
 }
 
@@ -217,11 +217,11 @@ async function uploadFile() {
   const fileContent = await readFile(filePath);
   const fileName = values.filename || filePath.split("/").pop() || "file";
 
-  // Step 1: Get upload URL using the new API
-  const uploadUrlData = await api("files.getUploadURLExternal", {
-    filename: fileName,
-    length: fileContent.length,
-  });
+  // Step 1: Get upload URL using the new API (requires form data, not JSON)
+  const formData = new FormData();
+  formData.append('filename', fileName);
+  formData.append('length', fileContent.length.toString());
+  const uploadUrlData = await apiFormData("files.getUploadURLExternal", formData);
 
   // Step 2: Upload file to the returned URL
   const uploadRes = await fetch(uploadUrlData.upload_url, {
