@@ -213,7 +213,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     clientSecret: env.SLACK_CLIENT_SECRET ?? "",
     authUrl: "https://slack.com/oauth/v2/authorize",
     tokenUrl: "https://slack.com/api/oauth.v2.access",
-    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    redirectUri: `${getAppUrl().replace("http://localhost", "https://localhost")}/api/oauth/callback`,
     scopes: [
       "channels:read",
       "channels:history",

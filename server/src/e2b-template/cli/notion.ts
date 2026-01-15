@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { parseArgs } from "util";
 
 const TOKEN = process.env.NOTION_ACCESS_TOKEN;
@@ -17,6 +16,7 @@ const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h" },
     query: { type: "string", short: "q" },
     limit: { type: "string", short: "l", default: "10" },
     parent: { type: "string", short: "p" },
@@ -161,7 +161,25 @@ async function queryDatabase(databaseId: string) {
   console.log(JSON.stringify(entries, null, 2));
 }
 
+function showHelp() {
+  console.log(`Notion CLI - Commands:
+  search [-q query] [-l limit] [--type page|database]  Search pages/databases
+  get <pageId>                                          Get page content
+  create --parent <id> --title <title> [--content <text>] [--type database]
+  append <pageId> --content <text>                      Append to page
+  databases                                             List all databases
+  query <databaseId> [-l limit]                         Query database entries
+
+Options:
+  -h, --help                                            Show this help message`);
+}
+
 async function main() {
+  if (values.help) {
+    showHelp();
+    return;
+  }
+
   try {
     switch (command) {
       case "search": await search(); break;
@@ -171,13 +189,7 @@ async function main() {
       case "databases": await listDatabases(); break;
       case "query": await queryDatabase(args[0]); break;
       default:
-        console.log(`Notion CLI - Commands:
-  search [-q query] [-l limit] [--type page|database]  Search pages/databases
-  get <pageId>                                          Get page content
-  create --parent <id> --title <title> [--content <text>] [--type database]
-  append <pageId> --content <text>                      Append to page
-  databases                                             List all databases
-  query <databaseId> [-l limit]                         Query database entries`);
+        showHelp();
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);

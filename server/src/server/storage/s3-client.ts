@@ -97,6 +97,29 @@ export async function getPresignedDownloadUrl(
   return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
 }
 
+// Download file content from S3 as Buffer
+export async function downloadFromS3(key: string): Promise<Buffer> {
+  const client = getS3Client();
+
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    })
+  );
+
+  if (!response.Body) {
+    throw new Error(`No body returned for S3 key: ${key}`);
+  }
+
+  // Convert the readable stream to a buffer
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
 // Generate storage key for a skill document
 export function generateStorageKey(
   userId: string,

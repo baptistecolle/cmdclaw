@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { parseArgs } from "util";
 
 const TOKEN = process.env.AIRTABLE_ACCESS_TOKEN;
@@ -19,6 +18,7 @@ const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h" },
     base: { type: "string", short: "b" },
     table: { type: "string", short: "t" },
     record: { type: "string", short: "r" },
@@ -126,7 +126,27 @@ async function searchRecords() {
   console.log(JSON.stringify(records, null, 2));
 }
 
+function showHelp() {
+  console.log(`Airtable CLI - Commands:
+  bases                                                 List all bases
+  schema -b <baseId>                                    Get base schema
+  list -b <baseId> -t <table> [-l limit] [-v view] [-f formula]
+  get -b <baseId> -t <table> -r <recordId>              Get single record
+  create -b <baseId> -t <table> --fields '{"Name":"value"}'
+  update -b <baseId> -t <table> -r <recordId> --fields '{"Name":"new"}'
+  delete -b <baseId> -t <table> -r <recordId>           Delete record
+  search -b <baseId> -t <table> -s <value> --search-field <field>
+
+Options:
+  -h, --help                                            Show this help message`);
+}
+
 async function main() {
+  if (values.help) {
+    showHelp();
+    return;
+  }
+
   try {
     switch (command) {
       case "bases": await listBases(); break;
@@ -138,15 +158,7 @@ async function main() {
       case "delete": await deleteRecord(); break;
       case "search": await searchRecords(); break;
       default:
-        console.log(`Airtable CLI - Commands:
-  bases                                                 List all bases
-  schema -b <baseId>                                    Get base schema
-  list -b <baseId> -t <table> [-l limit] [-v view] [-f formula]
-  get -b <baseId> -t <table> -r <recordId>              Get single record
-  create -b <baseId> -t <table> --fields '{"Name":"value"}'
-  update -b <baseId> -t <table> -r <recordId> --fields '{"Name":"new"}'
-  delete -b <baseId> -t <table> -r <recordId>           Delete record
-  search -b <baseId> -t <table> -s <value> --search-field <field>`);
+        showHelp();
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);

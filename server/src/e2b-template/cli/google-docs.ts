@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_DOCS_ACCESS_TOKEN;
@@ -15,6 +14,7 @@ const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h" },
     title: { type: "string", short: "t" },
     content: { type: "string", short: "c" },
     text: { type: "string" },
@@ -181,7 +181,26 @@ async function searchDocuments() {
   console.log(JSON.stringify(docs, null, 2));
 }
 
+function showHelp() {
+  console.log(`Google Docs CLI - Commands:
+  get <documentId>                              Get document content
+  create --title <title> [--content <text>]     Create a new document
+  append <documentId> --text <text>             Append text to document
+  list [-l limit]                               List recent documents
+  search <query> [-l limit]                     Search documents by content
+
+Example: gdocs get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
+
+Options:
+  -h, --help                                    Show this help message`);
+}
+
 async function main() {
+  if (values.help) {
+    showHelp();
+    return;
+  }
+
   try {
     switch (command) {
       case "get": await getDocument(args[0]); break;
@@ -190,14 +209,7 @@ async function main() {
       case "list": await listDocuments(); break;
       case "search": await searchDocuments(); break;
       default:
-        console.log(`Google Docs CLI - Commands:
-  get <documentId>                              Get document content
-  create --title <title> [--content <text>]     Create a new document
-  append <documentId> --text <text>             Append text to document
-  list [-l limit]                               List recent documents
-  search <query> [-l limit]                     Search documents by content
-
-Example: gdocs get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms`);
+        showHelp();
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);

@@ -20,7 +20,7 @@ export function ChatArea({ conversationId }: Props) {
   const { data: existingConversation, isLoading } = useConversation(
     conversationId
   );
-  const { sendMessage } = useChatStream();
+  const { sendMessage, abort } = useChatStream();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingParts, setStreamingParts] = useState<MessagePart[]>([]);
@@ -28,7 +28,9 @@ export function ChatArea({ conversationId }: Props) {
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isRecordingRef = useRef(false);
+  const isNearBottomRef = useRef(true);
 
   // Voice recording
   const { isRecording, error: voiceError, startRecording, stopRecording } = useVoiceRecording();
@@ -99,10 +101,28 @@ export function ChatArea({ conversationId }: Props) {
     }
   }, [conversationId]);
 
-  // Auto-scroll
+  // Track if user is near bottom of scroll
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const threshold = 100; // pixels from bottom
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    isNearBottomRef.current = distanceFromBottom < threshold;
+  }, []);
+
+  // Auto-scroll only if user is near bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, streamingParts]);
+
+  const handleStop = useCallback(() => {
+    abort();
+    setIsStreaming(false);
+    setStreamingParts([]);
+  }, [abort]);
 
   const handleSend = useCallback(async (content: string) => {
     const userMessage: Message = {
@@ -268,7 +288,11 @@ export function ChatArea({ conversationId }: Props) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="flex-1 overflow-y-auto p-4">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4"
+      >
         <div className="mx-auto max-w-3xl">
           {messages.length === 0 && !isStreaming ? (
             <div className="flex h-[60vh] flex-col items-center justify-center gap-4 text-center">
@@ -307,6 +331,7 @@ export function ChatArea({ conversationId }: Props) {
           )}
           <ChatInput
             onSend={handleSend}
+            onStop={handleStop}
             disabled={isStreaming || isRecording || isProcessingVoice}
             isStreaming={isStreaming}
             isRecording={isRecording}

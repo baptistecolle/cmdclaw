@@ -1,5 +1,6 @@
-#!/usr/bin/env bun
 import { parseArgs } from "util";
+import { readFile, access } from "fs/promises";
+import { constants } from "fs";
 
 const TOKEN = process.env.SLACK_ACCESS_TOKEN;
 if (!TOKEN) {
@@ -33,6 +34,7 @@ const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h" },
     channel: { type: "string", short: "c" },
     limit: { type: "string", short: "l", default: "20" },
     text: { type: "string", short: "t" },
@@ -203,41 +205,80 @@ async function uploadFile() {
   }
 
   const filePath = values.file;
-  const file = Bun.file(filePath);
 
-  if (!await file.exists()) {
+  // Check if file exists
+  try {
+    await access(filePath, constants.F_OK);
+  } catch {
     console.error(`Error: File not found: ${filePath}`);
     process.exit(1);
   }
 
-  const fileContent = await file.arrayBuffer();
+  const fileContent = await readFile(filePath);
   const fileName = values.filename || filePath.split("/").pop() || "file";
 
-  const formData = new FormData();
-  formData.append("channels", values.channel);
-  formData.append("file", new Blob([fileContent]), fileName);
-  formData.append("filename", fileName);
-  if (values.title) formData.append("title", values.title);
-  if (values.text) formData.append("initial_comment", values.text);
-  if (values.thread) formData.append("thread_ts", values.thread);
+  // Step 1: Get upload URL using the new API
+  const uploadUrlData = await api("files.getUploadURLExternal", {
+    filename: fileName,
+    length: fileContent.length,
+  });
 
-  const data = await apiFormData("files.upload", formData);
+  // Step 2: Upload file to the returned URL
+  const uploadRes = await fetch(uploadUrlData.upload_url, {
+    method: "POST",
+    body: fileContent,
+  });
 
+  if (!uploadRes.ok) {
+    throw new Error(`Failed to upload file: ${uploadRes.statusText}`);
+  }
+
+  // Step 3: Complete the upload and share to channel
+  const completeData = await api("files.completeUploadExternal", {
+    files: [{ id: uploadUrlData.file_id, title: values.title || fileName }],
+    channel_id: values.channel,
+    initial_comment: values.text,
+    thread_ts: values.thread,
+  });
+
+  const file = completeData.files?.[0];
   console.log(JSON.stringify({
     ok: true,
     file: {
-      id: data.file.id,
-      name: data.file.name,
-      title: data.file.title,
-      mimetype: data.file.mimetype,
-      size: data.file.size,
-      url: data.file.url_private,
-      permalink: data.file.permalink,
+      id: file?.id,
+      name: file?.name,
+      title: file?.title,
+      mimetype: file?.mimetype,
+      size: file?.size,
+      url: file?.url_private,
+      permalink: file?.permalink,
     },
   }, null, 2));
 }
 
+function showHelp() {
+  console.log(`Slack CLI - Commands:
+  channels [-l limit]                                   List channels
+  history -c <channelId> [-l limit]                     Get channel messages
+  recent [-l limit] [-q filter]                         Get latest messages across all channels
+  send -c <channelId> -t <text> [--thread <ts>]         Send message
+  search -q <query> [-l limit]                          Search messages
+  users [-l limit]                                      List users
+  user -u <userId>                                      Get user info
+  thread -c <channelId> --thread <ts>                   Get thread replies
+  react -c <channelId> --ts <messageTs> -e <emoji>      Add reaction
+  upload -c <channelId> -f <path> [--filename] [--title] [--text] [--thread]  Upload file
+
+Options:
+  -h, --help                                            Show this help message`);
+}
+
 async function main() {
+  if (values.help) {
+    showHelp();
+    return;
+  }
+
   try {
     switch (command) {
       case "channels": await listChannels(); break;
@@ -251,17 +292,7 @@ async function main() {
       case "react": await addReaction(); break;
       case "upload": await uploadFile(); break;
       default:
-        console.log(`Slack CLI - Commands:
-  channels [-l limit]                                   List channels
-  history -c <channelId> [-l limit]                     Get channel messages
-  recent [-l limit] [-q filter]                         Get latest messages across all channels
-  send -c <channelId> -t <text> [--thread <ts>]         Send message
-  search -q <query> [-l limit]                          Search messages
-  users [-l limit]                                      List users
-  user -u <userId>                                      Get user info
-  thread -c <channelId> --thread <ts>                   Get thread replies
-  react -c <channelId> --ts <messageTs> -e <emoji>      Add reaction
-  upload -c <channelId> -f <path> [--filename] [--title] [--text] [--thread]  Upload file`);
+        showHelp();
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);

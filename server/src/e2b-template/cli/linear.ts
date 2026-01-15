@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { parseArgs } from "util";
 
 const TOKEN = process.env.LINEAR_ACCESS_TOKEN;
@@ -22,6 +21,7 @@ const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h" },
     team: { type: "string", short: "t" },
     state: { type: "string", short: "s" },
     limit: { type: "string", short: "l", default: "20" },
@@ -140,7 +140,25 @@ async function myIssues() {
   console.log(JSON.stringify(data.viewer.assignedIssues.nodes, null, 2));
 }
 
+function showHelp() {
+  console.log(`Linear CLI - Commands:
+  list [-t team] [-s state] [-l limit]                  List issues
+  get <identifier>                                       Get issue details (e.g., ENG-123)
+  create --team <key> --title <title> [-d desc] [-p 0-4] [-a email]
+  update <identifier> [--title] [--state] [--priority]  Update issue
+  teams                                                  List teams
+  mine                                                   My assigned issues
+
+Options:
+  -h, --help                                             Show this help message`);
+}
+
 async function main() {
+  if (values.help) {
+    showHelp();
+    return;
+  }
+
   try {
     switch (command) {
       case "list": await listIssues(); break;
@@ -150,13 +168,7 @@ async function main() {
       case "teams": await listTeams(); break;
       case "mine": await myIssues(); break;
       default:
-        console.log(`Linear CLI - Commands:
-  list [-t team] [-s state] [-l limit]                  List issues
-  get <identifier>                                       Get issue details (e.g., ENG-123)
-  create --team <key> --title <title> [-d desc] [-p 0-4] [-a email]
-  update <identifier> [--title] [--state] [--priority]  Update issue
-  teams                                                  List teams
-  mine                                                   My assigned issues`);
+        showHelp();
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);

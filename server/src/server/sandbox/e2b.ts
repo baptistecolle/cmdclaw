@@ -3,6 +3,7 @@ import { env } from "@/env";
 import { db } from "@/server/db/client";
 import { skill } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
+import { downloadFromS3 } from "@/server/storage/s3-client";
 
 // Use custom template with npm + claude CLI pre-installed
 const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-agent-dev";
@@ -270,11 +271,12 @@ export async function writeSkillsToSandbox(
   sandbox: Sandbox,
   userId: string
 ): Promise<string[]> {
-  // Fetch all enabled skills for user with their files
+  // Fetch all enabled skills for user with their files and documents
   const skills = await db.query.skill.findMany({
     where: and(eq(skill.userId, userId), eq(skill.enabled, true)),
     with: {
       files: true,
+      documents: true,
     },
   });
 
@@ -293,6 +295,7 @@ export async function writeSkillsToSandbox(
     const skillDir = `/app/.claude/skills/${s.name}`;
     await sandbox.commands.run(`mkdir -p "${skillDir}"`);
 
+    // Write skill files (text-based, stored in DB)
     for (const file of s.files) {
       const filePath = `${skillDir}/${file.path}`;
 
@@ -307,8 +310,25 @@ export async function writeSkillsToSandbox(
       await sandbox.files.write(filePath, file.content);
     }
 
+    // Write skill documents (binary files from S3) at the same level as skill files
+    for (const doc of s.documents) {
+      try {
+        // Download document from S3
+        const buffer = await downloadFromS3(doc.storageKey);
+        const docPath = `${skillDir}/${doc.filename}`;
+
+        // Write to sandbox (convert Buffer to ArrayBuffer for e2b)
+        const arrayBuffer = new Uint8Array(buffer).buffer;
+        await sandbox.files.write(docPath, arrayBuffer);
+        console.log(`[E2B] Written document: ${doc.filename} (${doc.sizeBytes} bytes)`);
+      } catch (error) {
+        console.error(`[E2B] Failed to write document ${doc.filename}:`, error);
+        // Continue with other documents even if one fails
+      }
+    }
+
     writtenSkills.push(s.name);
-    console.log(`[E2B] Written skill: ${s.name} (${s.files.length} files)`);
+    console.log(`[E2B] Written skill: ${s.name} (${s.files.length} files, ${s.documents.length} documents)`);
   }
 
   return writtenSkills;
@@ -325,7 +345,9 @@ export function getSkillsSystemPrompt(skillNames: string[]): string {
   return `
 # Custom Skills
 
-You have access to custom skills in /app/.claude/skills/. Each skill directory contains a SKILL.md file with instructions.
+You have access to custom skills in /app/.claude/skills/. Each skill directory contains:
+- A SKILL.md file with instructions
+- Any associated documents (PDFs, images, etc.) at the same level
 
 Available skills:
 ${skillNames.map((name) => `- ${name}`).join("\n")}

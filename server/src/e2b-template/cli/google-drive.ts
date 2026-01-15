@@ -1,7 +1,7 @@
-#!/usr/bin/env bun
 import { parseArgs } from "util";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile, mkdir, readFile, access } from "fs/promises";
 import { dirname } from "path";
+import { constants } from "fs";
 
 const TOKEN = process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
 if (!TOKEN) {
@@ -16,6 +16,7 @@ const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h" },
     query: { type: "string", short: "q" },
     limit: { type: "string", short: "l", default: "20" },
     output: { type: "string", short: "o" },
@@ -159,14 +160,16 @@ async function uploadFile() {
     process.exit(1);
   }
 
-  const file = Bun.file(values.file);
-  if (!(await file.exists())) {
+  // Check if file exists
+  try {
+    await access(values.file, constants.F_OK);
+  } catch {
     console.error(`File not found: ${values.file}`);
     process.exit(1);
   }
 
   const fileName = values.name || values.file.split("/").pop();
-  const mimeType = values.mime || file.type || "application/octet-stream";
+  const mimeType = values.mime || "application/octet-stream";
 
   const metadata: any = { name: fileName };
   if (values.folder) {
@@ -178,7 +181,7 @@ async function uploadFile() {
   const delimiter = `\r\n--${boundary}\r\n`;
   const closeDelimiter = `\r\n--${boundary}--`;
 
-  const fileContent = await file.arrayBuffer();
+  const fileContent = await readFile(values.file);
 
   const body =
     delimiter +
@@ -187,7 +190,7 @@ async function uploadFile() {
     delimiter +
     `Content-Type: ${mimeType}\r\n` +
     "Content-Transfer-Encoding: base64\r\n\r\n" +
-    Buffer.from(fileContent).toString("base64") +
+    fileContent.toString("base64") +
     closeDelimiter;
 
   const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
@@ -262,19 +265,8 @@ async function listFolders() {
   console.log(JSON.stringify(folders, null, 2));
 }
 
-async function main() {
-  try {
-    switch (command) {
-      case "list": await listFiles(); break;
-      case "get": await getFile(args[0]); break;
-      case "download": await downloadFile(args[0]); break;
-      case "search": await searchFiles(); break;
-      case "upload": await uploadFile(); break;
-      case "mkdir": await createFolder(); break;
-      case "delete": await deleteFile(args[0]); break;
-      case "folders": await listFolders(); break;
-      default:
-        console.log(`Google Drive CLI - Commands:
+function showHelp() {
+  console.log(`Google Drive CLI - Commands:
   list [-q query] [-l limit] [-f folderId]      List files
   get <fileId>                                   Get file metadata
   download <fileId> [-o output]                  Download file
@@ -289,7 +281,30 @@ Query examples:
   -q "mimeType='application/pdf'"
   -q "modifiedTime > '2024-01-01T00:00:00'"
 
-Google Docs/Sheets/Slides are automatically exported as txt/csv/pdf`);
+Google Docs/Sheets/Slides are automatically exported as txt/csv/pdf
+
+Options:
+  -h, --help                                     Show this help message`);
+}
+
+async function main() {
+  if (values.help) {
+    showHelp();
+    return;
+  }
+
+  try {
+    switch (command) {
+      case "list": await listFiles(); break;
+      case "get": await getFile(args[0]); break;
+      case "download": await downloadFile(args[0]); break;
+      case "search": await searchFiles(); break;
+      case "upload": await uploadFile(); break;
+      case "mkdir": await createFolder(); break;
+      case "delete": await deleteFile(args[0]); break;
+      case "folders": await listFolders(); break;
+      default:
+        showHelp();
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);

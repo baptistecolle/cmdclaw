@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_SHEETS_ACCESS_TOKEN;
@@ -15,6 +14,7 @@ const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h" },
     range: { type: "string", short: "r" },
     values: { type: "string", short: "v" },
     title: { type: "string", short: "t" },
@@ -195,7 +195,29 @@ async function listSpreadsheets() {
   console.log(JSON.stringify(sheets, null, 2));
 }
 
+function showHelp() {
+  console.log(`Google Sheets CLI - Commands:
+  get <spreadsheetId> [--range <A1:D10>]        Get spreadsheet data or metadata
+  create --title <title>                         Create a new spreadsheet
+  append <spreadsheetId> --range <A:B> --values '[[...]]'   Append rows
+  update <spreadsheetId> --range <A1:B2> --values '[[...]]' Update cells
+  clear <spreadsheetId> --range <A1:B10>         Clear a range
+  add-sheet <spreadsheetId> --title <name>       Add a new sheet
+  list [-l limit]                                List recent spreadsheets
+
+Values format: '[["row1col1","row1col2"],["row2col1","row2col2"]]'
+Range examples: Sheet1!A1:D10, A1:B5, A:C
+
+Options:
+  -h, --help                                     Show this help message`);
+}
+
 async function main() {
+  if (values.help) {
+    showHelp();
+    return;
+  }
+
   try {
     switch (command) {
       case "get": await getSpreadsheet(args[0]); break;
@@ -206,17 +228,7 @@ async function main() {
       case "add-sheet": await addSheet(args[0]); break;
       case "list": await listSpreadsheets(); break;
       default:
-        console.log(`Google Sheets CLI - Commands:
-  get <spreadsheetId> [--range <A1:D10>]        Get spreadsheet data or metadata
-  create --title <title>                         Create a new spreadsheet
-  append <spreadsheetId> --range <A:B> --values '[[...]]'   Append rows
-  update <spreadsheetId> --range <A1:B2> --values '[[...]]' Update cells
-  clear <spreadsheetId> --range <A1:B10>         Clear a range
-  add-sheet <spreadsheetId> --title <name>       Add a new sheet
-  list [-l limit]                                List recent spreadsheets
-
-Values format: '[["row1col1","row1col2"],["row2col1","row2col2"]]'
-Range examples: Sheet1!A1:D10, A1:B5, A:C`);
+        showHelp();
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);

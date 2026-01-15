@@ -7,6 +7,7 @@ import type { ChatEvent } from "@/server/orpc/routers/chat";
 // Hook for streaming chat
 export function useChatStream() {
   const queryClient = useQueryClient();
+  const abortControllerRef = { current: null as AbortController | null };
 
   return {
     sendMessage: async (
@@ -27,10 +28,19 @@ export function useChatStream() {
         onError?: (message: string) => void;
       }
     ) => {
+      // Create a new AbortController for this request
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
       try {
-        const iterator = await client.chat.sendMessage(input);
+        const iterator = await client.chat.sendMessage(input, { signal });
 
         for await (const event of iterator) {
+          // Check if aborted before processing each event
+          if (signal.aborted) {
+            break;
+          }
+
           switch (event.type) {
             case "text":
               callbacks.onText?.(event.content);
@@ -55,10 +65,19 @@ export function useChatStream() {
           }
         }
       } catch (error) {
+        // Don't report abort errors
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
         callbacks.onError?.(
           error instanceof Error ? error.message : "Unknown error"
         );
+      } finally {
+        abortControllerRef.current = null;
       }
+    },
+    abort: () => {
+      abortControllerRef.current?.abort();
     },
   };
 }

@@ -22,6 +22,7 @@ const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h" },
     owner: { type: "string", short: "o" },
     repo: { type: "string", short: "r" },
     state: { type: "string", short: "s", default: "open" },
@@ -156,7 +157,26 @@ async function searchCode() {
   console.log(JSON.stringify({ total: result.total_count, results }, null, 2));
 }
 
+function showHelp() {
+  console.log(`GitHub CLI - Commands:
+  repos [-l limit]                                      List my repositories
+  prs -o <owner> -r <repo> [-s state] [-l limit]        List pull requests
+  pr <number> -o <owner> -r <repo>                      Get PR details
+  my-prs [-f created|assigned|review] [-s state]        My pull requests
+  issues -o <owner> -r <repo> [-s state] [--labels a,b] List issues
+  create-issue -o <owner> -r <repo> -t <title> [-b body] [--labels a,b]
+  search -q <query> [-l limit]                          Search code
+
+Options:
+  -h, --help                                            Show this help message`);
+}
+
 async function main() {
+  if (values.help) {
+    showHelp();
+    return;
+  }
+
   try {
     switch (command) {
       case "repos": await listRepos(); break;
@@ -167,14 +187,7 @@ async function main() {
       case "create-issue": await createIssue(); break;
       case "search": await searchCode(); break;
       default:
-        console.log(`GitHub CLI - Commands:
-  repos [-l limit]                                      List my repositories
-  prs -o <owner> -r <repo> [-s state] [-l limit]        List pull requests
-  pr <number> -o <owner> -r <repo>                      Get PR details
-  my-prs [-f created|assigned|review] [-s state]        My pull requests
-  issues -o <owner> -r <repo> [-s state] [--labels a,b] List issues
-  create-issue -o <owner> -r <repo> -t <title> [-b body] [--labels a,b]
-  search -q <query> [-l limit]                          Search code`);
+        showHelp();
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);

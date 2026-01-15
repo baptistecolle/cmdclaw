@@ -14,5 +14,7 @@ export const template = Template()
   .setWorkdir('/app')
   .copy(".claude", "/app/.claude")
   .copy("cli", "/app/cli")
+  // allow to install packages from pip
+  .runCmd('mkdir -p $HOME/.config/pip && echo -e "[global]\nbreak-system-packages = true" > $HOME/.config/pip/pip.conf')
   .runCmd('/app/cli/setup.sh')
 

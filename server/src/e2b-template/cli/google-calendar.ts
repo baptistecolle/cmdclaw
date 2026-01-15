@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_CALENDAR_ACCESS_TOKEN;
@@ -14,6 +13,7 @@ const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h" },
     limit: { type: "string", short: "l", default: "10" },
     timeMin: { type: "string", short: "t" },
     timeMax: { type: "string", short: "m" },
@@ -213,7 +213,28 @@ async function todayEvents() {
   console.log(JSON.stringify(events, null, 2));
 }
 
+function showHelp() {
+  console.log(`Google Calendar CLI - Commands:
+  list [-l limit] [-t timeMin] [-m timeMax] [-c calendar]  List events
+  get <eventId> [-c calendar]                               Get event details
+  create --summary <title> --start <datetime> --end <datetime> [--description] [--location] [--attendees email1,email2]
+  update <eventId> [--summary] [--start] [--end] [--description] [--location]
+  delete <eventId> [-c calendar]                            Delete an event
+  calendars                                                 List available calendars
+  today [-c calendar]                                       List today's events
+
+Datetime format: 2024-01-15T09:00:00 (timed) or 2024-01-15 (all-day)
+
+Options:
+  -h, --help                                                Show this help message`);
+}
+
 async function main() {
+  if (values.help) {
+    showHelp();
+    return;
+  }
+
   try {
     switch (command) {
       case "list": await listEvents(); break;
@@ -224,16 +245,7 @@ async function main() {
       case "calendars": await listCalendars(); break;
       case "today": await todayEvents(); break;
       default:
-        console.log(`Google Calendar CLI - Commands:
-  list [-l limit] [-t timeMin] [-m timeMax] [-c calendar]  List events
-  get <eventId> [-c calendar]                               Get event details
-  create --summary <title> --start <datetime> --end <datetime> [--description] [--location] [--attendees email1,email2]
-  update <eventId> [--summary] [--start] [--end] [--description] [--location]
-  delete <eventId> [-c calendar]                            Delete an event
-  calendars                                                 List available calendars
-  today [-c calendar]                                       List today's events
-
-Datetime format: 2024-01-15T09:00:00 (timed) or 2024-01-15 (all-day)`);
+        showHelp();
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);

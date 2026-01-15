@@ -70,7 +70,7 @@ const get = protectedProcedure
         id: m.id,
         role: m.role,
         content: m.content,
-        toolCalls: m.toolCalls,
+        contentParts: m.contentParts,
         createdAt: m.createdAt,
       })),
       createdAt: conv.createdAt,
