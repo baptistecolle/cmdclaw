@@ -1,7 +1,7 @@
 import { eventIterator } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import { conversation, message } from "@/server/db/schema";
+import { conversation, message, type ContentPart } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
   getCliEnvForUser,
@@ -163,18 +163,16 @@ async function* handleE2BExecution(
     const skillsInstructions = getSkillsSystemPrompt(writtenSkills);
 
     let assistantContent = "";
-    let toolCalls: {
-      id: string;
-      name: string;
-      input: Record<string, unknown>;
-      result?: unknown;
-    }[] = [];
+    // Interleaved content parts (text/tool_use/tool_result)
+    let contentParts: ContentPart[] = [];
+    let currentTextPart: { type: "text"; text: string } | null = null;
     let finalUsage = { inputTokens: 0, outputTokens: 0, totalCostUsd: 0 };
     let sessionId: string | undefined;
 
-    // Build system prompt with CLI instructions and skills
-    const systemPromptParts = [cliInstructions, skillsInstructions].filter(Boolean);
-    const systemPrompt = systemPromptParts.length > 0 ? systemPromptParts.join("\n\n") : undefined;
+    // Build system prompt with base identity, CLI instructions and skills
+    const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
+    const systemPromptParts = [baseSystemPrompt, cliInstructions, skillsInstructions].filter(Boolean);
+    const systemPrompt = systemPromptParts.join("\n\n");
 
     // Debug: Log what we're sending
     console.log("[E2B] Enabled integrations CLI instructions:", cliInstructions ? "present" : "none");
@@ -194,13 +192,23 @@ async function* handleE2BExecution(
           if (block.type === "text" && block.text) {
             assistantContent += block.text;
             yield { type: "text" as const, content: block.text };
+            // Build contentParts: append to current text part or create new one
+            if (currentTextPart) {
+              currentTextPart.text += block.text;
+            } else {
+              currentTextPart = { type: "text", text: block.text };
+              contentParts.push(currentTextPart);
+            }
           } else if (block.type === "tool_use" && block.name) {
+            // Finalize current text part before tool_use
+            currentTextPart = null;
             yield {
               type: "tool_use" as const,
               toolName: block.name,
               toolInput: block.input,
             };
-            toolCalls.push({
+            contentParts.push({
+              type: "tool_use",
               id: block.id || "",
               name: block.name,
               input: block.input as Record<string, unknown>,
@@ -211,14 +219,22 @@ async function* handleE2BExecution(
         // Tool results
         for (const block of event.message.content) {
           if (block.type === "tool_result" && block.tool_use_id) {
-            const toolCall = toolCalls.find((tc) => tc.id === block.tool_use_id);
-            if (toolCall) {
-              toolCall.result = block.content;
+            // Find the tool_use in contentParts to get the name
+            const toolUse = contentParts.find(
+              (p): p is ContentPart & { type: "tool_use" } =>
+                p.type === "tool_use" && p.id === block.tool_use_id
+            );
+            if (toolUse) {
               yield {
                 type: "tool_result" as const,
-                toolName: toolCall.name,
+                toolName: toolUse.name,
                 result: block.content,
               };
+              contentParts.push({
+                type: "tool_result",
+                tool_use_id: block.tool_use_id,
+                content: block.content,
+              });
             }
           }
         }
@@ -245,7 +261,7 @@ async function* handleE2BExecution(
         .where(eq(conversation.id, conv.id));
     }
 
-    // Save assistant message
+    // Save assistant message with interleaved contentParts
     const [assistantMessage] = await db
       .insert(message)
       .values({
@@ -253,7 +269,7 @@ async function* handleE2BExecution(
         role: "assistant",
         content:
           assistantContent || "I apologize, but I couldn't generate a response.",
-        toolCalls: toolCalls.length > 0 ? toolCalls : null,
+        contentParts: contentParts.length > 0 ? contentParts : null,
         inputTokens: finalUsage.inputTokens,
         outputTokens: finalUsage.outputTokens,
       })

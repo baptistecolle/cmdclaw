@@ -138,6 +138,12 @@ export const conversation = pgTable(
   ]
 );
 
+// Content part types for interleaved message structure
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+  | { type: "tool_result"; tool_use_id: string; content: unknown };
+
 export const message = pgTable(
   "message",
   {
@@ -149,15 +155,8 @@ export const message = pgTable(
       .references(() => conversation.id, { onDelete: "cascade" }),
     role: messageRoleEnum("role").notNull(),
     content: text("content").notNull(),
-    // Store tool calls and results as JSONB
-    toolCalls: jsonb("tool_calls").$type<
-      {
-        id: string;
-        name: string;
-        input: Record<string, unknown>;
-        result?: unknown;
-      }[]
-    >(),
+    // Interleaved content parts (text/tool_use/tool_result)
+    contentParts: jsonb("content_parts").$type<ContentPart[]>(),
     // Token usage for cost tracking
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),

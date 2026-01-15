@@ -11,12 +11,6 @@ export type Message = {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   parts?: MessagePart[];
-  toolCalls?: {
-    id: string;
-    name: string;
-    input: Record<string, unknown>;
-    result?: unknown;
-  }[];
 };
 
 type Props = {
@@ -36,7 +30,6 @@ export function MessageList({ messages }: Props) {
           role={message.role}
           content={message.content}
           parts={message.parts}
-          toolCalls={message.toolCalls}
         />
       ))}
     </div>

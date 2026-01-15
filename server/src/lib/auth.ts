@@ -45,6 +45,7 @@ export const auth = betterAuth({
     bearer(),
     magicLink({
       async sendMagicLink({ email, url }) {
+        console.log(`[auth] Sending magic link to ${email}`);
         if (resend && env.EMAIL_FROM) {
           await resend.emails.send({
             from: `Bap <${env.EMAIL_FROM}>`,

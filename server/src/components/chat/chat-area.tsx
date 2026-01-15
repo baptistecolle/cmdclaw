@@ -41,18 +41,52 @@ export function ChatArea({ conversationId }: Props) {
         id: string;
         role: string;
         content: string;
-        toolCalls?: unknown;
+        contentParts?: Array<
+          | { type: "text"; text: string }
+          | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+          | { type: "tool_result"; tool_use_id: string; content: unknown }
+        >;
       }>;
     } | null | undefined;
 
     if (conv?.messages) {
       setMessages(
-        conv.messages.map((m) => ({
-          id: m.id,
-          role: m.role as Message["role"],
-          content: m.content,
-          toolCalls: (m.toolCalls as Message["toolCalls"]) ?? undefined,
-        }))
+        conv.messages.map((m) => {
+          // Convert contentParts to frontend parts format
+          let parts: MessagePart[] | undefined;
+          if (m.contentParts && m.contentParts.length > 0) {
+            // Build a map of tool_use_id -> result for merging
+            const toolResults = new Map<string, unknown>();
+            for (const part of m.contentParts) {
+              if (part.type === "tool_result") {
+                toolResults.set(part.tool_use_id, part.content);
+              }
+            }
+            // Convert parts, merging tool_result into tool_use
+            parts = m.contentParts
+              .filter((p) => p.type !== "tool_result")
+              .map((p) => {
+                if (p.type === "text") {
+                  return { type: "text" as const, content: p.text };
+                } else {
+                  // tool_use -> tool_call with result merged
+                  return {
+                    type: "tool_call" as const,
+                    id: p.id,
+                    name: p.name,
+                    input: p.input,
+                    result: toolResults.get(p.id),
+                  };
+                }
+              });
+          }
+          return {
+            id: m.id,
+            role: m.role as Message["role"],
+            content: m.content,
+            parts,
+          };
+        })
       );
     }
   }, [existingConversation]);

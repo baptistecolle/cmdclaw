@@ -18,6 +18,17 @@ async function api(method: string, body?: Record<string, unknown>) {
   return data;
 }
 
+async function apiFormData(method: string, formData: FormData) {
+  const res = await fetch(`https://slack.com/api/${method}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${TOKEN}` },
+    body: formData,
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error);
+  return data;
+}
+
 const { positionals, values } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
@@ -34,6 +45,9 @@ const { positionals, values } = parseArgs({
     latest: { type: "string" },
     cursor: { type: "string" },
     inclusive: { type: "boolean", default: false },
+    file: { type: "string", short: "f" },
+    filename: { type: "string" },
+    title: { type: "string" },
   },
 });
 
@@ -182,6 +196,47 @@ async function addReaction() {
   console.log(`Reaction :${values.emoji}: added!`);
 }
 
+async function uploadFile() {
+  if (!values.channel || !values.file) {
+    console.error("Required: --channel <channelId> --file <path> [--filename <name>] [--title <title>] [--text <comment>]");
+    process.exit(1);
+  }
+
+  const filePath = values.file;
+  const file = Bun.file(filePath);
+
+  if (!await file.exists()) {
+    console.error(`Error: File not found: ${filePath}`);
+    process.exit(1);
+  }
+
+  const fileContent = await file.arrayBuffer();
+  const fileName = values.filename || filePath.split("/").pop() || "file";
+
+  const formData = new FormData();
+  formData.append("channels", values.channel);
+  formData.append("file", new Blob([fileContent]), fileName);
+  formData.append("filename", fileName);
+  if (values.title) formData.append("title", values.title);
+  if (values.text) formData.append("initial_comment", values.text);
+  if (values.thread) formData.append("thread_ts", values.thread);
+
+  const data = await apiFormData("files.upload", formData);
+
+  console.log(JSON.stringify({
+    ok: true,
+    file: {
+      id: data.file.id,
+      name: data.file.name,
+      title: data.file.title,
+      mimetype: data.file.mimetype,
+      size: data.file.size,
+      url: data.file.url_private,
+      permalink: data.file.permalink,
+    },
+  }, null, 2));
+}
+
 async function main() {
   try {
     switch (command) {
@@ -194,6 +249,7 @@ async function main() {
       case "user": await getUserInfo(); break;
       case "thread": await getThread(); break;
       case "react": await addReaction(); break;
+      case "upload": await uploadFile(); break;
       default:
         console.log(`Slack CLI - Commands:
   channels [-l limit]                                   List channels
@@ -204,7 +260,8 @@ async function main() {
   users [-l limit]                                      List users
   user -u <userId>                                      Get user info
   thread -c <channelId> --thread <ts>                   Get thread replies
-  react -c <channelId> --ts <messageTs> -e <emoji>      Add reaction`);
+  react -c <channelId> --ts <messageTs> -e <emoji>      Add reaction
+  upload -c <channelId> -f <path> [--filename] [--title] [--text] [--thread]  Upload file`);
     }
   } catch (e) {
     console.error("Error:", e instanceof Error ? e.message : e);
