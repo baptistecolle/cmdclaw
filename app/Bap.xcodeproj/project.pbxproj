@@ -12,7 +12,7 @@
 
 /* Begin PBXFileReference section */
 		F45F5C662F0FCA6F00F3F71A /* Bap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bap.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F4A1B0012F100000000001A1 /* BapIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = BapIOS.app; path = "Bap-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4A1B0012F100000000001A1 /* BapIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = BapIOS.app; path = Bap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */

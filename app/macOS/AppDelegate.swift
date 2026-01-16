@@ -6,6 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var recordingMenuItem: NSMenuItem?
     private var loginWindow: NSWindow?
+    private var homeWindow: NSWindow?
     private var chatWindow: NSPanel?
     private var globalKeyDownMonitor: Any?
     private var localKeyDownMonitor: Any?
@@ -159,11 +160,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(NSMenuItem.separator())
         }
 
+        menu.addItem(NSMenuItem(title: "Home", action: #selector(showHomeWindowAction), keyEquivalent: ","))
+        menu.addItem(NSMenuItem.separator())
+
         let recordItem = NSMenuItem(title: "Record (⌥ Space)", action: #selector(toggleRecording), keyEquivalent: "")
         recordingMenuItem = recordItem
         menu.addItem(recordItem)
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Check Accessibility...", action: #selector(openAccessibilityPrefs), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Sign Out", action: #selector(signOut), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
@@ -201,7 +203,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showLoginWindow() {
-        if loginWindow != nil { return }
+        // If window exists but is closed, reset it
+        if let existingWindow = loginWindow {
+            if existingWindow.isVisible {
+                existingWindow.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                return
+            } else {
+                loginWindow = nil
+            }
+        }
 
         let loginView = LoginView()
         let hostingController = NSHostingController(rootView: loginView)
@@ -210,11 +221,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Sign in to Bap"
         window.styleMask = [.titled, .closable]
         window.level = .floating
+
+        // Set content size to match LoginView's frame (320x420)
+        window.setContentSize(NSSize(width: 320, height: 420))
         window.center()
         window.makeKeyAndOrderFront(nil)
 
         // Activate the app so the window comes to front
         NSApp.activate(ignoringOtherApps: true)
+
+        // Observe window close to reset reference
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.loginWindow = nil
+        }
 
         loginWindow = window
     }
@@ -222,6 +245,50 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func hideLoginWindow() {
         loginWindow?.close()
         loginWindow = nil
+    }
+
+    // MARK: - Home Window
+
+    @objc private func showHomeWindowAction() {
+        showHomeWindow()
+    }
+
+    private func showHomeWindow() {
+        // If window exists but is closed, reset it
+        if let existingWindow = homeWindow {
+            if existingWindow.isVisible {
+                existingWindow.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                return
+            } else {
+                homeWindow = nil
+            }
+        }
+
+        let homeView = HomeView()
+        let hostingController = NSHostingController(rootView: homeView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Bap"
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.setContentSize(NSSize(width: 600, height: 400))
+        window.minSize = NSSize(width: 500, height: 300)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        // Activate the app so the window comes to front
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Observe window close to reset reference
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.homeWindow = nil
+        }
+
+        homeWindow = window
     }
 
     // MARK: - Sign Out

@@ -20,9 +20,11 @@ struct LoginView: View {
         VStack(spacing: 24) {
             // Logo and title
             VStack(spacing: 12) {
-                Image(systemName: "bubble.left.and.bubble.right.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.primary)
+                Image("BapLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 Text("Welcome to Bap")
                     .font(.title)
@@ -50,20 +52,25 @@ struct LoginView: View {
                             await sendMagicLink()
                         }
                     } label: {
-                        HStack {
+                        HStack(spacing: 6) {
                             if isLoading {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle())
                                     .scaleEffect(0.7)
                             } else {
                                 Image(systemName: "envelope.fill")
+                                    .font(.system(size: 13))
                             }
                             Text("Continue with Email")
+                                .font(.system(size: 15, weight: .medium))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .frame(height: 32)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.plain)
+                    .background(Color.primary)
+                    .foregroundColor(Color(NSColor.windowBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                     .disabled(email.isEmpty || isLoading)
                 }
 
@@ -83,31 +90,52 @@ struct LoginView: View {
 
                 // Social sign in buttons
                 VStack(spacing: 8) {
-                    // Sign in with Apple
-                    SignInWithAppleButton(.signIn) { request in
-                        request.requestedScopes = [.email, .fullName]
-                    } onCompletion: { result in
+                    // Continue with Apple
+                    Button {
                         Task {
-                            await handleAppleSignIn(result: result)
+                            await signInWithApple()
                         }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "apple.logo")
+                                .font(.system(size: 15))
+                            Text("Continue with Apple")
+                                .font(.system(size: 15, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 32)
                     }
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(height: 36)
+                    .buttonStyle(.plain)
+                    .background(Color.primary)
+                    .foregroundColor(Color(NSColor.windowBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .disabled(isLoading)
 
-                    // Sign in with Google
+                    // Continue with Google
                     Button {
                         Task {
                             await signInWithGoogle()
                         }
                     } label: {
-                        HStack {
-                            Image(systemName: "g.circle.fill")
+                        HStack(spacing: 6) {
+                            Image("GoogleLogo")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 15, height: 15)
                             Text("Continue with Google")
+                                .font(.system(size: 15, weight: .medium))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .frame(height: 32)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
+                    .background(Color(NSColor.windowBackgroundColor))
+                    .foregroundColor(.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                    )
                     .disabled(isLoading)
                 }
             }
@@ -162,23 +190,16 @@ struct LoginView: View {
         isLoading = false
     }
 
-    private func handleAppleSignIn(result: Result<ASAuthorization, Error>) async {
+    private func signInWithApple() async {
         isLoading = true
         errorMessage = nil
 
-        switch result {
-        case .success:
-            do {
-                try await authManager.signInWithApple()
-            } catch AuthError.cancelled {
-                // User cancelled
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        case .failure(let error):
-            if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
-                errorMessage = error.localizedDescription
-            }
+        do {
+            try await authManager.signInWithApple()
+        } catch AuthError.cancelled {
+            // User cancelled
+        } catch {
+            errorMessage = error.localizedDescription
         }
 
         isLoading = false
