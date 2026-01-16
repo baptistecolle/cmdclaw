@@ -4,6 +4,43 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { client } from "./client";
 import type { ChatEvent } from "@/server/orpc/routers/chat";
 
+// Types for chat event callbacks
+export type ToolUseData = {
+  toolName: string;
+  toolInput: unknown;
+  toolUseId?: string;
+  integration?: string;
+  operation?: string;
+  isWrite?: boolean;
+};
+
+export type PendingApprovalData = {
+  toolUseId: string;
+  toolName: string;
+  toolInput: unknown;
+  integration: string;
+  operation: string;
+  command?: string;
+};
+
+export type ChatCallbacks = {
+  onText?: (content: string) => void;
+  onToolUse?: (data: ToolUseData) => void;
+  onToolResult?: (toolName: string, result: unknown) => void;
+  onPendingApproval?: (data: PendingApprovalData) => void;
+  onApprovalResult?: (toolUseId: string, decision: "approved" | "denied") => void;
+  onDone?: (
+    conversationId: string,
+    messageId: string,
+    usage: {
+      inputTokens: number;
+      outputTokens: number;
+      totalCostUsd: number;
+    }
+  ) => void;
+  onError?: (message: string) => void;
+};
+
 // Hook for streaming chat
 export function useChatStream() {
   const queryClient = useQueryClient();
@@ -12,21 +49,7 @@ export function useChatStream() {
   return {
     sendMessage: async (
       input: { conversationId?: string; content: string; model?: string },
-      callbacks: {
-        onText?: (content: string) => void;
-        onToolUse?: (toolName: string, input: unknown) => void;
-        onToolResult?: (toolName: string, result: unknown) => void;
-        onDone?: (
-          conversationId: string,
-          messageId: string,
-          usage: {
-            inputTokens: number;
-            outputTokens: number;
-            totalCostUsd: number;
-          }
-        ) => void;
-        onError?: (message: string) => void;
-      }
+      callbacks: ChatCallbacks
     ) => {
       // Create a new AbortController for this request
       abortControllerRef.current = new AbortController();
@@ -46,10 +69,30 @@ export function useChatStream() {
               callbacks.onText?.(event.content);
               break;
             case "tool_use":
-              callbacks.onToolUse?.(event.toolName, event.toolInput);
+              callbacks.onToolUse?.({
+                toolName: event.toolName,
+                toolInput: event.toolInput,
+                toolUseId: event.toolUseId,
+                integration: event.integration,
+                operation: event.operation,
+                isWrite: event.isWrite,
+              });
               break;
             case "tool_result":
               callbacks.onToolResult?.(event.toolName, event.result);
+              break;
+            case "pending_approval":
+              callbacks.onPendingApproval?.({
+                toolUseId: event.toolUseId,
+                toolName: event.toolName,
+                toolInput: event.toolInput,
+                integration: event.integration,
+                operation: event.operation,
+                command: event.command,
+              });
+              break;
+            case "approval_result":
+              callbacks.onApprovalResult?.(event.toolUseId, event.decision);
               break;
             case "done":
               callbacks.onDone?.(
@@ -80,6 +123,21 @@ export function useChatStream() {
       abortControllerRef.current?.abort();
     },
   };
+}
+
+// Hook for approving/denying tool usage
+export function useApproveToolUse() {
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      toolUseId,
+      decision,
+    }: {
+      conversationId: string;
+      toolUseId: string;
+      decision: "allow" | "deny";
+    }) => client.chat.approveToolUse({ conversationId, toolUseId, decision }),
+  });
 }
 
 // Hook for listing conversations

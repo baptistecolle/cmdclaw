@@ -4,6 +4,16 @@ import { protectedProcedure } from "../middleware";
 import { integration, integrationToken } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
+import { createHash, randomBytes } from "crypto";
+
+// PKCE helpers for Airtable OAuth
+function generateCodeVerifier(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+function generateCodeChallenge(verifier: string): string {
+  return createHash("sha256").update(verifier).digest("base64url");
+}
 
 const integrationTypeSchema = z.enum([
   "gmail",
@@ -46,11 +56,15 @@ const getAuthUrl = protectedProcedure
   .handler(async ({ input, context }) => {
     const config = getOAuthConfig(input.type as IntegrationType);
 
+    // Generate PKCE code_verifier for Airtable
+    const codeVerifier = input.type === "airtable" ? generateCodeVerifier() : undefined;
+
     const state = Buffer.from(
       JSON.stringify({
         userId: context.user.id,
         type: input.type,
         redirectUrl: input.redirectUrl,
+        codeVerifier, // Store verifier in state for Airtable
       })
     ).toString("base64url");
 
@@ -79,6 +93,12 @@ const getAuthUrl = protectedProcedure
       params.set("owner", "user");
     }
 
+    // Airtable requires PKCE
+    if (input.type === "airtable" && codeVerifier) {
+      params.set("code_challenge", generateCodeChallenge(codeVerifier));
+      params.set("code_challenge_method", "S256");
+    }
+
     return { authUrl: `${config.authUrl}?${params}` };
   });
 
@@ -91,7 +111,7 @@ const handleCallback = protectedProcedure
     })
   )
   .handler(async ({ input, context }) => {
-    let stateData: { userId: string; type: IntegrationType; redirectUrl: string };
+    let stateData: { userId: string; type: IntegrationType; redirectUrl: string; codeVerifier?: string };
 
     try {
       stateData = JSON.parse(
@@ -117,12 +137,18 @@ const handleCallback = protectedProcedure
       redirect_uri: config.redirectUri,
     });
 
+    // Airtable requires code_verifier for PKCE
+    if (stateData.type === "airtable" && stateData.codeVerifier) {
+      tokenBody.set("code_verifier", stateData.codeVerifier);
+    }
+
     // Notion requires Basic auth header
     const headers: Record<string, string> = {
       "Content-Type": "application/x-www-form-urlencoded",
     };
 
-    if (stateData.type === "notion") {
+    // Notion and Airtable require Basic auth header
+    if (stateData.type === "notion" || stateData.type === "airtable") {
       headers["Authorization"] = `Basic ${Buffer.from(
         `${config.clientId}:${config.clientSecret}`
       ).toString("base64")}`;
@@ -135,6 +161,16 @@ const handleCallback = protectedProcedure
       headers["Accept"] = "application/json";
     }
 
+    // Debug logging for token exchange
+    console.log("Token exchange request:", {
+      url: config.tokenUrl,
+      headers: { ...headers, Authorization: headers.Authorization ? "[REDACTED]" : undefined },
+      body: Object.fromEntries(tokenBody.entries()),
+      clientIdPresent: !!config.clientId,
+      clientSecretPresent: !!config.clientSecret,
+      clientIdLength: config.clientId?.length,
+    });
+
     const tokenResponse = await fetch(config.tokenUrl, {
       method: "POST",
       headers,
@@ -144,6 +180,8 @@ const handleCallback = protectedProcedure
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
       console.error("Token exchange failed:", error);
+      console.error("Response status:", tokenResponse.status);
+      console.error("Response headers:", Object.fromEntries(tokenResponse.headers.entries()));
       throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Failed to exchange code for tokens" });
     }
 

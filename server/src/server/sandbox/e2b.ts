@@ -18,7 +18,7 @@ export interface SandboxConfig {
   integrationEnvs?: Record<string, string>;
 }
 
-// Claude CLI stream-json output types
+// SDK stream-json output types (base event structure)
 export interface ClaudeStreamEvent {
   type: string;
   subtype?: string;
@@ -41,6 +41,23 @@ export interface ClaudeStreamEvent {
   };
   total_cost_usd?: number;
   error?: string;
+}
+
+// SDK Agent events (superset of ClaudeStreamEvent)
+export interface SDKAgentEvent extends ClaudeStreamEvent {
+  // Additional fields for approval flow
+  toolUseId?: string;
+  toolName?: string;
+  toolInput?: unknown;
+  integration?: string;
+  operation?: string;
+  isWrite?: boolean;
+  command?: string;
+}
+
+// Get the active sandbox for a conversation (used by approval endpoint)
+export function getActiveSandbox(conversationId: string): Sandbox | undefined {
+  return activeSandboxes.get(conversationId);
 }
 
 /**
@@ -80,155 +97,6 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   return sandbox;
 }
 
-export interface RunClaudeOptions {
-  model?: string;
-  resume?: string;
-  systemPrompt?: string;
-}
-
-/**
- * Run Claude Code in the sandbox with real-time streaming
- */
-export async function* runClaudeInSandbox(
-  sandbox: Sandbox,
-  prompt: string,
-  options?: RunClaudeOptions
-): AsyncGenerator<ClaudeStreamEvent, void, unknown> {
-  // Create a queue for events
-  const eventQueue: ClaudeStreamEvent[] = [];
-  let resolveWait: (() => void) | null = null;
-  let isComplete = false;
-  let error: Error | null = null;
-
-  // Buffer for partial JSON lines
-  let buffer = "";
-
-  // Process incoming stdout data
-  const processStdout = (data: string) => {
-    buffer += data;
-
-    // Process complete lines
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-
-      try {
-        const event = JSON.parse(line) as ClaudeStreamEvent;
-        eventQueue.push(event);
-        if (resolveWait) {
-          resolveWait();
-          resolveWait = null;
-        }
-      } catch (e) {
-        // Not valid JSON, might be other output
-        console.log("[E2B stdout]:", line);
-      }
-    }
-  };
-
-  // Write prompt to a temp file to avoid shell escaping issues
-  // Use a unique filename to avoid permission issues on multi-turn conversations
-  const timestamp = Date.now();
-  const randomId = Math.random().toString(36).slice(2);
-  const promptFile = `/tmp/prompt-${timestamp}-${randomId}.txt`;
-  await sandbox.files.write(promptFile, prompt);
-
-  // Debug: Log prompt
-  console.log("[E2B] User prompt:", prompt.slice(0, 500));
-
-  // Build the command
-  let command = `cat ${promptFile} | claude -p --dangerously-skip-permissions --output-format stream-json --verbose`;
-
-  if (options?.model) {
-    command += ` --model ${options.model}`;
-  }
-
-  if (options?.resume) {
-    command += ` --resume ${options.resume}`;
-  }
-
-  // Add system prompt if provided
-  if (options?.systemPrompt) {
-    const systemPromptFile = `/tmp/system-${timestamp}-${randomId}.txt`;
-    await sandbox.files.write(systemPromptFile, options.systemPrompt);
-    command += ` --system-prompt "$(cat ${systemPromptFile})"`;
-    console.log("[E2B] System prompt:", options.systemPrompt.slice(0, 500));
-  }
-
-  console.log("[E2B] Running command:", command.slice(0, 300));
-
-  // Start the command (don't await - we want to stream)
-  const runPromise = sandbox.commands.run(command, {
-    timeoutMs: 0, // No timeout for long-running operations
-    onStdout: processStdout,
-    onStderr: (data) => {
-      console.error("[E2B stderr]:", data);
-    },
-  });
-
-  // Handle completion
-  runPromise
-    .then((result) => {
-      console.log("[E2B] Command completed:", {
-        exitCode: result.exitCode,
-        stdout: result.stdout?.slice(0, 500),
-        stderr: result.stderr,
-      });
-      // Process any remaining buffer
-      if (buffer.trim()) {
-        try {
-          const event = JSON.parse(buffer) as ClaudeStreamEvent;
-          eventQueue.push(event);
-        } catch (e) {
-          console.log("[E2B final stdout]:", buffer);
-        }
-      }
-      isComplete = true;
-      if (resolveWait) {
-        resolveWait();
-        resolveWait = null;
-      }
-    })
-    .catch((err: any) => {
-      console.error("[E2B] Command failed:", {
-        message: err.message,
-        exitCode: err.result?.exitCode,
-        stdout: err.result?.stdout?.slice(0, 1000),
-        stderr: err.result?.stderr,
-      });
-      error = err;
-      isComplete = true;
-      if (resolveWait) {
-        resolveWait();
-        resolveWait = null;
-      }
-    });
-
-  // Yield events as they arrive
-  while (true) {
-    // Yield all queued events
-    while (eventQueue.length > 0) {
-      yield eventQueue.shift()!;
-    }
-
-    // Check if we're done
-    if (isComplete) {
-      if (error) {
-        throw error;
-      }
-      break;
-    }
-
-    // Wait for more events
-    await new Promise<void>((resolve) => {
-      resolveWait = resolve;
-      // Also resolve after a short timeout to check for completion
-      setTimeout(resolve, 100);
-    });
-  }
-}
 
 /**
  * Kill a sandbox for a conversation
@@ -354,4 +222,161 @@ ${skillNames.map((name) => `- ${name}`).join("\n")}
 
 Read the SKILL.md file in each skill directory when relevant to the user's request.
 `;
+}
+
+export interface RunSDKAgentOptions {
+  model?: string;
+  resume?: string;
+  systemPrompt?: string;
+}
+
+/**
+ * Run SDK Agent in the sandbox with real-time streaming
+ */
+export async function* runSDKAgentInSandbox(
+  sandbox: Sandbox,
+  prompt: string,
+  options?: RunSDKAgentOptions
+): AsyncGenerator<SDKAgentEvent, void, unknown> {
+  // Create a queue for events
+  const eventQueue: SDKAgentEvent[] = [];
+  let resolveWait: (() => void) | null = null;
+  let isComplete = false;
+  let error: Error | null = null;
+
+  // Buffer for partial JSON lines
+  let buffer = "";
+
+  // Process incoming stdout data
+  const processStdout = (data: string) => {
+    buffer += data;
+
+    // Process complete lines
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+
+      try {
+        const event = JSON.parse(line) as SDKAgentEvent;
+        eventQueue.push(event);
+        if (resolveWait) {
+          resolveWait();
+          resolveWait = null;
+        }
+      } catch (e) {
+        // Not valid JSON, might be other output
+        console.log("[E2B SDK stdout]:", line);
+      }
+    }
+  };
+
+  // Build agent config
+  const agentConfig = {
+    prompt,
+    model: options?.model,
+    resume: options?.resume,
+    systemPrompt: options?.systemPrompt,
+  };
+
+  // Write config to a file (more reliable than env var for large prompts)
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).slice(2);
+  const configFile = `/tmp/agent-config-${timestamp}-${randomId}.json`;
+  await sandbox.files.write(configFile, JSON.stringify(agentConfig));
+
+  // Debug: Log prompt
+  console.log("[E2B SDK] User prompt:", prompt.slice(0, 500));
+
+  // Build the command - read config from file and pass to agent runner
+  const command = `AGENT_CONFIG="$(cat ${configFile})" npx tsx /app/agent-runner.ts`;
+
+  console.log("[E2B SDK] Running SDK agent");
+
+  // Start the command (don't await - we want to stream)
+  const runPromise = sandbox.commands.run(command, {
+    timeoutMs: 0, // No timeout for long-running operations
+    onStdout: processStdout,
+    onStderr: (data) => {
+      console.error("[E2B SDK stderr]:", data);
+    },
+  });
+
+  // Handle completion
+  runPromise
+    .then((result) => {
+      console.log("[E2B SDK] Agent completed:", {
+        exitCode: result.exitCode,
+        stdout: result.stdout?.slice(0, 500),
+        stderr: result.stderr,
+      });
+      // Process any remaining buffer
+      if (buffer.trim()) {
+        try {
+          const event = JSON.parse(buffer) as SDKAgentEvent;
+          eventQueue.push(event);
+        } catch (e) {
+          console.log("[E2B SDK final stdout]:", buffer);
+        }
+      }
+      isComplete = true;
+      if (resolveWait) {
+        resolveWait();
+        resolveWait = null;
+      }
+    })
+    .catch((err: any) => {
+      console.error("[E2B SDK] Agent failed:", {
+        message: err.message,
+        exitCode: err.result?.exitCode,
+        stdout: err.result?.stdout?.slice(0, 1000),
+        stderr: err.result?.stderr,
+      });
+      error = err;
+      isComplete = true;
+      if (resolveWait) {
+        resolveWait();
+        resolveWait = null;
+      }
+    });
+
+  // Yield events as they arrive
+  while (true) {
+    // Yield all queued events
+    while (eventQueue.length > 0) {
+      yield eventQueue.shift()!;
+    }
+
+    // Check if we're done
+    if (isComplete) {
+      if (error) {
+        throw error;
+      }
+      break;
+    }
+
+    // Wait for more events
+    await new Promise<void>((resolve) => {
+      resolveWait = resolve;
+      // Also resolve after a short timeout to check for completion
+      setTimeout(resolve, 100);
+    });
+  }
+}
+
+/**
+ * Write an approval response to the sandbox for the SDK agent to read
+ */
+export async function writeApprovalResponse(
+  sandbox: Sandbox,
+  toolUseId: string,
+  decision: "allow" | "deny"
+): Promise<void> {
+  const response = { toolUseId, decision };
+  await sandbox.files.write(
+    "/tmp/approval-response.json",
+    JSON.stringify(response)
+  );
+  console.log("[E2B SDK] Wrote approval response:", response);
 }

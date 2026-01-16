@@ -4,7 +4,16 @@ import { MessageItem } from "./message-item";
 
 export type MessagePart =
   | { type: "text"; content: string }
-  | { type: "tool_call"; id: string; name: string; input: unknown; result?: unknown };
+  | {
+      type: "tool_call";
+      id: string;
+      name: string;
+      input: unknown;
+      result?: unknown;
+      integration?: string;
+      operation?: string;
+      isWrite?: boolean;
+    };
 
 export type Message = {
   id: string;

@@ -11,9 +11,12 @@ import {
 import { env } from "@/env";
 import {
   getOrCreateSandbox,
-  runClaudeInSandbox,
+  runSDKAgentInSandbox,
   writeSkillsToSandbox,
   getSkillsSystemPrompt,
+  writeApprovalResponse,
+  getActiveSandbox,
+  type SDKAgentEvent,
 } from "@/server/sandbox/e2b";
 import { generateConversationTitle } from "@/server/utils/generate-title";
 
@@ -27,11 +30,29 @@ const chatEventSchema = z.discriminatedUnion("type", [
     type: z.literal("tool_use"),
     toolName: z.string(),
     toolInput: z.unknown(),
+    toolUseId: z.string().optional(),
+    integration: z.string().optional(),
+    operation: z.string().optional(),
+    isWrite: z.boolean().optional(),
   }),
   z.object({
     type: z.literal("tool_result"),
     toolName: z.string(),
     result: z.unknown(),
+  }),
+  z.object({
+    type: z.literal("pending_approval"),
+    toolUseId: z.string(),
+    toolName: z.string(),
+    toolInput: z.unknown(),
+    integration: z.string(),
+    operation: z.string(),
+    command: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("approval_result"),
+    toolUseId: z.string(),
+    decision: z.enum(["approved", "denied"]),
   }),
   z.object({
     type: z.literal("done"),
@@ -138,7 +159,7 @@ interface ExecutionContext {
 }
 
 /**
- * Handle execution using E2B sandbox
+ * Handle execution using E2B sandbox with SDK agent
  */
 async function* handleE2BExecution(
   ctx: ExecutionContext
@@ -178,15 +199,44 @@ async function* handleE2BExecution(
     console.log("[E2B] Enabled integrations CLI instructions:", cliInstructions ? "present" : "none");
     console.log("[E2B] Skills written:", writtenSkills.length > 0 ? writtenSkills.join(", ") : "none");
 
-    // Run Claude in sandbox
-    const claudeStream = runClaudeInSandbox(sandbox, input.content, {
+    // Run SDK agent in sandbox
+    const agentStream = runSDKAgentInSandbox(sandbox, input.content, {
       model: input.model ?? conv.model ?? "claude-sonnet-4-20250514",
       resume: conv.claudeSessionId ?? undefined,
       systemPrompt,
     });
 
-    for await (const event of claudeStream) {
-      // Process different event types from Claude CLI stream-json output
+    for await (const event of agentStream) {
+      // Handle SDK-specific events
+      if (event.type === "approval_needed") {
+        // Emit pending_approval event for frontend
+        yield {
+          type: "pending_approval" as const,
+          toolUseId: event.toolUseId || "",
+          toolName: event.toolName || "Bash",
+          toolInput: event.toolInput,
+          integration: event.integration || "",
+          operation: event.operation || "",
+          command: event.command,
+        };
+        continue;
+      }
+
+      if (event.type === "tool_use_integration") {
+        // Integration tool use with metadata (for frontend icon display)
+        yield {
+          type: "tool_use" as const,
+          toolName: "Bash",
+          toolInput: event.toolInput,
+          toolUseId: event.toolUseId,
+          integration: event.integration,
+          operation: event.operation,
+          isWrite: event.isWrite,
+        };
+        continue;
+      }
+
+      // Process standard event types from SDK (same as CLI stream-json output)
       if (event.type === "assistant" && event.message?.content) {
         for (const block of event.message.content) {
           if (block.type === "text" && block.text) {
@@ -206,6 +256,7 @@ async function* handleE2BExecution(
               type: "tool_use" as const,
               toolName: block.name,
               toolInput: block.input,
+              toolUseId: block.id,
             };
             contentParts.push({
               type: "tool_use",
@@ -306,6 +357,26 @@ async function* handleE2BExecution(
   }
 }
 
+// Approval endpoint for write operations
+const approveToolUse = protectedProcedure
+  .input(
+    z.object({
+      conversationId: z.string(),
+      toolUseId: z.string(),
+      decision: z.enum(["allow", "deny"]),
+    })
+  )
+  .handler(async ({ input }) => {
+    const sandbox = getActiveSandbox(input.conversationId);
+    if (!sandbox) {
+      throw new Error("Sandbox not found for this conversation");
+    }
+
+    await writeApprovalResponse(sandbox, input.toolUseId, input.decision);
+    return { success: true };
+  });
+
 export const chatRouter = {
   sendMessage,
+  approveToolUse,
 };

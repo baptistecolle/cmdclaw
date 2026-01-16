@@ -5,11 +5,23 @@ import { MessageList, type Message, type MessagePart } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { StreamingMessage } from "./streaming-message";
 import { VoiceIndicator, VoiceHint } from "./voice-indicator";
-import { useChatStream, useConversation, useTranscribe } from "@/orpc/hooks";
+import { ToolApprovalCard } from "./tool-approval-card";
+import {
+  useChatStream,
+  useConversation,
+  useTranscribe,
+  useApproveToolUse,
+  type PendingApprovalData,
+} from "@/orpc/hooks";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { useHotkeys } from "react-hotkeys-hook";
+
+// Pending approval state
+type PendingApproval = PendingApprovalData & {
+  status: "pending" | "approved" | "denied";
+};
 
 type Props = {
   conversationId?: string;
@@ -21,11 +33,16 @@ export function ChatArea({ conversationId }: Props) {
     conversationId
   );
   const { sendMessage, abort } = useChatStream();
+  const { mutateAsync: approveToolUse, isPending: isApproving } = useApproveToolUse();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingParts, setStreamingParts] = useState<MessagePart[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+
+  // Current conversation ID (may be set during streaming for new conversations)
+  const currentConversationIdRef = useRef<string | undefined>(conversationId);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -133,6 +150,7 @@ export function ChatArea({ conversationId }: Props) {
     setMessages((prev) => [...prev, userMessage]);
     setIsStreaming(true);
     setStreamingParts([]);
+    setPendingApprovals([]); // Clear any previous pending approvals
 
     const allParts: MessagePart[] = [];
     let toolCallCounter = 0;
@@ -151,12 +169,15 @@ export function ChatArea({ conversationId }: Props) {
           }
           setStreamingParts([...allParts]);
         },
-        onToolUse: (toolName, input) => {
+        onToolUse: (data) => {
           allParts.push({
             type: "tool_call",
-            id: `tc-${toolCallCounter++}`,
-            name: toolName,
-            input,
+            id: data.toolUseId || `tc-${toolCallCounter++}`,
+            name: data.toolName,
+            input: data.toolInput,
+            integration: data.integration,
+            operation: data.operation,
+            isWrite: data.isWrite,
           });
           setStreamingParts([...allParts]);
         },
@@ -170,6 +191,23 @@ export function ChatArea({ conversationId }: Props) {
             }
           }
           setStreamingParts([...allParts]);
+        },
+        onPendingApproval: (data) => {
+          // Add to pending approvals
+          setPendingApprovals((prev) => [
+            ...prev,
+            { ...data, status: "pending" },
+          ]);
+        },
+        onApprovalResult: (toolUseId, decision) => {
+          // Update the status of the approval
+          setPendingApprovals((prev) =>
+            prev.map((a) =>
+              a.toolUseId === toolUseId
+                ? { ...a, status: decision === "approved" ? "approved" : "denied" }
+                : a
+            )
+          );
         },
         onDone: (newConversationId, messageId) => {
           // Compute full content from text parts
@@ -190,15 +228,18 @@ export function ChatArea({ conversationId }: Props) {
           ]);
           setStreamingParts([]);
           setIsStreaming(false);
+          setPendingApprovals([]); // Clear pending approvals when done
 
-          // Navigate to new conversation if this was a new chat
+          // Update the ref and navigate to new conversation if this was a new chat
           if (!conversationId && newConversationId) {
+            currentConversationIdRef.current = newConversationId;
             router.push(`/chat/${newConversationId}`);
           }
         },
         onError: (message) => {
           console.error("Chat error:", message);
           setIsStreaming(false);
+          setPendingApprovals([]);
           // Add error message
           setMessages((prev) => [
             ...prev,
@@ -212,6 +253,55 @@ export function ChatArea({ conversationId }: Props) {
       }
     );
   }, [conversationId, router, sendMessage]);
+
+  // Handle approval/denial of tool use
+  const handleApprove = useCallback(
+    async (toolUseId: string) => {
+      const convId = currentConversationIdRef.current || conversationId;
+      if (!convId) return;
+
+      try {
+        await approveToolUse({
+          conversationId: convId,
+          toolUseId,
+          decision: "allow",
+        });
+        // Update local state
+        setPendingApprovals((prev) =>
+          prev.map((a) =>
+            a.toolUseId === toolUseId ? { ...a, status: "approved" } : a
+          )
+        );
+      } catch (err) {
+        console.error("Failed to approve tool use:", err);
+      }
+    },
+    [conversationId, approveToolUse]
+  );
+
+  const handleDeny = useCallback(
+    async (toolUseId: string) => {
+      const convId = currentConversationIdRef.current || conversationId;
+      if (!convId) return;
+
+      try {
+        await approveToolUse({
+          conversationId: convId,
+          toolUseId,
+          decision: "deny",
+        });
+        // Update local state
+        setPendingApprovals((prev) =>
+          prev.map((a) =>
+            a.toolUseId === toolUseId ? { ...a, status: "denied" } : a
+          )
+        );
+      } catch (err) {
+        console.error("Failed to deny tool use:", err);
+      }
+    },
+    [conversationId, approveToolUse]
+  );
 
   // Voice recording: stop and transcribe
   const stopRecordingAndTranscribe = useCallback(async () => {
@@ -311,7 +401,30 @@ export function ChatArea({ conversationId }: Props) {
               <MessageList messages={messages} />
 
               {isStreaming && (
-                <StreamingMessage parts={streamingParts} />
+                <>
+                  <StreamingMessage parts={streamingParts} />
+
+                  {/* Pending approval cards */}
+                  {pendingApprovals.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {pendingApprovals.map((approval) => (
+                        <ToolApprovalCard
+                          key={approval.toolUseId}
+                          toolUseId={approval.toolUseId}
+                          toolName={approval.toolName}
+                          toolInput={approval.toolInput}
+                          integration={approval.integration}
+                          operation={approval.operation}
+                          command={approval.command}
+                          status={approval.status}
+                          isLoading={isApproving}
+                          onApprove={() => handleApprove(approval.toolUseId)}
+                          onDeny={() => handleDeny(approval.toolUseId)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
