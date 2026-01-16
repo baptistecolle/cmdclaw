@@ -1,9 +1,9 @@
-import { HardDrive, Upload, FolderPlus, Trash2 } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
   PreviewBadge,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function DrivePreview({
@@ -31,7 +31,7 @@ function DriveUploadPreview({ args }: { args: Record<string, string | undefined>
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Upload className="h-4 w-4 text-yellow-500" />
+        <IntegrationLogo integration="google_drive" size={16} />
         <span className="text-sm font-medium">Upload File</span>
       </div>
 
@@ -53,13 +53,13 @@ function DriveMkdirPreview({ args }: { args: Record<string, string | undefined> 
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <FolderPlus className="h-4 w-4 text-yellow-500" />
+        <IntegrationLogo integration="google_drive" size={16} />
         <span className="text-sm font-medium">Create Folder</span>
       </div>
 
       <PreviewSection>
         <div className="rounded border bg-muted/30 p-3 flex items-center gap-2">
-          <FolderPlus className="h-5 w-5 text-yellow-500" />
+          <IntegrationLogo integration="google_drive" size={20} />
           <span className="font-medium">{name || "New Folder"}</span>
         </div>
         {parent && <PreviewField label="Parent Folder" value={parent} mono />}
@@ -74,7 +74,7 @@ function DriveDeletePreview({ positionalArgs }: { positionalArgs: string[] }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Trash2 className="h-4 w-4 text-red-500" />
+        <IntegrationLogo integration="google_drive" size={16} />
         <span className="text-sm font-medium">Delete Item</span>
         <PreviewBadge variant="danger">Destructive</PreviewBadge>
       </div>

@@ -1,10 +1,10 @@
-import { MessageSquare, Reply, Smile, Upload } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
   PreviewContent,
   PreviewBadge,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function SlackPreview({
@@ -31,11 +31,7 @@ function SlackSendPreview({ args }: { args: Record<string, string | undefined> }
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        {thread ? (
-          <Reply className="h-4 w-4 text-[#4A154B]" />
-        ) : (
-          <MessageSquare className="h-4 w-4 text-[#4A154B]" />
-        )}
+        <IntegrationLogo integration="slack" size={16} />
         <span className="text-sm font-medium">
           {thread ? "Reply to Thread" : "Send Message"}
         </span>
@@ -64,7 +60,7 @@ function SlackReactPreview({ args }: { args: Record<string, string | undefined> 
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Smile className="h-4 w-4 text-[#4A154B]" />
+        <IntegrationLogo integration="slack" size={16} />
         <span className="text-sm font-medium">Add Reaction</span>
       </div>
 
@@ -88,7 +84,7 @@ function SlackUploadPreview({ args }: { args: Record<string, string | undefined>
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Upload className="h-4 w-4 text-[#4A154B]" />
+        <IntegrationLogo integration="slack" size={16} />
         <span className="text-sm font-medium">Upload File</span>
       </div>
 

@@ -1,10 +1,10 @@
-import { TicketCheck, Plus, Edit } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
   PreviewContent,
   PreviewBadge,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function LinearPreview({
@@ -41,14 +41,14 @@ function LinearCreatePreview({ args }: { args: Record<string, string | undefined
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Plus className="h-4 w-4 text-purple-500" />
+        <IntegrationLogo integration="linear" size={16} />
         <span className="text-sm font-medium">Create Issue</span>
       </div>
 
       <PreviewSection>
         <div className="rounded border bg-muted/30 p-3">
           <div className="flex items-center gap-2 mb-2">
-            <TicketCheck className="h-4 w-4 text-purple-500" />
+            <IntegrationLogo integration="linear" size={16} />
             <span className="font-medium">{title || "Untitled Issue"}</span>
             {priorityInfo && (
               <PreviewBadge variant={priorityInfo.variant}>
@@ -89,7 +89,7 @@ function LinearUpdatePreview({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Edit className="h-4 w-4 text-purple-500" />
+        <IntegrationLogo integration="linear" size={16} />
         <span className="text-sm font-medium">Update Issue</span>
       </div>
 

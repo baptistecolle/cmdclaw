@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 import { type LucideIcon } from "lucide-react";
+import Image from "next/image";
+import { getIntegrationLogo } from "@/lib/integration-icons";
 
 export interface PreviewProps {
   integration: string;
@@ -10,9 +12,32 @@ export interface PreviewProps {
   className?: string;
 }
 
+interface IntegrationLogoProps {
+  integration: string;
+  size?: number;
+  className?: string;
+}
+
+export function IntegrationLogo({ integration, size = 16, className }: IntegrationLogoProps) {
+  const logo = getIntegrationLogo(integration);
+
+  if (!logo) return null;
+
+  return (
+    <Image
+      src={logo}
+      alt={integration}
+      width={size}
+      height={size}
+      className={cn("shrink-0", className)}
+    />
+  );
+}
+
 interface PreviewHeaderProps {
   icon?: LucideIcon;
   iconColor?: string;
+  integration?: string;
   operation: string;
   operationLabel?: string;
   className?: string;
@@ -21,13 +46,18 @@ interface PreviewHeaderProps {
 export function PreviewHeader({
   icon: Icon,
   iconColor,
+  integration,
   operation,
   operationLabel,
   className,
 }: PreviewHeaderProps) {
   return (
     <div className={cn("flex items-center gap-2 mb-3", className)}>
-      {Icon && <Icon className={cn("h-4 w-4", iconColor)} />}
+      {integration ? (
+        <IntegrationLogo integration={integration} size={16} />
+      ) : (
+        Icon && <Icon className={cn("h-4 w-4", iconColor)} />
+      )}
       <span className="text-sm font-medium">
         {operationLabel || operation}
       </span>

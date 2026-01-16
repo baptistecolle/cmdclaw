@@ -1,9 +1,9 @@
-import { Grid3X3, Plus, Edit, Trash2 } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
   PreviewBadge,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function AirtablePreview({
@@ -30,13 +30,13 @@ function AirtableCreatePreview({ args }: { args: Record<string, string | undefin
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Plus className="h-4 w-4 text-blue-400" />
+        <IntegrationLogo integration="airtable" size={16} />
         <span className="text-sm font-medium">Create Record</span>
       </div>
 
       <PreviewSection>
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-          <Grid3X3 className="h-4 w-4 text-blue-400" />
+          <IntegrationLogo integration="airtable" size={16} />
           <span className="font-mono">{baseId}</span>
           <span>/</span>
           <span>{table}</span>
@@ -61,13 +61,13 @@ function AirtableUpdatePreview({ args }: { args: Record<string, string | undefin
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Edit className="h-4 w-4 text-blue-400" />
+        <IntegrationLogo integration="airtable" size={16} />
         <span className="text-sm font-medium">Update Record</span>
       </div>
 
       <PreviewSection>
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-          <Grid3X3 className="h-4 w-4 text-blue-400" />
+          <IntegrationLogo integration="airtable" size={16} />
           <span className="font-mono">{baseId}</span>
           <span>/</span>
           <span>{table}</span>
@@ -92,14 +92,14 @@ function AirtableDeletePreview({ args }: { args: Record<string, string | undefin
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Trash2 className="h-4 w-4 text-red-500" />
+        <IntegrationLogo integration="airtable" size={16} />
         <span className="text-sm font-medium">Delete Record</span>
         <PreviewBadge variant="danger">Destructive</PreviewBadge>
       </div>
 
       <PreviewSection>
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-          <Grid3X3 className="h-4 w-4 text-blue-400" />
+          <IntegrationLogo integration="airtable" size={16} />
           <span className="font-mono">{baseId}</span>
           <span>/</span>
           <span>{table}</span>

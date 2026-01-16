@@ -1,10 +1,11 @@
-import { Calendar, CalendarPlus, CalendarX, Edit } from "lucide-react";
+import { Calendar } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
   PreviewContent,
   PreviewBadge,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function CalendarPreview({
@@ -34,7 +35,7 @@ function CalendarCreatePreview({ args }: { args: Record<string, string | undefin
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <CalendarPlus className="h-4 w-4 text-blue-500" />
+        <IntegrationLogo integration="google_calendar" size={16} />
         <span className="text-sm font-medium">Create Event</span>
       </div>
 
@@ -80,7 +81,7 @@ function CalendarUpdatePreview({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Edit className="h-4 w-4 text-blue-500" />
+        <IntegrationLogo integration="google_calendar" size={16} />
         <span className="text-sm font-medium">Update Event</span>
       </div>
 
@@ -105,7 +106,7 @@ function CalendarDeletePreview({ positionalArgs }: { positionalArgs: string[] })
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <CalendarX className="h-4 w-4 text-red-500" />
+        <IntegrationLogo integration="google_calendar" size={16} />
         <span className="text-sm font-medium">Delete Event</span>
         <PreviewBadge variant="danger">Destructive</PreviewBadge>
       </div>

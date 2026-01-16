@@ -74,6 +74,20 @@ export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
   hubspot: "text-orange-500",
 };
 
+export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
+  gmail: "/integrations/google-gmail.svg",
+  google_calendar: "/integrations/google-calendar.svg",
+  google_docs: "/integrations/google-docs.svg",
+  google_sheets: "/integrations/google-sheets.svg",
+  google_drive: "/integrations/google-drive.svg",
+  notion: "/integrations/notion.svg",
+  linear: "/integrations/linear.svg",
+  github: "/integrations/github.svg",
+  airtable: "/integrations/airtable.svg",
+  slack: "/integrations/slack.svg",
+  hubspot: "/integrations/hubspot.svg",
+};
+
 /**
  * Get the icon component for an integration
  */
@@ -93,4 +107,11 @@ export function getIntegrationDisplayName(integration: string): string {
  */
 export function getIntegrationColor(integration: string): string {
   return INTEGRATION_COLORS[integration as IntegrationType] || "text-muted-foreground";
+}
+
+/**
+ * Get the logo path for an integration
+ */
+export function getIntegrationLogo(integration: string): string | null {
+  return INTEGRATION_LOGOS[integration as IntegrationType] || null;
 }

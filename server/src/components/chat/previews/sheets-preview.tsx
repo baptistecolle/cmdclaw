@@ -1,10 +1,10 @@
-import { Table2, FilePlus, Edit, Trash2, Plus } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
   PreviewContent,
   PreviewBadge,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function SheetsPreview({
@@ -34,13 +34,13 @@ function SheetsCreatePreview({ args }: { args: Record<string, string | undefined
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <FilePlus className="h-4 w-4 text-green-500" />
+        <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Create Spreadsheet</span>
       </div>
 
       <PreviewSection>
         <div className="rounded border bg-muted/30 p-3 flex items-center gap-2">
-          <Table2 className="h-5 w-5 text-green-500" />
+          <IntegrationLogo integration="google_sheets" size={20} />
           <span className="font-medium">{title || "Untitled Spreadsheet"}</span>
         </div>
       </PreviewSection>
@@ -62,7 +62,7 @@ function SheetsAppendPreview({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Plus className="h-4 w-4 text-green-500" />
+        <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Append Rows</span>
       </div>
 
@@ -94,7 +94,7 @@ function SheetsUpdatePreview({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Edit className="h-4 w-4 text-green-500" />
+        <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Update Cells</span>
       </div>
 
@@ -125,7 +125,7 @@ function SheetsClearPreview({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Trash2 className="h-4 w-4 text-red-500" />
+        <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Clear Cells</span>
         <PreviewBadge variant="danger">Destructive</PreviewBadge>
       </div>
@@ -151,7 +151,7 @@ function SheetsAddSheetPreview({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Plus className="h-4 w-4 text-green-500" />
+        <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Add Sheet</span>
       </div>
 

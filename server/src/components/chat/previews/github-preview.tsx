@@ -1,9 +1,9 @@
-import { Github, CircleDot } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
   PreviewContent,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function GithubPreview({
@@ -28,14 +28,14 @@ function GithubCreateIssuePreview({ args }: { args: Record<string, string | unde
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <CircleDot className="h-4 w-4 text-green-500" />
+        <IntegrationLogo integration="github" size={16} />
         <span className="text-sm font-medium">Create Issue</span>
       </div>
 
       <PreviewSection>
         <div className="rounded border bg-muted/30 p-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-            <Github className="h-4 w-4" />
+            <IntegrationLogo integration="github" size={16} />
             <span className="font-mono">
               {owner}/{repo}
             </span>

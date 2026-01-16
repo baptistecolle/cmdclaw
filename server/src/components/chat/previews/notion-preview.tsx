@@ -1,9 +1,9 @@
-import { BookOpen, FilePlus, FileEdit } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
   PreviewContent,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function NotionPreview({
@@ -29,7 +29,7 @@ function NotionCreatePreview({ args }: { args: Record<string, string | undefined
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <FilePlus className="h-4 w-4 text-gray-800 dark:text-gray-200" />
+        <IntegrationLogo integration="notion" size={16} />
         <span className="text-sm font-medium">Create Page</span>
       </div>
 
@@ -69,7 +69,7 @@ function NotionAppendPreview({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <FileEdit className="h-4 w-4 text-gray-800 dark:text-gray-200" />
+        <IntegrationLogo integration="notion" size={16} />
         <span className="text-sm font-medium">Append to Page</span>
       </div>
 

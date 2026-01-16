@@ -1,9 +1,9 @@
-import { FileText, FilePlus, FileEdit } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
   PreviewContent,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function DocsPreview({
@@ -28,7 +28,7 @@ function DocsCreatePreview({ args }: { args: Record<string, string | undefined> 
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <FilePlus className="h-4 w-4 text-blue-600" />
+        <IntegrationLogo integration="google_docs" size={16} />
         <span className="text-sm font-medium">Create Document</span>
       </div>
 
@@ -68,7 +68,7 @@ function DocsAppendPreview({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <FileEdit className="h-4 w-4 text-blue-600" />
+        <IntegrationLogo integration="google_docs" size={16} />
         <span className="text-sm font-medium">Append to Document</span>
       </div>
 

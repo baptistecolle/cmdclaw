@@ -1,21 +1,11 @@
-import { Users, Building2, DollarSign, Ticket, ListTodo, StickyNote, Plus, Edit } from "lucide-react";
 import {
   PreviewProps,
   PreviewField,
   PreviewSection,
+  IntegrationLogo,
 } from "./preview-styles";
-import type { LucideIcon } from "lucide-react";
 
 type HubSpotObjectType = "contacts" | "companies" | "deals" | "tickets" | "tasks" | "notes";
-
-const OBJECT_ICONS: Record<HubSpotObjectType, LucideIcon> = {
-  contacts: Users,
-  companies: Building2,
-  deals: DollarSign,
-  tickets: Ticket,
-  tasks: ListTodo,
-  notes: StickyNote,
-};
 
 const OBJECT_LABELS: Record<HubSpotObjectType, string> = {
   contacts: "Contact",
@@ -35,7 +25,6 @@ export function HubspotPreview({
 
   if (!objectType || !action) return null;
 
-  const Icon = OBJECT_ICONS[objectType] || Users;
   const objectLabel = OBJECT_LABELS[objectType] || objectType;
 
   switch (action) {
@@ -45,16 +34,13 @@ export function HubspotPreview({
           args={args}
           objectType={objectType}
           objectLabel={objectLabel}
-          Icon={Icon}
         />
       );
     case "update":
       return (
         <HubspotUpdatePreview
           args={args}
-          objectType={objectType}
           objectLabel={objectLabel}
-          Icon={Icon}
         />
       );
     case "complete":
@@ -62,7 +48,6 @@ export function HubspotPreview({
         <HubspotCompletePreview
           args={args}
           objectLabel={objectLabel}
-          Icon={Icon}
         />
       );
     default:
@@ -74,14 +59,12 @@ interface HubspotPreviewComponentProps {
   args: Record<string, string | undefined>;
   objectType?: HubSpotObjectType;
   objectLabel: string;
-  Icon: LucideIcon;
 }
 
 function HubspotCreatePreview({
   args,
   objectType,
   objectLabel,
-  Icon,
 }: HubspotPreviewComponentProps) {
   // Extract common fields based on object type
   const fields = getDisplayFields(objectType!, args);
@@ -89,14 +72,14 @@ function HubspotCreatePreview({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Plus className="h-4 w-4 text-orange-500" />
+        <IntegrationLogo integration="hubspot" size={16} />
         <span className="text-sm font-medium">Create {objectLabel}</span>
       </div>
 
       <PreviewSection>
         <div className="rounded border bg-muted/30 p-3">
           <div className="flex items-center gap-2 mb-2">
-            <Icon className="h-4 w-4 text-orange-500" />
+            <IntegrationLogo integration="hubspot" size={16} />
             <span className="font-medium">{getPrimaryField(objectType!, args)}</span>
           </div>
 
@@ -117,23 +100,21 @@ function HubspotCreatePreview({
 
 function HubspotUpdatePreview({
   args,
-  objectType,
   objectLabel,
-  Icon,
-}: HubspotPreviewComponentProps) {
+}: Omit<HubspotPreviewComponentProps, "objectType">) {
   // The first positional arg after "hubspot <object> update" is the ID
   const id = args.id;
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Edit className="h-4 w-4 text-orange-500" />
+        <IntegrationLogo integration="hubspot" size={16} />
         <span className="text-sm font-medium">Update {objectLabel}</span>
       </div>
 
       <PreviewSection>
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-          <Icon className="h-4 w-4 text-orange-500" />
+          <IntegrationLogo integration="hubspot" size={16} />
           <span className="font-mono">{id || "Unknown ID"}</span>
         </div>
       </PreviewSection>
@@ -150,14 +131,13 @@ function HubspotUpdatePreview({
 function HubspotCompletePreview({
   args,
   objectLabel,
-  Icon,
 }: Omit<HubspotPreviewComponentProps, "objectType">) {
   const id = args.id;
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Icon className="h-4 w-4 text-green-500" />
+        <IntegrationLogo integration="hubspot" size={16} />
         <span className="text-sm font-medium">Complete {objectLabel}</span>
       </div>
 

@@ -1,8 +1,8 @@
-import { Mail, Send } from "lucide-react";
 import {
   PreviewProps,
   PreviewSection,
   PreviewContent,
+  IntegrationLogo,
 } from "./preview-styles";
 
 export function GmailPreview({
@@ -27,7 +27,7 @@ function GmailSendPreview({ args }: { args: Record<string, string | undefined> }
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Send className="h-4 w-4 text-red-500" />
+        <IntegrationLogo integration="gmail" size={16} />
         <span className="text-sm font-medium">Send Email</span>
       </div>
 
