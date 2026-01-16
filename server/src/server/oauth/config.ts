@@ -198,7 +198,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     authUrl: "https://airtable.com/oauth2/v1/authorize",
     tokenUrl: "https://airtable.com/oauth2/v1/token",
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
-    scopes: ["data.records:read", "data.records:write", "schema.bases:read"],
+    scopes: ["data.records:read", "data.records:write", "schema.bases:read", "user.email:read"],
     getUserInfo: async (accessToken) => {
       const res = await fetch("https://api.airtable.com/v0/meta/whoami", {
         headers: { Authorization: `Bearer ${accessToken}` },

@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Parse state
-  let stateData: { userId: string; type: IntegrationType; redirectUrl: string };
+  let stateData: { userId: string; type: IntegrationType; redirectUrl: string; codeVerifier?: string };
 
   try {
     stateData = JSON.parse(Buffer.from(state, "base64url").toString());
@@ -69,13 +69,18 @@ export async function GET(request: NextRequest) {
       "Content-Type": "application/x-www-form-urlencoded",
     };
 
-    // Notion requires Basic auth header
-    if (stateData.type === "notion") {
+    // Notion and Airtable require Basic auth header
+    if (stateData.type === "notion" || stateData.type === "airtable") {
       headers["Authorization"] = `Basic ${Buffer.from(
         `${config.clientId}:${config.clientSecret}`
       ).toString("base64")}`;
       tokenBody.delete("client_id");
       tokenBody.delete("client_secret");
+    }
+
+    // Airtable requires code_verifier for PKCE
+    if (stateData.type === "airtable" && stateData.codeVerifier) {
+      tokenBody.set("code_verifier", stateData.codeVerifier);
     }
 
     // GitHub needs Accept header

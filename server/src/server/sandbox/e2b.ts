@@ -290,7 +290,7 @@ export async function* runSDKAgentInSandbox(
   console.log("[E2B SDK] User prompt:", prompt.slice(0, 500));
 
   // Build the command - read config from file and pass to agent runner
-  const command = `AGENT_CONFIG="$(cat ${configFile})" npx tsx /app/agent-runner.ts`;
+  const command = `AGENT_CONFIG="$(cat ${configFile})" NODE_PATH=$(npm root -g) npx tsx /app/agent-runner.ts`;
 
   console.log("[E2B SDK] Running SDK agent");
 
