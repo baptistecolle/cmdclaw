@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronRight, Check, X, Loader2, ShieldAlert } from "lucide-react";
+import { useState, useMemo } from "react";
+import { ChevronDown, ChevronRight, Check, X, Loader2, ShieldAlert, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -9,6 +9,8 @@ import {
   getIntegrationDisplayName,
   getIntegrationColor,
 } from "@/lib/integration-icons";
+import { parseCliCommand } from "@/lib/parse-cli-command";
+import { getPreviewComponent, GenericPreview } from "./previews";
 
 export interface ToolApprovalCardProps {
   toolUseId: string;
@@ -36,10 +38,34 @@ export function ToolApprovalCard({
   isLoading,
 }: ToolApprovalCardProps) {
   const [expanded, setExpanded] = useState(true); // Start expanded for approvals
+  const [showRawCommand, setShowRawCommand] = useState(false);
 
   const Icon = getIntegrationIcon(integration);
   const displayName = getIntegrationDisplayName(integration);
   const colorClass = getIntegrationColor(integration);
+
+  // Parse the command to extract structured data
+  const parsedCommand = useMemo(() => {
+    if (!command) return null;
+    return parseCliCommand(command);
+  }, [command]);
+
+  // Get the appropriate preview component
+  const PreviewComponent = useMemo(() => {
+    return getPreviewComponent(integration);
+  }, [integration]);
+
+  // Build preview props
+  const previewProps = useMemo(() => {
+    if (!parsedCommand) return null;
+    return {
+      integration: parsedCommand.integration,
+      operation: parsedCommand.operation,
+      args: parsedCommand.args,
+      positionalArgs: parsedCommand.positionalArgs,
+      command: parsedCommand.rawCommand,
+    };
+  }, [parsedCommand]);
 
   return (
     <div
@@ -94,25 +120,43 @@ export function ToolApprovalCard({
 
       {expanded && (
         <div className="border-t px-3 py-3">
-          {command && (
+          {/* Formatted Preview */}
+          {previewProps && (
             <div className="mb-3">
-              <p className="mb-1 text-xs font-medium text-muted-foreground">
-                Command:
-              </p>
-              <pre className="overflow-x-auto rounded bg-muted p-2 font-mono text-xs">
-                {command}
-              </pre>
+              {PreviewComponent ? (
+                <PreviewComponent {...previewProps} />
+              ) : (
+                <GenericPreview {...previewProps} />
+              )}
             </div>
           )}
 
-          <div className="mb-3">
-            <p className="mb-1 text-xs font-medium text-muted-foreground">
-              Details:
-            </p>
-            <pre className="max-h-32 overflow-auto rounded bg-muted p-2 text-xs">
-              {JSON.stringify(toolInput, null, 2)}
-            </pre>
-          </div>
+          {/* Collapsible Raw Command Section */}
+          {command && (
+            <div className="mb-3">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowRawCommand(!showRawCommand);
+                }}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Code className="h-3 w-3" />
+                {showRawCommand ? "Hide" : "Show"} raw command
+                {showRawCommand ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+              </button>
+
+              {showRawCommand && (
+                <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 font-mono text-xs">
+                  {command}
+                </pre>
+              )}
+            </div>
+          )}
 
           {status === "pending" && (
             <div className="flex justify-end gap-2">

@@ -1,0 +1,128 @@
+import { Calendar, CalendarPlus, CalendarX, Edit } from "lucide-react";
+import {
+  PreviewProps,
+  PreviewField,
+  PreviewSection,
+  PreviewContent,
+  PreviewBadge,
+} from "./preview-styles";
+
+export function CalendarPreview({
+  operation,
+  args,
+  positionalArgs,
+}: PreviewProps) {
+  switch (operation) {
+    case "create":
+      return <CalendarCreatePreview args={args} />;
+    case "update":
+      return <CalendarUpdatePreview args={args} positionalArgs={positionalArgs} />;
+    case "delete":
+      return <CalendarDeletePreview positionalArgs={positionalArgs} />;
+    default:
+      return null;
+  }
+}
+
+function CalendarCreatePreview({ args }: { args: Record<string, string | undefined> }) {
+  const summary = args.summary;
+  const start = args.start;
+  const end = args.end;
+  const description = args.description;
+  const location = args.location;
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <CalendarPlus className="h-4 w-4 text-blue-500" />
+        <span className="text-sm font-medium">Create Event</span>
+      </div>
+
+      <PreviewSection>
+        <div className="rounded border bg-muted/30 p-3">
+          <div className="font-medium text-base mb-2">{summary || "Untitled Event"}</div>
+
+          <div className="space-y-1 text-sm">
+            {(start || end) && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>
+                  {formatDateTime(start)} {end && `— ${formatDateTime(end)}`}
+                </span>
+              </div>
+            )}
+
+            {location && (
+              <PreviewField label="Location" value={location} />
+            )}
+          </div>
+        </div>
+      </PreviewSection>
+
+      {description && (
+        <PreviewSection title="Description">
+          <PreviewContent>{description}</PreviewContent>
+        </PreviewSection>
+      )}
+    </div>
+  );
+}
+
+function CalendarUpdatePreview({
+  args,
+  positionalArgs,
+}: {
+  args: Record<string, string | undefined>;
+  positionalArgs: string[];
+}) {
+  const eventId = positionalArgs[0];
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <Edit className="h-4 w-4 text-blue-500" />
+        <span className="text-sm font-medium">Update Event</span>
+      </div>
+
+      <PreviewSection>
+        <PreviewField label="Event ID" value={eventId} mono />
+      </PreviewSection>
+
+      <PreviewSection title="Changes">
+        {args.summary && <PreviewField label="Title" value={args.summary} />}
+        {args.start && <PreviewField label="Start" value={formatDateTime(args.start)} />}
+        {args.end && <PreviewField label="End" value={formatDateTime(args.end)} />}
+        {args.description && <PreviewField label="Description" value={args.description} />}
+        {args.location && <PreviewField label="Location" value={args.location} />}
+      </PreviewSection>
+    </div>
+  );
+}
+
+function CalendarDeletePreview({ positionalArgs }: { positionalArgs: string[] }) {
+  const eventId = positionalArgs[0];
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <CalendarX className="h-4 w-4 text-red-500" />
+        <span className="text-sm font-medium">Delete Event</span>
+        <PreviewBadge variant="danger">Destructive</PreviewBadge>
+      </div>
+
+      <PreviewSection>
+        <PreviewField label="Event ID" value={eventId} mono />
+      </PreviewSection>
+    </div>
+  );
+}
+
+function formatDateTime(datetime: string | undefined): string {
+  if (!datetime) return "";
+  try {
+    const date = new Date(datetime);
+    return date.toLocaleString();
+  } catch {
+    return datetime;
+  }
+}
