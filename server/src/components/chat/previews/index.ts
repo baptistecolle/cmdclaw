@@ -16,21 +16,26 @@ import { GenericPreview } from "./generic-preview";
 export type { PreviewProps } from "./preview-styles";
 export { GenericPreview } from "./generic-preview";
 
-type PreviewComponent = ComponentType<PreviewProps>;
+export type PreviewComponent = ComponentType<PreviewProps>;
 
-// Map integration names to their preview components
-const INTEGRATION_PREVIEWS: Record<string, PreviewComponent> = {
-  slack: SlackPreview,
-  gmail: GmailPreview,
-  google_calendar: CalendarPreview,
-  google_docs: DocsPreview,
-  google_sheets: SheetsPreview,
-  google_drive: DrivePreview,
-  notion: NotionPreview,
-  linear: LinearPreview,
-  github: GithubPreview,
-  airtable: AirtablePreview,
-  hubspot: HubspotPreview,
+export interface IntegrationPreviewConfig {
+  component: PreviewComponent;
+  displayName: string;
+}
+
+// Map integration names to their preview components and display names
+export const INTEGRATION_PREVIEWS: Record<string, IntegrationPreviewConfig> = {
+  slack: { component: SlackPreview, displayName: "Slack" },
+  gmail: { component: GmailPreview, displayName: "Gmail" },
+  google_calendar: { component: CalendarPreview, displayName: "Google Calendar" },
+  google_docs: { component: DocsPreview, displayName: "Google Docs" },
+  google_sheets: { component: SheetsPreview, displayName: "Google Sheets" },
+  google_drive: { component: DrivePreview, displayName: "Google Drive" },
+  notion: { component: NotionPreview, displayName: "Notion" },
+  linear: { component: LinearPreview, displayName: "Linear" },
+  github: { component: GithubPreview, displayName: "GitHub" },
+  airtable: { component: AirtablePreview, displayName: "Airtable" },
+  hubspot: { component: HubspotPreview, displayName: "HubSpot" },
 };
 
 /**
@@ -42,7 +47,7 @@ const INTEGRATION_PREVIEWS: Record<string, PreviewComponent> = {
 export function getPreviewComponent(
   integration: string
 ): PreviewComponent | null {
-  return INTEGRATION_PREVIEWS[integration] || null;
+  return INTEGRATION_PREVIEWS[integration]?.component || null;
 }
 
 /**
@@ -50,4 +55,11 @@ export function getPreviewComponent(
  */
 export function hasCustomPreview(integration: string): boolean {
   return integration in INTEGRATION_PREVIEWS;
+}
+
+/**
+ * Get all integration keys
+ */
+export function getIntegrationKeys(): string[] {
+  return Object.keys(INTEGRATION_PREVIEWS);
 }
