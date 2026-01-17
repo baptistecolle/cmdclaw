@@ -1,77 +1,109 @@
 "use client";
 
-import { User, Bot } from "lucide-react";
-import { ToolCallDisplay } from "./tool-call-display";
-import { TextPartDisplay } from "./text-part-display";
-import { ThinkingPartDisplay } from "./thinking-part-display";
+import { useMemo } from "react";
+import { MessageBubble } from "./message-bubble";
+import { CollapsedTrace } from "./collapsed-trace";
 import type { MessagePart } from "./message-list";
+import type { IntegrationType } from "@/lib/integration-icons";
+import type { ActivityItemData } from "./activity-item";
 
 type Props = {
+  id: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   parts?: MessagePart[];
+  integrationsUsed?: string[];
 };
 
-export function MessageItem({ role, content, parts }: Props) {
+export function MessageItem({ id, role, content, parts, integrationsUsed }: Props) {
   // For user messages, show simple bubble
   if (role === "user") {
     return (
-      <div className="flex gap-3 py-4 flex-row-reverse">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-          <User className="h-4 w-4" />
-        </div>
-        <div className="flex max-w-[80%] flex-col gap-2 items-end">
-          <div className="rounded-lg px-4 py-2 bg-primary text-primary-foreground">
-            <p className="whitespace-pre-wrap text-sm">{content}</p>
-          </div>
-        </div>
+      <div className="py-4">
+        <MessageBubble role="user" content={content} />
       </div>
     );
   }
 
-  // For assistant messages, render parts linearly if available
-  const hasParts = parts && parts.length > 0;
+  // Convert message parts to activity items for collapsed trace
+  const activityItems = useMemo((): ActivityItemData[] => {
+    if (!parts) return [];
+
+    return parts
+      .filter((part) => part.type === "thinking" || part.type === "tool_call")
+      .map((part, index): ActivityItemData => {
+        if (part.type === "thinking") {
+          return {
+            id: `activity-${part.id}`,
+            timestamp: Date.now() - (parts.length - index) * 1000, // Approximate timestamps
+            type: "thinking",
+            content: part.content,
+          };
+        } else {
+          // tool_call
+          return {
+            id: `activity-${part.id}`,
+            timestamp: Date.now() - (parts.length - index) * 1000,
+            type: "tool_call",
+            content: part.name,
+            toolName: part.operation || part.name,
+            integration: part.integration as IntegrationType | undefined,
+            status: part.result !== undefined ? "complete" : "running",
+          };
+        }
+      });
+  }, [parts]);
+
+  // Extract integrations from parts if not provided
+  const integrations = useMemo((): IntegrationType[] => {
+    if (integrationsUsed && integrationsUsed.length > 0) {
+      return integrationsUsed as IntegrationType[];
+    }
+    if (!parts) return [];
+
+    const found = new Set<string>();
+    for (const part of parts) {
+      if (part.type === "tool_call" && part.integration) {
+        found.add(part.integration);
+      }
+    }
+    return Array.from(found) as IntegrationType[];
+  }, [parts, integrationsUsed]);
+
+  // Check if there were any tool calls or thinking (need to show trace)
+  const hasTrace = parts && parts.some(
+    (p) => p.type === "thinking" || p.type === "tool_call"
+  );
+
+  // Check if there was an error
+  const hasError = content.startsWith("Error:");
+
+  // Get text content
+  const textContent = content || "";
 
   return (
-    <div className="flex gap-3 py-4">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-        <Bot className="h-4 w-4" />
-      </div>
+    <div className="py-4 space-y-3">
+      {/* Show collapsed trace if there was any activity */}
+      {hasTrace && activityItems.length > 0 && (
+        <CollapsedTrace
+          messageId={id}
+          integrationsUsed={integrations}
+          hasError={hasError}
+          activityItems={activityItems}
+        />
+      )}
 
-      <div className="flex max-w-[80%] flex-col gap-2">
-        {hasParts ? (
-          parts.map((part, index) => {
-            if (part.type === "text") {
-              return (
-                <TextPartDisplay
-                  key={`text-${index}`}
-                  content={part.content}
-                />
-              );
-            } else if (part.type === "thinking") {
-              return (
-                <ThinkingPartDisplay
-                  key={part.id}
-                  content={part.content}
-                />
-              );
-            } else {
-              return (
-                <ToolCallDisplay
-                  key={part.id}
-                  name={part.name}
-                  input={part.input}
-                  result={part.result}
-                />
-              );
-            }
-          })
-        ) : (
-          <div className="rounded-lg px-4 py-2 bg-muted">
-            <p className="whitespace-pre-wrap text-sm">{content}</p>
-          </div>
-        )}
-      </div>
+      {/* Show message bubble if there's text content */}
+      {textContent && (
+        <MessageBubble role="assistant" content={textContent} />
+      )}
+
+      {/* If no text and no trace, show empty indicator */}
+      {!textContent && !hasTrace && (
+        <div className="text-sm text-muted-foreground italic">
+          Task completed
+        </div>
+      )}
     </div>
   );
 }

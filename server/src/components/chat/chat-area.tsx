@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { MessageList, type Message, type MessagePart } from "./message-list";
 import { ChatInput } from "./chat-input";
-import { StreamingMessage } from "./streaming-message";
 import { VoiceIndicator, VoiceHint } from "./voice-indicator";
 import { ToolApprovalCard } from "./tool-approval-card";
+import { ActivityFeed, type ActivityItemData } from "./activity-feed";
 import {
   useChatStream,
   useConversation,
@@ -17,11 +17,15 @@ import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { useHotkeys } from "react-hotkeys-hook";
+import type { IntegrationType } from "@/lib/integration-icons";
 
 // Pending approval state
 type PendingApproval = PendingApprovalData & {
   status: "pending" | "approved" | "denied";
 };
+
+// Trace state for tracking activity during a conversation turn
+type TraceStatus = "streaming" | "complete" | "error" | "waiting_approval";
 
 type Props = {
   conversationId?: string;
@@ -40,6 +44,15 @@ export function ChatArea({ conversationId }: Props) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+
+  // Activity feed state
+  const [activityItems, setActivityItems] = useState<ActivityItemData[]>([]);
+  const [integrationsUsed, setIntegrationsUsed] = useState<Set<IntegrationType>>(new Set());
+  const [isActivityFeedExpanded, setIsActivityFeedExpanded] = useState(false);
+  const [traceStatus, setTraceStatus] = useState<TraceStatus>("complete");
+
+  // Track tool call start times for duration display
+  const toolCallStartTimes = useRef<Map<string, number>>(new Map());
 
   // Current conversation ID (may be set during streaming for new conversations)
   const currentConversationIdRef = useRef<string | undefined>(conversationId);
@@ -118,6 +131,10 @@ export function ChatArea({ conversationId }: Props) {
     if (!conversationId) {
       setMessages([]);
       setStreamingParts([]);
+      setActivityItems([]);
+      setIntegrationsUsed(new Set());
+      setIsActivityFeedExpanded(false);
+      setTraceStatus("complete");
     }
   }, [conversationId]);
 
@@ -142,6 +159,8 @@ export function ChatArea({ conversationId }: Props) {
     abort();
     setIsStreaming(false);
     setStreamingParts([]);
+    setTraceStatus("complete");
+    setIsActivityFeedExpanded(false);
   }, [abort]);
 
   const handleSend = useCallback(async (content: string) => {
@@ -155,8 +174,18 @@ export function ChatArea({ conversationId }: Props) {
     setStreamingParts([]);
     setPendingApprovals([]); // Clear any previous pending approvals
 
+    // Reset activity feed state for new message
+    setActivityItems([]);
+    setIntegrationsUsed(new Set());
+    setIsActivityFeedExpanded(false);
+    setTraceStatus("streaming");
+    toolCallStartTimes.current.clear();
+
     const allParts: MessagePart[] = [];
+    const allActivityItems: ActivityItemData[] = [];
+    const usedIntegrations = new Set<IntegrationType>();
     let toolCallCounter = 0;
+    let activityCounter = 0;
 
     await sendMessage(
       { conversationId, content },
@@ -171,6 +200,7 @@ export function ChatArea({ conversationId }: Props) {
             allParts.push({ type: "text", content: text });
           }
           setStreamingParts([...allParts]);
+          // Note: Text content goes to message bubbles, not activity feed
         },
         onThinking: (data) => {
           // Create a new thinking part
@@ -180,11 +210,25 @@ export function ChatArea({ conversationId }: Props) {
             content: data.content,
           });
           setStreamingParts([...allParts]);
+
+          // Add to activity feed
+          const activityItem: ActivityItemData = {
+            id: `activity-${activityCounter++}`,
+            timestamp: Date.now(),
+            type: "thinking",
+            content: data.content,
+          };
+          allActivityItems.push(activityItem);
+          setActivityItems([...allActivityItems]);
         },
         onToolUse: (data) => {
+          const toolId = data.toolUseId || `tc-${toolCallCounter++}`;
+          const now = Date.now();
+          toolCallStartTimes.current.set(toolId, now);
+
           allParts.push({
             type: "tool_call",
-            id: data.toolUseId || `tc-${toolCallCounter++}`,
+            id: toolId,
             name: data.toolName,
             input: data.toolInput,
             integration: data.integration,
@@ -192,6 +236,25 @@ export function ChatArea({ conversationId }: Props) {
             isWrite: data.isWrite,
           });
           setStreamingParts([...allParts]);
+
+          // Track integration used
+          if (data.integration) {
+            usedIntegrations.add(data.integration as IntegrationType);
+            setIntegrationsUsed(new Set(usedIntegrations));
+          }
+
+          // Add to activity feed
+          const activityItem: ActivityItemData = {
+            id: `activity-${activityCounter++}`,
+            timestamp: now,
+            type: "tool_call",
+            content: data.toolName,
+            toolName: data.operation || data.toolName,
+            integration: data.integration as IntegrationType | undefined,
+            status: "running",
+          };
+          allActivityItems.push(activityItem);
+          setActivityItems([...allActivityItems]);
         },
         onToolResult: (toolName, result) => {
           // Find the last tool call with this name that doesn't have a result
@@ -203,6 +266,15 @@ export function ChatArea({ conversationId }: Props) {
             }
           }
           setStreamingParts([...allParts]);
+
+          // Update the corresponding activity item status to complete
+          const lastToolActivity = [...allActivityItems].reverse().find(
+            (item) => item.type === "tool_call" && item.content === toolName && item.status === "running"
+          );
+          if (lastToolActivity) {
+            lastToolActivity.status = "complete";
+            setActivityItems([...allActivityItems]);
+          }
         },
         onPendingApproval: (data) => {
           // Add to pending approvals
@@ -210,6 +282,7 @@ export function ChatArea({ conversationId }: Props) {
             ...prev,
             { ...data, status: "pending" },
           ]);
+          setTraceStatus("waiting_approval");
         },
         onApprovalResult: (toolUseId, decision) => {
           // Update the status of the approval
@@ -220,6 +293,7 @@ export function ChatArea({ conversationId }: Props) {
                 : a
             )
           );
+          setTraceStatus("streaming");
         },
         onDone: (newConversationId, messageId) => {
           // Compute full content from text parts
@@ -228,7 +302,7 @@ export function ChatArea({ conversationId }: Props) {
             .map((p) => p.content)
             .join("");
 
-          // Add assistant message to list
+          // Add assistant message to list with integrations used
           setMessages((prev) => [
             ...prev,
             {
@@ -236,11 +310,14 @@ export function ChatArea({ conversationId }: Props) {
               role: "assistant",
               content: fullContent,
               parts: allParts,
-            },
+              integrationsUsed: Array.from(usedIntegrations),
+            } as Message & { integrationsUsed?: IntegrationType[] },
           ]);
           setStreamingParts([]);
           setIsStreaming(false);
           setPendingApprovals([]); // Clear pending approvals when done
+          setTraceStatus("complete");
+          setIsActivityFeedExpanded(false); // Auto-collapse on complete
 
           // Update the ref and navigate to new conversation if this was a new chat
           if (!conversationId && newConversationId) {
@@ -252,6 +329,8 @@ export function ChatArea({ conversationId }: Props) {
           console.error("Chat error:", message);
           setIsStreaming(false);
           setPendingApprovals([]);
+          setTraceStatus("error");
+          setIsActivityFeedExpanded(true); // Keep expanded on error
           // Add error message
           setMessages((prev) => [
             ...prev,
@@ -413,12 +492,19 @@ export function ChatArea({ conversationId }: Props) {
               <MessageList messages={messages} />
 
               {isStreaming && (
-                <>
-                  <StreamingMessage parts={streamingParts} />
+                <div className="py-4 space-y-4">
+                  {/* Activity Feed - shows thinking and tool activity */}
+                  <ActivityFeed
+                    items={activityItems}
+                    isStreaming={isStreaming}
+                    isExpanded={isActivityFeedExpanded}
+                    onToggleExpand={() => setIsActivityFeedExpanded(!isActivityFeedExpanded)}
+                    integrationsUsed={Array.from(integrationsUsed)}
+                  />
 
                   {/* Pending approval cards */}
                   {pendingApprovals.length > 0 && (
-                    <div className="mt-4 space-y-2">
+                    <div className="space-y-2">
                       {pendingApprovals.map((approval) => (
                         <ToolApprovalCard
                           key={approval.toolUseId}
@@ -436,7 +522,7 @@ export function ChatArea({ conversationId }: Props) {
                       ))}
                     </div>
                   )}
-                </>
+                </div>
               )}
             </>
           )}

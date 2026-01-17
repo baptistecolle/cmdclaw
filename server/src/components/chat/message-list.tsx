@@ -21,6 +21,7 @@ export type Message = {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   parts?: MessagePart[];
+  integrationsUsed?: string[];
 };
 
 type Props = {
@@ -37,9 +38,11 @@ export function MessageList({ messages }: Props) {
       {messages.map((message) => (
         <MessageItem
           key={message.id}
+          id={message.id}
           role={message.role}
           content={message.content}
           parts={message.parts}
+          integrationsUsed={message.integrationsUsed}
         />
       ))}
     </div>
