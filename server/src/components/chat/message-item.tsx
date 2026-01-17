@@ -46,9 +46,12 @@ export function MessageItem({ id, role, content, parts, integrationsUsed }: Prop
             timestamp: Date.now() - (parts.length - index) * 1000,
             type: "tool_call",
             content: part.name,
-            toolName: part.operation || part.name,
+            toolName: part.name,
             integration: part.integration as IntegrationType | undefined,
+            operation: part.operation,
             status: part.result !== undefined ? "complete" : "running",
+            input: part.input,
+            result: part.result,
           };
         }
       });

@@ -54,6 +54,7 @@ export interface SDKAgentEvent extends ClaudeStreamEvent {
   operation?: string;
   isWrite?: boolean;
   command?: string;
+  decision?: "approved" | "denied";
 }
 
 // Get the active sandbox for a conversation (used by approval endpoint)

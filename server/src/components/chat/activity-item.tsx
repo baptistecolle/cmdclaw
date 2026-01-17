@@ -1,9 +1,53 @@
 "use client";
 
-import { Brain, Wrench, Check, Loader2, AlertCircle, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { getIntegrationLogo, getIntegrationDisplayName } from "@/lib/integration-icons";
+import {
+  Wrench,
+  Check,
+  Loader2,
+  AlertCircle,
+  Terminal,
+  FolderSearch,
+  FileSearch,
+  BookOpen,
+  FilePen,
+  Pencil,
+  Globe,
+  type LucideIcon,
+} from "lucide-react";
+import { getIntegrationLogo, getIntegrationDisplayName, getOperationLabel } from "@/lib/integration-icons";
 import type { IntegrationType } from "@/lib/integration-icons";
+
+// Map internal SDK tool names to user-friendly display names
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  Bash: "Running command",
+  Glob: "Searching files",
+  Grep: "Searching content",
+  Read: "Reading file",
+  Write: "Writing file",
+  Edit: "Editing file",
+  WebSearch: "Searching web",
+  WebFetch: "Fetching page",
+};
+
+// Map internal SDK tool names to icons (all use consistent blue color)
+const TOOL_ICONS: Record<string, LucideIcon> = {
+  Bash: Terminal,
+  Glob: FolderSearch,
+  Grep: FileSearch,
+  Read: BookOpen,
+  Write: FilePen,
+  Edit: Pencil,
+  WebSearch: Globe,
+  WebFetch: Globe,
+};
+
+function getToolDisplayName(toolName: string): string {
+  return TOOL_DISPLAY_NAMES[toolName] ?? toolName;
+}
+
+function getToolIcon(toolName: string): LucideIcon {
+  return TOOL_ICONS[toolName] ?? Wrench;
+}
 
 export type ActivityItemData = {
   id: string;
@@ -12,45 +56,65 @@ export type ActivityItemData = {
   content: string;
   toolName?: string;
   integration?: IntegrationType;
+  operation?: string;
   status?: "running" | "complete" | "error";
+  input?: unknown;
+  result?: unknown;
 };
 
 type Props = {
   item: ActivityItemData;
-  showTimestamp?: boolean;
 };
 
-function formatDuration(startTime: number): string {
-  const elapsed = Date.now() - startTime;
-  if (elapsed < 1000) return "<1s";
-  if (elapsed < 60000) return `${Math.floor(elapsed / 1000)}s`;
-  return `${Math.floor(elapsed / 60000)}m ${Math.floor((elapsed % 60000) / 1000)}s`;
+function formatValue(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
-export function ActivityItem({ item, showTimestamp = true }: Props) {
-  const { type, content, toolName, integration, status } = item;
+// Extract command string from Bash tool input
+function formatInput(input: unknown, toolName?: string): string {
+  if (input === undefined || input === null) return "";
 
-  // Truncate content for preview
-  const truncatedContent = content.length > 80 ? content.slice(0, 80) + "..." : content;
+  // For Bash commands, extract just the command string
+  if (toolName === "Bash" && typeof input === "object" && input !== null) {
+    const bashInput = input as { command?: string };
+    if (bashInput.command) {
+      return bashInput.command;
+    }
+  }
 
-  // Get icon and styling based on type
+  return formatValue(input);
+}
+
+export function ActivityItem({ item }: Props) {
+  const { type, content, toolName, integration, operation, status, input, result } = item;
+
+  // Get icon for tool calls only
   const getIcon = () => {
-    if (type === "thinking") {
-      return <Brain className="h-3.5 w-3.5 text-purple-500" />;
-    }
-    if (type === "tool_call" || type === "tool_result") {
-      // Show integration logo if available
-      if (integration) {
-        const logo = getIntegrationLogo(integration);
-        if (logo) {
-          return (
-            <img src={logo} alt={getIntegrationDisplayName(integration)} className="h-3.5 w-3.5" />
-          );
-        }
+    if (type !== "tool_call" && type !== "tool_result") return null;
+
+    // Integration icons take priority
+    if (integration) {
+      const logo = getIntegrationLogo(integration);
+      if (logo) {
+        return (
+          <img src={logo} alt={getIntegrationDisplayName(integration)} className="h-3.5 w-3.5 flex-shrink-0" />
+        );
       }
-      return <Wrench className="h-3.5 w-3.5 text-blue-500" />;
     }
-    return null;
+
+    // Tool-specific icons
+    if (toolName) {
+      const ToolIcon = getToolIcon(toolName);
+      return <ToolIcon className="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />;
+    }
+
+    return <Wrench className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />;
   };
 
   const getStatusIcon = () => {
@@ -58,50 +122,53 @@ export function ActivityItem({ item, showTimestamp = true }: Props) {
 
     switch (status) {
       case "running":
-        return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />;
+        return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" />;
       case "complete":
-        return <Check className="h-3 w-3 text-green-500" />;
+        return <Check className="h-3 w-3 text-green-500 flex-shrink-0" />;
       case "error":
-        return <AlertCircle className="h-3 w-3 text-red-500" />;
+        return <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />;
       default:
         return null;
     }
   };
 
-  const getDisplayText = () => {
-    if (type === "thinking") {
-      return <span className="italic text-muted-foreground">{truncatedContent}</span>;
-    }
-    if (type === "tool_call" && toolName) {
-      const displayName = integration
-        ? `${getIntegrationDisplayName(integration)}.${toolName.split("_").pop()}`
-        : toolName;
+  // Render thinking content
+  if (type === "thinking") {
+    return (
+      <div className="text-xs text-muted-foreground italic whitespace-pre-wrap py-0.5">
+        {content}
+      </div>
+    );
+  }
 
-      return (
-        <span className="text-foreground">
-          <span className="font-mono text-xs">{displayName}</span>
-          <span className="text-muted-foreground">
-            {status === "running" ? " → Running..." : status === "complete" ? " → Complete" : status === "error" ? " → Error" : ""}
-          </span>
-        </span>
-      );
+  // Render tool call with full input/result
+  // For integrations, show operation label (e.g., "Listing channels")
+  // For regular tools, show tool action (e.g., "Running command")
+  const displayName = (() => {
+    if (integration) {
+      // Use operation or toolName (which may contain the operation)
+      const op = operation || toolName;
+      return op ? getOperationLabel(integration, op) : getIntegrationDisplayName(integration);
     }
-    return <span className="text-muted-foreground">{truncatedContent}</span>;
-  };
+    return toolName ? getToolDisplayName(toolName) : content;
+  })();
+
+  const formattedInput = formatInput(input, toolName);
+  const formattedResult = formatValue(result);
 
   return (
-    <div className="flex items-center gap-2 py-0.5 text-xs">
-      <span className="flex-shrink-0">{getIcon()}</span>
-      <span className="flex-1 truncate">{getDisplayText()}</span>
-      <span className="flex items-center gap-1">
+    <div className="text-xs py-0.5">
+      <div className="flex items-center gap-1.5">
+        {getIcon()}
+        <span className="font-mono text-foreground">{displayName}</span>
         {getStatusIcon()}
-        {showTimestamp && (
-          <span className="flex items-center gap-0.5 text-muted-foreground/60">
-            <Clock className="h-2.5 w-2.5" />
-            {formatDuration(item.timestamp)}
-          </span>
-        )}
-      </span>
+      </div>
+      {formattedInput && (
+        <pre className="text-muted-foreground whitespace-pre-wrap ml-5 mt-0.5 font-mono">{formattedInput}</pre>
+      )}
+      {formattedResult && (
+        <pre className="text-muted-foreground whitespace-pre-wrap ml-5 mt-0.5 font-mono">{formattedResult}</pre>
+      )}
     </div>
   );
 }

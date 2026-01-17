@@ -18,7 +18,8 @@ type Props = {
   integrationsUsed: IntegrationType[];
 };
 
-const COLLAPSED_HEIGHT = 120; // ~5 lines
+// Line height is ~18px (text-xs with line-height), 5 lines = ~90px + padding
+const COLLAPSED_HEIGHT = 100;
 const MAX_EXPANDED_HEIGHT = 400;
 
 export function ActivityFeed({

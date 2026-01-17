@@ -15,6 +15,7 @@ export type ToolUseData = {
 };
 
 export type PendingApprovalData = {
+  conversationId: string;
   toolUseId: string;
   toolName: string;
   toolInput: unknown;
@@ -95,6 +96,7 @@ export function useChatStream() {
               break;
             case "pending_approval":
               callbacks.onPendingApproval?.({
+                conversationId: event.conversationId,
                 toolUseId: event.toolUseId,
                 toolName: event.toolName,
                 toolInput: event.toolInput,

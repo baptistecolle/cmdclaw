@@ -47,6 +47,7 @@ const chatEventSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("pending_approval"),
+    conversationId: z.string(),
     toolUseId: z.string(),
     toolName: z.string(),
     toolInput: z.unknown(),
@@ -217,12 +218,23 @@ async function* handleE2BExecution(
         // Emit pending_approval event for frontend
         yield {
           type: "pending_approval" as const,
+          conversationId: conv.id,
           toolUseId: event.toolUseId || "",
           toolName: event.toolName || "Bash",
           toolInput: event.toolInput,
           integration: event.integration || "",
           operation: event.operation || "",
           command: event.command,
+        };
+        continue;
+      }
+
+      if (event.type === "approval_result") {
+        // Forward approval result to frontend
+        yield {
+          type: "approval_result" as const,
+          toolUseId: event.toolUseId || "",
+          decision: event.decision === "approved" ? "approved" : "denied",
         };
         continue;
       }

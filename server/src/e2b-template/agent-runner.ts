@@ -214,6 +214,13 @@ const integrationPermissionHook: HookCallback = async (input, toolUseId, { signa
     // Wait for approval from server
     const decision = await waitForApproval(toolUseId!);
 
+    // Emit approval result back to frontend
+    emitEvent({
+      type: "approval_result",
+      toolUseId,
+      decision: decision === "allow" ? "approved" : "denied",
+    });
+
     if (decision === "deny") {
       return {
         hookSpecificOutput: {

@@ -75,7 +75,7 @@ export function CollapsedTrace({
               {activityItems.length > 0 ? (
                 <div className="space-y-0.5">
                   {activityItems.map((item) => (
-                    <ActivityItem key={item.id} item={item} showTimestamp={false} />
+                    <ActivityItem key={item.id} item={item} />
                   ))}
                 </div>
               ) : (

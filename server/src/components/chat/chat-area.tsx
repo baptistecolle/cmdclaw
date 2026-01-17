@@ -249,9 +249,11 @@ export function ChatArea({ conversationId }: Props) {
             timestamp: now,
             type: "tool_call",
             content: data.toolName,
-            toolName: data.operation || data.toolName,
+            toolName: data.toolName,
             integration: data.integration as IntegrationType | undefined,
+            operation: data.operation,
             status: "running",
+            input: data.toolInput,
           };
           allActivityItems.push(activityItem);
           setActivityItems([...allActivityItems]);
@@ -267,16 +269,21 @@ export function ChatArea({ conversationId }: Props) {
           }
           setStreamingParts([...allParts]);
 
-          // Update the corresponding activity item status to complete
+          // Update the corresponding activity item status to complete and add result
           const lastToolActivity = [...allActivityItems].reverse().find(
             (item) => item.type === "tool_call" && item.content === toolName && item.status === "running"
           );
           if (lastToolActivity) {
             lastToolActivity.status = "complete";
+            lastToolActivity.result = result;
             setActivityItems([...allActivityItems]);
           }
         },
         onPendingApproval: (data) => {
+          // Update the conversation ID ref if we receive it (for new conversations)
+          if (data.conversationId) {
+            currentConversationIdRef.current = data.conversationId;
+          }
           // Add to pending approvals
           setPendingApprovals((prev) => [
             ...prev,
