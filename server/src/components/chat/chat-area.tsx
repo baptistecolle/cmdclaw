@@ -64,6 +64,7 @@ export function ChatArea({ conversationId }: Props) {
           | { type: "text"; text: string }
           | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
           | { type: "tool_result"; tool_use_id: string; content: unknown }
+          | { type: "thinking"; id: string; content: string }
         >;
       }>;
     } | null | undefined;
@@ -87,6 +88,8 @@ export function ChatArea({ conversationId }: Props) {
               .map((p) => {
                 if (p.type === "text") {
                   return { type: "text" as const, content: p.text };
+                } else if (p.type === "thinking") {
+                  return { type: "thinking" as const, id: p.id, content: p.content };
                 } else {
                   // tool_use -> tool_call with result merged
                   return {
@@ -167,6 +170,15 @@ export function ChatArea({ conversationId }: Props) {
             // Create a new text part
             allParts.push({ type: "text", content: text });
           }
+          setStreamingParts([...allParts]);
+        },
+        onThinking: (data) => {
+          // Create a new thinking part
+          allParts.push({
+            type: "thinking",
+            id: data.thinkingId,
+            content: data.content,
+          });
           setStreamingParts([...allParts]);
         },
         onToolUse: (data) => {

@@ -23,8 +23,14 @@ export type PendingApprovalData = {
   command?: string;
 };
 
+export type ThinkingData = {
+  content: string;
+  thinkingId: string;
+};
+
 export type ChatCallbacks = {
   onText?: (content: string) => void;
+  onThinking?: (data: ThinkingData) => void;
   onToolUse?: (data: ToolUseData) => void;
   onToolResult?: (toolName: string, result: unknown) => void;
   onPendingApproval?: (data: PendingApprovalData) => void;
@@ -67,6 +73,12 @@ export function useChatStream() {
           switch (event.type) {
             case "text":
               callbacks.onText?.(event.content);
+              break;
+            case "thinking":
+              callbacks.onThinking?.({
+                content: event.content,
+                thinkingId: event.thinkingId,
+              });
               break;
             case "tool_use":
               callbacks.onToolUse?.({

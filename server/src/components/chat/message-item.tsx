@@ -3,6 +3,7 @@
 import { User, Bot } from "lucide-react";
 import { ToolCallDisplay } from "./tool-call-display";
 import { TextPartDisplay } from "./text-part-display";
+import { ThinkingPartDisplay } from "./thinking-part-display";
 import type { MessagePart } from "./message-list";
 
 type Props = {
@@ -44,6 +45,13 @@ export function MessageItem({ role, content, parts }: Props) {
               return (
                 <TextPartDisplay
                   key={`text-${index}`}
+                  content={part.content}
+                />
+              );
+            } else if (part.type === "thinking") {
+              return (
+                <ThinkingPartDisplay
+                  key={part.id}
                   content={part.content}
                 />
               );

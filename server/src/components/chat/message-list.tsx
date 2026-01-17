@@ -13,7 +13,8 @@ export type MessagePart =
       integration?: string;
       operation?: string;
       isWrite?: boolean;
-    };
+    }
+  | { type: "thinking"; id: string; content: string };
 
 export type Message = {
   id: string;

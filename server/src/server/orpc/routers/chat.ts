@@ -41,6 +41,11 @@ const chatEventSchema = z.discriminatedUnion("type", [
     result: z.unknown(),
   }),
   z.object({
+    type: z.literal("thinking"),
+    content: z.string(),
+    thinkingId: z.string(),
+  }),
+  z.object({
     type: z.literal("pending_approval"),
     toolUseId: z.string(),
     toolName: z.string(),
@@ -249,6 +254,16 @@ async function* handleE2BExecution(
               currentTextPart = { type: "text", text: block.text };
               contentParts.push(currentTextPart);
             }
+          } else if (block.type === "thinking" && block.thinking) {
+            // Finalize current text part before thinking
+            currentTextPart = null;
+            const thinkingId = `thinking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            yield { type: "thinking" as const, content: block.thinking, thinkingId };
+            contentParts.push({
+              type: "thinking",
+              id: thinkingId,
+              content: block.thinking,
+            });
           } else if (block.type === "tool_use" && block.name) {
             // Finalize current text part before tool_use
             currentTextPart = null;

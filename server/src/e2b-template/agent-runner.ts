@@ -270,6 +270,7 @@ async function main() {
         systemPrompt,
         permissionMode: "bypassPermissions", // We handle permissions via hooks
         allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebSearch", "WebFetch"],
+        // maxThinkingTokens: 10000, // Enable extended thinking
         ...(resume ? { resume } : {}),
         hooks: {
           PreToolUse: [

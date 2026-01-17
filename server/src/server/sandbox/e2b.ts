@@ -28,6 +28,7 @@ export interface ClaudeStreamEvent {
     content?: Array<{
       type: string;
       text?: string;
+      thinking?: string;
       id?: string;
       name?: string;
       input?: unknown;
