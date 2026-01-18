@@ -30,9 +30,16 @@ export function MessageItem({ id, role, content, parts, integrationsUsed }: Prop
     if (!parts) return [];
 
     return parts
-      .filter((part) => part.type === "thinking" || part.type === "tool_call")
+      .filter((part) => part.type === "text" || part.type === "thinking" || part.type === "tool_call")
       .map((part, index): ActivityItemData => {
-        if (part.type === "thinking") {
+        if (part.type === "text") {
+          return {
+            id: `activity-text-${index}`,
+            timestamp: Date.now() - (parts.length - index) * 1000,
+            type: "text",
+            content: part.content,
+          };
+        } else if (part.type === "thinking") {
           return {
             id: `activity-${part.id}`,
             timestamp: Date.now() - (parts.length - index) * 1000, // Approximate timestamps
@@ -73,9 +80,9 @@ export function MessageItem({ id, role, content, parts, integrationsUsed }: Prop
     return Array.from(found) as IntegrationType[];
   }, [parts, integrationsUsed]);
 
-  // Check if there were any tool calls or thinking (need to show trace)
+  // Check if there were any text, tool calls or thinking (need to show trace)
   const hasTrace = parts && parts.some(
-    (p) => p.type === "thinking" || p.type === "tool_call"
+    (p) => p.type === "text" || p.type === "thinking" || p.type === "tool_call"
   );
 
   // Check if there was an error

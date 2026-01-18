@@ -200,7 +200,22 @@ export function ChatArea({ conversationId }: Props) {
             allParts.push({ type: "text", content: text });
           }
           setStreamingParts([...allParts]);
-          // Note: Text content goes to message bubbles, not activity feed
+
+          // Add to activity feed - update existing text item or create new one
+          const lastTextActivity = allActivityItems[allActivityItems.length - 1];
+          if (lastTextActivity && lastTextActivity.type === "text") {
+            lastTextActivity.content += text;
+            setActivityItems([...allActivityItems]);
+          } else {
+            const activityItem: ActivityItemData = {
+              id: `activity-${activityCounter++}`,
+              timestamp: Date.now(),
+              type: "text",
+              content: text,
+            };
+            allActivityItems.push(activityItem);
+            setActivityItems([...allActivityItems]);
+          }
         },
         onThinking: (data) => {
           // Create a new thinking part

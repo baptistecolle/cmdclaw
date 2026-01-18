@@ -52,7 +52,7 @@ function getToolIcon(toolName: string): LucideIcon {
 export type ActivityItemData = {
   id: string;
   timestamp: number;
-  type: "thinking" | "tool_call" | "tool_result";
+  type: "text" | "thinking" | "tool_call" | "tool_result";
   content: string;
   toolName?: string;
   integration?: IntegrationType;
@@ -131,6 +131,15 @@ export function ActivityItem({ item }: Props) {
         return null;
     }
   };
+
+  // Render text content (agent response)
+  if (type === "text") {
+    return (
+      <div className="text-xs text-foreground whitespace-pre-wrap py-0.5">
+        {content}
+      </div>
+    );
+  }
 
   // Render thinking content
   if (type === "thinking") {
