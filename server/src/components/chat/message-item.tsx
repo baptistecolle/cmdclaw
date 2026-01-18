@@ -88,8 +88,22 @@ export function MessageItem({ id, role, content, parts, integrationsUsed }: Prop
   // Check if there was an error
   const hasError = content.startsWith("Error:");
 
-  // Get text content
-  const textContent = content || "";
+  // Get text content - only show the last text part when parts exist
+  const textContent = useMemo(() => {
+    if (!parts || parts.length === 0) {
+      return content || "";
+    }
+
+    // Find the last text part to display after the trace
+    const textParts = parts.filter((p) => p.type === "text");
+    if (textParts.length === 0) {
+      return "";
+    }
+
+    // Return only the last text part's content
+    const lastTextPart = textParts[textParts.length - 1];
+    return lastTextPart.content;
+  }, [parts, content]);
 
   return (
     <div className="py-4 space-y-3">

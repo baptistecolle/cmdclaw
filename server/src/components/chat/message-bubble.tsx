@@ -1,5 +1,6 @@
 "use client";
 
+import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -23,7 +24,9 @@ export function MessageBubble({ role, content, className }: Props) {
 
   return (
     <div className={className}>
-      <p className="whitespace-pre-wrap text-sm">{content}</p>
+      <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 max-w-none">
+        <ReactMarkdown>{content}</ReactMarkdown>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import ReactMarkdown from "react-markdown";
 import {
   Wrench,
   Check,
@@ -135,8 +136,8 @@ export function ActivityItem({ item }: Props) {
   // Render text content (agent response)
   if (type === "text") {
     return (
-      <div className="text-xs text-foreground whitespace-pre-wrap py-0.5">
-        {content}
+      <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 max-w-none py-0.5 text-foreground text-xs">
+        <ReactMarkdown>{content}</ReactMarkdown>
       </div>
     );
   }

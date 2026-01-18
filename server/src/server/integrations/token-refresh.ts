@@ -51,8 +51,8 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
     "Content-Type": "application/x-www-form-urlencoded",
   };
 
-  // Notion requires Basic auth header for token refresh
-  if (token.type === "notion") {
+  // Notion and Airtable require Basic auth header for token refresh
+  if (token.type === "notion" || token.type === "airtable") {
     headers["Authorization"] = `Basic ${Buffer.from(
       `${config.clientId}:${config.clientSecret}`
     ).toString("base64")}`;
