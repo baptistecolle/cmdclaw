@@ -14,7 +14,17 @@ export type MessagePart =
       operation?: string;
       isWrite?: boolean;
     }
-  | { type: "thinking"; id: string; content: string };
+  | { type: "thinking"; id: string; content: string }
+  | {
+      type: "approval";
+      toolUseId: string;
+      toolName: string;
+      toolInput: unknown;
+      integration: string;
+      operation: string;
+      command?: string;
+      status: "approved" | "denied";
+    };
 
 export type Message = {
   id: string;

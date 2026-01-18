@@ -14,6 +14,8 @@ type Props = {
   hasError: boolean;
   activityItems?: ActivityItemData[];
   className?: string;
+  defaultExpanded?: boolean;
+  onToggleExpand?: () => void;
 };
 
 export function CollapsedTrace({
@@ -22,14 +24,24 @@ export function CollapsedTrace({
   hasError,
   activityItems = [],
   className,
+  defaultExpanded = false,
+  onToggleExpand,
 }: Props) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  // Handle toggle - use external handler if provided
+  const handleToggle = () => {
+    if (onToggleExpand) {
+      onToggleExpand();
+    }
+    setIsExpanded(!isExpanded);
+  };
 
   return (
     <div className={cn("rounded-lg border border-border/50 bg-muted/20 overflow-hidden", className)}>
       {/* Header - always visible */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleToggle}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/30 transition-colors"
       >
         <ChevronRight

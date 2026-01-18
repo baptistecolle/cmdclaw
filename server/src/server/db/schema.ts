@@ -114,6 +114,24 @@ export const messageRoleEnum = pgEnum("message_role", [
   "tool",
 ]);
 
+export const generationStatusEnum = pgEnum("generation_status", [
+  "idle",
+  "generating",
+  "awaiting_approval",
+  "paused",
+  "complete",
+  "error",
+]);
+
+export const generationRecordStatusEnum = pgEnum("generation_record_status", [
+  "running",
+  "awaiting_approval",
+  "paused",
+  "completed",
+  "cancelled",
+  "error",
+]);
+
 export const conversation = pgTable(
   "conversation",
   {
@@ -125,6 +143,9 @@ export const conversation = pgTable(
     // Claude SDK session ID for resuming conversations
     claudeSessionId: text("claude_session_id"),
     model: text("model").default("claude-sonnet-4-20250514"),
+    // Generation tracking
+    generationStatus: generationStatusEnum("generation_status").default("idle").notNull(),
+    currentGenerationId: text("current_generation_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -170,6 +191,46 @@ export const message = pgTable(
   (table) => [
     index("message_conversation_id_idx").on(table.conversationId),
     index("message_created_at_idx").on(table.createdAt),
+  ]
+);
+
+// Approval state stored in generation
+export type PendingApproval = {
+  toolUseId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  requestedAt: string;
+};
+
+export const generation = pgTable(
+  "generation",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    // Set when message is saved on completion
+    messageId: text("message_id").references(() => message.id, { onDelete: "set null" }),
+    status: generationRecordStatusEnum("status").default("running").notNull(),
+    // Partial content (updated periodically during generation)
+    contentParts: jsonb("content_parts").$type<ContentPart[]>(),
+    // Approval state
+    pendingApproval: jsonb("pending_approval").$type<PendingApproval>(),
+    // E2B state
+    sandboxId: text("sandbox_id"),
+    isPaused: boolean("is_paused").default(false).notNull(),
+    // Metadata
+    errorMessage: text("error_message"),
+    inputTokens: integer("input_tokens").default(0).notNull(),
+    outputTokens: integer("output_tokens").default(0).notNull(),
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => [
+    index("generation_conversation_id_idx").on(table.conversationId),
+    index("generation_status_idx").on(table.status),
   ]
 );
 
@@ -251,6 +312,7 @@ export const integrationToken = pgTable(
 export const conversationRelations = relations(conversation, ({ one, many }) => ({
   user: one(user, { fields: [conversation.userId], references: [user.id] }),
   messages: many(message),
+  generations: many(generation),
 }));
 
 export const messageRelations = relations(message, ({ one }) => ({
@@ -262,6 +324,17 @@ export const messageRelations = relations(message, ({ one }) => ({
     fields: [message.parentMessageId],
     references: [message.id],
     relationName: "parentMessage",
+  }),
+}));
+
+export const generationRelations = relations(generation, ({ one }) => ({
+  conversation: one(conversation, {
+    fields: [generation.conversationId],
+    references: [conversation.id],
+  }),
+  message: one(message, {
+    fields: [generation.messageId],
+    references: [message.id],
   }),
 }));
 

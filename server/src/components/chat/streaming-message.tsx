@@ -47,7 +47,7 @@ export function StreamingMessage({ parts }: Props) {
                 isStreaming={isLast}
               />
             );
-          } else {
+          } else if (part.type === "tool_call") {
             return (
               <ToolCallDisplay
                 key={part.id}
@@ -56,6 +56,9 @@ export function StreamingMessage({ parts }: Props) {
                 result={part.result}
               />
             );
+          } else {
+            // Skip approval parts - they're shown separately in the approval card
+            return null;
           }
         })}
       </div>

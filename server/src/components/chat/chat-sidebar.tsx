@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, Settings, Trash2, LogOut, ChevronUp } from "lucide-react";
+import { Plus, Settings, Trash2, LogOut, ChevronUp, MoreHorizontal } from "lucide-react";
 import Image from "next/image";
 import {
   Sidebar,
@@ -152,12 +152,22 @@ export function ChatSidebar() {
                         </span>
                       </Link>
                     </SidebarMenuButton>
-                    <SidebarMenuAction
-                      onClick={(e) => handleDelete(conv.id, e)}
-                      showOnHover
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </SidebarMenuAction>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuAction showOnHover className="focus:ring-0 focus:outline-none focus-visible:ring-0 border-0 data-[state=open]:bg-transparent">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </SidebarMenuAction>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" side="right">
+                        <DropdownMenuItem
+                          onClick={(e) => handleDelete(conv.id, e)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span>Delete</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </SidebarMenuItem>
                 ))
               )}

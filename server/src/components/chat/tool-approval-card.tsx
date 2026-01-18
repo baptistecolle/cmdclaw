@@ -23,6 +23,7 @@ export interface ToolApprovalCardProps {
   onDeny: () => void;
   status: "pending" | "approved" | "denied";
   isLoading?: boolean;
+  readonly?: boolean;
 }
 
 export function ToolApprovalCard({
@@ -36,8 +37,10 @@ export function ToolApprovalCard({
   onDeny,
   status,
   isLoading,
+  readonly = false,
 }: ToolApprovalCardProps) {
-  const [expanded, setExpanded] = useState(true); // Start expanded for approvals
+  // Start collapsed for readonly (saved) approvals, expanded for pending
+  const [expanded, setExpanded] = useState(!readonly);
   const [showRawCommand, setShowRawCommand] = useState(false);
 
   const Icon = getIntegrationIcon(integration);

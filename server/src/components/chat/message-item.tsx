@@ -1,11 +1,27 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { MessageBubble } from "./message-bubble";
 import { CollapsedTrace } from "./collapsed-trace";
+import { ToolApprovalCard } from "./tool-approval-card";
 import type { MessagePart } from "./message-list";
 import type { IntegrationType } from "@/lib/integration-icons";
 import type { ActivityItemData } from "./activity-item";
+
+// Display segment for saved messages
+type DisplaySegment = {
+  id: string;
+  items: ActivityItemData[];
+  approval: {
+    toolUseId: string;
+    toolName: string;
+    toolInput: unknown;
+    integration: string;
+    operation: string;
+    command?: string;
+    status: "approved" | "denied";
+  } | null;
+};
 
 type Props = {
   id: string;
@@ -16,6 +32,9 @@ type Props = {
 };
 
 export function MessageItem({ id, role, content, parts, integrationsUsed }: Props) {
+  // Track expanded state for each segment
+  const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
+
   // For user messages, show simple bubble
   if (role === "user") {
     return (
@@ -25,60 +44,73 @@ export function MessageItem({ id, role, content, parts, integrationsUsed }: Prop
     );
   }
 
-  // Convert message parts to activity items for collapsed trace
-  const activityItems = useMemo((): ActivityItemData[] => {
+  // Parse message parts into segments based on approval parts
+  const segments = useMemo((): DisplaySegment[] => {
     if (!parts) return [];
 
-    return parts
-      .filter((part) => part.type === "text" || part.type === "thinking" || part.type === "tool_call")
-      .map((part, index): ActivityItemData => {
-        if (part.type === "text") {
-          return {
-            id: `activity-text-${index}`,
-            timestamp: Date.now() - (parts.length - index) * 1000,
-            type: "text",
-            content: part.content,
-          };
-        } else if (part.type === "thinking") {
-          return {
-            id: `activity-${part.id}`,
-            timestamp: Date.now() - (parts.length - index) * 1000, // Approximate timestamps
-            type: "thinking",
-            content: part.content,
-          };
-        } else {
-          // tool_call
-          return {
-            id: `activity-${part.id}`,
-            timestamp: Date.now() - (parts.length - index) * 1000,
-            type: "tool_call",
-            content: part.name,
-            toolName: part.name,
-            integration: part.integration as IntegrationType | undefined,
-            operation: part.operation,
-            status: part.result !== undefined ? "complete" : "running",
-            input: part.input,
-            result: part.result,
-          };
-        }
-      });
-  }, [parts]);
+    const result: DisplaySegment[] = [];
+    let currentSegment: DisplaySegment = { id: "seg-0", items: [], approval: null };
+    let segmentIndex = 0;
+    let activityIndex = 0;
 
-  // Extract integrations from parts if not provided
-  const integrations = useMemo((): IntegrationType[] => {
-    if (integrationsUsed && integrationsUsed.length > 0) {
-      return integrationsUsed as IntegrationType[];
-    }
-    if (!parts) return [];
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
 
-    const found = new Set<string>();
-    for (const part of parts) {
-      if (part.type === "tool_call" && part.integration) {
-        found.add(part.integration);
+      if (part.type === "approval") {
+        // Attach approval to current segment and start new one
+        currentSegment.approval = {
+          toolUseId: part.toolUseId,
+          toolName: part.toolName,
+          toolInput: part.toolInput,
+          integration: part.integration,
+          operation: part.operation,
+          command: part.command,
+          status: part.status,
+        };
+        result.push(currentSegment);
+        segmentIndex++;
+        currentSegment = { id: `seg-${segmentIndex}`, items: [], approval: null };
+      } else if (part.type === "tool_call") {
+        // Add tool call to current segment's items
+        currentSegment.items.push({
+          id: `activity-${part.id}`,
+          timestamp: Date.now() - (parts.length - i) * 1000,
+          type: "tool_call",
+          content: part.name,
+          toolName: part.name,
+          integration: part.integration as IntegrationType | undefined,
+          operation: part.operation,
+          status: part.result !== undefined ? "complete" : "running",
+          input: part.input,
+          result: part.result,
+        });
+        activityIndex++;
+      } else if (part.type === "thinking") {
+        currentSegment.items.push({
+          id: `activity-${part.id}`,
+          timestamp: Date.now() - (parts.length - i) * 1000,
+          type: "thinking",
+          content: part.content,
+        });
+        activityIndex++;
+      } else if (part.type === "text") {
+        currentSegment.items.push({
+          id: `activity-text-${activityIndex}`,
+          timestamp: Date.now() - (parts.length - i) * 1000,
+          type: "text",
+          content: part.content,
+        });
+        activityIndex++;
       }
     }
-    return Array.from(found) as IntegrationType[];
-  }, [parts, integrationsUsed]);
+
+    // Push final segment if it has items
+    if (currentSegment.items.length > 0) {
+      result.push(currentSegment);
+    }
+
+    return result;
+  }, [parts]);
 
   // Check if there were any text, tool calls or thinking (need to show trace)
   const hasTrace = parts && parts.some(
@@ -95,7 +127,7 @@ export function MessageItem({ id, role, content, parts, integrationsUsed }: Prop
     }
 
     // Find the last text part to display after the trace
-    const textParts = parts.filter((p) => p.type === "text");
+    const textParts = parts.filter((p): p is MessagePart & { type: "text" } => p.type === "text");
     if (textParts.length === 0) {
       return "";
     }
@@ -105,16 +137,96 @@ export function MessageItem({ id, role, content, parts, integrationsUsed }: Prop
     return lastTextPart.content;
   }, [parts, content]);
 
+  // Toggle segment expand/collapse
+  const toggleSegmentExpand = (segmentId: string) => {
+    setExpandedSegments((prev) => {
+      const next = new Set(prev);
+      if (next.has(segmentId)) {
+        next.delete(segmentId);
+      } else {
+        next.add(segmentId);
+      }
+      return next;
+    });
+  };
+
+  // Check if we have segments with approvals (need segmented display)
+  const hasApprovals = segments.some((seg) => seg.approval !== null);
+
   return (
     <div className="py-4 space-y-3">
-      {/* Show collapsed trace if there was any activity */}
-      {hasTrace && activityItems.length > 0 && (
-        <CollapsedTrace
-          messageId={id}
-          integrationsUsed={integrations}
-          hasError={hasError}
-          activityItems={activityItems}
-        />
+      {/* Show segmented trace if there are approvals, otherwise show collapsed trace */}
+      {hasTrace && segments.length > 0 && (
+        hasApprovals ? (
+          // Segmented display with approvals between segments
+          <div className="space-y-3">
+            {segments.map((segment, index) => {
+              // Get integrations used in this segment
+              const segmentIntegrations = Array.from(
+                new Set(
+                  segment.items
+                    .filter((item) => item.integration)
+                    .map((item) => item.integration as IntegrationType)
+                )
+              );
+
+              // Only last segment is expanded by default
+              const isExpanded = expandedSegments.has(segment.id);
+
+              return (
+                <div key={segment.id} className="space-y-3">
+                  {/* Activity trace for this segment */}
+                  {segment.items.length > 0 && (
+                    <CollapsedTrace
+                      messageId={`${id}-${segment.id}`}
+                      integrationsUsed={segmentIntegrations}
+                      hasError={hasError && index === segments.length - 1}
+                      activityItems={segment.items}
+                      defaultExpanded={isExpanded}
+                      onToggleExpand={() => toggleSegmentExpand(segment.id)}
+                    />
+                  )}
+
+                  {/* Approval card (readonly, no buttons) */}
+                  {segment.approval && (
+                    <ToolApprovalCard
+                      toolUseId={segment.approval.toolUseId}
+                      toolName={segment.approval.toolName}
+                      toolInput={segment.approval.toolInput}
+                      integration={segment.approval.integration}
+                      operation={segment.approval.operation}
+                      command={segment.approval.command}
+                      status={segment.approval.status}
+                      onApprove={() => {}}
+                      onDeny={() => {}}
+                      readonly
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          // Simple collapsed trace (no approvals)
+          <CollapsedTrace
+            messageId={id}
+            integrationsUsed={
+              integrationsUsed
+                ? (integrationsUsed as IntegrationType[])
+                : Array.from(
+                    new Set(
+                      segments.flatMap((seg) =>
+                        seg.items
+                          .filter((item) => item.integration)
+                          .map((item) => item.integration as IntegrationType)
+                      )
+                    )
+                  )
+            }
+            hasError={hasError}
+            activityItems={segments.flatMap((seg) => seg.items)}
+          />
+        )
       )}
 
       {/* Show message bubble if there's text content */}

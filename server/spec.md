@@ -1,316 +1,327 @@
-# Segmented Activity Feed Specification
+# Spec: Persistent Background Generation
 
-## Overview
+## Problem
 
-Redesign the activity feed and approval flow to display activities in **segments separated by approvals**, instead of one continuous activity feed with approvals below.
+When a user navigates away or refreshes during an AI generation, the response is lost. Currently:
+- User message is saved immediately to DB
+- Assistant message is saved **only after streaming completes** (in `onDone` handler)
+- If client disconnects mid-stream → assistant response is never saved
 
-### Current Behavior
-```
-┌─────────────────────────────┐
-│ Activity Feed               │
-│ - all activities            │
-│ - including post-approval   │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│ Approval Card(s)            │
-└─────────────────────────────┘
-```
+## Goal
 
-### Desired Behavior
-```
-┌─────────────────────────────┐
-│ Activity Feed 1 (collapsed) │
-│ - activities before approval│
-│ - tool call ⏳ (pending)    │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│ Approval Card A             │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│ Activity Feed 2 (collapsed) │
-│ - activities after A        │
-│ - another tool ⏳ (pending) │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│ Approval Card B             │
-└─────────────────────────────┘
-┌─────────────────────────────┐
-│ Activity Feed 3 (expanded)  │  ← Only latest segment is expanded
-│ - activities after B        │
-└─────────────────────────────┘
-```
+Make generation **backend-driven and persistent**. Once a message is sent, the backend completes the generation and saves it to the database regardless of client state (refresh, navigate away, close tab).
 
 ---
 
-## Requirements
+## Desired Behavior
 
-### 1. Segmented Display During Streaming
+### 1. Generation Lifecycle
 
-**R1.1** Activities must be grouped into segments, where each segment ends when an approval is required.
+| Event | Current Behavior | New Behavior |
+|-------|------------------|--------------|
+| User sends message | User msg saved, stream starts | User msg saved, **generation job starts in backend** |
+| Client disconnects | Stream aborts, assistant msg lost | **Generation continues in background** |
+| Client reconnects | Shows only user message | **Reconnects to live stream OR shows completed message** |
+| Generation completes | Saves if client connected | **Always saves to DB** |
+| Generation fails | Nothing saved | **Save partial content + error indicator** |
 
-**R1.2** The tool call that requires approval should appear **inside** the activity segment (as the last item with "pending" status), then the approval card appears below it.
+### 2. Reconnection
 
-**R1.3** When an approval is resolved, a new activity segment begins for subsequent activities.
+When user returns to a chat with an ongoing generation:
+- Client should **reconnect to the live stream** and see real-time updates
+- All content generated while away should be visible
+- Streaming should continue from current position
 
-**R1.4** If two approvals happen consecutively (no activities in between), show them back-to-back without an empty activity block.
+### 3. Multiple Tabs
 
-**R1.5** Only the **latest** activity segment should be expanded. All previous segments should be collapsed.
+- All tabs share the same generation stream (Option A)
+- All tabs see real-time updates simultaneously
+- Any tab can cancel the generation (first cancel wins)
+- No "leader" tab concept — simple shared state
 
-**R1.6** Each activity segment should have its own independent expand/collapse state.
+### 4. Cancellation
 
-### 2. Approval Card Display
+- User can cancel generation from any connected client
+- Cancellation stops the sandbox execution
+- Partial content up to cancellation point is saved with `status: "cancelled"`
 
-**R2.1** During streaming (pending state): Show full approval card with Approve/Deny buttons.
+### 5. Tool Approvals
 
-**R2.2** After resolution (in saved messages): Show approval card with final status only (Approved/Denied), no buttons.
+- If AI requests tool approval and user is away: **wait indefinitely**
+- After configurable timeout (e.g., 5 minutes): **pause the E2B sandbox** to save resources
+- When user returns: resume sandbox and show approval prompt
+- Sandbox pause/resume via E2B API:
+  ```typescript
+  await sbx.betaPause()  // Save resources while waiting
+  await Sandbox.resume(sandboxId)  // Resume when user returns
+  ```
 
-### 3. Data Persistence
+### 6. Error Handling
 
-**R3.1** Add a new `MessagePart` type for approvals:
-```typescript
-type ApprovalPart = {
-  type: "approval";
-  toolUseId: string;
-  toolName: string;
-  toolInput: unknown;
-  integration: string;
-  operation: string;
-  command?: string;
-  status: "approved" | "denied";
-};
-```
-
-**R3.2** Insert approval parts into the `parts` array at the correct position (after the corresponding tool_call).
-
-**R3.3** The segmented view must be preserved on page reload/navigation - saved messages should render identically to streaming view.
+When generation fails (API error, sandbox crash, timeout):
+- Save all content generated up to the error
+- Mark message with `status: "error"` and `errorMessage`
+- UI shows partial content with error indicator
+- User can retry or continue from error point
 
 ---
 
-## Implementation Details
+## Technical Design
 
-### Files to Modify
+### Database Schema Changes
 
-#### 1. `src/components/chat/message-list.tsx`
-- Add `ApprovalPart` to the `MessagePart` union type
-
-#### 2. `src/components/chat/chat-area.tsx`
-
-**State Changes:**
-- Replace `activityItems: ActivityItemData[]` with `segments: ActivitySegment[]`
-- Replace `pendingApprovals: PendingApproval[]` with tracking within segments
-
-**New Types:**
+Add to `conversation` table:
 ```typescript
-type ActivitySegment = {
-  id: string;
-  items: ActivityItemData[];
-  approval?: {
-    toolUseId: string;
-    toolName: string;
-    toolInput: unknown;
-    integration: string;
-    operation: string;
-    command?: string;
-    status: "pending" | "approved" | "denied";
-  };
-  isExpanded: boolean;
-};
+generationStatus: "idle" | "generating" | "awaiting_approval" | "paused" | "complete" | "error"
+currentGenerationId: string | null  // UUID for the current/last generation
 ```
 
-**Event Handler Changes:**
+Add new `generation` table:
+```typescript
+generation: {
+  id: string (UUID)
+  conversationId: string (FK)
+  messageId: string | null (FK - set when message is saved)
+  status: "running" | "awaiting_approval" | "paused" | "completed" | "cancelled" | "error"
 
-- `onToolUse`: Add to current segment's items
-- `onToolResult`: Update tool in current segment
-- `onPendingApproval`:
-  1. Update the last tool_call in current segment to "pending" status
-  2. Attach approval data to current segment
-  3. Collapse current segment
-  4. Create new segment (only if there will be more activities)
-- `onApprovalResult`:
-  1. Update approval status in the segment
-  2. Ensure new segment exists for subsequent activities
-- `onDone`:
-  1. Convert segments to `MessagePart[]` including approval parts
-  2. Pass to message storage
+  // Partial content (updated periodically during generation)
+  contentParts: jsonb  // Same structure as message.contentParts
 
-**Rendering Changes:**
-```tsx
-{isStreaming && (
-  <div className="py-4 space-y-4">
-    {segments.map((segment, index) => (
-      <React.Fragment key={segment.id}>
-        {/* Only render activity feed if segment has items */}
-        {segment.items.length > 0 && (
-          <ActivityFeed
-            items={segment.items}
-            isStreaming={isStreaming && index === segments.length - 1}
-            isExpanded={segment.isExpanded}
-            onToggleExpand={() => toggleSegmentExpand(segment.id)}
-            integrationsUsed={/* segment-specific integrations */}
-          />
-        )}
+  // Approval state
+  pendingApproval: jsonb | null  // { toolUseId, toolName, toolInput, ... }
 
-        {/* Render approval card if segment has one */}
-        {segment.approval && (
-          <ToolApprovalCard
-            {...segment.approval}
-            onApprove={() => handleApprove(segment.approval.toolUseId)}
-            onDeny={() => handleDeny(segment.approval.toolUseId)}
-          />
-        )}
-      </React.Fragment>
-    ))}
-  </div>
-)}
+  // E2B state
+  sandboxId: string | null
+  isPaused: boolean
+
+  // Metadata
+  errorMessage: string | null
+  inputTokens: number
+  outputTokens: number
+  startedAt: timestamp
+  completedAt: timestamp | null
+}
 ```
 
-#### 3. `src/components/chat/message-item.tsx`
+### Backend Changes
 
-**Changes:**
-- Parse `parts` array to reconstruct segments from saved message
-- Handle `approval` part type
-- Render segmented view using same visual structure as streaming
+#### 1. Decouple generation from client connection
 
-**Logic:**
-```typescript
-const segments = useMemo(() => {
-  if (!parts) return [];
-
-  const result: DisplaySegment[] = [];
-  let currentSegment: DisplaySegment = { id: 'seg-0', items: [], approval: null };
-
-  for (const part of parts) {
-    if (part.type === "approval") {
-      // Attach approval to current segment and start new one
-      currentSegment.approval = {
-        ...part,
-        status: part.status, // "approved" or "denied"
-      };
-      result.push(currentSegment);
-      currentSegment = { id: `seg-${result.length}`, items: [], approval: null };
-    } else if (part.type === "tool_call" || part.type === "thinking" || part.type === "text") {
-      // Add to current segment's items
-      currentSegment.items.push(convertToActivityItem(part));
-    }
-  }
-
-  // Push final segment if it has items
-  if (currentSegment.items.length > 0) {
-    result.push(currentSegment);
-  }
-
-  return result;
-}, [parts]);
+Current flow:
+```
+Client Request → Stream Response → Save on Complete
 ```
 
-#### 4. `src/components/chat/collapsed-trace.tsx`
+New flow:
+```
+Client Request → Start Generation Job → Return generationId
+                         ↓
+              Background: Run generation → Save periodically → Save on complete
+                         ↓
+Client Subscribe → Stream from generation job (can reconnect anytime)
+```
 
-**Changes:**
-- Rename to `SegmentedTrace` or update to handle segments
-- Accept segments array instead of flat activity items
-- Render multiple collapsible sections with approval cards between them
-- Only last segment expanded by default
-
-#### 5. `src/components/chat/tool-approval-card.tsx`
-
-**Changes:**
-- Support a `readonly` or `showButtonsOnly={false}` mode for saved approvals
-- When `status !== "pending"`, don't render approve/deny buttons
-- Keep the card collapsed by default in readonly mode
-
-#### 6. Backend: Message Storage
-
-Ensure the `contentParts` stored in the database includes approval parts. When `onDone` fires:
+#### 2. New RPC endpoints
 
 ```typescript
-// Convert segments to parts array for storage
-const partsToStore: MessagePart[] = [];
+// Start a new generation (returns immediately)
+startGeneration(input: { conversationId?: string, content: string, model?: string })
+  → { generationId: string, conversationId: string }
 
-for (const segment of segments) {
-  // Add all activity items as parts
-  for (const item of segment.items) {
-    if (item.type === "tool_call") {
-      partsToStore.push({
-        type: "tool_call",
-        id: item.id,
-        name: item.toolName,
-        input: item.input,
-        result: item.result,
-        integration: item.integration,
-        operation: item.operation,
-      });
-    } else if (item.type === "thinking") {
-      partsToStore.push({ type: "thinking", id: item.id, content: item.content });
-    } else if (item.type === "text") {
-      partsToStore.push({ type: "text", content: item.content });
-    }
-  }
+// Subscribe to generation stream (can be called multiple times, from multiple clients)
+subscribeGeneration(input: { generationId: string })
+  → AsyncGenerator<ChatEvent>  // Streams from current position
 
-  // Add approval part if exists
-  if (segment.approval) {
-    partsToStore.push({
-      type: "approval",
-      toolUseId: segment.approval.toolUseId,
-      toolName: segment.approval.toolName,
-      toolInput: segment.approval.toolInput,
-      integration: segment.approval.integration,
-      operation: segment.approval.operation,
-      command: segment.approval.command,
-      status: segment.approval.status,
-    });
+// Cancel a generation
+cancelGeneration(input: { generationId: string })
+  → { success: boolean }
+
+// Resume a paused generation (after approval timeout)
+resumeGeneration(input: { generationId: string })
+  → { success: boolean }
+
+// Submit approval decision
+submitApproval(input: { generationId: string, toolUseId: string, decision: "approve" | "deny" })
+  → { success: boolean }
+
+// Get generation status (for polling fallback)
+getGenerationStatus(input: { generationId: string })
+  → { status, contentParts, pendingApproval, ... }
+```
+
+#### 3. Generation Manager (new service)
+
+```typescript
+// Singleton service managing all active generations
+class GenerationManager {
+  private activeGenerations: Map<string, GenerationContext>
+
+  async startGeneration(params): Promise<string>
+  async subscribeToGeneration(generationId): AsyncGenerator<ChatEvent>
+  async cancelGeneration(generationId): Promise<void>
+  async submitApproval(generationId, toolUseId, decision): Promise<void>
+
+  // Internal
+  private async runGeneration(context: GenerationContext): Promise<void>
+  private async saveProgress(generationId): Promise<void>  // Periodic saves
+  private async handleApprovalTimeout(generationId): Promise<void>
+}
+
+interface GenerationContext {
+  id: string
+  conversationId: string
+  sandboxId: string
+  status: GenerationStatus
+  contentParts: ContentPart[]
+  subscribers: Set<Subscriber>  // Multiple clients can subscribe
+  abortController: AbortController
+}
+```
+
+#### 4. Periodic saves
+
+During generation, save progress to `generation` table:
+- After each tool_result (immediately)
+- After text chunks (debounced every 2 seconds)
+- Immediately on any status change
+
+This ensures minimal data loss on crash.
+
+#### 5. Approval timeout flow
+
+```
+Tool needs approval
+        ↓
+Set status = "awaiting_approval", save pendingApproval to DB
+        ↓
+Start timeout timer (5 minutes)
+        ↓
+If user approves/denies before timeout → continue generation
+        ↓
+If timeout reached:
+    - Pause E2B sandbox (sbx.betaPause())
+    - Set status = "paused", isPaused = true
+    - Generation is now "frozen"
+        ↓
+When user returns and submits approval:
+    - Resume sandbox (Sandbox.resume(sandboxId))
+    - Continue generation
+        ↓
+If paused sandbox exceeds 24 hours:
+    - Kill sandbox to save costs
+    - Keep generation record with status = "paused"
+    - On resume: create new sandbox, restore from last checkpoint
+```
+
+#### 6. Error handling & retry
+
+- Auto-retry up to 2 times for transient errors (timeout, 5xx, rate limit)
+- No retry for non-recoverable errors (content policy, 4xx)
+- After retries exhausted: save partial content with `status: "error"`
+
+#### 7. Generation timeout
+
+- Max generation time: 30 minutes (if no subscriber connected)
+- No timeout if user is actively watching (has subscriber)
+- Auto-cancel abandoned generations after 30 minutes
+
+#### 8. Cleanup
+
+- Delete completed generation records after 7 days
+- Keep error generation records for 30 days (debugging)
+- Generation table is transient; final data lives in `message` table
+
+### Frontend Changes
+
+#### 1. New hook: `useGeneration`
+
+```typescript
+function useGeneration(conversationId: string) {
+  // Check if there's an active/paused generation for this conversation
+  // Subscribe to it if exists
+  // Handle reconnection logic
+
+  return {
+    generation: GenerationState | null
+    isGenerating: boolean
+    isPaused: boolean
+    pendingApproval: ApprovalRequest | null
+
+    startGeneration: (content: string) => Promise<void>
+    cancelGeneration: () => Promise<void>
+    submitApproval: (decision: "approve" | "deny") => Promise<void>
+    resumeGeneration: () => Promise<void>
   }
 }
 ```
 
----
+#### 2. ChatArea changes
 
-## Edge Cases
-
-### E1: Approval at the very start
-If an approval is required before any activity, the first segment will only contain the pending tool call. Render it normally.
-
-### E2: Multiple consecutive approvals
-Skip empty activity blocks:
-```
-Approval A → Approval B → Activity
-```
-Renders as:
-```
-[Approval Card A]
-[Approval Card B]
-[Activity Feed]
+```typescript
+// On mount, check for active generation
+useEffect(() => {
+  if (conversation?.generationStatus === "generating" ||
+      conversation?.generationStatus === "awaiting_approval") {
+    // Reconnect to the stream
+    subscribeToGeneration(conversation.currentGenerationId)
+  }
+}, [conversation])
 ```
 
-### E3: Streaming ends with pending approval
-If streaming completes while an approval is pending, keep the approval card visible with pending status (this shouldn't happen normally but handle gracefully).
+#### 3. UI States
 
-### E4: Error during streaming
-Keep all segments visible with error state on the last one.
-
----
-
-## Visual States
-
-### Activity Segment Header
-- **Collapsed (previous segments):** Show item count, integrations used badge
-- **Expanded (latest segment):** Show full activity list with auto-scroll
-
-### Approval Card States
-- **Pending:** Amber border, spinner, Approve/Deny buttons
-- **Approved:** Green border, checkmark, no buttons
-- **Denied:** Red border, X icon, no buttons
+| Generation Status | UI Display |
+|-------------------|------------|
+| `generating` | Show streaming content with "Generating..." indicator |
+| `awaiting_approval` | Show content + approval prompt |
+| `paused` | Show content + "Generation paused" + approval prompt |
+| `error` | Show partial content + error message + retry button |
+| `cancelled` | Show partial content + "Cancelled" indicator |
+| `completed` | Show full message (normal display) |
 
 ---
 
-## Testing Checklist
+## Migration Path
 
-- [ ] Single approval flow displays correctly during streaming
-- [ ] Multiple approval flow creates separate segments
-- [ ] Consecutive approvals render back-to-back without empty segments
-- [ ] Only latest segment is expanded during streaming
-- [ ] Page reload preserves segmented view structure
-- [ ] Navigation away and back preserves view
-- [ ] Approval cards show correct status after approval/denial
-- [ ] Saved messages render identically to streaming view
-- [ ] Tool call with pending status appears in activity segment before approval card
-- [ ] Error states handled gracefully
+### Phase 1: Backend persistence (MVP)
+1. Add `generation` table
+2. Add `generationStatus` to conversation
+3. Implement GenerationManager with basic start/subscribe/cancel
+4. Save progress periodically
+5. Frontend: reconnect to active generation on mount
+
+### Phase 2: Approval timeout + pause
+1. Implement approval timeout logic
+2. Integrate E2B pause/resume
+3. UI for paused state
+
+### Phase 3: Polish
+1. Error recovery and retry
+2. Multiple tab sync improvements
+3. Generation history/debugging tools
+
+---
+
+## Files to Modify
+
+### Backend
+- `src/server/db/schema.ts` — Add generation table, update conversation
+- `src/server/orpc/routers/chat.ts` — Refactor to use GenerationManager
+- `src/server/services/generation-manager.ts` — New file
+- `src/server/sandbox/e2b.ts` — Add pause/resume support
+
+### Frontend
+- `src/orpc/hooks.ts` — Add useGeneration hook
+- `src/components/chat/chat-area.tsx` — Use useGeneration, handle reconnection
+- `src/components/chat/message-item.tsx` — Handle new status states (paused, error, cancelled)
+
+---
+
+## Success Criteria
+
+1. User can refresh mid-generation and see it continue
+2. User can navigate away and back, generation completes
+3. User can close browser, reopen, see completed generation
+4. Multiple tabs show same generation state
+5. Errors save partial content with clear error UI
+6. Approvals wait for user, with sandbox pausing after timeout
