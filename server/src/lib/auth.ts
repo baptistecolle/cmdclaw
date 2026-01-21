@@ -37,6 +37,7 @@ export const auth = betterAuth({
     "https://appleid.apple.com",
     "https://heybap.com",
     "https://www.heybap.com",
+    "https://app.heybap.com",
     "http://localhost:3000",
     "https://localcan.baptistecolle.com",
     "bap://",

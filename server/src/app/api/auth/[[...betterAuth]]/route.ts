@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 const trustedOrigins = [
   "https://localcan.baptistecolle.com",
   "https://heybap.com",
+  "https://app.heybap.com",
   "https://www.heybap.com",
   "http://localhost:3000",
 ];
