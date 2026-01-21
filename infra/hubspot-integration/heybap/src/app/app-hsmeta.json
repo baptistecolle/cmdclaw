@@ -1,16 +1,27 @@
 {
-  "uid": "get_started_app",
+  "uid": "heybap_app",
   "type": "app",
   "config": {
-    "description": "A basic static token app for testing",
-    "name": "My Get Started app",
-    "distribution": "private",
+    "description": "HeyBap AI Agent - Connect your HubSpot to automate CRM tasks",
+    "name": "HeyBap",
+    "logo": "/app/app-logo.png",
+    "distribution": "marketplace",
     "auth": {
-      "type": "static",
+      "type": "oauth",
+      "redirectUrls": [
+        "https://heybap.com/api/oauth/callback",
+        "http://localhost:3000/api/oauth/callback"
+      ],
       "requiredScopes": [
         "oauth",
         "crm.objects.contacts.read",
-        "crm.objects.contacts.write"
+        "crm.objects.contacts.write",
+        "crm.objects.companies.read",
+        "crm.objects.companies.write",
+        "crm.objects.deals.read",
+        "crm.objects.deals.write",
+        "tickets",
+        "crm.objects.owners.read"
       ],
       "optionalScopes": [],
       "conditionallyRequiredScopes": []
@@ -21,10 +32,10 @@
       "img": []
     },
     "support": {
-      "supportEmail": "support@example.com",
-      "documentationUrl": "https://example.com/docs",
-      "supportUrl": "https://example.com/support",
-      "supportPhone": "+18005555555"
+      "supportEmail": "baptiste@heybap.com",
+      "documentationUrl": "https://app.heybap.com",
+      "supportUrl": "https://app.heybap.com/support",
+      "supportPhone": "+41788732135"
     }
   }
 }
