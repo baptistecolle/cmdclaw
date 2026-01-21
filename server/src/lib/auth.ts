@@ -38,6 +38,7 @@ export const auth = betterAuth({
     "https://heybap.com",
     "https://www.heybap.com",
     "http://localhost:3000",
+    "https://localcan.baptistecolle.com",
     "bap://",
   ],
   plugins: [
