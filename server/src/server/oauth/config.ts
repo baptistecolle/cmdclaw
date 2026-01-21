@@ -258,14 +258,18 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
       "crm.objects.owners.read",
     ],
     getUserInfo: async (accessToken) => {
-      const res = await fetch("https://api.hubapi.com/account-info/v3/details", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const data = await res.json();
+      // Get token info which includes the user email
+      const tokenRes = await fetch(`https://api.hubapi.com/oauth/v1/access-tokens/${accessToken}`);
+      const tokenData = await tokenRes.json();
+
       return {
-        id: String(data.portalId),
-        displayName: data.accountType ? `${data.accountType} (${data.portalId})` : String(data.portalId),
-        metadata: { portalId: data.portalId, timeZone: data.timeZone },
+        id: String(tokenData.hub_id),
+        displayName: tokenData.user ?? tokenData.hub_domain ?? String(tokenData.hub_id),
+        metadata: {
+          portalId: tokenData.hub_id,
+          userId: tokenData.user_id,
+          hubDomain: tokenData.hub_domain,
+        },
       };
     },
   }),
