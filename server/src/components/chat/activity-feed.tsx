@@ -67,7 +67,7 @@ export function ActivityFeed({
       <div className="rounded-lg border border-border/50 bg-muted/30">
         <div className="flex items-center gap-2 px-3 py-2">
           <Activity className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Starting...</span>
+          <span className="text-sm text-muted-foreground">Processing...</span>
           <div className="flex gap-1 ml-auto">
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.3s]" />
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />

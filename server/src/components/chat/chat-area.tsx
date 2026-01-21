@@ -17,7 +17,7 @@ import {
 } from "@/orpc/hooks";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import { useRouter } from "next/navigation";
-import { MessageSquare, AlertCircle } from "lucide-react";
+import { MessageSquare, AlertCircle, Activity } from "lucide-react";
 import { useHotkeys } from "react-hotkeys-hook";
 import type { IntegrationType } from "@/lib/integration-icons";
 
@@ -899,8 +899,21 @@ export function ChatArea({ conversationId }: Props) {
             <>
               <MessageList messages={messages} />
 
-              {isStreaming && segments.length > 0 && (
+              {isStreaming && (
                 <div className="py-4 space-y-4">
+                  {segments.length === 0 && (
+                    <div className="rounded-lg border border-border/50 bg-muted/30">
+                      <div className="flex items-center gap-2 px-3 py-2">
+                        <Activity className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Creating agent...</span>
+                        <div className="flex gap-1 ml-auto">
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.3s]" />
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {segments.map((segment, index) => {
                     // Get integrations used in this segment
                     const segmentIntegrations = Array.from(
