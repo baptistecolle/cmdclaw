@@ -1,6 +1,6 @@
 import { env } from "@/env";
 
-export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot";
+export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin";
 
 export type OAuthConfig = {
   clientId: string;
@@ -271,6 +271,20 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
           hubDomain: tokenData.hub_domain,
         },
       };
+    },
+  }),
+
+  // LinkedIn uses Unipile hosted auth, not standard OAuth
+  // This config is a placeholder - actual auth is handled via generateLinkedInAuthUrl
+  linkedin: () => ({
+    clientId: "",
+    clientSecret: "",
+    authUrl: "",
+    tokenUrl: "",
+    redirectUri: `${getAppUrl()}/api/integrations/linkedin/callback`,
+    scopes: [],
+    getUserInfo: async () => {
+      throw new Error("LinkedIn uses Unipile auth, not standard OAuth");
     },
   }),
 };

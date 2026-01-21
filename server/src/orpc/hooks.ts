@@ -236,7 +236,7 @@ export function useGetAuthUrl() {
       type,
       redirectUrl,
     }: {
-      type: "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot";
+      type: "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin";
       redirectUrl: string;
     }) => client.integration.getAuthUrl({ type, redirectUrl }),
   });

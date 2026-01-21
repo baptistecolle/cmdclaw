@@ -30,6 +30,7 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   "github": "github",
   "airtable": "airtable",
   "hubspot": "hubspot",
+  "linkedin": "linkedin",
 };
 
 // Tool permissions: read operations auto-approve, write operations require approval
@@ -94,6 +95,25 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
       "notes.create",
     ],
   },
+  linkedin: {
+    read: [
+      "chats.list", "chats.get",
+      "messages.list",
+      "profile.me", "profile.get", "profile.company",
+      "search",
+      "invite.list",
+      "connections.list",
+      "posts.list", "posts.get",
+      "company.posts",
+    ],
+    write: [
+      "messages.send", "messages.start",
+      "invite.send",
+      "connections.remove",
+      "posts.create", "posts.comment", "posts.react",
+      "company.post",
+    ],
+  },
 };
 
 /**
@@ -118,6 +138,18 @@ function parseBashCommand(command: string): { integration: string; operation: st
     const action = parts[2];
     if (resource === "owners") {
       return { integration, operation: "owners" };
+    }
+    return { integration, operation: `${resource}.${action}` };
+  }
+
+  // LinkedIn has nested pattern: linkedin <resource> <action>
+  // e.g., linkedin chats list, linkedin messages send, linkedin profile me
+  if (integration === "linkedin" && parts.length >= 3) {
+    const resource = parts[1];
+    const action = parts[2];
+    // Handle special case for "search" which is just "linkedin search -q ..."
+    if (resource === "search") {
+      return { integration, operation: "search" };
     }
     return { integration, operation: `${resource}.${action}` };
   }

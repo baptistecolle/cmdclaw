@@ -56,6 +56,9 @@ export const env = createEnv({
     SLACK_CLIENT_SECRET: z.string().optional(),
     HUBSPOT_CLIENT_ID: z.string().optional(),
     HUBSPOT_CLIENT_SECRET: z.string().optional(),
+    // Unipile (LinkedIn integration)
+    UNIPILE_API_KEY: z.string().optional(),
+    UNIPILE_DSN: z.string().optional(),
     // Apple Sign In
     APPLE_CLIENT_ID: z.string().optional(),
     APPLE_CLIENT_SECRET: z.string().optional(),
@@ -121,6 +124,8 @@ export const env = createEnv({
     SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET,
     HUBSPOT_CLIENT_ID: process.env.HUBSPOT_CLIENT_ID,
     HUBSPOT_CLIENT_SECRET: process.env.HUBSPOT_CLIENT_SECRET,
+    UNIPILE_API_KEY: process.env.UNIPILE_API_KEY,
+    UNIPILE_DSN: process.env.UNIPILE_DSN,
     APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
     APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
     APPLE_APP_BUNDLE_IDENTIFIER: process.env.APPLE_APP_BUNDLE_IDENTIFIER,

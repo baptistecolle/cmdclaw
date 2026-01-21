@@ -5,6 +5,7 @@ import { integration, integrationToken } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 import { createHash, randomBytes } from "crypto";
+import { generateLinkedInAuthUrl, deleteUnipileAccount } from "@/server/integrations/unipile";
 
 // PKCE helpers for Airtable OAuth
 function generateCodeVerifier(): string {
@@ -27,6 +28,7 @@ const integrationTypeSchema = z.enum([
   "airtable",
   "slack",
   "hubspot",
+  "linkedin",
 ]);
 
 // List user's integrations
@@ -54,6 +56,12 @@ const getAuthUrl = protectedProcedure
     })
   )
   .handler(async ({ input, context }) => {
+    // LinkedIn uses Unipile hosted auth instead of standard OAuth
+    if (input.type === "linkedin") {
+      const url = await generateLinkedInAuthUrl(context.user.id, input.redirectUrl);
+      return { authUrl: url };
+    }
+
     const config = getOAuthConfig(input.type as IntegrationType);
 
     // Generate PKCE code_verifier for Airtable
@@ -288,19 +296,31 @@ const toggle = protectedProcedure
 const disconnect = protectedProcedure
   .input(z.object({ id: z.string() }))
   .handler(async ({ input, context }) => {
-    const result = await context.db
-      .delete(integration)
-      .where(
-        and(
-          eq(integration.id, input.id),
-          eq(integration.userId, context.user.id)
-        )
-      )
-      .returning({ id: integration.id });
+    // First, get the integration to check if it's LinkedIn
+    const existingIntegration = await context.db.query.integration.findFirst({
+      where: and(
+        eq(integration.id, input.id),
+        eq(integration.userId, context.user.id)
+      ),
+    });
 
-    if (result.length === 0) {
+    if (!existingIntegration) {
       throw new ORPCError("NOT_FOUND", { message: "Integration not found" });
     }
+
+    // For LinkedIn, also delete the Unipile account
+    if (existingIntegration.type === "linkedin" && existingIntegration.providerAccountId) {
+      try {
+        await deleteUnipileAccount(existingIntegration.providerAccountId);
+      } catch (error) {
+        console.error("Failed to delete Unipile account:", error);
+        // Continue with deletion even if Unipile deletion fails
+      }
+    }
+
+    await context.db
+      .delete(integration)
+      .where(eq(integration.id, input.id));
 
     return { success: true };
   });

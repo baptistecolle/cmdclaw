@@ -3,8 +3,10 @@ import { integration } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getValidTokensForUser } from "./token-refresh";
 import type { IntegrationType } from "@/server/oauth/config";
+import { env } from "@/env";
 
-const ENV_VAR_MAP: Record<IntegrationType, string> = {
+// Token-based integrations map to their access token env var
+const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
   gmail: "GMAIL_ACCESS_TOKEN",
   google_calendar: "GOOGLE_CALENDAR_ACCESS_TOKEN",
   google_docs: "GOOGLE_DOCS_ACCESS_TOKEN",
@@ -19,20 +21,35 @@ const ENV_VAR_MAP: Record<IntegrationType, string> = {
 };
 
 export async function getCliEnvForUser(userId: string): Promise<Record<string, string>> {
-  const env: Record<string, string> = {};
+  const cliEnv: Record<string, string> = {};
 
   // Get valid tokens, refreshing any that are expired or about to expire
   // This already filters by enabled integrations
   const tokens = await getValidTokensForUser(userId);
 
   for (const [type, accessToken] of tokens) {
-    const envVar = ENV_VAR_MAP[type];
+    const envVar = ENV_VAR_MAP[type as Exclude<IntegrationType, "linkedin">];
     if (envVar) {
-      env[envVar] = accessToken;
+      cliEnv[envVar] = accessToken;
     }
   }
 
-  return env;
+  // LinkedIn special case - uses Unipile account_id instead of OAuth tokens
+  const linkedinIntegration = await db.query.integration.findFirst({
+    where: and(
+      eq(integration.userId, userId),
+      eq(integration.type, "linkedin"),
+      eq(integration.enabled, true)
+    ),
+  });
+
+  if (linkedinIntegration && linkedinIntegration.providerAccountId) {
+    cliEnv.LINKEDIN_ACCOUNT_ID = linkedinIntegration.providerAccountId;
+    if (env.UNIPILE_API_KEY) cliEnv.UNIPILE_API_KEY = env.UNIPILE_API_KEY;
+    if (env.UNIPILE_DSN) cliEnv.UNIPILE_DSN = env.UNIPILE_DSN;
+  }
+
+  return cliEnv;
 }
 
 export function getCliInstructions(enabledIntegrations: IntegrationType[]): string {
@@ -173,6 +190,40 @@ export function getCliInstructions(enabledIntegrations: IntegrationType[]): stri
 - hubspot pipelines deals - List deal pipelines and stages
 - hubspot pipelines tickets - List ticket pipelines and stages
 - hubspot owners - List owners (sales reps)`);
+  }
+
+  if (enabledIntegrations.includes("linkedin")) {
+    instructions.push(`
+## LinkedIn CLI (via Unipile)
+MESSAGING
+- linkedin chats list [-l limit]                    List conversations
+- linkedin chats get <chatId>                       Get conversation details
+- linkedin messages list <chatId> [-l limit]        List messages in chat
+- linkedin messages send <chatId> --text <message>  Send message
+- linkedin messages start <profileId> --text <msg>  Start new conversation
+
+PROFILES
+- linkedin profile me                               Get my profile
+- linkedin profile get <identifier>                 Get user profile (URL or ID)
+- linkedin profile company <identifier>             Get company profile
+- linkedin search -q <query> [-l limit]             Search for people
+
+INVITATIONS & CONNECTIONS
+- linkedin invite send <profileId> [--message <m>]  Send connection request
+- linkedin invite list                              List pending invitations
+- linkedin connections list [-l limit]              List my connections
+- linkedin connections remove <profileId>           Remove connection
+
+POSTS & CONTENT
+- linkedin posts list [--profile <id>] [-l limit]   List posts
+- linkedin posts get <postId>                       Get post details
+- linkedin posts create --text <content>            Create a post
+- linkedin posts comment <postId> --text <comment>  Comment on post
+- linkedin posts react <postId> --type <LIKE|...>   React to post
+
+COMPANY PAGES
+- linkedin company posts <companyId> [-l limit]     List company posts
+- linkedin company post <companyId> --text <text>   Post as company (if admin)`);
   }
 
   if (instructions.length === 0) {

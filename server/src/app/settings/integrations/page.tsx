@@ -85,6 +85,12 @@ const integrationConfig = {
     icon: "/integrations/hubspot.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
+  linkedin: {
+    name: "LinkedIn",
+    description: "Send messages, manage connections, and post content",
+    icon: "/integrations/linkedin.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
 } as const;
 
 type IntegrationType = keyof typeof integrationConfig;

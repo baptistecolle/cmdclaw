@@ -248,6 +248,7 @@ export const integrationTypeEnum = pgEnum("integration_type", [
   "airtable",
   "slack",
   "hubspot",
+  "linkedin",
 ]);
 
 export const integration = pgTable(
