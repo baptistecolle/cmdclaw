@@ -8,43 +8,10 @@ import {
   TaskItem,
   TextStyle,
   Color,
+  Command,
   renderItems,
 } from "novel";
 import { Placeholder } from "@tiptap/extension-placeholder";
-import { Extension } from "@tiptap/core";
-import Suggestion from "@tiptap/suggestion";
-
-// Slash command extension that triggers on "/"
-const SlashCommand = Extension.create({
-  name: "slash-command",
-  addOptions() {
-    return {
-      suggestion: {
-        char: "/",
-        command: ({
-          editor,
-          range,
-          props,
-        }: {
-          editor: any;
-          range: any;
-          props: any;
-        }) => {
-          props.command({ editor, range });
-        },
-      },
-    };
-  },
-  addProseMirrorPlugins() {
-    return [
-      Suggestion({
-        editor: this.editor,
-        ...this.options.suggestion,
-        render: renderItems,
-      }),
-    ];
-  },
-});
 
 export const defaultExtensions = [
   StarterKit.configure({
@@ -125,5 +92,10 @@ export const defaultExtensions = [
     },
     includeChildren: false,
   }),
-  SlashCommand,
+  Command.configure({
+    suggestion: {
+      items: () => [],
+      render: renderItems,
+    },
+  }),
 ];

@@ -9,6 +9,7 @@ import {
   EditorCommandEmpty,
   EditorBubble,
   EditorBubbleItem,
+  handleCommandNavigation,
   type JSONContent,
 } from "novel";
 import { useRef } from "react";
@@ -139,6 +140,11 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
         )}
         extensions={defaultExtensions}
         initialContent={parseMarkdownToJSON(content)}
+        editorProps={{
+          handleDOMEvents: {
+            keydown: (_view, event) => handleCommandNavigation(event),
+          },
+        }}
         onUpdate={({ editor }) => {
           const markdown = editorToMarkdown(editor);
           onChange(markdown);
