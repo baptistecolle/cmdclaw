@@ -11,7 +11,7 @@ export const env = createEnv({
       process.env.NODE_ENV === "production"
         ? z.string()
         : z.string().optional(),
-    BETTER_AUTH_URL: z.string().url().optional(),
+    APP_URL: z.string().url().optional(),
     DATABASE_URL: z.string().url(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
@@ -33,9 +33,6 @@ export const env = createEnv({
         : z.string().optional(),
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
-    VERCEL_URL: z.string().optional(),
-    // App URL for OAuth redirects
-    APP_URL: z.string().url().optional(),
     // Anthropic
     ANTHROPIC_API_KEY: z.string().optional(),
     // E2B Sandbox
@@ -80,7 +77,7 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url(),
+    NEXT_PUBLIC_APP_URL: z.string().url(),
     NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
     NEXT_PUBLIC_POSTHOG_HOST: z.string().optional(),
     NEXT_PUBLIC_NODE_ENV: z
@@ -94,7 +91,7 @@ export const env = createEnv({
    */
   runtimeEnv: {
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
-    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
@@ -105,8 +102,6 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
     POSTHOG_HOST: process.env.POSTHOG_HOST,
-    VERCEL_URL: process.env.VERCEL_URL,
-    APP_URL: process.env.APP_URL,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     E2B_API_KEY: process.env.E2B_API_KEY,
     E2B_TEMPLATE: process.env.E2B_TEMPLATE,
@@ -136,7 +131,7 @@ export const env = createEnv({
     S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
     S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
     S3_FORCE_PATH_STYLE: process.env.S3_FORCE_PATH_STYLE,
-    NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     NEXT_PUBLIC_NODE_ENV:

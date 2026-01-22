@@ -1,0 +1,29 @@
+name: Build E2B Sandbox
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/e2b-template/**'
+  workflow_dispatch:
+
+jobs:
+  build-sandbox:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build E2B Sandbox
+        env:
+          E2B_ACCESS_TOKEN: ${{ secrets.E2B_ACCESS_TOKEN }}
+        run: bun run e2b:build:prod

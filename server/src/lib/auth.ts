@@ -11,9 +11,7 @@ import { authSchema } from "@/server/db/schema";
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
 const appUrl =
-  env.BETTER_AUTH_URL ??
-  env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-  (env.VERCEL_URL ? `https://${env.VERCEL_URL}` : "http://localhost:3000");
+  env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export const auth = betterAuth({
   appName: "Bap",
@@ -46,6 +44,7 @@ export const auth = betterAuth({
     nextCookies(),
     bearer(),
     magicLink({
+      expiresIn: 3600, // 1 hour
       async sendMagicLink({ email, url }) {
         console.log(`[auth] Sending magic link to ${email}`);
         if (resend && env.EMAIL_FROM) {
@@ -75,7 +74,7 @@ export const auth = betterAuth({
           </tr>
           <tr>
             <td style="padding: 24px 40px; border-top: 1px solid #e4e4e7; text-align: center;">
-              <p style="margin: 0; font-size: 12px; color: #a1a1aa;">This link will expire in 10 minutes.</p>
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa;">This link will expire in 1 hour.</p>
             </td>
           </tr>
         </table>

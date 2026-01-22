@@ -13,7 +13,8 @@ import {
 } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ExternalLink, CheckCircle2, XCircle, Loader2, Search } from "lucide-react";
+import { ExternalLink, CheckCircle2, XCircle, Loader2, Search, ChevronDown } from "lucide-react";
+import { getIntegrationActions } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -110,6 +111,7 @@ function IntegrationsPageContent() {
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const linkedInLinkingRef = useRef(false);
 
   // Handle LinkedIn account_id from redirect (Unipile hosted auth)
@@ -311,72 +313,131 @@ function IntegrationsPageContent() {
           {filteredIntegrations.map(([type, config]) => {
             const integration = connectedIntegrations.get(type);
             const isConnecting = connectingType === type;
+            const isExpanded = expandedCard === type;
+            const actions = getIntegrationActions(type);
 
             return (
               <div
                 key={type}
-                className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                className="rounded-lg border overflow-hidden"
               >
-                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                  <div
-                    className={cn(
-                      "flex shrink-0 items-center justify-center rounded-lg p-2 shadow-sm border",
-                      config.bgColor
-                    )}
-                  >
-                    <Image
-                      src={config.icon}
-                      alt={config.name}
-                      width={24}
-                      height={24}
-                    />
+                <div
+                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                >
+                  <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                    <div
+                      className={cn(
+                        "flex shrink-0 items-center justify-center rounded-lg p-2 shadow-sm border",
+                        config.bgColor
+                      )}
+                    >
+                      <Image
+                        src={config.icon}
+                        alt={config.name}
+                        width={24}
+                        height={24}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-medium">{config.name}</h3>
+                      {integration ? (
+                        <p className="truncate text-sm text-muted-foreground">
+                          Connected as{" "}
+                          <span className="font-medium">
+                            {integration.displayName}
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          {config.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="font-medium">{config.name}</h3>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    {actions.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedCard(isExpanded ? null : type);
+                        }}
+                      >
+                        {isExpanded ? "Hide" : "Show"} Capabilities
+                        <ChevronDown
+                          className={cn(
+                            "ml-1 h-4 w-4 transition-transform duration-200",
+                            isExpanded && "rotate-180"
+                          )}
+                        />
+                      </Button>
+                    )}
                     {integration ? (
-                      <p className="truncate text-sm text-muted-foreground">
-                        Connected as{" "}
-                        <span className="font-medium">
-                          {integration.displayName}
-                        </span>
-                      </p>
+                      <>
+                        <label
+                          className="flex cursor-pointer items-center gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Checkbox
+                            checked={integration.enabled}
+                            onCheckedChange={(checked) =>
+                              handleToggle(integration.id, checked === true)
+                            }
+                          />
+                          <span className="text-sm">Enabled</span>
+                        </label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDisconnect(integration.id);
+                          }}
+                        >
+                          Disconnect
+                        </Button>
+                      </>
                     ) : (
-                      <p className="text-sm text-muted-foreground">
-                        {config.description}
-                      </p>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleConnect(type);
+                        }}
+                        disabled={isConnecting}
+                      >
+                        {isConnecting ? "Connecting..." : "Connect"}
+                        <ExternalLink className="ml-2 h-4 w-4" />
+                      </Button>
                     )}
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
-                  {integration ? (
-                    <>
-                      <label className="flex cursor-pointer items-center gap-2">
-                        <Checkbox
-                          checked={integration.enabled}
-                          onCheckedChange={(checked) =>
-                            handleToggle(integration.id, checked === true)
-                          }
-                        />
-                        <span className="text-sm">Enabled</span>
-                      </label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDisconnect(integration.id)}
-                      >
-                        Disconnect
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      onClick={() => handleConnect(type)}
-                      disabled={isConnecting}
-                    >
-                      {isConnecting ? "Connecting..." : "Connect"}
-                      <ExternalLink className="ml-2 h-4 w-4" />
-                    </Button>
+                {/* Expandable actions section */}
+                <div
+                  className={cn(
+                    "grid transition-all duration-200 ease-in-out",
+                    isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
                   )}
+                >
+                  <div className="overflow-hidden">
+                    {actions.length > 0 && (
+                      <div className="border-t px-4 py-3 bg-muted/30">
+                        <p className="text-xs text-muted-foreground mb-2">Available actions:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {actions.map((action) => (
+                            <span
+                              key={action.key}
+                              className="bg-muted text-muted-foreground rounded-md px-2 py-1 text-xs"
+                            >
+                              {action.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );

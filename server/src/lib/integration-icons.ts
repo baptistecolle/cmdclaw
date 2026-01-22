@@ -16,6 +16,7 @@ import {
   Grid3X3,
   MessageSquare,
   Users,
+  Linkedin,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,7 +31,8 @@ export type IntegrationType =
   | "github"
   | "airtable"
   | "slack"
-  | "hubspot";
+  | "hubspot"
+  | "linkedin";
 
 export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   gmail: Mail,
@@ -44,6 +46,7 @@ export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   airtable: Grid3X3,
   slack: MessageSquare,
   hubspot: Users,
+  linkedin: Linkedin,
 };
 
 export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
@@ -58,6 +61,7 @@ export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
   airtable: "Airtable",
   slack: "Slack",
   hubspot: "HubSpot",
+  linkedin: "LinkedIn",
 };
 
 export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
@@ -72,6 +76,7 @@ export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
   airtable: "text-blue-400",
   slack: "text-[#4A154B]",
   hubspot: "text-orange-500",
+  linkedin: "text-[#0A66C2]",
 };
 
 export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
@@ -86,6 +91,7 @@ export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
   airtable: "/integrations/airtable.svg",
   slack: "/integrations/slack.svg",
   hubspot: "/integrations/hubspot.svg",
+  linkedin: "/integrations/linkedin.svg",
 };
 
 // Human-readable descriptions for integration operations
@@ -206,6 +212,28 @@ export const INTEGRATION_OPERATION_LABELS: Record<IntegrationType, Record<string
     "pipelines.tickets": "Getting ticket pipelines",
     owners: "Listing owners",
   },
+  linkedin: {
+    "chats.list": "Listing chats",
+    "chats.get": "Getting chat",
+    "messages.list": "Listing messages",
+    "messages.send": "Sending message",
+    "messages.start": "Starting conversation",
+    "profile.me": "Getting my profile",
+    "profile.get": "Getting profile",
+    "profile.company": "Getting company profile",
+    search: "Searching",
+    "invite.list": "Listing invitations",
+    "invite.send": "Sending invitation",
+    "connections.list": "Listing connections",
+    "connections.remove": "Removing connection",
+    "posts.list": "Listing posts",
+    "posts.get": "Getting post",
+    "posts.create": "Creating post",
+    "posts.comment": "Commenting on post",
+    "posts.react": "Reacting to post",
+    "company.posts": "Listing company posts",
+    "company.post": "Creating company post",
+  },
 };
 
 /**
@@ -246,4 +274,38 @@ export function getOperationLabel(integration: string, operation: string): strin
   }
   // Fallback: capitalize and format the operation name
   return operation.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Get all available actions for an integration as display-friendly labels
+ */
+export function getIntegrationActions(integration: string): { key: string; label: string }[] {
+  const labels = INTEGRATION_OPERATION_LABELS[integration as IntegrationType];
+  if (!labels) return [];
+
+  return Object.entries(labels).map(([key, label]) => ({
+    key,
+    // Convert "Listing channels" to "List channels" for cleaner display
+    label: label.replace(/^(Listing|Getting|Reading|Searching|Creating|Updating|Deleting|Sending|Adding|Uploading|Appending|Completing|Removing|Commenting|Reacting|Starting)/, (match) => {
+      const verbMap: Record<string, string> = {
+        Listing: "List",
+        Getting: "Get",
+        Reading: "Read",
+        Searching: "Search",
+        Creating: "Create",
+        Updating: "Update",
+        Deleting: "Delete",
+        Sending: "Send",
+        Adding: "Add",
+        Uploading: "Upload",
+        Appending: "Append",
+        Completing: "Complete",
+        Removing: "Remove",
+        Commenting: "Comment on",
+        Reacting: "React to",
+        Starting: "Start",
+      };
+      return verbMap[match] || match;
+    }),
+  }));
 }
