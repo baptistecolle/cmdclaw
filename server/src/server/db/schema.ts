@@ -22,6 +22,7 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
+  onboardedAt: timestamp("onboarded_at"),
 });
 
 export const session = pgTable(
@@ -118,6 +119,7 @@ export const generationStatusEnum = pgEnum("generation_status", [
   "idle",
   "generating",
   "awaiting_approval",
+  "awaiting_auth",
   "paused",
   "complete",
   "error",
@@ -126,6 +128,7 @@ export const generationStatusEnum = pgEnum("generation_status", [
 export const generationRecordStatusEnum = pgEnum("generation_record_status", [
   "running",
   "awaiting_approval",
+  "awaiting_auth",
   "paused",
   "completed",
   "cancelled",
@@ -202,6 +205,14 @@ export type PendingApproval = {
   requestedAt: string;
 };
 
+// Auth state stored in generation
+export type PendingAuth = {
+  integrations: string[];  // Integration types needed
+  connectedIntegrations: string[];  // Already connected during this request
+  requestedAt: string;
+  reason?: string;
+};
+
 export const generation = pgTable(
   "generation",
   {
@@ -218,6 +229,8 @@ export const generation = pgTable(
     contentParts: jsonb("content_parts").$type<ContentPart[]>(),
     // Approval state
     pendingApproval: jsonb("pending_approval").$type<PendingApproval>(),
+    // Auth state
+    pendingAuth: jsonb("pending_auth").$type<PendingAuth>(),
     // E2B state
     sandboxId: text("sandbox_id"),
     isPaused: boolean("is_paused").default(false).notNull(),

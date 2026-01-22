@@ -7,10 +7,10 @@ import {
   SidebarTrigger,
 } from "@/components/animate-ui/components/radix/sidebar";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useConversation } from "@/orpc/hooks";
-import { useParams } from "next/navigation";
-import { Copy, Check } from "lucide-react";
-import { useState } from "react";
+import { useConversation, useCurrentUser } from "@/orpc/hooks";
+import { useParams, useRouter } from "next/navigation";
+import { Copy, Check, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 
 type Message = {
   role: string;
@@ -112,6 +112,23 @@ export default function ChatLayout({
   children: React.ReactNode;
 }) {
   const { isAdmin } = useIsAdmin();
+  const router = useRouter();
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+
+  useEffect(() => {
+    if (!userLoading && user && !user.onboardedAt) {
+      router.replace("/onboarding/integrations");
+    }
+  }, [user, userLoading, router]);
+
+  // Show loading while checking onboarding status
+  if (userLoading || (user && !user.onboardedAt)) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider className="bg-background text-foreground">

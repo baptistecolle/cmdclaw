@@ -4,6 +4,7 @@ import { conversationRouter } from "./routers/conversation";
 import { generationRouter } from "./routers/generation";
 import { integrationRouter } from "./routers/integration";
 import { skillRouter } from "./routers/skill";
+import { userRouter } from "./routers/user";
 import { voiceRouter } from "./routers/voice";
 
 const ping = baseProcedure.handler(async () => ({
@@ -17,6 +18,7 @@ export const appRouter = {
   generation: generationRouter,
   integration: integrationRouter,
   skill: skillRouter,
+  user: userRouter,
   voice: voiceRouter,
   health: { ping },
 };

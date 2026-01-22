@@ -6,15 +6,19 @@ import { MessageList, type Message, type MessagePart } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { VoiceIndicator, VoiceHint } from "./voice-indicator";
 import { ToolApprovalCard } from "./tool-approval-card";
+import { AuthRequestCard } from "./auth-request-card";
 import { ActivityFeed, type ActivityItemData } from "./activity-feed";
 import {
   useConversation,
   useTranscribe,
   useGeneration,
   useSubmitApproval,
+  useSubmitAuthResult,
+  useGetAuthUrl,
   useActiveGeneration,
   useCancelGeneration,
   type GenerationPendingApprovalData,
+  type AuthNeededData,
 } from "@/orpc/hooks";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import { useRouter } from "next/navigation";
@@ -23,7 +27,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import type { IntegrationType } from "@/lib/integration-icons";
 
 // Trace state for tracking activity during a conversation turn
-type TraceStatus = "streaming" | "complete" | "error" | "waiting_approval";
+type TraceStatus = "streaming" | "complete" | "error" | "waiting_approval" | "waiting_auth";
 
 // Segment approval data
 type SegmentApproval = {
@@ -36,11 +40,20 @@ type SegmentApproval = {
   status: "pending" | "approved" | "denied";
 };
 
-// Activity segment - groups activities between approvals
+// Segment auth data
+type SegmentAuth = {
+  integrations: string[];
+  connectedIntegrations: string[];
+  reason?: string;
+  status: "pending" | "connecting" | "completed" | "cancelled";
+};
+
+// Activity segment - groups activities between approvals/auth
 type ActivitySegment = {
   id: string;
   items: ActivityItemData[];
   approval?: SegmentApproval;
+  auth?: SegmentAuth;
   isExpanded: boolean;
 };
 
@@ -56,6 +69,8 @@ export function ChatArea({ conversationId }: Props) {
   );
   const { startGeneration, subscribeToGeneration, abort } = useGeneration();
   const { mutateAsync: submitApproval, isPending: isApproving } = useSubmitApproval();
+  const { mutateAsync: submitAuthResult, isPending: isSubmittingAuth } = useSubmitAuthResult();
+  const { mutateAsync: getAuthUrl } = useGetAuthUrl();
   const { mutateAsync: cancelGeneration } = useCancelGeneration();
   const { data: activeGeneration } = useActiveGeneration(conversationId);
 
@@ -165,12 +180,15 @@ export function ChatArea({ conversationId }: Props) {
   useEffect(() => {
     if (
       activeGeneration?.generationId &&
-      (activeGeneration.status === "generating" || activeGeneration.status === "awaiting_approval")
+      (activeGeneration.status === "generating" || activeGeneration.status === "awaiting_approval" || activeGeneration.status === "awaiting_auth")
     ) {
       // There's an active generation - reconnect to it
       currentGenerationIdRef.current = activeGeneration.generationId;
       setIsStreaming(true);
-      setTraceStatus(activeGeneration.status === "awaiting_approval" ? "waiting_approval" : "streaming");
+      setTraceStatus(
+        activeGeneration.status === "awaiting_approval" ? "waiting_approval" :
+        activeGeneration.status === "awaiting_auth" ? "waiting_auth" : "streaming"
+      );
 
       // Subscribe to the generation stream
       const allParts: MessagePart[] = [];
@@ -321,6 +339,54 @@ export function ChatArea({ conversationId }: Props) {
             }
           }
           setTraceStatus("streaming");
+          updateSegmentsState();
+        },
+        onAuthNeeded: (data) => {
+          currentGenerationIdRef.current = data.generationId;
+          if (data.conversationId) {
+            currentConversationIdRef.current = data.conversationId;
+          }
+
+          const currentSeg = getCurrentSegment();
+          currentSeg.auth = {
+            integrations: data.integrations,
+            connectedIntegrations: [],
+            reason: data.reason,
+            status: "pending",
+          };
+
+          currentSeg.isExpanded = false;
+          allSegments.push({
+            id: `seg-${segmentCounter++}`,
+            items: [],
+            isExpanded: true,
+          });
+
+          setTraceStatus("waiting_auth");
+          updateSegmentsState();
+        },
+        onAuthProgress: (connected, remaining) => {
+          for (const seg of allSegments) {
+            if (seg.auth && seg.auth.status === "pending") {
+              seg.auth.connectedIntegrations.push(connected);
+              if (remaining.length === 0) {
+                seg.auth.status = "completed";
+              }
+              break;
+            }
+          }
+          updateSegmentsState();
+        },
+        onAuthResult: (success) => {
+          for (const seg of allSegments) {
+            if (seg.auth) {
+              seg.auth.status = success ? "completed" : "cancelled";
+              break;
+            }
+          }
+          if (success) {
+            setTraceStatus("streaming");
+          }
           updateSegmentsState();
         },
         onDone: (generationId, newConversationId, messageId, usage) => {
@@ -648,6 +714,59 @@ export function ChatArea({ conversationId }: Props) {
           setTraceStatus("streaming");
           updateSegmentsState();
         },
+        onAuthNeeded: (data) => {
+          // Update the generation ID and conversation ID refs
+          currentGenerationIdRef.current = data.generationId;
+          if (data.conversationId) {
+            currentConversationIdRef.current = data.conversationId;
+          }
+
+          // Attach auth to current segment
+          const currentSeg = getCurrentSegment();
+          currentSeg.auth = {
+            integrations: data.integrations,
+            connectedIntegrations: [],
+            reason: data.reason,
+            status: "pending",
+          };
+
+          // Collapse current segment and create new one for subsequent activities
+          currentSeg.isExpanded = false;
+          allSegments.push({
+            id: `seg-${segmentCounter++}`,
+            items: [],
+            isExpanded: true,
+          });
+
+          setTraceStatus("waiting_auth");
+          updateSegmentsState();
+        },
+        onAuthProgress: (connected, remaining) => {
+          // Find and update auth status in segments
+          for (const seg of allSegments) {
+            if (seg.auth && seg.auth.status === "pending") {
+              seg.auth.connectedIntegrations.push(connected);
+              if (remaining.length === 0) {
+                seg.auth.status = "completed";
+              }
+              break;
+            }
+          }
+          updateSegmentsState();
+        },
+        onAuthResult: (success) => {
+          // Find and update auth status in segments
+          for (const seg of allSegments) {
+            if (seg.auth) {
+              seg.auth.status = success ? "completed" : "cancelled";
+              break;
+            }
+          }
+          if (success) {
+            setTraceStatus("streaming");
+          }
+          updateSegmentsState();
+        },
         onDone: (generationId, newConversationId, messageId) => {
           // Compute full content from text parts
           const fullContent = allParts
@@ -853,6 +972,76 @@ export function ChatArea({ conversationId }: Props) {
     [submitApproval]
   );
 
+  // Handle auth connect - redirect to OAuth
+  const handleAuthConnect = useCallback(
+    async (integration: string) => {
+      const genId = currentGenerationIdRef.current;
+      const convId = currentConversationIdRef.current;
+      if (!genId || !convId) return;
+
+      // Update status to connecting
+      setSegments((prev) =>
+        prev.map((seg) =>
+          seg.auth?.status === "pending"
+            ? { ...seg, auth: { ...seg.auth, status: "connecting" as const } }
+            : seg
+        )
+      );
+
+      try {
+        // Get auth URL and redirect
+        const result = await getAuthUrl({
+          type: integration as "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin",
+          redirectUrl: `${window.location.origin}/chat/${convId}?auth_complete=${integration}&generation_id=${genId}`,
+        });
+        window.location.href = result.authUrl;
+      } catch (err) {
+        console.error("Failed to get auth URL:", err);
+        // Reset status on error
+        setSegments((prev) =>
+          prev.map((seg) =>
+            seg.auth?.status === "connecting"
+              ? { ...seg, auth: { ...seg.auth, status: "pending" as const } }
+              : seg
+          )
+        );
+      }
+    },
+    [getAuthUrl]
+  );
+
+  // Handle auth cancel
+  const handleAuthCancel = useCallback(
+    async () => {
+      const genId = currentGenerationIdRef.current;
+      if (!genId) return;
+
+      // Find first pending integration
+      const seg = segments.find((s) => s.auth?.status === "pending");
+      const integration = seg?.auth?.integrations[0];
+      if (!integration) return;
+
+      try {
+        await submitAuthResult({
+          generationId: genId,
+          integration,
+          success: false,
+        });
+
+        setSegments((prev) =>
+          prev.map((s) =>
+            s.auth?.status === "pending"
+              ? { ...s, auth: { ...s.auth, status: "cancelled" as const } }
+              : s
+          )
+        );
+      } catch (err) {
+        console.error("Failed to cancel auth:", err);
+      }
+    },
+    [submitAuthResult, segments]
+  );
+
   // Voice recording: stop and transcribe
   const stopRecordingAndTranscribe = useCallback(async () => {
     if (!isRecordingRef.current) return;
@@ -887,9 +1076,9 @@ export function ChatArea({ conversationId }: Props) {
     }
   }, [startRecording, isStreaming, isProcessingVoice]);
 
-  // Push-to-talk: Ctrl/Cmd + M - start recording on keydown
+  // Push-to-talk: Ctrl/Cmd + K - start recording on keydown
   useHotkeys(
-    "mod+m",
+    "mod+k",
     handleStartRecording,
     { keydown: true, keyup: false, preventDefault: true },
     [handleStartRecording]
@@ -903,9 +1092,9 @@ export function ChatArea({ conversationId }: Props) {
       if (!isRecordingRef.current) return;
 
       const isHotkeyRelease =
-        e.key === "m" ||
-        e.key === "M" ||
-        e.code === "KeyM" ||
+        e.key === "k" ||
+        e.key === "K" ||
+        e.code === "KeyK" ||
         e.key === "Meta" ||
         e.key === "Control";
 
@@ -981,7 +1170,7 @@ export function ChatArea({ conversationId }: Props) {
                         {segment.items.length > 0 && (
                           <ActivityFeed
                             items={segment.items}
-                            isStreaming={isStreaming && index === segments.length - 1 && !segment.approval}
+                            isStreaming={isStreaming && index === segments.length - 1 && !segment.approval && !segment.auth}
                             isExpanded={segment.isExpanded}
                             onToggleExpand={() => toggleSegmentExpand(segment.id)}
                             integrationsUsed={segmentIntegrations}
@@ -1001,6 +1190,19 @@ export function ChatArea({ conversationId }: Props) {
                             isLoading={isApproving}
                             onApprove={() => handleApprove(segment.approval!.toolUseId)}
                             onDeny={() => handleDeny(segment.approval!.toolUseId)}
+                          />
+                        )}
+
+                        {/* Render auth request card if segment has one */}
+                        {segment.auth && (
+                          <AuthRequestCard
+                            integrations={segment.auth.integrations}
+                            connectedIntegrations={segment.auth.connectedIntegrations}
+                            reason={segment.auth.reason}
+                            status={segment.auth.status}
+                            isLoading={isSubmittingAuth}
+                            onConnect={handleAuthConnect}
+                            onCancel={handleAuthCancel}
                           />
                         )}
                       </div>

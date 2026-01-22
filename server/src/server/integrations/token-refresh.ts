@@ -60,7 +60,13 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
     tokenBody.delete("client_secret");
   }
 
+  const now = new Date();
+  const tokenAge = token.expiresAt ? Math.round((now.getTime() - token.expiresAt.getTime()) / 1000 / 60) : 'unknown';
   console.log(`[Token Refresh] Refreshing ${token.type} token...`);
+  console.log(`[Token Refresh] Integration ID: ${token.integrationId}`);
+  console.log(`[Token Refresh] Token expired at: ${token.expiresAt?.toISOString() ?? 'no expiry'}`);
+  console.log(`[Token Refresh] Token age (mins past expiry): ${tokenAge}`);
+  console.log(`[Token Refresh] Refresh token present: ${!!token.refreshToken} (length: ${token.refreshToken?.length ?? 0})`);
 
   const response = await fetch(config.tokenUrl, {
     method: "POST",

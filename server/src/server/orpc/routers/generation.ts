@@ -48,6 +48,23 @@ const generationEventSchema = z.discriminatedUnion("type", [
     decision: z.enum(["approved", "denied"]),
   }),
   z.object({
+    type: z.literal("auth_needed"),
+    generationId: z.string(),
+    conversationId: z.string(),
+    integrations: z.array(z.string()),
+    reason: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("auth_progress"),
+    connected: z.string(),
+    remaining: z.array(z.string()),
+  }),
+  z.object({
+    type: z.literal("auth_result"),
+    success: z.boolean(),
+    integrations: z.array(z.string()).optional(),
+  }),
+  z.object({
     type: z.literal("done"),
     generationId: z.string(),
     conversationId: z.string(),
@@ -160,6 +177,26 @@ const submitApproval = protectedProcedure
     return { success };
   });
 
+// Submit auth result (after OAuth completes)
+const submitAuthResult = protectedProcedure
+  .input(
+    z.object({
+      generationId: z.string(),
+      integration: z.string(),
+      success: z.boolean(),
+    })
+  )
+  .output(z.object({ success: z.boolean() }))
+  .handler(async ({ input, context }) => {
+    const success = await generationManager.submitAuthResult(
+      input.generationId,
+      input.integration,
+      input.success,
+      context.user.id
+    );
+    return { success };
+  });
+
 // Get generation status (for polling fallback)
 const getGenerationStatus = protectedProcedure
   .input(
@@ -169,7 +206,7 @@ const getGenerationStatus = protectedProcedure
   )
   .output(
     z.object({
-      status: z.enum(["running", "awaiting_approval", "paused", "completed", "cancelled", "error"]),
+      status: z.enum(["running", "awaiting_approval", "awaiting_auth", "paused", "completed", "cancelled", "error"]),
       contentParts: z.array(z.unknown()),
       pendingApproval: z
         .object({
@@ -214,7 +251,7 @@ const getActiveGeneration = protectedProcedure
   .output(
     z.object({
       generationId: z.string().nullable(),
-      status: z.enum(["idle", "generating", "awaiting_approval", "paused", "complete", "error"]).nullable(),
+      status: z.enum(["idle", "generating", "awaiting_approval", "awaiting_auth", "paused", "complete", "error"]).nullable(),
     })
   )
   .handler(async ({ input, context }) => {
@@ -232,13 +269,14 @@ const getActiveGeneration = protectedProcedure
     }
 
     // Map generation status to conversation status
-    const mapStatus = (genStatus: string | null | undefined): "idle" | "generating" | "awaiting_approval" | "paused" | "complete" | "error" | null => {
+    const mapStatus = (genStatus: string | null | undefined): "idle" | "generating" | "awaiting_approval" | "awaiting_auth" | "paused" | "complete" | "error" | null => {
       if (!genStatus) return null;
       switch (genStatus) {
         case "running": return "generating";
         case "completed": return "complete";
         case "cancelled": return "idle";
         case "awaiting_approval": return "awaiting_approval";
+        case "awaiting_auth": return "awaiting_auth";
         case "paused": return "paused";
         case "error": return "error";
         default: return null;
@@ -268,6 +306,7 @@ export const generationRouter = {
   cancelGeneration,
   resumeGeneration,
   submitApproval,
+  submitAuthResult,
   getGenerationStatus,
   getActiveGeneration,
 };

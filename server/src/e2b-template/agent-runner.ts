@@ -13,9 +13,11 @@ import { readFile, writeFile, unlink } from "fs/promises";
 const config = JSON.parse(process.env.AGENT_CONFIG || "{}");
 const { prompt, model, resume, systemPrompt } = config;
 
-// Approval communication paths
+// Approval and auth communication paths
 const APPROVAL_REQUEST_FILE = "/tmp/approval-request.json";
 const APPROVAL_RESPONSE_FILE = "/tmp/approval-response.json";
+const AUTH_RESPONSE_FILE = "/tmp/auth-response.json";
+const INTEGRATION_TOKENS_FILE = "/tmp/integration-tokens.json";
 const INTERRUPT_REQUEST_FILE = "/tmp/interrupt-request.json";
 
 // Integration CLI names to internal type mapping
@@ -205,9 +207,100 @@ async function waitForApproval(toolUseId: string): Promise<"allow" | "deny"> {
 }
 
 /**
+ * Wait for auth response from the server
+ */
+async function waitForAuth(): Promise<{ success: boolean; integrations: string[] }> {
+  const startTime = Date.now();
+  const timeout = 10 * 60 * 1000; // 10 minute timeout
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      const responseRaw = await readFile(AUTH_RESPONSE_FILE, "utf8");
+      const response = JSON.parse(responseRaw);
+      await unlink(AUTH_RESPONSE_FILE).catch(() => {});
+      return { success: response.success, integrations: response.integrations || [] };
+    } catch {
+      // File doesn't exist yet, continue polling
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  // Timeout: default to failure
+  return { success: false, integrations: [] };
+}
+
+/**
+ * Load integration tokens from file and set them in process.env
+ * This is called after successful OAuth to inject new tokens into the environment
+ */
+async function loadTokensFromFile(): Promise<void> {
+  try {
+    const tokensRaw = await readFile(INTEGRATION_TOKENS_FILE, "utf8");
+    const tokens = JSON.parse(tokensRaw);
+
+    // Set each token in the environment
+    for (const [envVar, value] of Object.entries(tokens)) {
+      if (typeof value === "string") {
+        process.env[envVar] = value;
+        console.error(`[Agent] Loaded token for ${envVar}`);
+      }
+    }
+
+    // Clean up the tokens file
+    await unlink(INTEGRATION_TOKENS_FILE).catch(() => {});
+  } catch {
+    // File doesn't exist or invalid - this is fine
+  }
+}
+
+/**
+ * Get the environment variable name for an integration's token
+ */
+function getTokenEnvVar(integration: string): string {
+  const envVarMap: Record<string, string> = {
+    slack: "SLACK_ACCESS_TOKEN",
+    gmail: "GMAIL_ACCESS_TOKEN",
+    google_calendar: "GOOGLE_CALENDAR_ACCESS_TOKEN",
+    google_docs: "GOOGLE_DOCS_ACCESS_TOKEN",
+    google_sheets: "GOOGLE_SHEETS_ACCESS_TOKEN",
+    google_drive: "GOOGLE_DRIVE_ACCESS_TOKEN",
+    notion: "NOTION_ACCESS_TOKEN",
+    linear: "LINEAR_ACCESS_TOKEN",
+    github: "GITHUB_ACCESS_TOKEN",
+    airtable: "AIRTABLE_ACCESS_TOKEN",
+    hubspot: "HUBSPOT_ACCESS_TOKEN",
+    linkedin: "LINKEDIN_ACCOUNT_ID",
+  };
+  return envVarMap[integration] || "";
+}
+
+/**
+ * Get the display name for an integration
+ */
+function getIntegrationDisplayName(integration: string): string {
+  const names: Record<string, string> = {
+    slack: "Slack",
+    gmail: "Gmail",
+    google_calendar: "Google Calendar",
+    google_docs: "Google Docs",
+    google_sheets: "Google Sheets",
+    google_drive: "Google Drive",
+    notion: "Notion",
+    linear: "Linear",
+    github: "GitHub",
+    airtable: "Airtable",
+    hubspot: "HubSpot",
+    linkedin: "LinkedIn",
+  };
+  return names[integration] || integration;
+}
+
+/**
  * PreToolUse hook for integration permission control
  */
 const integrationPermissionHook: HookCallback = async (input, toolUseId, { signal }) => {
+  console.error(`[Hook] Received hook event: ${input.hook_event_name}`);
+
   if (input.hook_event_name !== "PreToolUse") {
     return {};
   }
@@ -216,20 +309,58 @@ const integrationPermissionHook: HookCallback = async (input, toolUseId, { signa
   const toolName = preInput.tool_name;
   const toolInput = preInput.tool_input as Record<string, unknown>;
 
+  console.error(`[Hook] PreToolUse for tool: ${toolName}`);
+
   // Only process Bash commands that call our CLI tools
   if (toolName !== "Bash") {
+    console.error(`[Hook] Not a Bash command, skipping`);
     return {};
   }
 
   const command = (toolInput.command as string) || "";
+  console.error(`[Hook] Bash command: ${command}`);
+
   const parsed = parseBashCommand(command);
+  console.error(`[Hook] Parsed result: ${JSON.stringify(parsed)}`);
 
   // Not an integration command, allow it
   if (!parsed) {
+    console.error(`[Hook] Not an integration command, allowing`);
     return {};
   }
 
   const { integration, operation } = parsed;
+
+  // Check if integration token is available
+  const tokenEnvVar = getTokenEnvVar(integration);
+  const hasToken = tokenEnvVar ? !!process.env[tokenEnvVar] : false;
+  console.error(`[Hook] Integration: ${integration}, EnvVar: ${tokenEnvVar}, HasToken: ${hasToken}`);
+
+  if (!hasToken) {
+    console.error(`[Hook] No token found, emitting auth_needed event`);
+    // Emit auth_needed event
+    emitEvent({
+      type: "auth_needed",
+      integrations: [integration],
+      reason: `${getIntegrationDisplayName(integration)} authentication required`,
+    });
+
+    // Wait for auth response
+    const authResult = await waitForAuth();
+
+    if (!authResult.success) {
+      return {
+        hookSpecificOutput: {
+          hookEventName: input.hook_event_name,
+          permissionDecision: "deny",
+          permissionDecisionReason: "Authentication not completed",
+        },
+      };
+    }
+
+    // Auth succeeded - load the new tokens from file into process.env
+    await loadTokensFromFile();
+  }
 
   // Check if this is a write operation
   if (isWriteOperation(integration, operation)) {

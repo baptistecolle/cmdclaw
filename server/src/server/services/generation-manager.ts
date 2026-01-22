@@ -7,6 +7,7 @@ import {
   message,
   type ContentPart,
   type PendingApproval,
+  type PendingAuth,
 } from "@/server/db/schema";
 import {
   getOrCreateSandbox,
@@ -14,6 +15,7 @@ import {
   writeSkillsToSandbox,
   getSkillsSystemPrompt,
   writeApprovalResponse,
+  writeAuthResponse,
   getActiveSandbox,
   killSandbox,
   type SDKAgentEvent,
@@ -22,6 +24,7 @@ import {
   getCliEnvForUser,
   getCliInstructions,
   getEnabledIntegrationTypes,
+  getTokensForIntegrations,
 } from "@/server/integrations/cli-env";
 import { generateConversationTitle } from "@/server/utils/generate-title";
 import { env } from "@/env";
@@ -53,6 +56,19 @@ export type GenerationEvent =
     }
   | { type: "approval_result"; toolUseId: string; decision: "approved" | "denied" }
   | {
+      type: "auth_needed";
+      generationId: string;
+      conversationId: string;
+      integrations: string[];
+      reason?: string;
+    }
+  | {
+      type: "auth_progress";
+      connected: string;
+      remaining: string[];
+    }
+  | { type: "auth_result"; success: boolean; integrations?: string[] }
+  | {
       type: "done";
       generationId: string;
       conversationId: string;
@@ -66,6 +82,7 @@ export type GenerationEvent =
 type GenerationStatus =
   | "running"
   | "awaiting_approval"
+  | "awaiting_auth"
   | "paused"
   | "completed"
   | "cancelled"
@@ -88,6 +105,8 @@ interface GenerationContext {
   abortController: AbortController;
   pendingApproval: PendingApproval | null;
   approvalTimeoutId?: ReturnType<typeof setTimeout>;
+  pendingAuth: PendingAuth | null;
+  authTimeoutId?: ReturnType<typeof setTimeout>;
   usage: { inputTokens: number; outputTokens: number; totalCostUsd: number };
   sessionId?: string;
   errorMessage?: string;
@@ -101,6 +120,8 @@ interface GenerationContext {
 
 // Approval timeout: 5 minutes before pausing sandbox
 const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
+// Auth timeout: 10 minutes for OAuth flow
+const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
 // Save debounce interval for text chunks
 const SAVE_DEBOUNCE_MS = 2000;
 // Max generation time without subscribers
@@ -200,6 +221,7 @@ class GenerationManager {
       subscribers: new Map(),
       abortController: new AbortController(),
       pendingApproval: null,
+      pendingAuth: null,
       usage: { inputTokens: 0, outputTokens: 0, totalCostUsd: 0 },
       startedAt: new Date(),
       lastSaveAt: new Date(),
@@ -306,7 +328,7 @@ class GenerationManager {
         return;
       }
 
-      // If paused or awaiting approval, we need to resume the context
+      // If paused or awaiting approval/auth, we need to resume the context
       // For now, just report the state
       yield { type: "status_change", status: genRecord.status };
       if (genRecord.pendingApproval) {
@@ -319,6 +341,15 @@ class GenerationManager {
           toolInput: genRecord.pendingApproval.toolInput,
           integration: "",
           operation: "",
+        };
+      }
+      if (genRecord.pendingAuth) {
+        yield {
+          type: "auth_needed",
+          generationId: genRecord.id,
+          conversationId: genRecord.conversationId,
+          integrations: genRecord.pendingAuth.integrations,
+          reason: genRecord.pendingAuth.reason,
         };
       }
       return;
@@ -384,6 +415,17 @@ class GenerationManager {
         toolInput: ctx.pendingApproval.toolInput,
         integration: "",
         operation: "",
+      });
+    }
+
+    // If pending auth, send that event
+    if (ctx.pendingAuth) {
+      eventQueue.push({
+        type: "auth_needed",
+        generationId: ctx.id,
+        conversationId: ctx.conversationId,
+        integrations: ctx.pendingAuth.integrations,
+        reason: ctx.pendingAuth.reason,
       });
     }
 
@@ -622,6 +664,12 @@ class GenerationManager {
           continue;
         }
 
+        if (event.type === "auth_needed") {
+          console.log(`[GenerationManager] Received auth_needed event:`, event);
+          await this.handleAuthNeeded(ctx, event);
+          continue;
+        }
+
         if (event.type === "approval_result") {
           this.broadcast(ctx, {
             type: "approval_result",
@@ -826,6 +874,160 @@ class GenerationManager {
     this.broadcast(ctx, { type: "status_change", status: "paused" });
   }
 
+  private async handleAuthNeeded(ctx: GenerationContext, event: SDKAgentEvent): Promise<void> {
+    console.log(`[GenerationManager] handleAuthNeeded for generation ${ctx.id}:`, {
+      integrations: (event as any).integrations,
+      reason: (event as any).reason,
+    });
+
+    ctx.status = "awaiting_auth";
+    ctx.pendingAuth = {
+      integrations: (event as any).integrations || [],
+      connectedIntegrations: [],
+      requestedAt: new Date().toISOString(),
+      reason: (event as any).reason,
+    };
+
+    // Update database
+    await db
+      .update(generation)
+      .set({
+        status: "awaiting_auth",
+        pendingAuth: ctx.pendingAuth,
+      })
+      .where(eq(generation.id, ctx.id));
+
+    await db
+      .update(conversation)
+      .set({ generationStatus: "awaiting_auth" })
+      .where(eq(conversation.id, ctx.conversationId));
+
+    // Notify subscribers
+    this.broadcast(ctx, {
+      type: "auth_needed",
+      generationId: ctx.id,
+      conversationId: ctx.conversationId,
+      integrations: ctx.pendingAuth.integrations,
+      reason: ctx.pendingAuth.reason,
+    });
+
+    // Start auth timeout (10 minutes)
+    ctx.authTimeoutId = setTimeout(() => {
+      this.handleAuthTimeout(ctx);
+    }, AUTH_TIMEOUT_MS);
+  }
+
+  private async handleAuthTimeout(ctx: GenerationContext): Promise<void> {
+    if (ctx.status !== "awaiting_auth" || !ctx.pendingAuth) {
+      return;
+    }
+
+    console.log(`[GenerationManager] Auth timeout for generation ${ctx.id}, cancelling`);
+
+    // Write failure response to sandbox
+    const sandbox = getActiveSandbox(ctx.conversationId);
+    if (sandbox) {
+      await writeAuthResponse(sandbox, false, []);
+    }
+
+    await this.finishGeneration(ctx, "cancelled");
+  }
+
+  /**
+   * Submit an auth result (called after OAuth completes)
+   */
+  async submitAuthResult(
+    generationId: string,
+    integration: string,
+    success: boolean,
+    userId: string
+  ): Promise<boolean> {
+    const ctx = this.activeGenerations.get(generationId);
+    if (!ctx) {
+      return false;
+    }
+
+    if (ctx.userId !== userId) {
+      throw new Error("Access denied");
+    }
+
+    if (!ctx.pendingAuth) {
+      return false;
+    }
+
+    // Clear auth timeout
+    if (ctx.authTimeoutId) {
+      clearTimeout(ctx.authTimeoutId);
+      ctx.authTimeoutId = undefined;
+    }
+
+    if (!success) {
+      // User cancelled - write failure and cancel generation
+      const sandbox = getActiveSandbox(ctx.conversationId);
+      if (sandbox) {
+        await writeAuthResponse(sandbox, false, []);
+      }
+      await this.finishGeneration(ctx, "cancelled");
+      return true;
+    }
+
+    // Track connected integration
+    ctx.pendingAuth.connectedIntegrations.push(integration);
+
+    const allConnected = ctx.pendingAuth.integrations.every(
+      (i) => ctx.pendingAuth!.connectedIntegrations.includes(i)
+    );
+
+    if (allConnected) {
+      // All integrations connected - fetch tokens and write to sandbox
+      const tokens = await getTokensForIntegrations(
+        ctx.userId,
+        ctx.pendingAuth.connectedIntegrations
+      );
+
+      const sandbox = getActiveSandbox(ctx.conversationId);
+      if (sandbox) {
+        await writeAuthResponse(sandbox, true, ctx.pendingAuth.connectedIntegrations, tokens);
+      }
+
+      // Broadcast result before clearing pendingAuth
+      this.broadcast(ctx, {
+        type: "auth_result",
+        success: true,
+        integrations: ctx.pendingAuth.connectedIntegrations,
+      });
+
+      // Clear pending auth and resume
+      ctx.pendingAuth = null;
+      ctx.status = "running";
+
+      // Update database
+      await db
+        .update(generation)
+        .set({
+          status: "running",
+          pendingAuth: null,
+        })
+        .where(eq(generation.id, ctx.id));
+
+      await db
+        .update(conversation)
+        .set({ generationStatus: "generating" })
+        .where(eq(conversation.id, ctx.conversationId));
+    } else {
+      // Still waiting for more integrations - broadcast progress
+      this.broadcast(ctx, {
+        type: "auth_progress",
+        connected: integration,
+        remaining: ctx.pendingAuth.integrations.filter(
+          (i) => !ctx.pendingAuth!.connectedIntegrations.includes(i)
+        ),
+      });
+    }
+
+    return true;
+  }
+
   private async finishGeneration(
     ctx: GenerationContext,
     status: "completed" | "cancelled" | "error"
@@ -836,6 +1038,9 @@ class GenerationManager {
     }
     if (ctx.approvalTimeoutId) {
       clearTimeout(ctx.approvalTimeoutId);
+    }
+    if (ctx.authTimeoutId) {
+      clearTimeout(ctx.authTimeoutId);
     }
 
     // NOTE: We set ctx.status AFTER broadcasting to subscribers to avoid a race condition

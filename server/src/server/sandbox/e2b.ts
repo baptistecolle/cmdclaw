@@ -382,3 +382,29 @@ export async function writeApprovalResponse(
   );
   console.log("[E2B SDK] Wrote approval response:", response);
 }
+
+/**
+ * Write an auth response to the sandbox for the SDK agent to read
+ */
+export async function writeAuthResponse(
+  sandbox: Sandbox,
+  success: boolean,
+  integrations: string[],
+  tokens?: Record<string, string>
+): Promise<void> {
+  const response = { success, integrations, timestamp: Date.now() };
+  await sandbox.files.write(
+    "/tmp/auth-response.json",
+    JSON.stringify(response)
+  );
+  console.log("[E2B SDK] Wrote auth response:", response);
+
+  // If tokens provided, write them to a separate file for the agent to load
+  if (tokens && Object.keys(tokens).length > 0) {
+    await sandbox.files.write(
+      "/tmp/integration-tokens.json",
+      JSON.stringify(tokens)
+    );
+    console.log("[E2B SDK] Wrote integration tokens for:", Object.keys(tokens));
+  }
+}

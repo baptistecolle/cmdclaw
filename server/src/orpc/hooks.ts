@@ -429,6 +429,28 @@ export function useDeleteSkillDocument() {
   });
 }
 
+// ========== USER HOOKS ==========
+
+// Hook for getting current user
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: ["user", "me"],
+    queryFn: () => client.user.me(),
+  });
+}
+
+// Hook for completing onboarding
+export function useCompleteOnboarding() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => client.user.completeOnboarding(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    },
+  });
+}
+
 // ========== GENERATION HOOKS ==========
 
 export type GenerationPendingApprovalData = {
@@ -442,6 +464,13 @@ export type GenerationPendingApprovalData = {
   command?: string;
 };
 
+export type AuthNeededData = {
+  generationId: string;
+  conversationId: string;
+  integrations: string[];
+  reason?: string;
+};
+
 export type GenerationCallbacks = {
   onText?: (content: string) => void;
   onThinking?: (data: ThinkingData) => void;
@@ -449,6 +478,9 @@ export type GenerationCallbacks = {
   onToolResult?: (toolName: string, result: unknown) => void;
   onPendingApproval?: (data: GenerationPendingApprovalData) => void;
   onApprovalResult?: (toolUseId: string, decision: "approved" | "denied") => void;
+  onAuthNeeded?: (data: AuthNeededData) => void;
+  onAuthProgress?: (connected: string, remaining: string[]) => void;
+  onAuthResult?: (success: boolean, integrations?: string[]) => void;
   onDone?: (
     generationId: string,
     conversationId: string,
@@ -529,6 +561,20 @@ export function useGeneration() {
               break;
             case "approval_result":
               callbacks.onApprovalResult?.(event.toolUseId, event.decision);
+              break;
+            case "auth_needed":
+              callbacks.onAuthNeeded?.({
+                generationId: event.generationId,
+                conversationId: event.conversationId,
+                integrations: event.integrations,
+                reason: event.reason,
+              });
+              break;
+            case "auth_progress":
+              callbacks.onAuthProgress?.(event.connected, event.remaining);
+              break;
+            case "auth_result":
+              callbacks.onAuthResult?.(event.success, event.integrations);
               break;
             case "done":
               callbacks.onDone?.(
@@ -621,6 +667,20 @@ export function useGeneration() {
             case "approval_result":
               callbacks.onApprovalResult?.(event.toolUseId, event.decision);
               break;
+            case "auth_needed":
+              callbacks.onAuthNeeded?.({
+                generationId: event.generationId,
+                conversationId: event.conversationId,
+                integrations: event.integrations,
+                reason: event.reason,
+              });
+              break;
+            case "auth_progress":
+              callbacks.onAuthProgress?.(event.connected, event.remaining);
+              break;
+            case "auth_result":
+              callbacks.onAuthResult?.(event.success, event.integrations);
+              break;
             case "done":
               callbacks.onDone?.(
                 event.generationId,
@@ -682,6 +742,21 @@ export function useSubmitApproval() {
   });
 }
 
+// Hook for submitting auth result (after OAuth completes)
+export function useSubmitAuthResult() {
+  return useMutation({
+    mutationFn: ({
+      generationId,
+      integration,
+      success,
+    }: {
+      generationId: string;
+      integration: string;
+      success: boolean;
+    }) => client.generation.submitAuthResult({ generationId, integration, success }),
+  });
+}
+
 // Hook for getting active generation for a conversation
 export function useActiveGeneration(conversationId: string | undefined) {
   return useQuery({
@@ -689,9 +764,9 @@ export function useActiveGeneration(conversationId: string | undefined) {
     queryFn: () => client.generation.getActiveGeneration({ conversationId: conversationId! }),
     enabled: !!conversationId,
     refetchInterval: (query) => {
-      // Poll while generating
+      // Poll while generating or awaiting auth
       const status = query.state.data?.status;
-      if (status === "generating" || status === "awaiting_approval") {
+      if (status === "generating" || status === "awaiting_approval" || status === "awaiting_auth") {
         return 2000;
       }
       return false;

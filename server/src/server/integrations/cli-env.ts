@@ -52,111 +52,86 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
   return cliEnv;
 }
 
-export function getCliInstructions(enabledIntegrations: IntegrationType[]): string {
-  const instructions: string[] = [];
+export function getCliInstructions(connectedIntegrations: IntegrationType[]): string {
+  // Helper to show connection status
+  const statusTag = (type: IntegrationType) =>
+    connectedIntegrations.includes(type) ? "✓ Connected" : "⚡ Auth Required";
 
-  if (enabledIntegrations.includes("gmail")) {
-    instructions.push(`
-## Google Gmail CLI
+  // Always include ALL integration instructions - auth will be requested on use if needed
+  const instructions = `
+## Google Gmail CLI [${statusTag("gmail")}]
 - google-gmail list [-q query] [-l limit] - List emails
 - google-gmail get <messageId> - Get full email content
 - google-gmail unread - Count unread emails
 - google-gmail send --to <email> --subject <subject> --body <body>
-- Example: google-gmail list -q "is:unread" -l 5`);
-  }
+- Example: google-gmail list -q "is:unread" -l 5
 
-  if (enabledIntegrations.includes("google_calendar")) {
-    instructions.push(`
-## Google Calendar CLI
+## Google Calendar CLI [${statusTag("google_calendar")}]
 - gcalendar list [-t timeMin] [-m timeMax] [-l limit] - List events
 - gcalendar get <eventId> - Get event details
 - gcalendar create --summary <title> --start <datetime> --end <datetime> [--description <text>]
 - gcalendar delete <eventId> - Delete an event
 - gcalendar calendars - List available calendars
-- Example: gcalendar list -l 10`);
-  }
+- Example: gcalendar list -l 10
 
-  if (enabledIntegrations.includes("google_docs")) {
-    instructions.push(`
-## Google Docs CLI
+## Google Docs CLI [${statusTag("google_docs")}]
 - gdocs get <documentId> - Get document content
 - gdocs create --title <title> [--content <text>] - Create a document
 - gdocs append <documentId> --text <text> - Append text to document
 - gdocs list - List recent documents
-- Example: gdocs get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms`);
-  }
+- Example: gdocs get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
 
-  if (enabledIntegrations.includes("google_sheets")) {
-    instructions.push(`
-## Google Sheets CLI
+## Google Sheets CLI [${statusTag("google_sheets")}]
 - gsheets get <spreadsheetId> [--range <A1:B10>] - Get spreadsheet data
 - gsheets create --title <title> - Create a spreadsheet
 - gsheets append <spreadsheetId> --range <A:B> --values '[[...]]' - Append rows
 - gsheets update <spreadsheetId> --range <A1:B2> --values '[[...]]' - Update cells
 - gsheets list - List recent spreadsheets
-- Example: gsheets get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms --range Sheet1!A1:D10`);
-  }
+- Example: gsheets get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms --range Sheet1!A1:D10
 
-  if (enabledIntegrations.includes("google_drive")) {
-    instructions.push(`
-## Google Drive CLI
+## Google Drive CLI [${statusTag("google_drive")}]
 - gdrive list [-q query] [-l limit] - List files
 - gdrive get <fileId> - Get file metadata
 - gdrive download <fileId> [--output <path>] - Download file
 - gdrive search -q <query> - Search files
 - gdrive upload --file <path> [--name <name>] [--folder <folderId>] - Upload file
-- Example: gdrive list -l 20`);
-  }
+- Example: gdrive list -l 20
 
-  if (enabledIntegrations.includes("notion")) {
-    instructions.push(`
-## Notion CLI
+## Notion CLI [${statusTag("notion")}]
 - notion search [-q query] [--type page|database] - Search pages/databases
 - notion get <pageId> - Get page content
 - notion create --parent <id> --title <title> [--content <text>]
 - notion append <pageId> --content <text> - Append to page
 - notion databases - List all databases
-- notion query <databaseId> - Query database entries`);
-  }
+- notion query <databaseId> - Query database entries
 
-  if (enabledIntegrations.includes("linear")) {
-    instructions.push(`
-## Linear CLI
+## Linear CLI [${statusTag("linear")}]
 - linear list [-t team] [-s state] [-l limit] - List issues
 - linear get <identifier> - Get issue (e.g., ENG-123)
 - linear create --team <key> --title <title> [-d description] [-p priority]
 - linear update <identifier> [--title] [--state] [--priority]
 - linear teams - List teams
-- linear mine - My assigned issues`);
-  }
+- linear mine - My assigned issues
 
-  if (enabledIntegrations.includes("github")) {
-    instructions.push(`
-## GitHub CLI
+## GitHub CLI [${statusTag("github")}]
 - github repos - List my repositories
 - github prs -o <owner> -r <repo> - List pull requests
 - github pr <number> -o <owner> -r <repo> - Get PR details
 - github my-prs [-f created|assigned|review] - My pull requests
 - github issues -o <owner> -r <repo> - List issues
 - github create-issue -o <owner> -r <repo> -t <title> [-b body]
-- github search -q <query> - Search code`);
-  }
+- github search -q <query> - Search code
 
-  if (enabledIntegrations.includes("airtable")) {
-    instructions.push(`
-## Airtable CLI
+## Airtable CLI [${statusTag("airtable")}]
 - airtable bases - List all bases
 - airtable schema -b <baseId> - Get base schema
 - airtable list -b <baseId> -t <table> - List records
 - airtable get -b <baseId> -t <table> -r <recordId> - Get record
 - airtable create -b <baseId> -t <table> --fields '{"Name":"value"}'
 - airtable update -b <baseId> -t <table> -r <recordId> --fields '{"Name":"new"}'
-- airtable delete -b <baseId> -t <table> -r <recordId>`);
-  }
+- airtable delete -b <baseId> -t <table> -r <recordId>
 
-  if (enabledIntegrations.includes("slack")) {
-    instructions.push(`
-## Slack CLI
+## Slack CLI [${statusTag("slack")}]
 - slack channels - List channels
 - slack history -c <channelId> - Get channel messages
 - slack send -c <channelId> -t <text> [--thread <ts>] - Send message
@@ -164,12 +139,9 @@ export function getCliInstructions(enabledIntegrations: IntegrationType[]): stri
 - slack users - List users
 - slack user -u <userId> - Get user info
 - slack thread -c <channelId> --thread <ts> - Get thread replies
-- slack react -c <channelId> --ts <messageTs> -e <emoji>`);
-  }
+- slack react -c <channelId> --ts <messageTs> -e <emoji>
 
-  if (enabledIntegrations.includes("hubspot")) {
-    instructions.push(`
-## HubSpot CLI
+## HubSpot CLI [${statusTag("hubspot")}]
 - hubspot contacts list [-l limit] [-q query] - List contacts
 - hubspot contacts get <id> - Get contact details
 - hubspot contacts create --email <email> [--firstname] [--lastname] [--company] [--phone]
@@ -189,12 +161,9 @@ export function getCliInstructions(enabledIntegrations: IntegrationType[]): stri
 - hubspot notes create --body <text> [--contact <id>] [--company <id>] [--deal <id>]
 - hubspot pipelines deals - List deal pipelines and stages
 - hubspot pipelines tickets - List ticket pipelines and stages
-- hubspot owners - List owners (sales reps)`);
-  }
+- hubspot owners - List owners (sales reps)
 
-  if (enabledIntegrations.includes("linkedin")) {
-    instructions.push(`
-## LinkedIn CLI (via Unipile)
+## LinkedIn CLI (via Unipile) [${statusTag("linkedin")}]
 MESSAGING
 - linkedin chats list [-l limit]                    List conversations
 - linkedin chats get <chatId>                       Get conversation details
@@ -223,21 +192,17 @@ POSTS & CONTENT
 
 COMPANY PAGES
 - linkedin company posts <companyId> [-l limit]     List company posts
-- linkedin company post <companyId> --text <text>   Post as company (if admin)`);
-  }
-
-  if (instructions.length === 0) {
-    return "";
-  }
+- linkedin company post <companyId> --text <text>   Post as company (if admin)
+`;
 
   return `
 # Available Integration CLIs
 
 You have access to CLI tools for the following integrations.
-The authentication tokens are already configured in the environment.
+For integrations marked [⚡ Auth Required], authentication will be requested when you try to use them.
 Source code for each tool is available at /app/cli/<name>.ts
 
-${instructions.join("\n")}
+${instructions}
 `;
 }
 
@@ -248,4 +213,46 @@ export async function getEnabledIntegrationTypes(userId: string): Promise<Integr
     .where(and(eq(integration.userId, userId), eq(integration.enabled, true)));
 
   return results.map((r) => r.type);
+}
+
+/**
+ * Get tokens for specific integrations (used for mid-conversation auth)
+ * Returns a map of environment variable name -> access token
+ */
+export async function getTokensForIntegrations(
+  userId: string,
+  integrationTypes: string[]
+): Promise<Record<string, string>> {
+  const tokens: Record<string, string> = {};
+
+  // Get valid tokens for these integrations
+  const allTokens = await getValidTokensForUser(userId);
+
+  for (const [type, accessToken] of allTokens) {
+    if (integrationTypes.includes(type)) {
+      const envVar = ENV_VAR_MAP[type as Exclude<IntegrationType, "linkedin">];
+      if (envVar) {
+        tokens[envVar] = accessToken;
+      }
+    }
+  }
+
+  // LinkedIn special case
+  if (integrationTypes.includes("linkedin")) {
+    const linkedinIntegration = await db.query.integration.findFirst({
+      where: and(
+        eq(integration.userId, userId),
+        eq(integration.type, "linkedin"),
+        eq(integration.enabled, true)
+      ),
+    });
+
+    if (linkedinIntegration && linkedinIntegration.providerAccountId) {
+      tokens.LINKEDIN_ACCOUNT_ID = linkedinIntegration.providerAccountId;
+      if (env.UNIPILE_API_KEY) tokens.UNIPILE_API_KEY = env.UNIPILE_API_KEY;
+      if (env.UNIPILE_DSN) tokens.UNIPILE_DSN = env.UNIPILE_DSN;
+    }
+  }
+
+  return tokens;
 }
