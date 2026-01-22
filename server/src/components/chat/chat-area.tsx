@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageList, type Message, type MessagePart } from "./message-list";
 import { ChatInput } from "./chat-input";
-import { VoiceIndicator } from "./voice-indicator";
+import { VoiceIndicator, VoiceHint } from "./voice-indicator";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { AuthRequestCard } from "./auth-request-card";
 import { ActivityFeed, type ActivityItemData } from "./activity-feed";
@@ -1226,15 +1226,20 @@ export function ChatArea({ conversationId }: Props) {
               error={voiceError}
             />
           )}
-          <ChatInput
-            onSend={handleSend}
-            onStop={handleStop}
-            disabled={isStreaming || isRecording || isProcessingVoice}
-            isStreaming={isStreaming}
-            isRecording={isRecording}
-            onStartRecording={handleStartRecording}
-            onStopRecording={stopRecordingAndTranscribe}
-          />
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <ChatInput
+                onSend={handleSend}
+                onStop={handleStop}
+                disabled={isStreaming || isRecording || isProcessingVoice}
+                isStreaming={isStreaming}
+                isRecording={isRecording}
+                onStartRecording={handleStartRecording}
+                onStopRecording={stopRecordingAndTranscribe}
+              />
+            </div>
+            <VoiceHint />
+          </div>
         </div>
       </div>
     </div>
