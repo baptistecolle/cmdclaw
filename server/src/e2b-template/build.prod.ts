@@ -10,7 +10,7 @@ async function main() {
   console.log("Building production template...");
 
   const result = await Template.build(template, {
-    alias: "bap-agent",
+    alias: "bap-agent-prod",
     cpuCount: 2,
     memoryMB: 2048,
     onBuildLogs: defaultBuildLogger(),
