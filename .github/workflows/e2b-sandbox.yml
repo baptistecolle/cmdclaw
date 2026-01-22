@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'src/e2b-template/**'
+      - 'server/src/e2b-template/**'
   workflow_dispatch:
 
 jobs:
@@ -21,9 +21,11 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
+        working-directory: server
         run: bun install
 
       - name: Build E2B Sandbox
+        working-directory: server
         env:
           E2B_ACCESS_TOKEN: ${{ secrets.E2B_ACCESS_TOKEN }}
         run: bun run e2b:build:prod
