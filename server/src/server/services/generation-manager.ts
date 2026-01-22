@@ -809,7 +809,9 @@ class GenerationManager {
       clearTimeout(ctx.approvalTimeoutId);
     }
 
-    ctx.status = status;
+    // NOTE: We set ctx.status AFTER broadcasting to subscribers to avoid a race condition
+    // where the subscription loop sees the status change and exits before receiving the
+    // terminal event (done/cancelled/error). The status is set after broadcast below.
 
     let messageId: string | undefined;
 
@@ -878,7 +880,7 @@ class GenerationManager {
       })
       .where(eq(conversation.id, ctx.conversationId));
 
-    // Notify subscribers
+    // Notify subscribers BEFORE setting status to avoid race condition
     if (status === "completed" && messageId) {
       this.broadcast(ctx, {
         type: "done",
@@ -892,6 +894,10 @@ class GenerationManager {
     } else if (status === "error") {
       this.broadcast(ctx, { type: "error", message: ctx.errorMessage || "Unknown error" });
     }
+
+    // Set status AFTER broadcast so subscription loop receives the terminal event
+    // before seeing the status change
+    ctx.status = status;
 
     // Cleanup
     this.activeGenerations.delete(ctx.id);
