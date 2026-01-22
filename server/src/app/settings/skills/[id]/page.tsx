@@ -644,11 +644,11 @@ function SkillEditorPageContent() {
         {skill.documents?.map((doc) => {
           const Icon = getDocumentIcon(doc.mimeType);
           return (
-            <button
+            <div
               key={doc.id}
               onClick={() => handleSelectDocument(doc.id)}
               className={cn(
-                "group flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors",
+                "group flex cursor-pointer items-center gap-1 px-2.5 py-1.5 text-xs transition-colors",
                 selectedDocumentId === doc.id
                   ? "border-b-2 border-foreground/70 font-medium text-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -665,7 +665,7 @@ function SkillEditorPageContent() {
               >
                 <Trash2 className="h-2.5 w-2.5" />
               </button>
-            </button>
+            </div>
           );
         })}
         <DropdownMenu>
