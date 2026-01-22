@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -9,6 +9,7 @@ import {
   useGetAuthUrl,
   useToggleIntegration,
   useDisconnectIntegration,
+  useLinkLinkedIn,
 } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,6 +102,7 @@ function IntegrationsPageContent() {
   const getAuthUrl = useGetAuthUrl();
   const toggleIntegration = useToggleIntegration();
   const disconnectIntegration = useDisconnectIntegration();
+  const linkLinkedIn = useLinkLinkedIn();
   const [connectingType, setConnectingType] = useState<string | null>(null);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
@@ -108,6 +110,33 @@ function IntegrationsPageContent() {
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const linkedInLinkingRef = useRef(false);
+
+  // Handle LinkedIn account_id from redirect (Unipile hosted auth)
+  useEffect(() => {
+    const accountId = searchParams.get("account_id");
+    if (accountId && !linkedInLinkingRef.current) {
+      linkedInLinkingRef.current = true;
+      linkLinkedIn.mutateAsync(accountId)
+        .then(() => {
+          setNotification({
+            type: "success",
+            message: "LinkedIn connected successfully!",
+          });
+          refetch();
+        })
+        .catch((error) => {
+          console.error("Failed to link LinkedIn:", error);
+          setNotification({
+            type: "error",
+            message: "Failed to connect LinkedIn. Please try again.",
+          });
+        })
+        .finally(() => {
+          window.history.replaceState({}, "", "/settings/integrations");
+        });
+    }
+  }, [searchParams, linkLinkedIn, refetch]);
 
   // Handle URL params for success/error
   useEffect(() => {

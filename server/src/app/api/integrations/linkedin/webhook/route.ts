@@ -4,12 +4,14 @@ import { integration } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getUnipileAccount } from "@/server/integrations/unipile";
 
-interface UnipileWebhookPayload {
-  event: string;
+interface AccountStatusPayload {
   account_id: string;
-  name?: string;
-  status?: string;
-  error?: string;
+  message: string;
+  account_type: string;
+}
+
+interface UnipileWebhookPayload {
+  AccountStatus?: AccountStatusPayload;
 }
 
 export async function POST(request: NextRequest) {
@@ -18,19 +20,29 @@ export async function POST(request: NextRequest) {
 
     console.log("LinkedIn webhook received:", JSON.stringify(body, null, 2));
 
-    const { event, account_id, name: userId } = body;
+    // Handle AccountStatus webhook format
+    const accountStatus = body.AccountStatus;
+    if (!accountStatus) {
+      console.error("Missing AccountStatus in webhook payload");
+      return NextResponse.json({ ok: false, error: "Missing AccountStatus" }, { status: 400 });
+    }
+
+    const { account_id, message } = accountStatus;
+    // Get userId from query params (passed in notify_url)
+    const userId = request.nextUrl.searchParams.get("userId");
 
     if (!account_id) {
       console.error("Missing account_id in webhook payload");
       return NextResponse.json({ ok: false, error: "Missing account_id" }, { status: 400 });
     }
 
-    switch (event) {
-      case "account.created":
-      case "account.connected": {
+    switch (message) {
+      case "CREATION_SUCCESS": {
         if (!userId) {
-          console.error("Missing userId (name) in webhook payload for account creation");
-          return NextResponse.json({ ok: false, error: "Missing userId" }, { status: 400 });
+          // userId not available via webhook (Unipile strips query params)
+          // Integration will be linked via redirect instead
+          console.log("CREATION_SUCCESS received - integration will be linked via redirect");
+          return NextResponse.json({ ok: true });
         }
 
         try {
@@ -78,8 +90,9 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case "account.disconnected":
-      case "account.error": {
+      case "DISCONNECTED":
+      case "CREATION_FAILED":
+      case "ERROR": {
         const existingIntegration = await db.query.integration.findFirst({
           where: eq(integration.providerAccountId, account_id),
         });
@@ -90,13 +103,13 @@ export async function POST(request: NextRequest) {
             .set({ enabled: false })
             .where(eq(integration.id, existingIntegration.id));
 
-          console.log(`LinkedIn integration disabled for account ${account_id}: ${event}`);
+          console.log(`LinkedIn integration disabled for account ${account_id}: ${message}`);
         }
         break;
       }
 
       default:
-        console.log(`Unhandled webhook event: ${event}`);
+        console.log(`Unhandled webhook message: ${message}`);
     }
 
     return NextResponse.json({ ok: true });

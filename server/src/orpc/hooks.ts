@@ -242,6 +242,18 @@ export function useGetAuthUrl() {
   });
 }
 
+// Hook for linking LinkedIn account after redirect
+export function useLinkLinkedIn() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (accountId: string) => client.integration.linkLinkedIn({ accountId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["integration"] });
+    },
+  });
+}
+
 // Hook for voice transcription
 export function useTranscribe() {
   return useMutation({

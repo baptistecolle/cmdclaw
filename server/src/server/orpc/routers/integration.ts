@@ -5,7 +5,7 @@ import { integration, integrationToken } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 import { createHash, randomBytes } from "crypto";
-import { generateLinkedInAuthUrl, deleteUnipileAccount } from "@/server/integrations/unipile";
+import { generateLinkedInAuthUrl, deleteUnipileAccount, getUnipileAccount } from "@/server/integrations/unipile";
 
 // PKCE helpers for Airtable OAuth
 function generateCodeVerifier(): string {
@@ -325,10 +325,48 @@ const disconnect = protectedProcedure
     return { success: true };
   });
 
+// Link LinkedIn account after redirect (Unipile strips query params from webhook notify_url)
+const linkLinkedIn = protectedProcedure
+  .input(z.object({ accountId: z.string() }))
+  .handler(async ({ input, context }) => {
+    try {
+      const account = await getUnipileAccount(input.accountId);
+
+      const integrationData = {
+        providerAccountId: input.accountId,
+        displayName: account.name || account.identifier,
+        enabled: true,
+        metadata: {
+          unipileAccountId: input.accountId,
+          linkedinIdentifier: account.identifier,
+        },
+      };
+
+      // Use upsert to handle race conditions
+      await context.db
+        .insert(integration)
+        .values({
+          userId: context.user.id,
+          type: "linkedin",
+          ...integrationData,
+        })
+        .onConflictDoUpdate({
+          target: [integration.userId, integration.type],
+          set: integrationData,
+        });
+
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to link LinkedIn account:", error);
+      throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Failed to link LinkedIn account" });
+    }
+  });
+
 export const integrationRouter = {
   list,
   getAuthUrl,
   handleCallback,
   toggle,
   disconnect,
+  linkLinkedIn,
 };
