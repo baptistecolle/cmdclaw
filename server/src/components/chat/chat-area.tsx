@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MessageList, type Message, type MessagePart } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { VoiceIndicator, VoiceHint } from "./voice-indicator";
@@ -49,6 +50,7 @@ type Props = {
 
 export function ChatArea({ conversationId }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: existingConversation, isLoading } = useConversation(
     conversationId
   );
@@ -708,6 +710,7 @@ export function ChatArea({ conversationId }: Props) {
           // Update the ref and navigate to new conversation if this was a new chat
           if (!conversationId && newConversationId) {
             currentConversationIdRef.current = newConversationId;
+            queryClient.invalidateQueries({ queryKey: ["conversation"] });
             router.push(`/chat/${newConversationId}`);
           }
         },
@@ -747,7 +750,7 @@ export function ChatArea({ conversationId }: Props) {
         currentConversationIdRef.current = result.conversationId;
       }
     }
-  }, [conversationId, router, startGeneration]);
+  }, [conversationId, router, startGeneration, queryClient]);
 
   // Handle approval/denial of tool use
   const handleApprove = useCallback(
