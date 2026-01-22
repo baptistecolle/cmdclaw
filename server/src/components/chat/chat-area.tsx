@@ -746,8 +746,10 @@ export function ChatArea({ conversationId }: Props) {
     // Store the generation ID from the result
     if (result) {
       currentGenerationIdRef.current = result.generationId;
-      if (!conversationId) {
+      if (!conversationId && result.conversationId) {
         currentConversationIdRef.current = result.conversationId;
+        // Invalidate immediately so sidebar shows the new conversation right away
+        queryClient.invalidateQueries({ queryKey: ["conversation"] });
       }
     }
   }, [conversationId, router, startGeneration, queryClient]);
