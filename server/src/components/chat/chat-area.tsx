@@ -352,7 +352,17 @@ export function ChatArea({ conversationId }: Props) {
         onCancelled: () => {
           setIsStreaming(false);
           setTraceStatus("complete");
-          setSegments([]);
+          // Mark running items as interrupted instead of clearing
+          setSegments((prevSegments) =>
+            prevSegments.map((segment) => ({
+              ...segment,
+              items: segment.items.map((item) =>
+                item.status === "running"
+                  ? { ...item, status: "interrupted" as const }
+                  : item
+              ),
+            }))
+          );
           currentGenerationIdRef.current = undefined;
         },
       });
@@ -386,10 +396,34 @@ export function ChatArea({ conversationId }: Props) {
         console.error("Failed to cancel generation:", err);
       }
     }
+
+    // Update segments: mark running items as interrupted, add system message
+    setSegments((prevSegments) => {
+      if (prevSegments.length === 0) return prevSegments;
+
+      return prevSegments.map((segment, index) => {
+        // Mark any running items as interrupted
+        const updatedItems = segment.items.map((item) =>
+          item.status === "running" ? { ...item, status: "interrupted" as const } : item
+        );
+
+        // Add interruption message to last segment
+        if (index === prevSegments.length - 1) {
+          updatedItems.push({
+            id: `interrupted-${Date.now()}`,
+            timestamp: Date.now(),
+            type: "system" as const,
+            content: "Interrupted by user",
+          });
+        }
+
+        return { ...segment, items: updatedItems, isExpanded: true };
+      });
+    });
+
     setIsStreaming(false);
     setStreamingParts([]);
     setTraceStatus("complete");
-    setSegments([]);
     currentGenerationIdRef.current = undefined;
   }, [abort, cancelGeneration]);
 
@@ -737,7 +771,17 @@ export function ChatArea({ conversationId }: Props) {
         onCancelled: () => {
           setIsStreaming(false);
           setTraceStatus("complete");
-          setSegments([]);
+          // Mark running items as interrupted instead of clearing
+          setSegments((prevSegments) =>
+            prevSegments.map((segment) => ({
+              ...segment,
+              items: segment.items.map((item) =>
+                item.status === "running"
+                  ? { ...item, status: "interrupted" as const }
+                  : item
+              ),
+            }))
+          );
           currentGenerationIdRef.current = undefined;
         },
       }

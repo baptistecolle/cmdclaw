@@ -16,6 +16,7 @@ const { prompt, model, resume, systemPrompt } = config;
 // Approval communication paths
 const APPROVAL_REQUEST_FILE = "/tmp/approval-request.json";
 const APPROVAL_RESPONSE_FILE = "/tmp/approval-response.json";
+const INTERRUPT_REQUEST_FILE = "/tmp/interrupt-request.json";
 
 // Integration CLI names to internal type mapping
 const CLI_TO_INTEGRATION: Record<string, string> = {
@@ -301,8 +302,8 @@ async function main() {
   }
 
   try {
-    // Run the agent with SDK
-    for await (const message of query({
+    // Create the query object so we can call interrupt()
+    const q = query({
       prompt,
       options: {
         model: model || "claude-sonnet-4-20250514",
@@ -317,10 +318,30 @@ async function main() {
           ],
         },
       },
-    })) {
-      // Output all messages as JSON to stdout
+    });
+
+    // Poll for interrupt requests (similar to approval flow)
+    const checkInterrupt = setInterval(async () => {
+      try {
+        const data = await readFile(INTERRUPT_REQUEST_FILE, "utf8");
+        const request = JSON.parse(data);
+        if (request.interrupt) {
+          clearInterval(checkInterrupt);
+          await unlink(INTERRUPT_REQUEST_FILE).catch(() => {});
+          emitEvent({ type: "interrupting" });
+          await q.interrupt();
+        }
+      } catch {
+        // File doesn't exist yet, continue polling
+      }
+    }, 100);
+
+    // Stream messages from the query
+    for await (const message of q) {
       emitEvent(message as Record<string, unknown>);
     }
+
+    clearInterval(checkInterrupt);
   } catch (error) {
     emitEvent({
       type: "error",

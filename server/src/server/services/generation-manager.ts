@@ -436,6 +436,20 @@ class GenerationManager {
       throw new Error("Access denied");
     }
 
+    // Signal the agent-runner to call query.interrupt() for graceful interruption
+    const sandbox = getActiveSandbox(ctx.conversationId);
+    if (sandbox) {
+      try {
+        await sandbox.files.write(
+          "/tmp/interrupt-request.json",
+          JSON.stringify({ interrupt: true, timestamp: Date.now() })
+        );
+        console.log("[GenerationManager] Sent interrupt signal to sandbox");
+      } catch (error) {
+        console.error("[GenerationManager] Failed to send interrupt signal:", error);
+      }
+    }
+
     ctx.abortController.abort();
     await this.finishGeneration(ctx, "cancelled");
     return true;

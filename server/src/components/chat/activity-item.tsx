@@ -13,6 +13,7 @@ import {
   FilePen,
   Pencil,
   Globe,
+  StopCircle,
   type LucideIcon,
 } from "lucide-react";
 import { getIntegrationLogo, getIntegrationDisplayName, getOperationLabel } from "@/lib/integration-icons";
@@ -53,12 +54,12 @@ function getToolIcon(toolName: string): LucideIcon {
 export type ActivityItemData = {
   id: string;
   timestamp: number;
-  type: "text" | "thinking" | "tool_call" | "tool_result";
+  type: "text" | "thinking" | "tool_call" | "tool_result" | "system";
   content: string;
   toolName?: string;
   integration?: IntegrationType;
   operation?: string;
-  status?: "running" | "complete" | "error";
+  status?: "running" | "complete" | "error" | "interrupted";
   input?: unknown;
   result?: unknown;
 };
@@ -128,6 +129,8 @@ export function ActivityItem({ item }: Props) {
         return <Check className="h-3 w-3 text-green-500 flex-shrink-0" />;
       case "error":
         return <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />;
+      case "interrupted":
+        return <StopCircle className="h-3 w-3 text-orange-500 flex-shrink-0" />;
       default:
         return null;
     }
@@ -147,6 +150,16 @@ export function ActivityItem({ item }: Props) {
     return (
       <div className="text-xs text-muted-foreground italic whitespace-pre-wrap py-0.5">
         {content}
+      </div>
+    );
+  }
+
+  // Render system message (interruption, etc.)
+  if (type === "system") {
+    return (
+      <div className="text-xs py-0.5 flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
+        <StopCircle className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="font-medium">{content}</span>
       </div>
     );
   }
