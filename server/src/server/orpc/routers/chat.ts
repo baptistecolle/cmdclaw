@@ -240,6 +240,17 @@ async function* handleE2BExecution(
       }
 
       if (event.type === "tool_use_integration") {
+        // Update the existing contentPart with integration metadata
+        if (event.toolUseId && event.integration) {
+          const existingPart = contentParts.find(
+            (p): p is ContentPart & { type: "tool_use" } =>
+              p.type === "tool_use" && p.id === event.toolUseId
+          );
+          if (existingPart) {
+            existingPart.integration = event.integration;
+            existingPart.operation = event.operation || "";
+          }
+        }
         // Integration tool use with metadata (for frontend icon display)
         yield {
           type: "tool_use" as const,
@@ -285,6 +296,7 @@ async function* handleE2BExecution(
               toolInput: block.input,
               toolUseId: block.id,
             };
+            // Create contentPart - integration/operation will be added by tool_use_integration event
             contentParts.push({
               type: "tool_use",
               id: block.id || "",

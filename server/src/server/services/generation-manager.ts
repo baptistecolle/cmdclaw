@@ -266,6 +266,8 @@ class GenerationManager {
                 toolName: part.name,
                 toolInput: part.input,
                 toolUseId: part.id,
+                integration: part.integration,
+                operation: part.operation,
               };
             } else if (part.type === "tool_result") {
               // Find tool name from previous tool_use
@@ -630,6 +632,18 @@ class GenerationManager {
         }
 
         if (event.type === "tool_use_integration") {
+          // Update the existing contentPart with integration metadata
+          if (event.toolUseId && event.integration) {
+            const existingPart = ctx.contentParts.find(
+              (p): p is ContentPart & { type: "tool_use" } =>
+                p.type === "tool_use" && p.id === event.toolUseId
+            );
+            if (existingPart) {
+              existingPart.integration = event.integration;
+              existingPart.operation = event.operation || "";
+              await this.saveProgress(ctx); // Save immediately to persist integration metadata
+            }
+          }
           this.broadcast(ctx, {
             type: "tool_use",
             toolName: "Bash",
@@ -679,6 +693,7 @@ class GenerationManager {
                 toolInput: block.input,
                 toolUseId: block.id,
               });
+              // Create contentPart - integration/operation will be added by tool_use_integration event
               ctx.contentParts.push({
                 type: "tool_use",
                 id: block.id || "",

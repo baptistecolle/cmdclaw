@@ -96,7 +96,7 @@ export function ChatArea({ conversationId }: Props) {
         content: string;
         contentParts?: Array<
           | { type: "text"; text: string }
-          | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+          | { type: "tool_use"; id: string; name: string; input: Record<string, unknown>; integration?: string; operation?: string }
           | { type: "tool_result"; tool_use_id: string; content: unknown }
           | { type: "thinking"; id: string; content: string }
         >;
@@ -132,6 +132,8 @@ export function ChatArea({ conversationId }: Props) {
                     name: p.name,
                     input: p.input,
                     result: toolResults.get(p.id),
+                    integration: p.integration,
+                    operation: p.operation,
                   };
                 }
               });
