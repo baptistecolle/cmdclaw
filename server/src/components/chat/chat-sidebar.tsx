@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, Settings, Trash2, LogOut, ChevronUp, MoreHorizontal } from "lucide-react";
+import { Plus, Settings, Trash2, LogOut, ChevronUp, MoreHorizontal, Plug, Sparkles } from "lucide-react";
 import Image from "next/image";
 import {
   Sidebar,
@@ -211,6 +211,18 @@ export function ChatSidebar() {
                   <Link href="/settings/integrations" className="flex items-center gap-2">
                     <Settings className="h-4 w-4" />
                     <span>Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/integrations" className="flex items-center gap-2">
+                    <Plug className="h-4 w-4" />
+                    <span>Add Integration</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/skills" className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    <span>Add Skills</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
