@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageList, type Message, type MessagePart } from "./message-list";
 import { ChatInput } from "./chat-input";
-import { VoiceIndicator, VoiceHint } from "./voice-indicator";
+import { VoiceIndicator } from "./voice-indicator";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { AuthRequestCard } from "./auth-request-card";
 import { ActivityFeed, type ActivityItemData } from "./activity-feed";
@@ -911,10 +911,10 @@ export function ChatArea({ conversationId }: Props) {
     // Store the generation ID from the result
     if (result) {
       currentGenerationIdRef.current = result.generationId;
+      // Always invalidate so sidebar shows the updated conversation
+      queryClient.invalidateQueries({ queryKey: ["conversation"] });
       if (!conversationId && result.conversationId) {
         currentConversationIdRef.current = result.conversationId;
-        // Invalidate immediately so sidebar shows the new conversation right away
-        queryClient.invalidateQueries({ queryKey: ["conversation"] });
       }
     }
   }, [conversationId, router, startGeneration, queryClient]);
@@ -1235,7 +1235,6 @@ export function ChatArea({ conversationId }: Props) {
             onStartRecording={handleStartRecording}
             onStopRecording={stopRecordingAndTranscribe}
           />
-          <VoiceHint className="text-center" />
         </div>
       </div>
     </div>

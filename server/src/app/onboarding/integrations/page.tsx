@@ -164,24 +164,31 @@ function OnboardingIntegrationsContent() {
           </div>
         )}
         {isRecommended && !isConnected && (
-          <div className="absolute -top-2 left-1/2 -translate-x-1/2">
-            <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
-              Recommended
-            </span>
-          </div>
+          <span className="text-[10px] font-medium text-primary">
+            Recommended
+          </span>
         )}
-        <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-white dark:bg-gray-800 border shadow-sm">
-          {isConnecting ? (
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          ) : (
+        {isConnecting ? (
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        ) : isRecommended ? (
+          <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-white dark:bg-gray-800 border shadow-sm">
             <Image
               src={config.icon}
               alt={config.name}
-              width={28}
-              height={28}
+              width={32}
+              height={32}
             />
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center w-8 h-8">
+            <Image
+              src={config.icon}
+              alt={config.name}
+              width={32}
+              height={32}
+            />
+          </div>
+        )}
         <span className="text-xs font-medium text-muted-foreground">
           {config.name}
         </span>

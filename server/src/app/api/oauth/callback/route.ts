@@ -46,11 +46,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Helper to build redirect URL with the correct base path
+  const buildRedirectUrl = (params: string) => {
+    const baseUrl = stateData.redirectUrl || "/settings/integrations";
+    return new URL(`${baseUrl}?${params}`, request.url);
+  };
+
   // Verify user matches
   if (stateData.userId !== sessionData.user.id) {
-    return NextResponse.redirect(
-      new URL("/settings/integrations?error=user_mismatch", request.url)
-    );
+    return NextResponse.redirect(buildRedirectUrl("error=user_mismatch"));
   }
 
   try {
@@ -97,9 +101,7 @@ export async function GET(request: NextRequest) {
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
       console.error("Token exchange failed:", error);
-      return NextResponse.redirect(
-        new URL("/settings/integrations?error=token_exchange_failed", request.url)
-      );
+      return NextResponse.redirect(buildRedirectUrl("error=token_exchange_failed"));
     }
 
     const tokens = await tokenResponse.json();
@@ -122,9 +124,7 @@ export async function GET(request: NextRequest) {
 
     if (!accessToken) {
       console.error("No access token in response:", tokens);
-      return NextResponse.redirect(
-        new URL("/settings/integrations?error=no_access_token", request.url)
-      );
+      return NextResponse.redirect(buildRedirectUrl("error=no_access_token"));
     }
 
     // Get user info from provider
@@ -181,13 +181,9 @@ export async function GET(request: NextRequest) {
       idToken: tokens.id_token,
     });
 
-    return NextResponse.redirect(
-      new URL("/settings/integrations?success=true", request.url)
-    );
+    return NextResponse.redirect(buildRedirectUrl("success=true"));
   } catch (error) {
     console.error("OAuth callback error:", error);
-    return NextResponse.redirect(
-      new URL("/settings/integrations?error=callback_failed", request.url)
-    );
+    return NextResponse.redirect(buildRedirectUrl("error=callback_failed"));
   }
 }
