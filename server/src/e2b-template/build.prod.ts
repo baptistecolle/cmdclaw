@@ -14,6 +14,7 @@ async function main() {
     cpuCount: 2,
     memoryMB: 2048,
     onBuildLogs: defaultBuildLogger(),
+    ...(process.env.E2B_ACCESS_TOKEN && { apiKey: process.env.E2B_ACCESS_TOKEN }),
   });
 
   console.log("\nTemplate built successfully!");
@@ -22,4 +23,7 @@ async function main() {
   console.log("\nUse with: Sandbox.create('bap-agent')");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

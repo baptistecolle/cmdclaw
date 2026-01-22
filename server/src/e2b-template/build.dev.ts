@@ -24,4 +24,7 @@ async function main() {
   console.log("\nUse with: Sandbox.create('bap-agent-dev')");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
