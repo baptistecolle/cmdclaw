@@ -5,9 +5,8 @@ import { ChevronDown, ChevronRight, Check, X, Loader2, Link2 } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  getIntegrationIcon,
   getIntegrationDisplayName,
-  getIntegrationColor,
+  getIntegrationLogo,
 } from "@/lib/integration-icons";
 
 export interface AuthRequestCardProps {
@@ -50,7 +49,19 @@ export function AuthRequestCard({
         ) : (
           <ChevronRight className="h-4 w-4" />
         )}
-        <Link2 className="h-4 w-4 text-blue-500" />
+        <div className="flex items-center -space-x-1">
+          {integrations.slice(0, 3).map((integration) => {
+            const logo = getIntegrationLogo(integration);
+            return logo ? (
+              <img
+                key={integration}
+                src={logo}
+                alt={getIntegrationDisplayName(integration)}
+                className="h-5 w-5 object-contain"
+              />
+            ) : null;
+          })}
+        </div>
         <span className="font-medium">Connection Required</span>
 
         <div className="flex-1" />
@@ -87,66 +98,73 @@ export function AuthRequestCard({
             <p className="mb-3 text-sm text-muted-foreground">{reason}</p>
           )}
 
-          <div className="space-y-2 mb-3">
+          <div className="space-y-3">
             {integrations.map((integration) => {
-              const Icon = getIntegrationIcon(integration);
+              const logo = getIntegrationLogo(integration);
               const displayName = getIntegrationDisplayName(integration);
-              const colorClass = getIntegrationColor(integration);
               const isConnected = connectedIntegrations.includes(integration);
 
               return (
                 <div
                   key={integration}
-                  className="flex items-center justify-between rounded border p-2"
+                  className="flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-2">
-                    {Icon && <Icon className={cn("h-4 w-4", colorClass)} />}
-                    <span className="text-sm font-medium">{displayName}</span>
-                  </div>
-                  {isConnected ? (
-                    <span className="flex items-center gap-1 text-xs text-green-500">
-                      <Check className="h-3 w-3" />
-                      Connected
+                  <div className="flex items-center gap-3">
+                    {logo && (
+                      <img
+                        src={logo}
+                        alt={displayName}
+                        className="h-6 w-6 object-contain"
+                      />
+                    )}
+                    <span className="text-sm">
+                      <span className="font-medium">Bap</span> needs access to{" "}
+                      <span className="font-medium">{displayName}</span>
                     </span>
-                  ) : status === "pending" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onConnect(integration);
-                      }}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Link2 className="h-4 w-4 mr-1" />
-                      )}
-                      Connect
-                    </Button>
-                  ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isConnected ? (
+                      <span className="flex items-center gap-1 text-xs text-green-500">
+                        <Check className="h-3 w-3" />
+                        Connected
+                      </span>
+                    ) : status === "pending" ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCancel();
+                          }}
+                          disabled={isLoading}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onConnect(integration);
+                          }}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Link2 className="h-4 w-4 mr-1" />
+                          )}
+                          Connect
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               );
             })}
           </div>
-
-          {status === "pending" && (
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCancel();
-                }}
-                disabled={isLoading}
-              >
-                <X className="h-4 w-4 mr-1" />
-                Cancel
-              </Button>
-            </div>
-          )}
         </div>
       )}
     </div>
