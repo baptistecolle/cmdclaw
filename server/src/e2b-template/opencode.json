@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "server": {
+    "port": 4096,
+    "hostname": "0.0.0.0"
+  },
+  "tools": {
+    "write": true,
+    "bash": true,
+    "edit": true,
+    "glob": true,
+    "grep": true,
+    "read": true,
+    "webfetch": true,
+    "websearch": true
+  },
+  "permission": {
+    "edit": "allow",
+    "write": "allow",
+    "bash": "allow"
+  },
+  "plugin": [
+    "integration-permissions"
+  ]
+}

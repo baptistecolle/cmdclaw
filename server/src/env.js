@@ -64,6 +64,11 @@ export const env = createEnv({
     APPLE_APP_BUNDLE_IDENTIFIER: z.string().optional(),
     // Fal.ai
     FAL_KEY: z.string().optional(),
+    // Gemini (title generation)
+    GEMINI_API_KEY: z.string().optional(),
+    // OpenCode plugin callbacks
+    BAP_SERVER_URL: z.string().url().optional(),
+    BAP_SERVER_SECRET: z.string().optional(),
     // S3/MinIO Configuration
     S3_ENDPOINT: z.string().url().optional(),
     S3_REGION: z.string().default("us-east-1"),
@@ -129,6 +134,9 @@ export const env = createEnv({
     APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
     APPLE_APP_BUNDLE_IDENTIFIER: process.env.APPLE_APP_BUNDLE_IDENTIFIER,
     FAL_KEY: process.env.FAL_KEY,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    BAP_SERVER_URL: process.env.BAP_SERVER_URL,
+    BAP_SERVER_SECRET: process.env.BAP_SERVER_SECRET,
     S3_ENDPOINT: process.env.S3_ENDPOINT,
     S3_REGION: process.env.S3_REGION,
     S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,

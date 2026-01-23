@@ -12,7 +12,10 @@
       "Bash(gh secret set:*)",
       "WebFetch(domain:opencode.ai)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(bun remove:*)",
+      "Bash(bun add:*)",
+      "Bash(bun run typecheck:*)"
     ]
   }
 }

@@ -1,20 +1,21 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { env } from "@/env";
 
 /**
- * Generate a short title for a conversation using Claude Haiku.
+ * Generate a short title for a conversation using Gemini Flash.
  */
 export async function generateConversationTitle(
   userMessage: string,
   assistantMessage: string
 ): Promise<string | null> {
   try {
-    if (!env.ANTHROPIC_API_KEY) {
-      console.warn("[Title] No ANTHROPIC_API_KEY, skipping title generation");
+    if (!env.GEMINI_API_KEY) {
+      console.warn("[Title] No GEMINI_API_KEY, skipping title generation");
       return null;
     }
 
-    const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = [
       "Generate a short title (3-6 words) for this conversation. Return ONLY the title, no quotes or punctuation.",
@@ -24,15 +25,12 @@ export async function generateConversationTitle(
       "Assistant: " + assistantMessage.slice(0, 500),
     ].join("\n");
 
-    const response = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307",
-      max_tokens: 30,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
 
-    const textBlock = response.content.find((block) => block.type === "text");
-    if (textBlock && textBlock.type === "text") {
-      return textBlock.text.trim();
+    if (text) {
+      return text.trim();
     }
 
     return null;

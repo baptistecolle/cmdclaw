@@ -1,4 +1,3 @@
-import { Sandbox } from "e2b";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import {
@@ -11,14 +10,14 @@ import {
 } from "@/server/db/schema";
 import {
   getOrCreateSandbox,
-  runSDKAgentInSandbox,
+  getOrCreateSession,
+  getOpencodeClient,
   writeSkillsToSandbox,
   getSkillsSystemPrompt,
   writeApprovalResponse,
   writeAuthResponse,
   getActiveSandbox,
   killSandbox,
-  type SDKAgentEvent,
 } from "@/server/sandbox/e2b";
 import {
   getCliEnvForUser,
@@ -105,8 +104,10 @@ interface GenerationContext {
   abortController: AbortController;
   pendingApproval: PendingApproval | null;
   approvalTimeoutId?: ReturnType<typeof setTimeout>;
+  approvalResolver?: (decision: "allow" | "deny") => void;
   pendingAuth: PendingAuth | null;
   authTimeoutId?: ReturnType<typeof setTimeout>;
+  authResolver?: (result: { success: boolean; userId?: string }) => void;
   usage: { inputTokens: number; outputTokens: number; totalCostUsd: number };
   sessionId?: string;
   errorMessage?: string;
@@ -529,7 +530,13 @@ class GenerationManager {
       ctx.approvalTimeoutId = undefined;
     }
 
-    // Write approval to sandbox
+    // Resolve the approval promise if waiting (OpenCode plugin flow)
+    if (ctx.approvalResolver) {
+      ctx.approvalResolver(decision === "approve" ? "allow" : "deny");
+      ctx.approvalResolver = undefined;
+    }
+
+    // Write approval to sandbox (legacy SDK flow)
     const sandbox = getActiveSandbox(ctx.conversationId);
     if (sandbox) {
       await writeApprovalResponse(sandbox, toolUseId, decision === "approve" ? "allow" : "deny");
@@ -621,14 +628,29 @@ class GenerationManager {
 
       const cliInstructions = getCliInstructions(enabledIntegrations);
 
-      // Get or create sandbox
-      const sandbox = await getOrCreateSandbox({
-        conversationId: ctx.conversationId,
-        anthropicApiKey: env.ANTHROPIC_API_KEY,
-        integrationEnvs: cliEnv,
+      // Get conversation for existing session info
+      const conv = await db.query.conversation.findFirst({
+        where: eq(conversation.id, ctx.conversationId),
       });
 
-      // Sandbox is tracked by conversation ID in the e2b module
+      // Determine if we need to replay history (existing conversation)
+      const hasExistingMessages = !!conv?.opencodeSessionId;
+
+      // Get or create sandbox with OpenCode session
+      const { client, sessionId, sandbox } = await getOrCreateSession(
+        {
+          conversationId: ctx.conversationId,
+          anthropicApiKey: env.ANTHROPIC_API_KEY,
+          integrationEnvs: cliEnv,
+        },
+        {
+          title: conv?.title || "Conversation",
+          replayHistory: hasExistingMessages,
+        }
+      );
+
+      // Store session ID
+      ctx.sessionId = sessionId;
 
       // Write skills to sandbox
       const writtenSkills = await writeSkillsToSandbox(sandbox, ctx.userId);
@@ -641,153 +663,59 @@ class GenerationManager {
       );
       const systemPrompt = systemPromptParts.join("\n\n");
 
-      // Get conversation for session ID
-      const conv = await db.query.conversation.findFirst({
-        where: eq(conversation.id, ctx.conversationId),
-      });
-
-      // Run SDK agent
-      const agentStream = runSDKAgentInSandbox(sandbox, ctx.userMessageContent, {
-        model: ctx.model,
-        resume: conv?.claudeSessionId ?? undefined,
-        systemPrompt,
-      });
-
       let currentTextPart: { type: "text"; text: string } | null = null;
 
-      for await (const event of agentStream) {
+      // Subscribe to SSE events BEFORE sending the prompt
+      const eventResult = await client.event.subscribe();
+      const eventStream = eventResult.stream;
+
+      // Parse model string into provider/model format
+      // e.g., "claude-sonnet-4-20250514" -> { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" }
+      const modelConfig = {
+        providerID: "anthropic",
+        modelID: ctx.model,
+      };
+
+      // Send the prompt to OpenCode
+      console.log("[GenerationManager] Sending prompt to OpenCode session:", sessionId);
+      const promptPromise = client.session.prompt({
+        path: { id: sessionId },
+        body: {
+          parts: [{ type: "text", text: ctx.userMessageContent }],
+          system: systemPrompt,
+          model: modelConfig,
+        },
+      });
+
+      // Process SSE events
+      for await (const event of eventStream) {
         if (ctx.abortController.signal.aborted) {
           break;
         }
 
-        // Handle SDK-specific events
-        if (event.type === "approval_needed") {
-          await this.handleApprovalNeeded(ctx, event);
-          continue;
+        // Log events for debugging
+        console.log("[OpenCode Event]", event.type, JSON.stringify(event.properties || {}).slice(0, 200));
+
+        // Transform OpenCode events to GenerationEvents
+        await this.processOpencodeEvent(ctx, event, currentTextPart, (part) => {
+          currentTextPart = part;
+        });
+
+        // Check for session idle (generation complete)
+        if (event.type === "session.idle") {
+          console.log("[GenerationManager] Session idle - generation complete");
+          break;
         }
 
-        if (event.type === "auth_needed") {
-          console.log(`[GenerationManager] Received auth_needed event:`, event);
-          await this.handleAuthNeeded(ctx, event);
-          continue;
-        }
-
-        if (event.type === "approval_result") {
-          this.broadcast(ctx, {
-            type: "approval_result",
-            toolUseId: event.toolUseId || "",
-            decision: event.decision === "approved" ? "approved" : "denied",
-          });
-          continue;
-        }
-
-        if (event.type === "tool_use_integration") {
-          // Update the existing contentPart with integration metadata
-          if (event.toolUseId && event.integration) {
-            const existingPart = ctx.contentParts.find(
-              (p): p is ContentPart & { type: "tool_use" } =>
-                p.type === "tool_use" && p.id === event.toolUseId
-            );
-            if (existingPart) {
-              existingPart.integration = event.integration;
-              existingPart.operation = event.operation || "";
-              await this.saveProgress(ctx); // Save immediately to persist integration metadata
-            }
-          }
-          this.broadcast(ctx, {
-            type: "tool_use",
-            toolName: "Bash",
-            toolInput: event.toolInput,
-            toolUseId: event.toolUseId,
-            integration: event.integration,
-            operation: event.operation,
-            isWrite: event.isWrite,
-          });
-          continue;
-        }
-
-        // Process standard events
-        if (event.type === "assistant" && event.message?.content) {
-          for (const block of event.message.content) {
-            if (block.type === "text" && block.text) {
-              ctx.assistantContent += block.text;
-              this.broadcast(ctx, { type: "text", content: block.text });
-
-              if (currentTextPart) {
-                currentTextPart.text += block.text;
-              } else {
-                currentTextPart = { type: "text", text: block.text };
-                ctx.contentParts.push(currentTextPart);
-              }
-
-              this.scheduleSave(ctx);
-            } else if (block.type === "thinking" && block.thinking) {
-              currentTextPart = null;
-              const thinkingId = `thinking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-              this.broadcast(ctx, {
-                type: "thinking",
-                content: block.thinking,
-                thinkingId,
-              });
-              ctx.contentParts.push({
-                type: "thinking",
-                id: thinkingId,
-                content: block.thinking,
-              });
-              this.scheduleSave(ctx);
-            } else if (block.type === "tool_use" && block.name) {
-              currentTextPart = null;
-              this.broadcast(ctx, {
-                type: "tool_use",
-                toolName: block.name,
-                toolInput: block.input,
-                toolUseId: block.id,
-              });
-              // Create contentPart - integration/operation will be added by tool_use_integration event
-              ctx.contentParts.push({
-                type: "tool_use",
-                id: block.id || "",
-                name: block.name,
-                input: block.input as Record<string, unknown>,
-              });
-              await this.saveProgress(ctx); // Save immediately after tool_use
-            }
-          }
-        } else if (event.type === "user" && event.message?.content) {
-          for (const block of event.message.content) {
-            if (block.type === "tool_result" && block.tool_use_id) {
-              const toolUse = ctx.contentParts.find(
-                (p): p is ContentPart & { type: "tool_use" } =>
-                  p.type === "tool_use" && p.id === block.tool_use_id
-              );
-              if (toolUse) {
-                this.broadcast(ctx, {
-                  type: "tool_result",
-                  toolName: toolUse.name,
-                  result: block.content,
-                });
-                ctx.contentParts.push({
-                  type: "tool_result",
-                  tool_use_id: block.tool_use_id,
-                  content: block.content,
-                });
-                await this.saveProgress(ctx); // Save immediately after tool_result
-              }
-            }
-          }
-        } else if (event.type === "result") {
-          if (event.subtype === "success") {
-            ctx.usage = {
-              inputTokens: event.usage?.input_tokens ?? 0,
-              outputTokens: event.usage?.output_tokens ?? 0,
-              totalCostUsd: event.total_cost_usd ?? 0,
-            };
-            ctx.sessionId = event.session_id;
-          } else if (event.subtype === "error") {
-            throw new Error(event.error || "Unknown error");
-          }
+        // Check for session error
+        if (event.type === "session.error") {
+          const error = (event.properties as any)?.error || "Unknown error";
+          throw new Error(error);
         }
       }
+
+      // Wait for prompt to complete
+      await promptPromise;
 
       // Check if aborted
       if (ctx.abortController.signal.aborted) {
@@ -804,7 +732,109 @@ class GenerationManager {
     }
   }
 
-  private async handleApprovalNeeded(ctx: GenerationContext, event: SDKAgentEvent): Promise<void> {
+  /**
+   * Process an OpenCode SSE event and transform it to GenerationEvent
+   */
+  private async processOpencodeEvent(
+    ctx: GenerationContext,
+    event: { type: string; properties?: unknown },
+    currentTextPart: { type: "text"; text: string } | null,
+    setCurrentTextPart: (part: { type: "text"; text: string } | null) => void
+  ): Promise<void> {
+    const props = event.properties as Record<string, unknown>;
+
+    switch (event.type) {
+      case "message.part.updated": {
+        const part = props.part as Record<string, unknown>;
+        if (!part) return;
+
+        // Text content
+        if (part.type === "text") {
+          const text = part.text as string;
+          if (text) {
+            ctx.assistantContent += text;
+            this.broadcast(ctx, { type: "text", content: text });
+
+            if (currentTextPart) {
+              currentTextPart.text += text;
+            } else {
+              const newPart = { type: "text" as const, text };
+              ctx.contentParts.push(newPart);
+              setCurrentTextPart(newPart);
+            }
+            this.scheduleSave(ctx);
+          }
+        }
+
+        // Tool invocation
+        if (part.type === "tool-invocation") {
+          setCurrentTextPart(null);
+          const toolName = part.toolName as string;
+          const toolInput = part.input as Record<string, unknown>;
+          const toolUseId = part.toolInvocationId as string;
+
+          this.broadcast(ctx, {
+            type: "tool_use",
+            toolName,
+            toolInput,
+            toolUseId,
+          });
+
+          ctx.contentParts.push({
+            type: "tool_use",
+            id: toolUseId || "",
+            name: toolName,
+            input: toolInput || {},
+          });
+          await this.saveProgress(ctx);
+        }
+
+        // Tool result
+        if (part.type === "tool-result") {
+          const toolUseId = part.toolInvocationId as string;
+          const result = part.result;
+          const toolUse = ctx.contentParts.find(
+            (p): p is ContentPart & { type: "tool_use" } =>
+              p.type === "tool_use" && p.id === toolUseId
+          );
+          if (toolUse) {
+            this.broadcast(ctx, {
+              type: "tool_result",
+              toolName: toolUse.name,
+              result,
+            });
+            ctx.contentParts.push({
+              type: "tool_result",
+              tool_use_id: toolUseId,
+              content: result,
+            });
+            await this.saveProgress(ctx);
+          }
+        }
+        break;
+      }
+
+      case "session.updated": {
+        // Track session metadata if needed
+        const session = props.session as Record<string, unknown>;
+        if (session?.id) {
+          ctx.sessionId = session.id as string;
+        }
+        break;
+      }
+
+      case "session.status": {
+        // Can track status changes if needed
+        break;
+      }
+    }
+  }
+
+  // Note: handleApprovalNeeded and handleAuthNeeded are no longer needed for OpenCode
+  // The plugin handles these via HTTP callbacks to the internal router
+  // Keeping the methods for backwards compatibility with any direct event handling
+
+  private async handleApprovalNeeded(ctx: GenerationContext, event: Record<string, unknown>): Promise<void> {
     // Check if conversation has auto-approve enabled
     const conv = await db.query.conversation.findFirst({
       where: eq(conversation.id, ctx.conversationId),
@@ -814,14 +844,14 @@ class GenerationManager {
     if (conv?.autoApprove && conv.userId) {
       // Auto-approve the tool use
       console.log(`[GenerationManager] Auto-approving tool use for generation ${ctx.id}`);
-      await this.submitApproval(ctx.id, event.toolUseId || "", "approve", conv.userId);
+      await this.submitApproval(ctx.id, (event.toolUseId as string) || "", "approve", conv.userId);
       return;
     }
 
     ctx.status = "awaiting_approval";
     ctx.pendingApproval = {
-      toolUseId: event.toolUseId || "",
-      toolName: event.toolName || "Bash",
+      toolUseId: (event.toolUseId as string) || "",
+      toolName: (event.toolName as string) || "Bash",
       toolInput: (event.toolInput as Record<string, unknown>) || {},
       requestedAt: new Date().toISOString(),
     };
@@ -845,12 +875,12 @@ class GenerationManager {
       type: "pending_approval",
       generationId: ctx.id,
       conversationId: ctx.conversationId,
-      toolUseId: event.toolUseId || "",
-      toolName: event.toolName || "Bash",
+      toolUseId: (event.toolUseId as string) || "",
+      toolName: (event.toolName as string) || "Bash",
       toolInput: event.toolInput,
-      integration: event.integration || "",
-      operation: event.operation || "",
-      command: event.command,
+      integration: (event.integration as string) || "",
+      operation: (event.operation as string) || "",
+      command: event.command as string | undefined,
     });
 
     // Start approval timeout
@@ -889,18 +919,18 @@ class GenerationManager {
     this.broadcast(ctx, { type: "status_change", status: "paused" });
   }
 
-  private async handleAuthNeeded(ctx: GenerationContext, event: SDKAgentEvent): Promise<void> {
+  private async handleAuthNeeded(ctx: GenerationContext, event: Record<string, unknown>): Promise<void> {
     console.log(`[GenerationManager] handleAuthNeeded for generation ${ctx.id}:`, {
-      integrations: (event as any).integrations,
-      reason: (event as any).reason,
+      integrations: event.integrations,
+      reason: event.reason,
     });
 
     ctx.status = "awaiting_auth";
     ctx.pendingAuth = {
-      integrations: (event as any).integrations || [],
+      integrations: (event.integrations as string[]) || [],
       connectedIntegrations: [],
       requestedAt: new Date().toISOString(),
-      reason: (event as any).reason,
+      reason: event.reason as string | undefined,
     };
 
     // Update database
@@ -977,7 +1007,12 @@ class GenerationManager {
     }
 
     if (!success) {
-      // User cancelled - write failure and cancel generation
+      // User cancelled - resolve promise with failure (OpenCode plugin flow)
+      if (ctx.authResolver) {
+        ctx.authResolver({ success: false });
+        ctx.authResolver = undefined;
+      }
+      // Write failure to sandbox (legacy SDK flow)
       const sandbox = getActiveSandbox(ctx.conversationId);
       if (sandbox) {
         await writeAuthResponse(sandbox, false, []);
@@ -1000,6 +1035,13 @@ class GenerationManager {
         ctx.pendingAuth.connectedIntegrations
       );
 
+      // Resolve the auth promise if waiting (OpenCode plugin flow)
+      if (ctx.authResolver) {
+        ctx.authResolver({ success: true, userId: ctx.userId });
+        ctx.authResolver = undefined;
+      }
+
+      // Write to sandbox (legacy SDK flow)
       const sandbox = getActiveSandbox(ctx.conversationId);
       if (sandbox) {
         await writeAuthResponse(sandbox, true, ctx.pendingAuth.connectedIntegrations, tokens);
@@ -1043,6 +1085,139 @@ class GenerationManager {
     return true;
   }
 
+  /**
+   * Wait for user approval on a write operation (called by internal router from plugin).
+   * This creates a pending approval request and waits for the user to respond.
+   */
+  async waitForApproval(
+    generationId: string,
+    request: {
+      toolInput: Record<string, unknown>;
+      integration: string;
+      operation: string;
+      command: string;
+    }
+  ): Promise<"allow" | "deny"> {
+    const ctx = this.activeGenerations.get(generationId);
+    if (!ctx) {
+      return "deny";
+    }
+
+    // Create a promise that resolves when user approves/denies
+    return new Promise((resolve) => {
+      const toolUseId = `plugin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      ctx.status = "awaiting_approval";
+      ctx.pendingApproval = {
+        toolUseId,
+        toolName: "Bash",
+        toolInput: request.toolInput,
+        requestedAt: new Date().toISOString(),
+      };
+      ctx.approvalResolver = resolve;
+
+      // Update database
+      db.update(generation)
+        .set({
+          status: "awaiting_approval",
+          pendingApproval: ctx.pendingApproval,
+        })
+        .where(eq(generation.id, ctx.id))
+        .then(() => {
+          // Update conversation status
+          return db
+            .update(conversation)
+            .set({ generationStatus: "awaiting_approval" })
+            .where(eq(conversation.id, ctx.conversationId));
+        })
+        .catch((err) => console.error("[GenerationManager] DB update error:", err));
+
+      // Notify subscribers
+      this.broadcast(ctx, {
+        type: "pending_approval",
+        generationId: ctx.id,
+        conversationId: ctx.conversationId,
+        toolUseId,
+        toolName: "Bash",
+        toolInput: request.toolInput,
+        integration: request.integration,
+        operation: request.operation,
+        command: request.command,
+      });
+
+      // Start approval timeout
+      ctx.approvalTimeoutId = setTimeout(() => {
+        if (ctx.approvalResolver) {
+          ctx.approvalResolver("deny");
+          ctx.approvalResolver = undefined;
+        }
+        this.handleApprovalTimeout(ctx);
+      }, APPROVAL_TIMEOUT_MS);
+    });
+  }
+
+  /**
+   * Wait for OAuth authentication (called by internal router from plugin).
+   * This creates a pending auth request and waits for the OAuth flow to complete.
+   */
+  async waitForAuth(
+    generationId: string,
+    request: {
+      integration: string;
+      reason?: string;
+    }
+  ): Promise<{ success: boolean; userId?: string }> {
+    const ctx = this.activeGenerations.get(generationId);
+    if (!ctx) {
+      return { success: false };
+    }
+
+    // Create a promise that resolves when OAuth completes
+    return new Promise((resolve) => {
+      ctx.status = "awaiting_auth";
+      ctx.pendingAuth = {
+        integrations: [request.integration],
+        connectedIntegrations: [],
+        requestedAt: new Date().toISOString(),
+        reason: request.reason,
+      };
+      ctx.authResolver = resolve;
+
+      // Update database
+      db.update(generation)
+        .set({
+          status: "awaiting_auth",
+          pendingAuth: ctx.pendingAuth,
+        })
+        .where(eq(generation.id, ctx.id))
+        .then(() => {
+          return db
+            .update(conversation)
+            .set({ generationStatus: "awaiting_auth" })
+            .where(eq(conversation.id, ctx.conversationId));
+        })
+        .catch((err) => console.error("[GenerationManager] DB update error:", err));
+
+      // Notify subscribers
+      this.broadcast(ctx, {
+        type: "auth_needed",
+        generationId: ctx.id,
+        conversationId: ctx.conversationId,
+        integrations: [request.integration],
+        reason: request.reason,
+      });
+
+      // Start auth timeout
+      ctx.authTimeoutId = setTimeout(() => {
+        if (ctx.authResolver) {
+          ctx.authResolver({ success: false });
+          ctx.authResolver = undefined;
+        }
+        this.handleAuthTimeout(ctx);
+      }, AUTH_TIMEOUT_MS);
+    });
+  }
+
   private async finishGeneration(
     ctx: GenerationContext,
     status: "completed" | "cancelled" | "error"
@@ -1069,7 +1244,7 @@ class GenerationManager {
       if (ctx.sessionId) {
         await db
           .update(conversation)
-          .set({ claudeSessionId: ctx.sessionId })
+          .set({ opencodeSessionId: ctx.sessionId })
           .where(eq(conversation.id, ctx.conversationId));
       }
 

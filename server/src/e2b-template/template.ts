@@ -9,12 +9,15 @@ export const template = Template()
   // Install Node.js 22.x LTS from NodeSource and update npm to latest
   .runCmd('curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs')
   .runCmd('sudo npm install -g npm@latest')
-  // Claude Code and tsx for running TypeScript CLI tools
-  .npmInstall(['@anthropic-ai/claude-code', '@anthropic-ai/claude-agent-sdk', 'tsx'], { g: true })
+  // OpenCode server and tsx for running TypeScript CLI tools
+  .npmInstall(['opencode', 'tsx'], { g: true })
   .setWorkdir('/app')
-  .copy(".claude", "/app/.claude")
+  // Copy OpenCode config and plugins
+  .copy("opencode.json", "/app/opencode.json")
+  .runCmd('mkdir -p /app/.opencode/plugins')
+  .copy("plugins/integration-permissions.ts", "/app/.opencode/plugins/integration-permissions.ts")
+  // Copy CLI tools directory
   .copy("cli", "/app/cli")
-  .copy("agent-runner.ts", "/app/agent-runner.ts")
   // allow to install packages from pip
   .runCmd('mkdir -p $HOME/.config/pip && echo -e "[global]\nbreak-system-packages = true" > $HOME/.config/pip/pip.conf')
   .runCmd('/app/cli/setup.sh')

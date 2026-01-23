@@ -3,9 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 import { client } from "./client";
-import type { ChatEvent } from "@/server/orpc/routers/chat";
 
-// Types for chat event callbacks
+// Types for generation event callbacks
 export type ToolUseData = {
   toolName: string;
   toolInput: unknown;
@@ -15,145 +14,10 @@ export type ToolUseData = {
   isWrite?: boolean;
 };
 
-export type PendingApprovalData = {
-  conversationId: string;
-  toolUseId: string;
-  toolName: string;
-  toolInput: unknown;
-  integration: string;
-  operation: string;
-  command?: string;
-};
-
 export type ThinkingData = {
   content: string;
   thinkingId: string;
 };
-
-export type ChatCallbacks = {
-  onText?: (content: string) => void;
-  onThinking?: (data: ThinkingData) => void;
-  onToolUse?: (data: ToolUseData) => void;
-  onToolResult?: (toolName: string, result: unknown) => void;
-  onPendingApproval?: (data: PendingApprovalData) => void;
-  onApprovalResult?: (toolUseId: string, decision: "approved" | "denied") => void;
-  onDone?: (
-    conversationId: string,
-    messageId: string,
-    usage: {
-      inputTokens: number;
-      outputTokens: number;
-      totalCostUsd: number;
-    }
-  ) => void;
-  onError?: (message: string) => void;
-};
-
-// Hook for streaming chat
-export function useChatStream() {
-  const queryClient = useQueryClient();
-  const abortControllerRef = { current: null as AbortController | null };
-
-  return {
-    sendMessage: async (
-      input: { conversationId?: string; content: string; model?: string },
-      callbacks: ChatCallbacks
-    ) => {
-      // Create a new AbortController for this request
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
-
-      try {
-        const iterator = await client.chat.sendMessage(input, { signal });
-
-        for await (const event of iterator) {
-          // Check if aborted before processing each event
-          if (signal.aborted) {
-            break;
-          }
-
-          switch (event.type) {
-            case "text":
-              callbacks.onText?.(event.content);
-              break;
-            case "thinking":
-              callbacks.onThinking?.({
-                content: event.content,
-                thinkingId: event.thinkingId,
-              });
-              break;
-            case "tool_use":
-              callbacks.onToolUse?.({
-                toolName: event.toolName,
-                toolInput: event.toolInput,
-                toolUseId: event.toolUseId,
-                integration: event.integration,
-                operation: event.operation,
-                isWrite: event.isWrite,
-              });
-              break;
-            case "tool_result":
-              callbacks.onToolResult?.(event.toolName, event.result);
-              break;
-            case "pending_approval":
-              callbacks.onPendingApproval?.({
-                conversationId: event.conversationId,
-                toolUseId: event.toolUseId,
-                toolName: event.toolName,
-                toolInput: event.toolInput,
-                integration: event.integration,
-                operation: event.operation,
-                command: event.command,
-              });
-              break;
-            case "approval_result":
-              callbacks.onApprovalResult?.(event.toolUseId, event.decision);
-              break;
-            case "done":
-              callbacks.onDone?.(
-                event.conversationId,
-                event.messageId,
-                event.usage
-              );
-              queryClient.invalidateQueries({ queryKey: ["conversation"] });
-              break;
-            case "error":
-              callbacks.onError?.(event.message);
-              break;
-          }
-        }
-      } catch (error) {
-        // Don't report abort errors
-        if (error instanceof Error && error.name === "AbortError") {
-          return;
-        }
-        callbacks.onError?.(
-          error instanceof Error ? error.message : "Unknown error"
-        );
-      } finally {
-        abortControllerRef.current = null;
-      }
-    },
-    abort: () => {
-      abortControllerRef.current?.abort();
-    },
-  };
-}
-
-// Hook for approving/denying tool usage
-export function useApproveToolUse() {
-  return useMutation({
-    mutationFn: ({
-      conversationId,
-      toolUseId,
-      decision,
-    }: {
-      conversationId: string;
-      toolUseId: string;
-      decision: "allow" | "deny";
-    }) => client.chat.approveToolUse({ conversationId, toolUseId, decision }),
-  });
-}
 
 // Hook for listing conversations
 export function useConversationList(options?: { limit?: number }) {

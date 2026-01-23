@@ -143,8 +143,8 @@ export const conversation = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
     userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
     title: text("title").default("New conversation"),
-    // Claude SDK session ID for resuming conversations
-    claudeSessionId: text("claude_session_id"),
+    // OpenCode session ID for resuming conversations
+    opencodeSessionId: text("opencode_session_id"),
     model: text("model").default("claude-sonnet-4-20250514"),
     // Generation tracking
     generationStatus: generationStatusEnum("generation_status").default("idle").notNull(),
@@ -189,8 +189,8 @@ export const message = pgTable(
     outputTokens: integer("output_tokens"),
     // Parent message for threading tool responses
     parentMessageId: text("parent_message_id"),
-    // Claude SDK message UUID for checkpointing
-    claudeMessageUuid: text("claude_message_uuid"),
+    // OpenCode message ID for checkpointing
+    opencodeMessageId: text("opencode_message_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

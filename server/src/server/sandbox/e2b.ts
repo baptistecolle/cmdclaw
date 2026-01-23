@@ -1,16 +1,25 @@
 import { Sandbox } from "e2b";
+import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
-import { skill } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { skill, message, conversation } from "@/server/db/schema";
+import { eq, and, asc } from "drizzle-orm";
 import { downloadFromS3 } from "@/server/storage/s3-client";
 
-// Use custom template with npm + claude CLI pre-installed
+// Use custom template with OpenCode pre-installed
 const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-agent-dev";
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const OPENCODE_PORT = 4096;
 
 // Cache of active sandboxes by conversation ID
-const activeSandboxes = new Map<string, Sandbox>();
+interface SandboxState {
+  sandbox: Sandbox;
+  client: OpencodeClient;
+  sessionId: string | null;
+  serverUrl: string;
+}
+
+const activeSandboxes = new Map<string, SandboxState>();
 
 export interface SandboxConfig {
   conversationId: string;
@@ -18,64 +27,38 @@ export interface SandboxConfig {
   integrationEnvs?: Record<string, string>;
 }
 
-// SDK stream-json output types (base event structure)
-export interface ClaudeStreamEvent {
-  type: string;
-  subtype?: string;
-  session_id?: string;
-  message?: {
-    id?: string;
-    content?: Array<{
-      type: string;
-      text?: string;
-      thinking?: string;
-      id?: string;
-      name?: string;
-      input?: unknown;
-      tool_use_id?: string;
-      content?: unknown;
-    }>;
-  };
-  usage?: {
-    input_tokens: number;
-    output_tokens: number;
-  };
-  total_cost_usd?: number;
-  error?: string;
-}
-
-// SDK Agent events (superset of ClaudeStreamEvent)
-export interface SDKAgentEvent extends ClaudeStreamEvent {
-  // Additional fields for approval flow
-  toolUseId?: string;
-  toolName?: string;
-  toolInput?: unknown;
-  integration?: string;
-  operation?: string;
-  isWrite?: boolean;
-  command?: string;
-  decision?: "approved" | "denied";
-}
-
-// Get the active sandbox for a conversation (used by approval endpoint)
-export function getActiveSandbox(conversationId: string): Sandbox | undefined {
-  return activeSandboxes.get(conversationId);
+/**
+ * Wait for OpenCode server to be ready
+ */
+async function waitForServer(url: string, maxWait = 30000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < maxWait) {
+    try {
+      const res = await fetch(`${url}/doc`, { method: "GET" });
+      if (res.ok) return;
+    } catch {
+      // Server not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error("OpenCode server in sandbox failed to start");
 }
 
 /**
- * Get or create a sandbox for a conversation
+ * Get or create a sandbox with OpenCode server running inside
  */
 export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox> {
   // Check if we have an active sandbox for this conversation
-  let sandbox = activeSandboxes.get(config.conversationId);
+  let state = activeSandboxes.get(config.conversationId);
 
-  if (sandbox) {
-    // Verify sandbox is still alive
+  if (state) {
+    // Verify sandbox and OpenCode server are alive
     try {
-      await sandbox.commands.run("echo alive", { timeoutMs: 5000 });
-      return sandbox;
+      const res = await fetch(`${state.serverUrl}/doc`, { method: "GET" });
+      if (res.ok) return state.sandbox;
     } catch {
-      // Sandbox is dead, remove from cache and create new one
+      // Sandbox or server is dead, remove from cache and create new one
+      await state.sandbox.kill().catch(() => {});
       activeSandboxes.delete(config.conversationId);
     }
   }
@@ -85,29 +68,175 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   console.log("[E2B] Creating sandbox from template:", TEMPLATE_NAME);
   console.log("[E2B] API key:", hasApiKey ? "present" : "MISSING");
 
-  sandbox = await Sandbox.create(TEMPLATE_NAME, {
+  const sandbox = await Sandbox.create(TEMPLATE_NAME, {
     envs: {
       ANTHROPIC_API_KEY: config.anthropicApiKey,
+      BAP_SERVER_URL: env.BAP_SERVER_URL || "",
+      BAP_SERVER_SECRET: env.BAP_SERVER_SECRET || "",
+      CONVERSATION_ID: config.conversationId,
       ...config.integrationEnvs,
     },
     timeoutMs: SANDBOX_TIMEOUT_MS,
   });
 
-  // Cache the sandbox
-  activeSandboxes.set(config.conversationId, sandbox);
+  // Set SANDBOX_ID env var (needed by plugin)
+  await sandbox.commands.run(
+    `echo "export SANDBOX_ID=${sandbox.sandboxId}" >> ~/.bashrc`
+  );
 
+  // Start OpenCode server in background
+  console.log("[E2B] Starting OpenCode server...");
+  sandbox.commands.run(
+    `cd /app && opencode serve --port ${OPENCODE_PORT} --hostname 0.0.0.0`,
+    {
+      background: true,
+      onStderr: (data) => console.error("[OpenCode stderr]", data),
+    }
+  );
+
+  // Get the public URL for the sandbox port
+  const serverUrl = `https://${sandbox.getHost(OPENCODE_PORT)}`;
+  await waitForServer(serverUrl);
+
+  // Create SDK client pointing to sandbox's OpenCode server
+  const client = createOpencodeClient({
+    baseUrl: serverUrl,
+  });
+
+  state = { sandbox, client, sessionId: null, serverUrl };
+  activeSandboxes.set(config.conversationId, state);
+
+  console.log("[E2B] OpenCode server ready at:", serverUrl);
   return sandbox;
 }
 
+/**
+ * Get the OpenCode client for a conversation's sandbox
+ */
+export function getOpencodeClient(conversationId: string): OpencodeClient | undefined {
+  const state = activeSandboxes.get(conversationId);
+  return state?.client;
+}
+
+/**
+ * Get the sandbox state for a conversation
+ */
+export function getSandboxState(conversationId: string): SandboxState | undefined {
+  return activeSandboxes.get(conversationId);
+}
+
+/**
+ * Get or create an OpenCode session within a sandbox
+ * Handles conversation replay for session recovery
+ */
+export async function getOrCreateSession(
+  config: SandboxConfig,
+  options?: { title?: string; replayHistory?: boolean }
+): Promise<{ client: OpencodeClient; sessionId: string; sandbox: Sandbox }> {
+  // Ensure sandbox exists
+  const sandbox = await getOrCreateSandbox(config);
+  const state = activeSandboxes.get(config.conversationId);
+
+  if (!state) {
+    throw new Error("Sandbox state not found after creation");
+  }
+
+  // Create a new session
+  const sessionResult = await state.client.session.create({
+    body: { title: options?.title || "Conversation" },
+  });
+
+  if (sessionResult.error || !sessionResult.data) {
+    throw new Error("Failed to create OpenCode session");
+  }
+
+  const sessionId = sessionResult.data.id;
+  state.sessionId = sessionId;
+
+  // Replay conversation history if needed
+  if (options?.replayHistory) {
+    await replayConversationHistory(
+      state.client,
+      sessionId,
+      config.conversationId
+    );
+  }
+
+  return { client: state.client, sessionId, sandbox: state.sandbox };
+}
+
+/**
+ * Replay conversation history to a new OpenCode session
+ * Uses noReply: true to inject context without generating a response
+ */
+async function replayConversationHistory(
+  client: OpencodeClient,
+  sessionId: string,
+  conversationId: string
+): Promise<void> {
+  // Fetch all messages for this conversation
+  const messages = await db.query.message.findMany({
+    where: eq(message.conversationId, conversationId),
+    orderBy: asc(message.createdAt),
+  });
+
+  if (messages.length === 0) return;
+
+  // Build conversation context
+  const historyContext = messages
+    .map((m) => {
+      if (m.role === "user") {
+        return `User: ${m.content}`;
+      } else if (m.role === "assistant") {
+        // Include tool uses and results for context
+        if (m.contentParts) {
+          const parts = m.contentParts
+            .map((p) => {
+              if (p.type === "text") return p.text;
+              if (p.type === "tool_use") return `[Used ${p.name}]`;
+              if (p.type === "tool_result") return `[Result received]`;
+              return "";
+            })
+            .filter(Boolean)
+            .join("\n");
+          return `Assistant: ${parts}`;
+        }
+        return `Assistant: ${m.content}`;
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+
+  // Inject history as context using noReply: true
+  await client.session.prompt({
+    path: { id: sessionId },
+    body: {
+      parts: [
+        {
+          type: "text",
+          text: `<conversation_history>\n${historyContext}\n</conversation_history>\n\nContinue this conversation. The user's next message follows.`,
+        },
+      ],
+      noReply: true,
+    },
+  });
+}
+
+// Get the active sandbox for a conversation (used by approval endpoint)
+export function getActiveSandbox(conversationId: string): Sandbox | undefined {
+  const state = activeSandboxes.get(conversationId);
+  return state?.sandbox;
+}
 
 /**
  * Kill a sandbox for a conversation
  */
 export async function killSandbox(conversationId: string): Promise<void> {
-  const sandbox = activeSandboxes.get(conversationId);
-  if (sandbox) {
+  const state = activeSandboxes.get(conversationId);
+  if (state) {
     try {
-      await sandbox.kill();
+      await state.sandbox.kill();
     } catch (error) {
       console.error("[E2B] Failed to kill sandbox:", error);
     }
@@ -119,8 +248,8 @@ export async function killSandbox(conversationId: string): Promise<void> {
  * Cleanup all sandboxes (call on server shutdown)
  */
 export async function cleanupAllSandboxes(): Promise<void> {
-  const promises = Array.from(activeSandboxes.values()).map((sandbox) =>
-    sandbox.kill().catch(console.error)
+  const promises = Array.from(activeSandboxes.values()).map((state) =>
+    state.sandbox.kill().catch(console.error)
   );
   await Promise.all(promises);
   activeSandboxes.clear();
@@ -134,8 +263,7 @@ export function isE2BConfigured(): boolean {
 }
 
 /**
- * Write user's skills to the sandbox
- * Skills are written to /app/.claude/skills/<skill-name>/
+ * Write user's skills to the sandbox as AGENTS.md format
  */
 export async function writeSkillsToSandbox(
   sandbox: Sandbox,
@@ -157,49 +285,57 @@ export async function writeSkillsToSandbox(
   console.log(`[E2B] Writing ${skills.length} skills to sandbox`);
 
   // Create skills directory
-  await sandbox.commands.run("mkdir -p /app/.claude/skills");
+  await sandbox.commands.run("mkdir -p /app/.opencode/skills");
 
   const writtenSkills: string[] = [];
+  let agentsContent = "# Custom Skills\n\n";
 
   for (const s of skills) {
-    const skillDir = `/app/.claude/skills/${s.name}`;
+    const skillDir = `/app/.opencode/skills/${s.name}`;
     await sandbox.commands.run(`mkdir -p "${skillDir}"`);
+
+    // Add skill to AGENTS.md
+    agentsContent += `## ${s.displayName}\n\n`;
+    agentsContent += `${s.description}\n\n`;
+    agentsContent += `Files available in: /app/.opencode/skills/${s.name}/\n\n`;
 
     // Write skill files (text-based, stored in DB)
     for (const file of s.files) {
       const filePath = `${skillDir}/${file.path}`;
 
-      // Create parent directories if needed (for nested paths like scripts/helper.py)
+      // Create parent directories if needed
       const lastSlash = filePath.lastIndexOf("/");
       const parentDir = filePath.substring(0, lastSlash);
       if (parentDir !== skillDir) {
         await sandbox.commands.run(`mkdir -p "${parentDir}"`);
       }
 
-      // Write the file
       await sandbox.files.write(filePath, file.content);
     }
 
-    // Write skill documents (binary files from S3) at the same level as skill files
+    // Write skill documents (binary files from S3)
     for (const doc of s.documents) {
       try {
-        // Download document from S3
         const buffer = await downloadFromS3(doc.storageKey);
         const docPath = `${skillDir}/${doc.filename}`;
-
-        // Write to sandbox (convert Buffer to ArrayBuffer for e2b)
         const arrayBuffer = new Uint8Array(buffer).buffer;
         await sandbox.files.write(docPath, arrayBuffer);
-        console.log(`[E2B] Written document: ${doc.filename} (${doc.sizeBytes} bytes)`);
+        console.log(
+          `[E2B] Written document: ${doc.filename} (${doc.sizeBytes} bytes)`
+        );
       } catch (error) {
         console.error(`[E2B] Failed to write document ${doc.filename}:`, error);
-        // Continue with other documents even if one fails
       }
     }
 
     writtenSkills.push(s.name);
-    console.log(`[E2B] Written skill: ${s.name} (${s.files.length} files, ${s.documents.length} documents)`);
+    console.log(
+      `[E2B] Written skill: ${s.name} (${s.files.length} files, ${s.documents.length} documents)`
+    );
   }
+
+  // Write AGENTS.md
+  await sandbox.files.write("/app/.opencode/AGENTS.md", agentsContent);
 
   return writtenSkills;
 }
@@ -215,7 +351,7 @@ export function getSkillsSystemPrompt(skillNames: string[]): string {
   return `
 # Custom Skills
 
-You have access to custom skills in /app/.claude/skills/. Each skill directory contains:
+You have access to custom skills in /app/.opencode/skills/. Each skill directory contains:
 - A SKILL.md file with instructions
 - Any associated documents (PDFs, images, etc.) at the same level
 
@@ -226,149 +362,10 @@ Read the SKILL.md file in each skill directory when relevant to the user's reque
 `;
 }
 
-export interface RunSDKAgentOptions {
-  model?: string;
-  resume?: string;
-  systemPrompt?: string;
-}
+// Legacy functions kept for backwards compatibility during migration
 
 /**
- * Run SDK Agent in the sandbox with real-time streaming
- */
-export async function* runSDKAgentInSandbox(
-  sandbox: Sandbox,
-  prompt: string,
-  options?: RunSDKAgentOptions
-): AsyncGenerator<SDKAgentEvent, void, unknown> {
-  // Create a queue for events
-  const eventQueue: SDKAgentEvent[] = [];
-  let resolveWait: (() => void) | null = null;
-  let isComplete = false;
-  let error: Error | null = null;
-
-  // Buffer for partial JSON lines
-  let buffer = "";
-
-  // Process incoming stdout data
-  const processStdout = (data: string) => {
-    buffer += data;
-
-    // Process complete lines
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-
-      try {
-        const event = JSON.parse(line) as SDKAgentEvent;
-        eventQueue.push(event);
-        if (resolveWait) {
-          resolveWait();
-          resolveWait = null;
-        }
-      } catch (e) {
-        // Not valid JSON, might be other output
-        console.log("[E2B SDK stdout]:", line);
-      }
-    }
-  };
-
-  // Build agent config
-  const agentConfig = {
-    prompt,
-    model: options?.model,
-    resume: options?.resume,
-    systemPrompt: options?.systemPrompt,
-  };
-
-  // Write config to a file (more reliable than env var for large prompts)
-  const timestamp = Date.now();
-  const randomId = Math.random().toString(36).slice(2);
-  const configFile = `/tmp/agent-config-${timestamp}-${randomId}.json`;
-  await sandbox.files.write(configFile, JSON.stringify(agentConfig));
-
-  // Debug: Log prompt
-  console.log("[E2B SDK] User prompt:", prompt.slice(0, 500));
-
-  // Build the command - read config from file and pass to agent runner
-  const command = `AGENT_CONFIG="$(cat ${configFile})" NODE_PATH=$(npm root -g) npx tsx /app/agent-runner.ts`;
-
-  console.log("[E2B SDK] Running SDK agent");
-
-  // Start the command (don't await - we want to stream)
-  const runPromise = sandbox.commands.run(command, {
-    timeoutMs: 0, // No timeout for long-running operations
-    onStdout: processStdout,
-    onStderr: (data) => {
-      console.error("[E2B SDK stderr]:", data);
-    },
-  });
-
-  // Handle completion
-  runPromise
-    .then((result) => {
-      console.log("[E2B SDK] Agent completed:", {
-        exitCode: result.exitCode,
-        stdout: result.stdout?.slice(0, 500),
-        stderr: result.stderr,
-      });
-      // Process any remaining buffer
-      if (buffer.trim()) {
-        try {
-          const event = JSON.parse(buffer) as SDKAgentEvent;
-          eventQueue.push(event);
-        } catch (e) {
-          console.log("[E2B SDK final stdout]:", buffer);
-        }
-      }
-      isComplete = true;
-      if (resolveWait) {
-        resolveWait();
-        resolveWait = null;
-      }
-    })
-    .catch((err: any) => {
-      console.error("[E2B SDK] Agent failed:", {
-        message: err.message,
-        exitCode: err.result?.exitCode,
-        stdout: err.result?.stdout?.slice(0, 1000),
-        stderr: err.result?.stderr,
-      });
-      error = err;
-      isComplete = true;
-      if (resolveWait) {
-        resolveWait();
-        resolveWait = null;
-      }
-    });
-
-  // Yield events as they arrive
-  while (true) {
-    // Yield all queued events
-    while (eventQueue.length > 0) {
-      yield eventQueue.shift()!;
-    }
-
-    // Check if we're done
-    if (isComplete) {
-      if (error) {
-        throw error;
-      }
-      break;
-    }
-
-    // Wait for more events
-    await new Promise<void>((resolve) => {
-      resolveWait = resolve;
-      // Also resolve after a short timeout to check for completion
-      setTimeout(resolve, 100);
-    });
-  }
-}
-
-/**
- * Write an approval response to the sandbox for the SDK agent to read
+ * @deprecated Use OpenCode HTTP callbacks instead
  */
 export async function writeApprovalResponse(
   sandbox: Sandbox,
@@ -384,7 +381,7 @@ export async function writeApprovalResponse(
 }
 
 /**
- * Write an auth response to the sandbox for the SDK agent to read
+ * @deprecated Use OpenCode HTTP callbacks instead
  */
 export async function writeAuthResponse(
   sandbox: Sandbox,
@@ -399,12 +396,14 @@ export async function writeAuthResponse(
   );
   console.log("[E2B SDK] Wrote auth response:", response);
 
-  // If tokens provided, write them to a separate file for the agent to load
   if (tokens && Object.keys(tokens).length > 0) {
     await sandbox.files.write(
       "/tmp/integration-tokens.json",
       JSON.stringify(tokens)
     );
-    console.log("[E2B SDK] Wrote integration tokens for:", Object.keys(tokens));
+    console.log(
+      "[E2B SDK] Wrote integration tokens for:",
+      Object.keys(tokens)
+    );
   }
 }
