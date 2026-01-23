@@ -9,7 +9,10 @@
       "Bash(find:*)",
       "WebFetch(domain:www.better-auth.com)",
       "Bash(bun run build)",
-      "Bash(gh secret set:*)"
+      "Bash(gh secret set:*)",
+      "WebFetch(domain:opencode.ai)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebSearch"
     ]
   }
 }

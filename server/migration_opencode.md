@@ -141,7 +141,8 @@ await client.session.create({ body: { title: "..." } })
 await client.session.prompt({
   path: { id: sessionId },
   body: {
-    model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+    // Model format: "provider/model-id" or separate providerID + modelID
+    model: "anthropic/claude-sonnet-4-20250514",
     parts: [{ type: "text", text: prompt }]
   }
 })
@@ -350,9 +351,12 @@ app.post("/api/internal/auth-request", async (req, res) => {
 
 **Solution**: Store conversation history in database, replay messages when creating new session.
 
+**Confirmed**: `noReply: boolean` is supported in `@opencode-ai/sdk@1.1.34` - allows injecting context without triggering a response.
+
 ```typescript
 /**
  * Replay conversation history to a new OpenCode session
+ * Uses noReply: true to inject context without generating a response
  */
 async function replayConversationHistory(
   client: OpencodeClient,
@@ -367,7 +371,7 @@ async function replayConversationHistory(
 
   if (messages.length === 0) return
 
-  // Build conversation context for system prompt
+  // Build conversation context
   const historyContext = messages.map(m => {
     if (m.role === "user") {
       return `User: ${m.content}`
@@ -387,7 +391,8 @@ async function replayConversationHistory(
     return ""
   }).filter(Boolean).join("\n\n")
 
-  // Inject history as context (noReply mode)
+  // Inject history as context using noReply: true
+  // This adds the context to the session without generating a response
   await client.session.prompt({
     path: { id: sessionId },
     body: {
@@ -395,7 +400,7 @@ async function replayConversationHistory(
         type: "text",
         text: `<conversation_history>\n${historyContext}\n</conversation_history>\n\nContinue this conversation. The user's next message follows.`
       }],
-      noReply: true // Don't generate response, just inject context
+      noReply: true
     }
   })
 }
@@ -526,10 +531,14 @@ bun add @opencode-ai/sdk @google/generative-ai
     "bash": "allow"
   },
   "plugin": [
-    "./plugins/integration-permissions.ts"
+    "integration-permissions"
   ]
 }
 ```
+
+**Note**: Plugins are loaded from `.opencode/plugins/` directory. Place the plugin file at:
+- Project-level: `/app/.opencode/plugins/integration-permissions.ts`
+- The plugin name in config omits the path and extension
 
 #### 1.4 Update E2B Template Build
 
@@ -605,7 +614,7 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   if (state) {
     // Verify sandbox and OpenCode server are alive
     try {
-      const res = await fetch(`${state.serverUrl}/health`)
+      const res = await fetch(`${state.serverUrl}/global/health`)
       if (res.ok) return state
     } catch {
       await state.sandbox.kill().catch(() => {})
@@ -615,17 +624,20 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
 
   console.log("[E2B] Creating sandbox with OpenCode:", TEMPLATE_NAME)
 
+  // Create sandbox first (without SANDBOX_ID - we'll set it after)
   const sandbox = await Sandbox.create(TEMPLATE_NAME, {
     envs: {
       ANTHROPIC_API_KEY: config.anthropicApiKey,
       BAP_SERVER_URL: env.BAP_SERVER_URL,
       BAP_SERVER_SECRET: env.BAP_SERVER_SECRET,
       CONVERSATION_ID: config.conversationId,
-      SANDBOX_ID: sandbox.sandboxId,
       ...config.integrationEnvs,
     },
     timeoutMs: SANDBOX_TIMEOUT_MS,
   })
+
+  // Set SANDBOX_ID env var after sandbox is created (needed by plugin)
+  await sandbox.commands.run(`echo "export SANDBOX_ID=${sandbox.sandboxId}" >> ~/.bashrc`)
 
   // Start OpenCode server in headless mode (background)
   console.log("[E2B] Starting OpenCode server...")
