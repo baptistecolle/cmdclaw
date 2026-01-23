@@ -64,7 +64,6 @@ This document outlines the migration from the current Claude Code + Claude Agent
 2. **Built-in session management** - OpenCode handles persistence
 3. **Plugin system** - Cleaner permission hooks, no file IPC
 4. **OpenAPI spec** - Type-safe SDK generated from spec
-5. **MCP support** - Can expose integrations as MCP servers
 6. **Better observability** - `/doc` endpoint, health checks
 
 ---
@@ -118,7 +117,7 @@ Write Operations (require approval):
 | JSON-line streaming (stdout) | SSE via `event.subscribe()` over HTTP |
 | PreToolUse hooks in agent-runner | Plugin `Tool.preExecute` events (in sandbox) |
 | Custom Skills (written to sandbox) | `.opencode/skills/` directory (in sandbox) |
-| Integration CLIs (in sandbox) | **Kept** + Optional MCP wrapper |
+| Integration CLIs (in sandbox) | **Kept** |
 | Session resume | `session.get()` / OpenCode session persistence |
 | File-based IPC | **Removed** - Use OpenCode permission API |
 
@@ -166,54 +165,7 @@ bun add @opencode-ai/sdk
 
 **File**: `src/e2b-template/template.ts` (update)
 
-```typescript
-import { Sandbox } from "e2b"
-
-export const E2B_TEMPLATE_CONFIG = {
-  // Ubuntu 24.04 base
-  dockerfile: `
-FROM ubuntu:24.04
-
-# Install essentials
-RUN apt-get update && apt-get install -y \\
-    curl git build-essential
-
-# Install Node.js 22.x
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \\
-    && apt-get install -y nodejs
-
-# Install Bun
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="/root/.bun/bin:$PATH"
-
-# Install OpenCode globally
-RUN bun install -g opencode
-
-# Install integration CLIs (keep existing)
-RUN bun install -g \\
-    @anthropic-ai/slack-cli \\
-    @anthropic-ai/gmail-cli \\
-    @anthropic-ai/gcalendar-cli \\
-    @anthropic-ai/gdocs-cli \\
-    @anthropic-ai/gsheets-cli \\
-    @anthropic-ai/gdrive-cli \\
-    @anthropic-ai/notion-cli \\
-    @anthropic-ai/linear-cli \\
-    @anthropic-ai/github-cli \\
-    @anthropic-ai/airtable-cli \\
-    @anthropic-ai/hubspot-cli \\
-    @anthropic-ai/linkedin-cli \\
-    @anthropic-ai/salesforce-cli
-
-# Create workspace
-WORKDIR /app
-
-# Copy OpenCode config template
-COPY opencode.json /app/opencode.json
-COPY .opencode/ /app/.opencode/
-`,
-}
-```
+update to use opencode instead of claude agent sdk
 
 #### 1.3 OpenCode Config for Sandbox
 
@@ -222,8 +174,6 @@ COPY .opencode/ /app/.opencode/
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "anthropic/claude-sonnet-4-20250514",
-  "small_model": "anthropic/claude-3-haiku-20240307",
   "server": {
     "port": 4096,
     "hostname": "0.0.0.0"
@@ -254,7 +204,7 @@ COPY .opencode/ /app/.opencode/
 # Keep these
 ANTHROPIC_API_KEY=...      # Passed to sandbox for OpenCode
 E2B_API_KEY=...            # E2B API access
-E2B_TEMPLATE=bap-opencode  # New template name
+E2B_TEMPLATE=bap-agent     # Same name, updated template
 
 # Remove
 # No changes needed - same env vars, different template
@@ -274,7 +224,7 @@ import { createOpencodeClient } from "@opencode-ai/sdk"
 import type { Client } from "@opencode-ai/sdk"
 import { env } from "@/env"
 
-const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-opencode"
+const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-agent-prod"
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 const OPENCODE_PORT = 4096
 
@@ -558,68 +508,7 @@ export async function handleApproval(
 
 ### Phase 4: Integration Migration
 
-#### Option A: MCP Servers (Recommended)
-
-Create MCP server configurations for each integration:
-
-```json
-// opencode.json
-{
-  "mcp": {
-    "slack": {
-      "command": "bun",
-      "args": ["run", "./mcp-servers/slack.ts"],
-      "env": {
-        "SLACK_ACCESS_TOKEN": "{env:SLACK_ACCESS_TOKEN}"
-      }
-    },
-    "gmail": {
-      "command": "bun",
-      "args": ["run", "./mcp-servers/gmail.ts"]
-    }
-    // ... other integrations
-  }
-}
-```
-
-#### Option B: Plugin Custom Tools
-
-```typescript
-// .opencode/plugins/slack-tools.ts
-import { z } from "zod"
-
-export default function slackTools(ctx: PluginContext) {
-  ctx.tool({
-    name: "slack_send",
-    description: "Send a message to a Slack channel",
-    schema: z.object({
-      channel: z.string(),
-      message: z.string()
-    }),
-    execute: async ({ channel, message }) => {
-      // Call Slack API
-      const response = await fetch("https://slack.com/api/chat.postMessage", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.SLACK_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ channel, text: message })
-      })
-      return await response.json()
-    }
-  })
-
-  ctx.tool({
-    name: "slack_channels",
-    description: "List Slack channels",
-    schema: z.object({}),
-    execute: async () => {
-      // ... implementation
-    }
-  })
-}
-```
+keep the current cli tools with a system prompt informing agent they exist
 
 ---
 
@@ -670,47 +559,7 @@ export async function loadUserSkills(userId: string) {
 ### Phase 6: Title Generation Migration
 
 **Current**: Direct Anthropic SDK call
-**New**: OpenCode with small model
-
-```typescript
-// src/server/utils/generate-title.ts
-import { getOpenCodeClient } from "../opencode/client"
-
-export async function generateTitle(
-  firstMessage: string
-): Promise<string | null> {
-  try {
-    const client = await getOpenCodeClient()
-
-    // Create ephemeral session for title generation
-    const session = await client.session.create({
-      body: { title: "Title Generation" }
-    })
-
-    const result = await client.session.prompt({
-      path: { id: session.id },
-      body: {
-        model: {
-          providerID: "anthropic",
-          modelID: "claude-3-haiku-20240307"
-        },
-        parts: [{
-          type: "text",
-          text: `Generate a very short title (3-5 words max) for a conversation that starts with: "${firstMessage.slice(0, 500)}"`
-        }]
-      }
-    })
-
-    // Clean up
-    await client.session.delete({ path: { id: session.id } })
-
-    return extractTitle(result)
-  } catch (error) {
-    console.warn("Title generation failed:", error)
-    return null
-  }
-}
-```
+**New**: use gemini flash call to generate title
 
 ---
 
@@ -750,7 +599,6 @@ src/e2b-template/
 ├── opencode.json            # Config to bake into E2B
 ├── plugins/
 │   └── integration-permissions.ts
-└── Dockerfile               # Updated E2B template
 
 src/server/sandbox/
 └── e2b.ts                   # Updated with OpenCode client
@@ -766,8 +614,8 @@ src/server/sandbox/
 - [ ] Keep `e2b` package
 - [ ] Create `src/e2b-template/opencode.json`
 - [ ] Create `src/e2b-template/plugins/integration-permissions.ts`
-- [ ] Update E2B template Dockerfile to install `opencode`
-- [ ] Build and push new E2B template: `bap-opencode`
+- [ ] Update E2B template to install `opencode`
+- [ ] Build and push updated E2B template: `bap-agent-dev`
 - [ ] Test sandbox creates and OpenCode server starts
 
 ### Phase 2: Core Chat
@@ -786,37 +634,70 @@ src/server/sandbox/
 
 ### Phase 4: Integrations
 - [ ] Verify integration CLIs work in new template
-- [ ] Test Slack read/write
-- [ ] Test Gmail read/write
-- [ ] Test remaining 11 integrations
 
 ### Phase 5: Skills
 - [ ] Update `writeSkillsToSandbox()` to write to `/app/.opencode/skills/`
 - [ ] Verify OpenCode picks up skills as instructions
 - [ ] Test skill with documents (PDFs, images)
 
-### Phase 6: Cleanup
+### Phase 6: Database Migration
+- [ ] Add `opencodeSessionId` column to conversation table
+- [ ] Drop `claudeSessionId` column
+
+### Phase 7: Cleanup
 - [ ] Remove `@anthropic-ai/sdk` if not used elsewhere
-- [ ] Update E2B_TEMPLATE env var to new template name
+- [ ] Remove `@anthropic-ai/claude-agent-sdk`
+- [ ] Verify E2B_TEMPLATE env var is `bap-agent-dev`
 - [ ] Update deployment configs
-- [ ] Monitor for issues
 
 ---
 
-## Open Questions
+## Design Decisions
 
-1. **Integration Approach**: For the 13 CLI integrations, prefer:
-   - **Keep as Bash commands** (simpler, current approach works)
-   - **Wrap with MCP Servers** (more discoverable, better tool schema)
-   - **Convert to Plugin Custom Tools** (tighter integration)
+### 1. Integrations: Keep as Bash Commands ✓
 
-2. **Auth Flow**: OAuth token injection:
-   - **Keep current approach** - Inject tokens as env vars when creating sandbox
-   - Tokens passed to OpenCode via environment, same as now
+The 13 CLI tools (Slack, Gmail, etc.) continue to work via Bash tool. OpenCode's permission plugin intercepts these commands and applies read/write rules. No MCP conversion needed. Do not use MCP is it a bad standard.
 
-3. **Session Persistence**: OpenCode has built-in session management:
-   - Keep using `conversation.claudeSessionId` for resume?
-   - Or use OpenCode's session IDs directly?
+### 2. Auth Flow: Inject Tokens at Sandbox Creation ✓
+
+Keep current approach - cleanest for multi-tenant:
+
+```typescript
+// When creating sandbox, inject all user's integration tokens
+const sandbox = await Sandbox.create(TEMPLATE_NAME, {
+  envs: {
+    ANTHROPIC_API_KEY: config.anthropicApiKey,
+    SLACK_ACCESS_TOKEN: user.slackToken,
+    GMAIL_ACCESS_TOKEN: user.gmailToken,
+    // ... all integration tokens
+  },
+})
+```
+
+For mid-session OAuth (user connects new integration):
+- Complete OAuth on your server
+- Write tokens to sandbox via `sandbox.files.write("/tmp/new-tokens.json")`
+- Plugin reloads tokens from file (same pattern as current `loadTokensFromFile()`)
+
+### 3. Session IDs: Use OpenCode's Directly ✓
+
+**Database change**: Replace `claudeSessionId` with `opencodeSessionId`
+
+**Benefits**:
+- OpenCode handles session persistence internally
+- Resume works automatically via `session.get()`
+- No custom session tracking needed
+
+**Flow**:
+```typescript
+// First message in conversation
+const session = await client.session.create({ body: { title } })
+await db.update(conversation).set({ opencodeSessionId: session.id })
+
+// Subsequent messages
+const sessionId = conversation.opencodeSessionId
+await client.session.prompt({ path: { id: sessionId }, body: { ... } })
+```
 
 ---
 
@@ -826,5 +707,8 @@ If you have access to more OpenCode docs, these would help:
 - **Plugin Events** - Full list of hookable events (`Tool.preExecute`, etc.)
 - **Permission API** - How to respond to permission requests programmatically
 - **SSE Event Types** - Complete list of event types from `event.subscribe()`
-- **MCP in OpenCode** - How MCP servers integrate with the agent
-- **Multi-project** - Can one OpenCode server handle multiple projects/contexts?
+
+The offical docs of opencode
+https://opencode.ai/docs/plugins/#create-a-plugin
+https://opencode.ai/docs/server/
+https://opencode.ai/docs/sdk/
