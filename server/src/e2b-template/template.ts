@@ -6,10 +6,15 @@ export const template = Template()
   .aptInstall(['curl', 'git', 'ripgrep', 'ca-certificates', 'gnupg', 'unzip'])
   // Install Python 3 (Ubuntu 24.04 has Python 3.12)
   .aptInstall(['python3', 'python3-venv', 'python3-pip', 'python-is-python3'])
-  // Install bun
-  .runCmd('curl -fsSL https://bun.sh/install | bash && echo \'export BUN_INSTALL="$HOME/.bun"\' >> ~/.bashrc && echo \'export PATH="$BUN_INSTALL/bin:$PATH"\' >> ~/.bashrc')
+  // Install Node.js 22.x LTS (needed for packages with node shebang)
+  .runCmd('curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs')
+  // Install bun and create symlinks in /usr/local/bin for PATH availability
+  .runCmd('curl -fsSL https://bun.sh/install | bash')
+  .runCmd('sudo ln -s $HOME/.bun/bin/bun /usr/local/bin/bun')
   // OpenCode server and tsx for running TypeScript CLI tools
   .runCmd('$HOME/.bun/bin/bun install -g opencode-ai tsx')
+  .runCmd('sudo ln -s $HOME/.bun/bin/opencode /usr/local/bin/opencode')
+  .runCmd('sudo ln -s $HOME/.bun/bin/tsx /usr/local/bin/tsx')
   .setWorkdir('/app')
   // Copy OpenCode config and plugins
   .copy("opencode.json", "/app/opencode.json")
