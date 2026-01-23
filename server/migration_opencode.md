@@ -15,6 +15,7 @@ This document outlines the migration from the current Claude Code + Claude Agent
 - OpenCode Server - Running **inside E2B sandbox** (headless mode)
 - OpenCode Plugins - Custom tools & permission hooks (baked into E2B template)
 - E2B Sandboxes - **Kept for isolation**
+- Gemini API - Title generation (direct call)
 
 **Architecture:**
 ```
@@ -22,8 +23,8 @@ This document outlines the migration from the current Claude Code + Claude Agent
 │  Your Next.js Server                                        │
 │                                                             │
 │  ┌─────────────────────┐    ┌─────────────────────────────┐ │
-│  │  Chat Router        │───▶│  OpenCode SDK Client        │ │
-│  │  (orpc endpoint)    │    │  createOpencodeClient()     │ │
+│  │  Generation Manager │───▶│  OpenCode SDK Client        │ │
+│  │  (consolidated)     │    │  createOpencodeClient()     │ │
 │  └─────────────────────┘    └──────────────┬──────────────┘ │
 │                                            │                │
 └────────────────────────────────────────────┼────────────────┘
@@ -37,9 +38,8 @@ This document outlines the migration from the current Claude Code + Claude Agent
 │  │                                                         ││
 │  │  ├── Agents (build, plan, custom)                       ││
 │  │  ├── Tools (Read, Write, Edit, Bash, Glob, Grep, etc)   ││
-│  │  ├── Plugins (integration permissions, custom tools)    ││
-│  │  ├── Skills (user-defined, written to .opencode/skills) ││
-│  │  └── MCP Servers (Slack, Gmail, GitHub, etc)            ││
+│  │  ├── Plugins (integration permissions, auth bridge)     ││
+│  │  └── Conversation Replay (for session recovery)         ││
 │  └─────────────────────────────────────────────────────────┘│
 │                                                             │
 │  Integration CLIs: slack, gmail, gcalendar, notion, etc.    │
@@ -53,18 +53,21 @@ This document outlines the migration from the current Claude Code + Claude Agent
 | Agent execution | `query()` from `@anthropic-ai/claude-agent-sdk` | `opencode serve` HTTP server |
 | Communication | JSON lines over stdout | HTTP API + SSE |
 | Streaming | Parse stdout in real-time | `client.event.subscribe()` |
-| Permission hooks | `PreToolUse` callback in agent-runner.ts | Plugin `Tool.preExecute` event |
-| Approval IPC | File polling (`/tmp/approval-*.json`) | HTTP permission API |
-| Session resume | `resume` option in `query()` | OpenCode session persistence |
+| Permission hooks | `PreToolUse` callback in agent-runner.ts | Plugin `tool.execute.before` hook |
+| Approval IPC | File polling (`/tmp/approval-*.json`) | Plugin HTTP callback to server |
+| Session resume | `resume` option in `query()` | Conversation replay on new sessions |
 | Tools | Hardcoded allowedTools list | Configurable in `opencode.json` |
+| Title generation | Anthropic SDK (Haiku) | Gemini API (Flash) |
+| Chat implementation | Two parallel paths | Single consolidated GenerationManager |
 
 ### Benefits of Migration
 
 1. **Standard HTTP API** - No more parsing stdout JSON lines
-2. **Built-in session management** - OpenCode handles persistence
-3. **Plugin system** - Cleaner permission hooks, no file IPC
+2. **Built-in session management** - OpenCode handles persistence within sandbox
+3. **Plugin system** - Cleaner permission hooks
 4. **OpenAPI spec** - Type-safe SDK generated from spec
-6. **Better observability** - `/doc` endpoint, health checks
+5. **Better observability** - `/doc` endpoint, health checks
+6. **Simplified codebase** - One consolidated chat flow
 
 ---
 
@@ -76,8 +79,8 @@ This document outlines the migration from the current Claude Code + Claude Agent
 |-----------|------|---------|
 | Agent Runner | `src/e2b-template/agent-runner.ts` | Runs Claude Agent SDK with hooks |
 | E2B Manager | `src/server/sandbox/e2b.ts` | Sandbox lifecycle management |
-| Chat Router | `src/server/orpc/routers/chat.ts` | Streaming chat endpoint |
-| Generation Manager | `src/server/services/generation-manager.ts` | Multi-user approval/auth flow |
+| Chat Router | `src/server/orpc/routers/chat.ts` | Simple streaming chat endpoint |
+| Generation Manager | `src/server/services/generation-manager.ts` | Complex multi-user approval/auth flow |
 | Title Generator | `src/server/utils/generate-title.ts` | Conversation title via Haiku |
 
 ### Key Patterns
@@ -87,6 +90,7 @@ This document outlines the migration from the current Claude Code + Claude Agent
 3. **Permission Hooks**: `PreToolUse` hooks intercept Bash commands
 4. **File-based IPC**: Approval/auth via `/tmp/*.json` files
 5. **Integration CLIs**: 13 external tools (Slack, Gmail, etc.)
+6. **Dual Chat Paths**: `chat.ts` (simple) and `GenerationManager` (complex) - **MUST CONSOLIDATE**
 
 ### Integration Permission Model
 
@@ -115,11 +119,11 @@ Write Operations (require approval):
 | E2B Sandbox | **E2B Sandbox (kept!)** |
 | Claude Agent SDK `query()` | `client.session.prompt()` via HTTP to sandbox |
 | JSON-line streaming (stdout) | SSE via `event.subscribe()` over HTTP |
-| PreToolUse hooks in agent-runner | Plugin `Tool.preExecute` events (in sandbox) |
-| Custom Skills (written to sandbox) | `.opencode/skills/` directory (in sandbox) |
+| PreToolUse hooks in agent-runner | Plugin `tool.execute.before` hook |
+| Custom Skills (written to sandbox) | Custom agent instructions / AGENTS.md |
 | Integration CLIs (in sandbox) | **Kept** |
-| Session resume | `session.get()` / OpenCode session persistence |
-| File-based IPC | **Removed** - Use OpenCode permission API |
+| Session resume | **Conversation replay** (messages replayed to new session) |
+| File-based IPC | **Plugin HTTP bridge** to your server |
 
 ### OpenCode SDK Core Methods
 
@@ -144,9 +148,335 @@ await client.session.prompt({
 await client.event.subscribe() // SSE stream
 ```
 
+### OpenCode Plugin System (CORRECTED)
+
+**Important**: OpenCode plugins use a hook object pattern, NOT an event emitter.
+
+```typescript
+// Plugin structure (CORRECT)
+export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
+  return {
+    "tool.execute.before": async (input, output) => {
+      // input.tool = tool name (e.g., "bash")
+      // output.args = tool arguments
+      // Throw to block execution
+    },
+    "tool.execute.after": async (input, output) => {
+      // Post-execution hook
+    }
+  }
+}
+```
+
+### OpenCode Event Types (from SSE)
+
+```
+Session events:
+- session.created, session.deleted, session.error
+- session.idle, session.status, session.updated
+
+Message events:
+- message.part.removed, message.part.updated
+- message.removed, message.updated
+
+Permission events:
+- permission.replied, permission.updated
+
+Other:
+- server.connected (initial event)
+- todo.updated
+```
+
+---
+
+## Critical Design Decisions
+
+### 1. Plugin-to-Server Communication (Approval Flow)
+
+**Problem**: OpenCode plugins can't emit custom events to external listeners.
+
+**Solution**: Plugin makes HTTP calls directly to your server.
+
+```typescript
+// In plugin: call your server's approval endpoint
+export const IntegrationPermissionsPlugin = async ({ client }) => {
+  const SERVER_URL = process.env.BAP_SERVER_URL // e.g., "https://your-server.com"
+  const SERVER_SECRET = process.env.BAP_SERVER_SECRET
+
+  return {
+    "tool.execute.before": async (input, output) => {
+      if (input.tool !== "bash") return
+
+      const command = output.args.command
+      const parsed = parseBashCommand(command)
+      if (!parsed) return // Not an integration command
+
+      const { integration, operation } = parsed
+
+      // Check if write operation
+      if (isWriteOperation(integration, operation)) {
+        // Call your server to request approval
+        const response = await fetch(`${SERVER_URL}/api/internal/approval-request`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SERVER_SECRET}`
+          },
+          body: JSON.stringify({
+            sandboxId: process.env.SANDBOX_ID,
+            conversationId: process.env.CONVERSATION_ID,
+            integration,
+            operation,
+            command,
+            toolInput: output.args
+          })
+        })
+
+        const { decision } = await response.json()
+
+        if (decision === "deny") {
+          throw new Error("User denied this action")
+        }
+      }
+    }
+  }
+}
+```
+
+**Server-side approval endpoint**:
+```typescript
+// New internal endpoint (not exposed to frontend)
+app.post("/api/internal/approval-request", async (req, res) => {
+  const { sandboxId, conversationId, integration, operation, command, toolInput } = req.body
+
+  // Find the active generation for this conversation
+  const ctx = generationManager.getContextByConversation(conversationId)
+  if (!ctx) {
+    return res.json({ decision: "deny" })
+  }
+
+  // Check auto-approve setting
+  if (ctx.autoApprove) {
+    return res.json({ decision: "allow" })
+  }
+
+  // Create a promise that resolves when user approves/denies
+  const decision = await ctx.waitForApproval({
+    toolInput,
+    integration,
+    operation,
+    command
+  })
+
+  return res.json({ decision })
+})
+```
+
+### 2. Mid-Session OAuth Flow (KEPT)
+
+**Problem**: OpenCode's permission system is for tool permissions, not OAuth flows.
+
+**Solution**: Plugin detects missing tokens and calls server, which handles OAuth and injects tokens.
+
+```typescript
+// In plugin: check for missing tokens and request auth
+"tool.execute.before": async (input, output) => {
+  if (input.tool !== "bash") return
+
+  const command = output.args.command
+  const parsed = parseBashCommand(command)
+  if (!parsed) return
+
+  const { integration } = parsed
+  const tokenEnvVar = getTokenEnvVar(integration)
+  const hasToken = !!process.env[tokenEnvVar]
+
+  if (!hasToken) {
+    // Call server to request auth
+    const response = await fetch(`${SERVER_URL}/api/internal/auth-request`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SERVER_SECRET}`
+      },
+      body: JSON.stringify({
+        conversationId: process.env.CONVERSATION_ID,
+        integration,
+        reason: `${getIntegrationDisplayName(integration)} authentication required`
+      })
+    })
+
+    const { success, tokens } = await response.json()
+
+    if (!success) {
+      throw new Error("Authentication not completed")
+    }
+
+    // Inject tokens into environment
+    for (const [key, value] of Object.entries(tokens)) {
+      process.env[key] = value
+    }
+  }
+}
+```
+
+**Server-side auth endpoint**:
+```typescript
+app.post("/api/internal/auth-request", async (req, res) => {
+  const { conversationId, integration, reason } = req.body
+
+  const ctx = generationManager.getContextByConversation(conversationId)
+  if (!ctx) {
+    return res.json({ success: false })
+  }
+
+  // Wait for OAuth to complete (up to 10 minutes)
+  const result = await ctx.waitForAuth({ integration, reason })
+
+  if (!result.success) {
+    return res.json({ success: false })
+  }
+
+  // Fetch fresh tokens
+  const tokens = await getTokensForIntegrations(ctx.userId, [integration])
+
+  return res.json({ success: true, tokens })
+})
+```
+
+### 3. Conversation Replay (Session Recovery)
+
+**Problem**: OpenCode sessions live in the sandbox. If sandbox dies, session is lost.
+
+**Solution**: Store conversation history in database, replay messages when creating new session.
+
+```typescript
+/**
+ * Replay conversation history to a new OpenCode session
+ */
+async function replayConversationHistory(
+  client: OpencodeClient,
+  sessionId: string,
+  conversationId: string
+): Promise<void> {
+  // Fetch all messages for this conversation
+  const messages = await db.query.message.findMany({
+    where: eq(message.conversationId, conversationId),
+    orderBy: asc(message.createdAt)
+  })
+
+  if (messages.length === 0) return
+
+  // Build conversation context for system prompt
+  const historyContext = messages.map(m => {
+    if (m.role === "user") {
+      return `User: ${m.content}`
+    } else if (m.role === "assistant") {
+      // Include tool uses and results for context
+      if (m.contentParts) {
+        const parts = m.contentParts.map(p => {
+          if (p.type === "text") return p.text
+          if (p.type === "tool_use") return `[Used ${p.name}]`
+          if (p.type === "tool_result") return `[Result received]`
+          return ""
+        }).filter(Boolean).join("\n")
+        return `Assistant: ${parts}`
+      }
+      return `Assistant: ${m.content}`
+    }
+    return ""
+  }).filter(Boolean).join("\n\n")
+
+  // Inject history as context (noReply mode)
+  await client.session.prompt({
+    path: { id: sessionId },
+    body: {
+      parts: [{
+        type: "text",
+        text: `<conversation_history>\n${historyContext}\n</conversation_history>\n\nContinue this conversation. The user's next message follows.`
+      }],
+      noReply: true // Don't generate response, just inject context
+    }
+  })
+}
+```
+
+### 4. Consolidated Generation Manager
+
+**Decision**: Merge `chat.ts` and `GenerationManager` into single implementation.
+
+The consolidated `GenerationManager` will:
+1. Handle all chat streaming
+2. Manage approval flow with plugin HTTP callbacks
+3. Manage auth flow with plugin HTTP callbacks
+4. Support conversation replay for session recovery
+5. Track subscribers for real-time updates
+6. Persist generation state to database
+
+**Files to consolidate**:
+- DELETE: `src/server/orpc/routers/chat.ts` (move logic to GenerationManager)
+- REFACTOR: `src/server/services/generation-manager.ts` (update for OpenCode)
+- NEW: `src/server/orpc/routers/generation.ts` (thin router calling GenerationManager)
+
+### 5. Title Generation with Gemini
+
+**Decision**: Use direct Gemini API call instead of Anthropic SDK.
+
+```typescript
+// src/server/utils/generate-title.ts
+import { GoogleGenerativeAI } from "@google/generative-ai"
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+
+export async function generateConversationTitle(
+  userMessage: string,
+  assistantResponse: string
+): Promise<string | null> {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
+
+    const prompt = `Generate a short, descriptive title (max 50 chars) for this conversation.
+
+User: ${userMessage.slice(0, 500)}
+Assistant: ${assistantResponse.slice(0, 500)}
+
+Title (no quotes):`
+
+    const result = await model.generateContent(prompt)
+    const title = result.response.text().trim().slice(0, 50)
+    return title || null
+  } catch (error) {
+    console.error("[Gemini] Failed to generate title:", error)
+    return null
+  }
+}
+```
+
+**Dependencies**:
+```bash
+bun add @google/generative-ai
+```
+
+**Environment variable**:
+```env
+GEMINI_API_KEY=...
+```
+
 ---
 
 ## Migration Tasks
+
+### Phase 0: Pre-Migration Consolidation
+
+**Goal**: Simplify codebase before migrating.
+
+#### 0.1 Consolidate Chat Implementations
+
+- [ ] Audit `chat.ts` vs `GenerationManager` - identify differences
+- [ ] Remove `chat.ts` router
+- [ ] Update all frontend code to use GenerationManager endpoints
+- [ ] Ensure all chat flows go through GenerationManager
+- [ ] Test: basic chat, approval flow, auth flow all work
 
 ### Phase 1: E2B Template with OpenCode
 
@@ -155,21 +485,24 @@ await client.event.subscribe() // SSE stream
 ```bash
 # On your server (client-side only)
 bun remove @anthropic-ai/sdk @anthropic-ai/claude-agent-sdk
-bun add @opencode-ai/sdk
+bun add @opencode-ai/sdk @google/generative-ai
 
 # Keep e2b! We still need it
 # e2b is already installed
 ```
 
-#### 1.2 New E2B Template Definition
+#### 1.2 Create OpenCode Plugin
 
-**File**: `src/e2b-template/template.ts` (update)
+**File**: `src/e2b-template/plugins/integration-permissions.ts`
 
-update to use opencode instead of claude agent sdk
+```typescript
+// Full plugin with approval + auth flow
+// See "Critical Design Decisions" section above for implementation
+```
 
 #### 1.3 OpenCode Config for Sandbox
 
-**File**: `src/e2b-template/opencode.json` (baked into E2B template)
+**File**: `src/e2b-template/opencode.json`
 
 ```json
 {
@@ -198,7 +531,20 @@ update to use opencode instead of claude agent sdk
 }
 ```
 
-#### 1.4 Environment Variables
+#### 1.4 Update E2B Template Build
+
+**File**: `src/e2b-template/template.ts` - Add OpenCode installation:
+
+```bash
+# Install OpenCode globally
+npm install -g opencode
+
+# Copy plugin and config
+COPY opencode.json /app/opencode.json
+COPY plugins/ /app/.opencode/plugins/
+```
+
+#### 1.5 Environment Variables
 
 ```env
 # Keep these
@@ -206,8 +552,14 @@ ANTHROPIC_API_KEY=...      # Passed to sandbox for OpenCode
 E2B_API_KEY=...            # E2B API access
 E2B_TEMPLATE=bap-agent     # Same name, updated template
 
-# Remove
-# No changes needed - same env vars, different template
+# Add these
+GEMINI_API_KEY=...         # For title generation
+BAP_SERVER_URL=...         # Plugin callback URL (your server)
+BAP_SERVER_SECRET=...      # Plugin authentication secret
+
+# Pass to sandbox
+CONVERSATION_ID=...        # Set at sandbox creation
+SANDBOX_ID=...             # Set at sandbox creation
 ```
 
 ---
@@ -216,7 +568,7 @@ E2B_TEMPLATE=bap-agent     # Same name, updated template
 
 #### 2.1 Update E2B Sandbox Manager
 
-**File**: `src/server/sandbox/e2b.ts` (refactor to include OpenCode server)
+**File**: `src/server/sandbox/e2b.ts` (refactor for OpenCode)
 
 ```typescript
 import { Sandbox } from "e2b"
@@ -253,8 +605,8 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   if (state) {
     // Verify sandbox and OpenCode server are alive
     try {
-      await state.client.global.health()
-      return state
+      const res = await fetch(`${state.serverUrl}/health`)
+      if (res.ok) return state
     } catch {
       await state.sandbox.kill().catch(() => {})
       activeSandboxes.delete(config.conversationId)
@@ -266,6 +618,10 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   const sandbox = await Sandbox.create(TEMPLATE_NAME, {
     envs: {
       ANTHROPIC_API_KEY: config.anthropicApiKey,
+      BAP_SERVER_URL: env.BAP_SERVER_URL,
+      BAP_SERVER_SECRET: env.BAP_SERVER_SECRET,
+      CONVERSATION_ID: config.conversationId,
+      SANDBOX_ID: sandbox.sandboxId,
       ...config.integrationEnvs,
     },
     timeoutMs: SANDBOX_TIMEOUT_MS,
@@ -301,7 +657,7 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
   const start = Date.now()
   while (Date.now() - start < maxWait) {
     try {
-      const res = await fetch(`${url}/health`, { method: "GET" })
+      const res = await fetch(`${url}/doc`, { method: "GET" })
       if (res.ok) return
     } catch {}
     await new Promise(r => setTimeout(r, 500))
@@ -311,404 +667,348 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
 
 /**
  * Get or create an OpenCode session within a sandbox
+ * Handles conversation replay for session recovery
  */
 export async function getOrCreateSession(
   config: SandboxConfig,
-  title?: string
+  options?: { title?: string; replayHistory?: boolean }
 ): Promise<{ client: Client; sessionId: string; sandbox: Sandbox }> {
   const state = await getOrCreateSandbox(config)
 
-  if (state.sessionId) {
-    try {
-      await state.client.session.get({ path: { id: state.sessionId } })
-      return { client: state.client, sessionId: state.sessionId, sandbox: state.sandbox }
-    } catch {
-      state.sessionId = null
-    }
-  }
-
+  // Always create a new session (replay handles continuity)
   const session = await state.client.session.create({
-    body: { title: title || "Conversation" }
+    body: { title: options?.title || "Conversation" }
   })
   state.sessionId = session.id
+
+  // Replay conversation history if needed
+  if (options?.replayHistory) {
+    await replayConversationHistory(state.client, session.id, config.conversationId)
+  }
 
   return { client: state.client, sessionId: session.id, sandbox: state.sandbox }
 }
 
-// Keep existing: killSandbox, cleanupAllSandboxes, etc.
+// Keep existing: killSandbox, cleanupAllSandboxes, writeSkillsToSandbox, etc.
 ```
 
 #### 2.2 Delete Agent Runner
 
-**Current**: `src/e2b-template/agent-runner.ts`
-**Action**: Delete entirely - OpenCode handles agent execution internally
+**Action**: Delete `src/e2b-template/agent-runner.ts` entirely.
 
-#### 2.3 Update Chat Streaming
+OpenCode handles agent execution internally. The plugin system replaces all the PreToolUse hook logic.
 
-**File**: `src/server/sandbox/e2b.ts` (add streaming function)
+#### 2.3 Update Generation Manager for OpenCode
+
+**File**: `src/server/services/generation-manager.ts`
+
+Key changes:
+1. Replace `runSDKAgentInSandbox()` with OpenCode SDK calls
+2. Use SSE subscription instead of stdout parsing
+3. Add `waitForApproval()` and `waitForAuth()` methods for plugin callbacks
+4. Add `replayConversationHistory()` for session recovery
+5. Update event transformation for OpenCode event types
+
+#### 2.4 Add Internal API Endpoints
+
+**File**: `src/server/orpc/routers/internal.ts` (NEW)
 
 ```typescript
-export interface OpenCodeStreamEvent {
-  type: string
-  session?: { id: string }
-  message?: {
-    id: string
-    role: string
-    parts: Array<{
-      type: "text" | "tool_use" | "tool_result" | "thinking"
-      text?: string
-      thinking?: string
-      toolUseId?: string
-      toolName?: string
-      toolInput?: unknown
-    }>
-  }
-  permission?: {
-    id: string
-    tool: string
-    input: unknown
-  }
-  usage?: {
-    inputTokens: number
-    outputTokens: number
-  }
-}
-
-/**
- * Stream chat from OpenCode server in sandbox
- */
-export async function* streamChatFromSandbox(
-  config: SandboxConfig,
-  prompt: string,
-  options?: { model?: string; systemPrompt?: string }
-): AsyncGenerator<OpenCodeStreamEvent> {
-  const { client, sessionId } = await getOrCreateSession(config)
-
-  // Start the prompt (non-blocking, returns immediately)
-  const promptPromise = client.session.prompt({
-    path: { id: sessionId },
-    body: {
-      model: options?.model ? {
-        providerID: "anthropic",
-        modelID: options.model
-      } : undefined,
-      parts: [{ type: "text", text: prompt }]
-    }
-  })
-
-  // Subscribe to SSE events
-  const eventStream = await client.event.subscribe()
-
-  for await (const event of eventStream) {
-    // Transform to our event format and yield
-    yield event as OpenCodeStreamEvent
-
-    // Check for completion
-    if (
-      event.type === "session.completed" ||
-      event.type === "session.error" ||
-      event.type === "session.aborted"
-    ) {
-      break
-    }
-  }
-
-  // Ensure prompt completed
-  await promptPromise
+// Endpoints called by plugin from sandbox
+export const internalRouter = {
+  approvalRequest,  // POST /api/internal/approval-request
+  authRequest,      // POST /api/internal/auth-request
 }
 ```
 
 ---
 
-### Phase 3: Permission System Migration
+### Phase 3: Event Transformation
 
-#### 3.1 Create Integration Permission Plugin
-
-**File**: `.opencode/plugins/integration-permissions.ts`
+#### 3.1 Map OpenCode Events to GenerationEvents
 
 ```typescript
-import type { PluginContext } from "@opencode-ai/plugin"
-import { z } from "zod"
-
-// Integration CLI to type mapping
-const CLI_TO_INTEGRATION: Record<string, string> = {
-  "slack": "slack",
-  "google-gmail": "gmail",
-  "gcalendar": "google_calendar",
-  // ... rest of mappings
-}
-
-// Permission definitions
-const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
-  slack: {
-    read: ["channels", "history", "search", "recent", "users", "user", "thread"],
-    write: ["send", "react", "upload"],
-  },
-  // ... rest of integrations
-}
-
-export default function integrationPermissions(ctx: PluginContext) {
-  // Hook into tool execution
-  ctx.on("Tool.preExecute", async (event) => {
-    if (event.tool.name !== "bash") return
-
-    const command = event.tool.input?.command as string
-    const parsed = parseBashCommand(command)
-
-    if (!parsed) return // Not an integration command
-
-    const { integration, operation } = parsed
-    const permissions = TOOL_PERMISSIONS[integration]
-
-    if (!permissions) return
-
-    // Check if write operation
-    if (permissions.write.includes(operation)) {
-      // Request approval
-      return {
-        action: "ask",
-        reason: `Write operation: ${integration}.${operation}`
+// OpenCode SSE event → GenerationEvent mapping
+function transformEvent(event: OpenCodeEvent): GenerationEvent | null {
+  switch (event.type) {
+    case "message.part.updated":
+      const part = event.properties.part
+      if (part.type === "text") {
+        return { type: "text", content: part.text }
       }
-    }
+      if (part.type === "tool-invocation") {
+        return {
+          type: "tool_use",
+          toolName: part.toolName,
+          toolInput: part.input,
+          toolUseId: part.toolInvocationId
+        }
+      }
+      if (part.type === "tool-result") {
+        return {
+          type: "tool_result",
+          toolName: part.toolName,
+          result: part.result
+        }
+      }
+      break
 
-    // Read operations auto-approve
-    return { action: "allow" }
-  })
-}
+    case "session.idle":
+      // Generation complete
+      return null // Handle in completion logic
 
-function parseBashCommand(command: string) {
-  // ... same logic as current agent-runner.ts
+    case "session.error":
+      return { type: "error", message: event.properties.error }
+  }
+  return null
 }
 ```
 
-#### 3.2 Migrate Approval Flow
+#### 3.2 Log All Events During Development
 
-**Current**: File-based IPC (`/tmp/approval-*.json`)
-**New**: OpenCode permission API
+Add comprehensive logging to understand OpenCode's actual event structure:
 
 ```typescript
-// In your API router
-import { getOpenCodeClient } from "./opencode/client"
-
-export async function handleApproval(
-  sessionId: string,
-  permissionId: string,
-  decision: "allow" | "deny"
-) {
-  const client = await getOpenCodeClient()
-
-  await client.session.permission({
-    path: { id: sessionId, permissionId },
-    body: { decision }
-  })
+for await (const event of client.event.subscribe()) {
+  console.log("[OpenCode Event]", JSON.stringify(event, null, 2))
+  // ... transform and process
 }
 ```
 
 ---
 
-### Phase 4: Integration Migration
+### Phase 4: Skills Migration
 
-keep the current cli tools with a system prompt informing agent they exist
+#### 4.1 Skills Directory Structure
 
----
+OpenCode uses AGENTS.md for custom agent instructions. Update skill writing:
 
-### Phase 5: Skills Migration
-
-#### 5.1 Skills Directory Structure
-
-```
-.opencode/
-├── skills/
-│   ├── skill-name/
-│   │   ├── SKILL.md       # Instructions
-│   │   ├── document.pdf   # Associated files
-│   │   └── helper.py      # Support scripts
-```
-
-#### 5.2 Dynamic Skill Loading
-
-Replace `writeSkillsToSandbox()` with OpenCode instructions:
+**File**: `src/server/sandbox/e2b.ts`
 
 ```typescript
-// Load user skills into opencode config dynamically
-export async function loadUserSkills(userId: string) {
+/**
+ * Write user's skills to the sandbox as AGENTS.md
+ */
+export async function writeSkillsToSandbox(
+  sandbox: Sandbox,
+  userId: string
+): Promise<string[]> {
   const skills = await db.query.skill.findMany({
     where: and(eq(skill.userId, userId), eq(skill.enabled, true)),
     with: { files: true, documents: true }
   })
 
-  // Write skills to .opencode/skills/ directory
-  for (const s of skills) {
-    const skillDir = `.opencode/skills/${s.name}`
-    await fs.mkdir(skillDir, { recursive: true })
+  if (skills.length === 0) return []
 
+  // Create .opencode directory
+  await sandbox.commands.run("mkdir -p /app/.opencode")
+
+  // Build AGENTS.md content
+  let agentsContent = "# Custom Skills\n\n"
+
+  for (const s of skills) {
+    const skillDir = `/app/.opencode/skills/${s.name}`
+    await sandbox.commands.run(`mkdir -p "${skillDir}"`)
+
+    // Add skill to AGENTS.md
+    agentsContent += `## ${s.displayName}\n\n`
+    agentsContent += `${s.description}\n\n`
+    agentsContent += `Files available in: /app/.opencode/skills/${s.name}/\n\n`
+
+    // Write skill files
     for (const file of s.files) {
-      await fs.writeFile(`${skillDir}/${file.path}`, file.content)
+      await sandbox.files.write(`${skillDir}/${file.path}`, file.content)
     }
 
+    // Write skill documents (binary)
     for (const doc of s.documents) {
       const buffer = await downloadFromS3(doc.storageKey)
-      await fs.writeFile(`${skillDir}/${doc.filename}`, buffer)
+      await sandbox.files.write(`${skillDir}/${doc.filename}`, new Uint8Array(buffer).buffer)
     }
   }
+
+  // Write AGENTS.md
+  await sandbox.files.write("/app/.opencode/AGENTS.md", agentsContent)
+
+  return skills.map(s => s.name)
 }
 ```
 
 ---
 
-### Phase 6: Title Generation Migration
+### Phase 5: Database Migration
 
-**Current**: Direct Anthropic SDK call
-**New**: use gemini flash call to generate title
+#### 5.1 Update Schema
+
+```sql
+-- Rename column
+ALTER TABLE conversation RENAME COLUMN claude_session_id TO opencode_session_id;
+
+-- Optional: rename message column too
+ALTER TABLE message RENAME COLUMN claude_message_uuid TO opencode_message_id;
+```
+
+#### 5.2 Update Drizzle Schema
+
+**File**: `src/server/db/schema.ts`
+
+```typescript
+export const conversation = pgTable("conversation", {
+  // ... existing fields
+  // claudeSessionId: text("claude_session_id"),  // REMOVE
+  opencodeSessionId: text("opencode_session_id"), // ADD
+})
+
+export const message = pgTable("message", {
+  // ... existing fields
+  // claudeMessageUuid: text("claude_message_uuid"),  // REMOVE
+  opencodeMessageId: text("opencode_message_id"),    // ADD (optional)
+})
+```
+
+#### 5.3 Run Migration
+
+```bash
+bun db:push
+```
 
 ---
 
-## Files to Delete
+### Phase 6: Cleanup
 
-After migration is complete:
+#### 6.1 Remove Old Dependencies
+
+```bash
+bun remove @anthropic-ai/sdk @anthropic-ai/claude-agent-sdk
+```
+
+#### 6.2 Files to Delete
 
 ```
 src/e2b-template/
   - agent-runner.ts         # DELETE - OpenCode handles this
-  - template.ts             # REFACTOR - Update for OpenCode
-
-src/server/sandbox/
-  - e2b.ts                  # REFACTOR - Keep but update for OpenCode client
 ```
 
----
-
-## Files to Create/Update
-
-### In E2B Template (baked into sandbox image)
+#### 6.3 Files to Update
 
 ```
-/app/
-├── opencode.json                    # OpenCode server config
-└── .opencode/
-    ├── plugins/
-    │   └── integration-permissions.ts  # Permission hooks
-    └── agents/
-        └── bap.md                   # Custom agent (optional)
+src/server/sandbox/e2b.ts          # MAJOR REFACTOR
+src/server/services/generation-manager.ts  # MAJOR REFACTOR
+src/server/utils/generate-title.ts # UPDATE for Gemini
+src/server/db/schema.ts            # UPDATE column names
+src/e2b-template/template.ts       # UPDATE for OpenCode
 ```
 
-### In Your Server
+#### 6.4 Files to Create
 
 ```
-src/e2b-template/
-├── opencode.json            # Config to bake into E2B
-├── plugins/
-│   └── integration-permissions.ts
-
-src/server/sandbox/
-└── e2b.ts                   # Updated with OpenCode client
+src/e2b-template/opencode.json
+src/e2b-template/plugins/integration-permissions.ts
+src/server/orpc/routers/internal.ts
 ```
 
 ---
 
 ## Migration Checklist
 
+### Phase 0: Pre-Migration
+- [ ] Consolidate chat.ts into GenerationManager
+- [ ] Test all existing functionality still works
+- [ ] Document current event types and transformations
+
 ### Phase 1: E2B Template
-- [ ] Install `@opencode-ai/sdk` on server (client only)
+- [ ] Install `@opencode-ai/sdk` on server
+- [ ] Install `@google/generative-ai` on server
 - [ ] Remove `@anthropic-ai/claude-agent-sdk` from server
-- [ ] Keep `e2b` package
 - [ ] Create `src/e2b-template/opencode.json`
 - [ ] Create `src/e2b-template/plugins/integration-permissions.ts`
 - [ ] Update E2B template to install `opencode`
-- [ ] Build and push updated E2B template: `bap-agent-dev`
+- [ ] Build and push updated E2B template
 - [ ] Test sandbox creates and OpenCode server starts
 
 ### Phase 2: Core Chat
 - [ ] Update `src/server/sandbox/e2b.ts` with OpenCode client
 - [ ] Delete `src/e2b-template/agent-runner.ts`
-- [ ] Update chat router to use `streamChatFromSandbox()`
-- [ ] Implement SSE event transformation
+- [ ] Update GenerationManager for OpenCode
+- [ ] Add internal API endpoints for plugin callbacks
+- [ ] Implement `waitForApproval()` and `waitForAuth()` methods
+- [ ] Implement `replayConversationHistory()`
 - [ ] Test basic chat works end-to-end
 
-### Phase 3: Permissions
-- [ ] Implement permission plugin with read/write rules
-- [ ] Map OpenCode permission events to your approval flow
-- [ ] Update frontend approval UI if needed
+### Phase 3: Event Transformation
+- [ ] Log all OpenCode SSE events to understand structure
+- [ ] Implement event transformation
+- [ ] Update frontend if event types changed
+- [ ] Test streaming works correctly
+
+### Phase 4: Permissions & Auth
 - [ ] Test read operations auto-approve
 - [ ] Test write operations pause for approval
-
-### Phase 4: Integrations
-- [ ] Verify integration CLIs work in new template
+- [ ] Test mid-session OAuth flow
+- [ ] Test approval timeout behavior
 
 ### Phase 5: Skills
-- [ ] Update `writeSkillsToSandbox()` to write to `/app/.opencode/skills/`
-- [ ] Verify OpenCode picks up skills as instructions
-- [ ] Test skill with documents (PDFs, images)
+- [ ] Update skill writing to use AGENTS.md format
+- [ ] Test skills load correctly in OpenCode
+- [ ] Test skill documents (PDFs, images)
 
-### Phase 6: Database Migration
-- [ ] Add `opencodeSessionId` column to conversation table
-- [ ] Drop `claudeSessionId` column
+### Phase 6: Title Generation
+- [ ] Implement Gemini-based title generation
+- [ ] Add GEMINI_API_KEY to environment
+- [ ] Test title generation works
 
-### Phase 7: Cleanup
-- [ ] Remove `@anthropic-ai/sdk` if not used elsewhere
-- [ ] Remove `@anthropic-ai/claude-agent-sdk`
-- [ ] Verify E2B_TEMPLATE env var is `bap-agent-dev`
+### Phase 7: Database
+- [ ] Create migration for column rename
+- [ ] Update Drizzle schema
+- [ ] Run migration: `bun db:push`
+- [ ] Update all code references to new column names
+
+### Phase 8: Cleanup
+- [ ] Remove old dependencies
+- [ ] Delete deprecated files
 - [ ] Update deployment configs
+- [ ] Final end-to-end testing
 
 ---
 
-## Design Decisions
+## Risk Mitigation
 
-### 1. Integrations: Keep as Bash Commands ✓
+### Known Risks
 
-The 13 CLI tools (Slack, Gmail, etc.) continue to work via Bash tool. OpenCode's permission plugin intercepts these commands and applies read/write rules. No MCP conversion needed. Do not use MCP is it a bad standard.
+1. **OpenCode Plugin API Stability**: Plugin system may change. Pin OpenCode version.
 
-### 2. Auth Flow: Inject Tokens at Sandbox Creation ✓
+2. **SSE Event Format**: May differ from documentation. Log extensively during development.
 
-Keep current approach - cleanest for multi-tenant:
+3. **Conversation Replay Performance**: Long conversations may have slow replay. Consider:
+   - Limiting history to last N messages
+   - Summarizing older messages
+   - Caching replay context
 
-```typescript
-// When creating sandbox, inject all user's integration tokens
-const sandbox = await Sandbox.create(TEMPLATE_NAME, {
-  envs: {
-    ANTHROPIC_API_KEY: config.anthropicApiKey,
-    SLACK_ACCESS_TOKEN: user.slackToken,
-    GMAIL_ACCESS_TOKEN: user.gmailToken,
-    // ... all integration tokens
-  },
-})
-```
+4. **Plugin HTTP Timeouts**: If server is slow to respond, plugin may timeout. Configure appropriate timeouts.
 
-For mid-session OAuth (user connects new integration):
-- Complete OAuth on your server
-- Write tokens to sandbox via `sandbox.files.write("/tmp/new-tokens.json")`
-- Plugin reloads tokens from file (same pattern as current `loadTokensFromFile()`)
+5. **Sandbox URL Accessibility**: E2B sandbox URLs must be accessible from your server for SSE. Verify network connectivity.
 
-### 3. Session IDs: Use OpenCode's Directly ✓
+### Rollback Plan
 
-**Database change**: Replace `claudeSessionId` with `opencodeSessionId`
+If critical issues arise:
+1. Revert E2B template to previous version
+2. Restore old dependencies
+3. Use old agent-runner.ts
 
-**Benefits**:
-- OpenCode handles session persistence internally
-- Resume works automatically via `session.get()`
-- No custom session tracking needed
-
-**Flow**:
-```typescript
-// First message in conversation
-const session = await client.session.create({ body: { title } })
-await db.update(conversation).set({ opencodeSessionId: session.id })
-
-// Subsequent messages
-const sessionId = conversation.opencodeSessionId
-await client.session.prompt({ path: { id: sessionId }, body: { ... } })
-```
+Keep old template available: `bap-agent-legacy`
 
 ---
 
-## Additional Documentation Needed
+## Additional Documentation
 
-If you have access to more OpenCode docs, these would help:
-- **Plugin Events** - Full list of hookable events (`Tool.preExecute`, etc.)
-- **Permission API** - How to respond to permission requests programmatically
-- **SSE Event Types** - Complete list of event types from `event.subscribe()`
+### OpenCode Resources
+- Plugins: https://opencode.ai/docs/plugins/
+- Server: https://opencode.ai/docs/server/
+- SDK: https://opencode.ai/docs/sdk/
 
-The offical docs of opencode
-https://opencode.ai/docs/plugins/#create-a-plugin
-https://opencode.ai/docs/server/
-https://opencode.ai/docs/sdk/
+### E2B Resources
+- Documentation: https://e2b.dev/docs
+- Sandbox API: https://e2b.dev/docs/sandbox/overview
+
+### Gemini Resources
+- Node.js SDK: https://ai.google.dev/gemini-api/docs/get-started/node
