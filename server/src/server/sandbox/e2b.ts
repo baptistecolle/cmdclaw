@@ -71,7 +71,7 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   const sandbox = await Sandbox.create(TEMPLATE_NAME, {
     envs: {
       ANTHROPIC_API_KEY: config.anthropicApiKey,
-      BAP_SERVER_URL: env.BAP_SERVER_URL || "",
+      APP_URL: env.APP_URL || "",
       BAP_SERVER_SECRET: env.BAP_SERVER_SECRET || "",
       CONVERSATION_ID: config.conversationId,
       ...config.integrationEnvs,
@@ -223,12 +223,6 @@ async function replayConversationHistory(
   });
 }
 
-// Get the active sandbox for a conversation (used by approval endpoint)
-export function getActiveSandbox(conversationId: string): Sandbox | undefined {
-  const state = activeSandboxes.get(conversationId);
-  return state?.sandbox;
-}
-
 /**
  * Kill a sandbox for a conversation
  */
@@ -362,48 +356,3 @@ Read the SKILL.md file in each skill directory when relevant to the user's reque
 `;
 }
 
-// Legacy functions kept for backwards compatibility during migration
-
-/**
- * @deprecated Use OpenCode HTTP callbacks instead
- */
-export async function writeApprovalResponse(
-  sandbox: Sandbox,
-  toolUseId: string,
-  decision: "allow" | "deny"
-): Promise<void> {
-  const response = { toolUseId, decision };
-  await sandbox.files.write(
-    "/tmp/approval-response.json",
-    JSON.stringify(response)
-  );
-  console.log("[E2B SDK] Wrote approval response:", response);
-}
-
-/**
- * @deprecated Use OpenCode HTTP callbacks instead
- */
-export async function writeAuthResponse(
-  sandbox: Sandbox,
-  success: boolean,
-  integrations: string[],
-  tokens?: Record<string, string>
-): Promise<void> {
-  const response = { success, integrations, timestamp: Date.now() };
-  await sandbox.files.write(
-    "/tmp/auth-response.json",
-    JSON.stringify(response)
-  );
-  console.log("[E2B SDK] Wrote auth response:", response);
-
-  if (tokens && Object.keys(tokens).length > 0) {
-    await sandbox.files.write(
-      "/tmp/integration-tokens.json",
-      JSON.stringify(tokens)
-    );
-    console.log(
-      "[E2B SDK] Wrote integration tokens for:",
-      Object.keys(tokens)
-    );
-  }
-}

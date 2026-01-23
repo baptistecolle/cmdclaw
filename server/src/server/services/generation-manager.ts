@@ -9,21 +9,14 @@ import {
   type PendingAuth,
 } from "@/server/db/schema";
 import {
-  getOrCreateSandbox,
   getOrCreateSession,
-  getOpencodeClient,
   writeSkillsToSandbox,
   getSkillsSystemPrompt,
-  writeApprovalResponse,
-  writeAuthResponse,
-  getActiveSandbox,
-  killSandbox,
 } from "@/server/sandbox/e2b";
 import {
   getCliEnvForUser,
   getCliInstructions,
   getEnabledIntegrationTypes,
-  getTokensForIntegrations,
 } from "@/server/integrations/cli-env";
 import { generateConversationTitle } from "@/server/utils/generate-title";
 import { env } from "@/env";
@@ -125,8 +118,6 @@ const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
 // Save debounce interval for text chunks
 const SAVE_DEBOUNCE_MS = 2000;
-// Max generation time without subscribers
-const MAX_UNATTENDED_GENERATION_MS = 30 * 60 * 1000;
 
 class GenerationManager {
   private activeGenerations = new Map<string, GenerationContext>();
@@ -483,20 +474,6 @@ class GenerationManager {
       throw new Error("Access denied");
     }
 
-    // Signal the agent-runner to call query.interrupt() for graceful interruption
-    const sandbox = getActiveSandbox(ctx.conversationId);
-    if (sandbox) {
-      try {
-        await sandbox.files.write(
-          "/tmp/interrupt-request.json",
-          JSON.stringify({ interrupt: true, timestamp: Date.now() })
-        );
-        console.log("[GenerationManager] Sent interrupt signal to sandbox");
-      } catch (error) {
-        console.error("[GenerationManager] Failed to send interrupt signal:", error);
-      }
-    }
-
     ctx.abortController.abort();
     await this.finishGeneration(ctx, "cancelled");
     return true;
@@ -534,12 +511,6 @@ class GenerationManager {
     if (ctx.approvalResolver) {
       ctx.approvalResolver(decision === "approve" ? "allow" : "deny");
       ctx.approvalResolver = undefined;
-    }
-
-    // Write approval to sandbox (legacy SDK flow)
-    const sandbox = getActiveSandbox(ctx.conversationId);
-    if (sandbox) {
-      await writeApprovalResponse(sandbox, toolUseId, decision === "approve" ? "allow" : "deny");
     }
 
     // Clear pending approval
@@ -830,65 +801,6 @@ class GenerationManager {
     }
   }
 
-  // Note: handleApprovalNeeded and handleAuthNeeded are no longer needed for OpenCode
-  // The plugin handles these via HTTP callbacks to the internal router
-  // Keeping the methods for backwards compatibility with any direct event handling
-
-  private async handleApprovalNeeded(ctx: GenerationContext, event: Record<string, unknown>): Promise<void> {
-    // Check if conversation has auto-approve enabled
-    const conv = await db.query.conversation.findFirst({
-      where: eq(conversation.id, ctx.conversationId),
-      columns: { autoApprove: true, userId: true },
-    });
-
-    if (conv?.autoApprove && conv.userId) {
-      // Auto-approve the tool use
-      console.log(`[GenerationManager] Auto-approving tool use for generation ${ctx.id}`);
-      await this.submitApproval(ctx.id, (event.toolUseId as string) || "", "approve", conv.userId);
-      return;
-    }
-
-    ctx.status = "awaiting_approval";
-    ctx.pendingApproval = {
-      toolUseId: (event.toolUseId as string) || "",
-      toolName: (event.toolName as string) || "Bash",
-      toolInput: (event.toolInput as Record<string, unknown>) || {},
-      requestedAt: new Date().toISOString(),
-    };
-
-    // Update database
-    await db
-      .update(generation)
-      .set({
-        status: "awaiting_approval",
-        pendingApproval: ctx.pendingApproval,
-      })
-      .where(eq(generation.id, ctx.id));
-
-    await db
-      .update(conversation)
-      .set({ generationStatus: "awaiting_approval" })
-      .where(eq(conversation.id, ctx.conversationId));
-
-    // Notify subscribers
-    this.broadcast(ctx, {
-      type: "pending_approval",
-      generationId: ctx.id,
-      conversationId: ctx.conversationId,
-      toolUseId: (event.toolUseId as string) || "",
-      toolName: (event.toolName as string) || "Bash",
-      toolInput: event.toolInput,
-      integration: (event.integration as string) || "",
-      operation: (event.operation as string) || "",
-      command: event.command as string | undefined,
-    });
-
-    // Start approval timeout
-    ctx.approvalTimeoutId = setTimeout(() => {
-      this.handleApprovalTimeout(ctx);
-    }, APPROVAL_TIMEOUT_MS);
-  }
-
   private async handleApprovalTimeout(ctx: GenerationContext): Promise<void> {
     if (ctx.status !== "awaiting_approval" || !ctx.pendingApproval) {
       return;
@@ -919,61 +831,12 @@ class GenerationManager {
     this.broadcast(ctx, { type: "status_change", status: "paused" });
   }
 
-  private async handleAuthNeeded(ctx: GenerationContext, event: Record<string, unknown>): Promise<void> {
-    console.log(`[GenerationManager] handleAuthNeeded for generation ${ctx.id}:`, {
-      integrations: event.integrations,
-      reason: event.reason,
-    });
-
-    ctx.status = "awaiting_auth";
-    ctx.pendingAuth = {
-      integrations: (event.integrations as string[]) || [],
-      connectedIntegrations: [],
-      requestedAt: new Date().toISOString(),
-      reason: event.reason as string | undefined,
-    };
-
-    // Update database
-    await db
-      .update(generation)
-      .set({
-        status: "awaiting_auth",
-        pendingAuth: ctx.pendingAuth,
-      })
-      .where(eq(generation.id, ctx.id));
-
-    await db
-      .update(conversation)
-      .set({ generationStatus: "awaiting_auth" })
-      .where(eq(conversation.id, ctx.conversationId));
-
-    // Notify subscribers
-    this.broadcast(ctx, {
-      type: "auth_needed",
-      generationId: ctx.id,
-      conversationId: ctx.conversationId,
-      integrations: ctx.pendingAuth.integrations,
-      reason: ctx.pendingAuth.reason,
-    });
-
-    // Start auth timeout (10 minutes)
-    ctx.authTimeoutId = setTimeout(() => {
-      this.handleAuthTimeout(ctx);
-    }, AUTH_TIMEOUT_MS);
-  }
-
   private async handleAuthTimeout(ctx: GenerationContext): Promise<void> {
     if (ctx.status !== "awaiting_auth" || !ctx.pendingAuth) {
       return;
     }
 
     console.log(`[GenerationManager] Auth timeout for generation ${ctx.id}, cancelling`);
-
-    // Write failure response to sandbox
-    const sandbox = getActiveSandbox(ctx.conversationId);
-    if (sandbox) {
-      await writeAuthResponse(sandbox, false, []);
-    }
 
     await this.finishGeneration(ctx, "cancelled");
   }
@@ -1012,11 +875,6 @@ class GenerationManager {
         ctx.authResolver({ success: false });
         ctx.authResolver = undefined;
       }
-      // Write failure to sandbox (legacy SDK flow)
-      const sandbox = getActiveSandbox(ctx.conversationId);
-      if (sandbox) {
-        await writeAuthResponse(sandbox, false, []);
-      }
       await this.finishGeneration(ctx, "cancelled");
       return true;
     }
@@ -1029,22 +887,10 @@ class GenerationManager {
     );
 
     if (allConnected) {
-      // All integrations connected - fetch tokens and write to sandbox
-      const tokens = await getTokensForIntegrations(
-        ctx.userId,
-        ctx.pendingAuth.connectedIntegrations
-      );
-
       // Resolve the auth promise if waiting (OpenCode plugin flow)
       if (ctx.authResolver) {
         ctx.authResolver({ success: true, userId: ctx.userId });
         ctx.authResolver = undefined;
-      }
-
-      // Write to sandbox (legacy SDK flow)
-      const sandbox = getActiveSandbox(ctx.conversationId);
-      if (sandbox) {
-        await writeAuthResponse(sandbox, true, ctx.pendingAuth.connectedIntegrations, tokens);
       }
 
       // Broadcast result before clearing pendingAuth

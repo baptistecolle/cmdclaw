@@ -223,18 +223,18 @@ async function requestApproval(params: {
   command: string;
   toolInput: unknown;
 }): Promise<"allow" | "deny"> {
-  const serverUrl = process.env.BAP_SERVER_URL;
+  const serverUrl = process.env.APP_URL;
   const serverSecret = process.env.BAP_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
   const sandboxId = process.env.SANDBOX_ID;
 
   if (!serverUrl || !conversationId) {
-    console.error("[Plugin] Missing BAP_SERVER_URL or CONVERSATION_ID");
+    console.error("[Plugin] Missing APP_URL or CONVERSATION_ID");
     return "deny";
   }
 
   try {
-    const response = await fetch(`${serverUrl}/api/rpc/internal/approvalRequest`, {
+    const response = await fetch(`${serverUrl}/api/rpc/internal.approvalRequest`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -270,17 +270,17 @@ async function requestAuth(params: {
   integration: string;
   reason: string;
 }): Promise<{ success: boolean; tokens?: Record<string, string> }> {
-  const serverUrl = process.env.BAP_SERVER_URL;
+  const serverUrl = process.env.APP_URL;
   const serverSecret = process.env.BAP_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
 
   if (!serverUrl || !conversationId) {
-    console.error("[Plugin] Missing BAP_SERVER_URL or CONVERSATION_ID");
+    console.error("[Plugin] Missing APP_URL or CONVERSATION_ID");
     return { success: false };
   }
 
   try {
-    const response = await fetch(`${serverUrl}/api/rpc/internal/authRequest`, {
+    const response = await fetch(`${serverUrl}/api/rpc/internal.authRequest`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

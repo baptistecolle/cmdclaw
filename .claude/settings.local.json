@@ -15,7 +15,8 @@
       "WebSearch",
       "Bash(bun remove:*)",
       "Bash(bun add:*)",
-      "Bash(bun run typecheck:*)"
+      "Bash(bun run typecheck:*)",
+      "Bash(git show:*)"
     ]
   }
 }
