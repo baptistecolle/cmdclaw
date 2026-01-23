@@ -60,6 +60,9 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
     tokenBody.delete("client_secret");
   }
 
+  // Salesforce uses standard OAuth refresh but may return updated instance_url
+  // (handled in the response processing below)
+
   const now = new Date();
   const tokenAge = token.expiresAt ? Math.round((now.getTime() - token.expiresAt.getTime()) / 1000 / 60) : 'unknown';
   console.log(`[Token Refresh] Refreshing ${token.type} token...`);

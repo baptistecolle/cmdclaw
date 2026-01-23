@@ -29,6 +29,7 @@ const integrationTypeSchema = z.enum([
   "slack",
   "hubspot",
   "linkedin",
+  "salesforce",
 ]);
 
 // List user's integrations

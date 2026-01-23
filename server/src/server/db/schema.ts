@@ -264,6 +264,7 @@ export const integrationTypeEnum = pgEnum("integration_type", [
   "slack",
   "hubspot",
   "linkedin",
+  "salesforce",
 ]);
 
 export const integration = pgTable(

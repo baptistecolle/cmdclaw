@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Users,
   Linkedin,
+  Cloud,
   type LucideIcon,
 } from "lucide-react";
 
@@ -32,7 +33,8 @@ export type IntegrationType =
   | "airtable"
   | "slack"
   | "hubspot"
-  | "linkedin";
+  | "linkedin"
+  | "salesforce";
 
 export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   gmail: Mail,
@@ -47,6 +49,7 @@ export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   slack: MessageSquare,
   hubspot: Users,
   linkedin: Linkedin,
+  salesforce: Cloud,
 };
 
 export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
@@ -62,6 +65,7 @@ export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
   slack: "Slack",
   hubspot: "HubSpot",
   linkedin: "LinkedIn",
+  salesforce: "Salesforce",
 };
 
 export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
@@ -77,6 +81,7 @@ export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
   slack: "text-[#4A154B]",
   hubspot: "text-orange-500",
   linkedin: "text-[#0A66C2]",
+  salesforce: "text-[#00A1E0]",
 };
 
 export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
@@ -92,6 +97,7 @@ export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
   slack: "/integrations/slack.svg",
   hubspot: "/integrations/hubspot.svg",
   linkedin: "/integrations/linkedin.svg",
+  salesforce: "/integrations/salesforce.svg",
 };
 
 // Human-readable descriptions for integration operations
@@ -233,6 +239,15 @@ export const INTEGRATION_OPERATION_LABELS: Record<IntegrationType, Record<string
     "posts.react": "Reacting to post",
     "company.posts": "Listing company posts",
     "company.post": "Creating company post",
+  },
+  salesforce: {
+    query: "Querying records",
+    get: "Getting record",
+    describe: "Getting object metadata",
+    objects: "Listing objects",
+    search: "Searching records",
+    create: "Creating record",
+    update: "Updating record",
   },
 };
 

@@ -130,6 +130,14 @@ export async function GET(request: NextRequest) {
     // Get user info from provider
     const userInfo = await config.getUserInfo(accessToken);
 
+    // Salesforce: capture instance_url from token response
+    if (stateData.type === "salesforce" && tokens.instance_url) {
+      userInfo.metadata = {
+        ...userInfo.metadata,
+        instanceUrl: tokens.instance_url,
+      };
+    }
+
     // Create or update integration
     const existingIntegration = await db.query.integration.findFirst({
       where: and(

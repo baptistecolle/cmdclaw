@@ -34,6 +34,7 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   "airtable": "airtable",
   "hubspot": "hubspot",
   "linkedin": "linkedin",
+  "salesforce": "salesforce",
 };
 
 // Tool permissions: read operations auto-approve, write operations require approval
@@ -116,6 +117,10 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
       "posts.create", "posts.comment", "posts.react",
       "company.post",
     ],
+  },
+  salesforce: {
+    read: ["query", "get", "describe", "objects", "search"],
+    write: ["create", "update"],
   },
 };
 
@@ -270,6 +275,7 @@ function getTokenEnvVar(integration: string): string {
     airtable: "AIRTABLE_ACCESS_TOKEN",
     hubspot: "HUBSPOT_ACCESS_TOKEN",
     linkedin: "LINKEDIN_ACCOUNT_ID",
+    salesforce: "SALESFORCE_ACCESS_TOKEN",
   };
   return envVarMap[integration] || "";
 }
@@ -291,6 +297,7 @@ function getIntegrationDisplayName(integration: string): string {
     airtable: "Airtable",
     hubspot: "HubSpot",
     linkedin: "LinkedIn",
+    salesforce: "Salesforce",
   };
   return names[integration] || integration;
 }

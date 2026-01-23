@@ -93,6 +93,12 @@ const integrationConfig = {
     icon: "/integrations/linkedin.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
+  salesforce: {
+    name: "Salesforce",
+    description: "Query and manage CRM records, opportunities, and contacts",
+    icon: "/integrations/salesforce.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
 } as const;
 
 type IntegrationType = keyof typeof integrationConfig;

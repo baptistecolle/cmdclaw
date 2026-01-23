@@ -18,6 +18,7 @@ const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
   airtable: "AIRTABLE_ACCESS_TOKEN",
   slack: "SLACK_ACCESS_TOKEN",
   hubspot: "HUBSPOT_ACCESS_TOKEN",
+  salesforce: "SALESFORCE_ACCESS_TOKEN",
 };
 
 export async function getCliEnvForUser(userId: string): Promise<Record<string, string>> {
@@ -47,6 +48,22 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
     cliEnv.LINKEDIN_ACCOUNT_ID = linkedinIntegration.providerAccountId;
     if (env.UNIPILE_API_KEY) cliEnv.UNIPILE_API_KEY = env.UNIPILE_API_KEY;
     if (env.UNIPILE_DSN) cliEnv.UNIPILE_DSN = env.UNIPILE_DSN;
+  }
+
+  // Salesforce special case - needs instance URL from metadata
+  const salesforceIntegration = await db.query.integration.findFirst({
+    where: and(
+      eq(integration.userId, userId),
+      eq(integration.type, "salesforce"),
+      eq(integration.enabled, true)
+    ),
+  });
+
+  if (salesforceIntegration && salesforceIntegration.metadata) {
+    const metadata = salesforceIntegration.metadata as Record<string, unknown>;
+    if (metadata.instanceUrl) {
+      cliEnv.SALESFORCE_INSTANCE_URL = metadata.instanceUrl as string;
+    }
   }
 
   return cliEnv;
@@ -193,6 +210,69 @@ POSTS & CONTENT
 COMPANY PAGES
 - linkedin company posts <companyId> [-l limit]     List company posts
 - linkedin company post <companyId> --text <text>   Post as company (if admin)
+
+## Salesforce CLI [${statusTag("salesforce")}]
+
+Query and manage Salesforce CRM records.
+
+### Commands
+
+**Query records (SOQL):**
+\`\`\`bash
+salesforce query "SELECT Id, Name, Email FROM Contact WHERE AccountId = '001xxx'"
+salesforce query "SELECT Id, Name, Amount, StageName FROM Opportunity WHERE Amount > 50000"
+salesforce query "SELECT Id, Name FROM Account WHERE Industry = 'Technology' LIMIT 10"
+\`\`\`
+
+**Get single record:**
+\`\`\`bash
+salesforce get Account 001xxxxxxxxxxxx
+salesforce get Contact 003xxxxxxxxxxxx Name,Email,Phone
+\`\`\`
+
+**Create record:**
+\`\`\`bash
+salesforce create Contact '{"FirstName": "John", "LastName": "Doe", "Email": "john@example.com", "AccountId": "001xxx"}'
+salesforce create Task '{"Subject": "Follow up", "WhoId": "003xxx", "ActivityDate": "2025-02-01"}'
+salesforce create Opportunity '{"Name": "New Deal", "StageName": "Prospecting", "CloseDate": "2025-03-01", "Amount": 10000}'
+\`\`\`
+
+**Update record:**
+\`\`\`bash
+salesforce update Opportunity 006xxxxxxxxxxxx '{"StageName": "Negotiation", "Amount": 15000}'
+salesforce update Contact 003xxxxxxxxxxxx '{"Phone": "555-1234"}'
+\`\`\`
+
+**Describe object (get fields):**
+\`\`\`bash
+salesforce describe Account
+salesforce describe Opportunity
+salesforce describe CustomObject__c
+\`\`\`
+
+**List all objects:**
+\`\`\`bash
+salesforce objects
+\`\`\`
+
+**Search across objects (SOSL):**
+\`\`\`bash
+salesforce search "FIND {Acme} IN ALL FIELDS RETURNING Account(Id, Name), Contact(Id, Name, Email)"
+\`\`\`
+
+### Common Objects
+- **Account** - Companies/organizations
+- **Contact** - People at companies
+- **Lead** - Potential customers
+- **Opportunity** - Sales deals
+- **Task** - To-do items
+- **Case** - Support tickets
+
+### SOQL Tips
+- Use \`LIMIT\` to restrict results
+- Date literals: \`TODAY\`, \`THIS_MONTH\`, \`LAST_N_DAYS:30\`
+- Custom objects end with \`__c\` (e.g., \`Invoice__c\`)
+- Custom fields end with \`__c\` (e.g., \`Custom_Field__c\`)
 `;
 
   return `
@@ -251,6 +331,24 @@ export async function getTokensForIntegrations(
       tokens.LINKEDIN_ACCOUNT_ID = linkedinIntegration.providerAccountId;
       if (env.UNIPILE_API_KEY) tokens.UNIPILE_API_KEY = env.UNIPILE_API_KEY;
       if (env.UNIPILE_DSN) tokens.UNIPILE_DSN = env.UNIPILE_DSN;
+    }
+  }
+
+  // Salesforce special case - needs instance URL from metadata
+  if (integrationTypes.includes("salesforce")) {
+    const salesforceIntegration = await db.query.integration.findFirst({
+      where: and(
+        eq(integration.userId, userId),
+        eq(integration.type, "salesforce"),
+        eq(integration.enabled, true)
+      ),
+    });
+
+    if (salesforceIntegration && salesforceIntegration.metadata) {
+      const metadata = salesforceIntegration.metadata as Record<string, unknown>;
+      if (metadata.instanceUrl) {
+        tokens.SALESFORCE_INSTANCE_URL = metadata.instanceUrl as string;
+      }
     }
   }
 

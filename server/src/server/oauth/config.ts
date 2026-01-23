@@ -1,6 +1,6 @@
 import { env } from "@/env";
 
-export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin";
+export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce";
 
 export type OAuthConfig = {
   clientId: string;
@@ -285,6 +285,32 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     scopes: [],
     getUserInfo: async () => {
       throw new Error("LinkedIn uses Unipile auth, not standard OAuth");
+    },
+  }),
+
+  salesforce: () => ({
+    clientId: env.SALESFORCE_CLIENT_ID ?? "",
+    clientSecret: env.SALESFORCE_CLIENT_SECRET ?? "",
+    authUrl: "https://login.salesforce.com/services/oauth2/authorize",
+    tokenUrl: "https://login.salesforce.com/services/oauth2/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: ["api", "refresh_token", "openid"],
+    getUserInfo: async (accessToken: string) => {
+      const res = await fetch(
+        "https://login.salesforce.com/services/oauth2/userinfo",
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+      const data = await res.json();
+      return {
+        id: data.user_id,
+        displayName: data.name || data.email,
+        metadata: {
+          organizationId: data.organization_id,
+          email: data.email,
+        },
+      };
     },
   }),
 };
