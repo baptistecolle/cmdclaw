@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
       tokenBody.delete("client_secret");
     }
 
-    // Airtable requires code_verifier for PKCE
-    if (stateData.type === "airtable" && stateData.codeVerifier) {
+    // Airtable and Salesforce require code_verifier for PKCE
+    if (stateData.codeVerifier) {
       tokenBody.set("code_verifier", stateData.codeVerifier);
     }
 
