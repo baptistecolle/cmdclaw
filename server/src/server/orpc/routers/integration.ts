@@ -65,8 +65,9 @@ const getAuthUrl = protectedProcedure
 
     const config = getOAuthConfig(input.type as IntegrationType);
 
-    // Generate PKCE code_verifier for Airtable
-    const codeVerifier = input.type === "airtable" ? generateCodeVerifier() : undefined;
+    // Generate PKCE code_verifier for providers that require it
+    const pkceProviders = ["airtable", "salesforce"];
+    const codeVerifier = pkceProviders.includes(input.type) ? generateCodeVerifier() : undefined;
 
     const state = Buffer.from(
       JSON.stringify({
@@ -102,8 +103,8 @@ const getAuthUrl = protectedProcedure
       params.set("owner", "user");
     }
 
-    // Airtable requires PKCE
-    if (input.type === "airtable" && codeVerifier) {
+    // Airtable and Salesforce require PKCE
+    if (codeVerifier) {
       params.set("code_challenge", generateCodeChallenge(codeVerifier));
       params.set("code_challenge_method", "S256");
     }
@@ -146,8 +147,8 @@ const handleCallback = protectedProcedure
       redirect_uri: config.redirectUri,
     });
 
-    // Airtable requires code_verifier for PKCE
-    if (stateData.type === "airtable" && stateData.codeVerifier) {
+    // Airtable and Salesforce require code_verifier for PKCE
+    if (stateData.codeVerifier) {
       tokenBody.set("code_verifier", stateData.codeVerifier);
     }
 
