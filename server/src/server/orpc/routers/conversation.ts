@@ -66,6 +66,7 @@ const get = protectedProcedure
       id: conv.id,
       title: conv.title,
       model: conv.model,
+      autoApprove: conv.autoApprove,
       messages: conv.messages.map((m) => ({
         id: m.id,
         role: m.role,
@@ -103,6 +104,33 @@ const updateTitle = protectedProcedure
     }
 
     return { success: true };
+  });
+
+// Update conversation auto-approve setting
+const updateAutoApprove = protectedProcedure
+  .input(
+    z.object({
+      id: z.string(),
+      autoApprove: z.boolean(),
+    })
+  )
+  .handler(async ({ input, context }) => {
+    const result = await context.db
+      .update(conversation)
+      .set({ autoApprove: input.autoApprove })
+      .where(
+        and(
+          eq(conversation.id, input.id),
+          eq(conversation.userId, context.user.id)
+        )
+      )
+      .returning({ id: conversation.id, autoApprove: conversation.autoApprove });
+
+    if (result.length === 0) {
+      throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }
+
+    return { success: true, autoApprove: result[0].autoApprove };
   });
 
 // Archive conversation
@@ -152,6 +180,7 @@ export const conversationRouter = {
   list,
   get,
   updateTitle,
+  updateAutoApprove,
   archive,
   delete: del,
 };

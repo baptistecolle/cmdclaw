@@ -95,6 +95,7 @@ const startGeneration = protectedProcedure
       conversationId: z.string().optional(),
       content: z.string().min(1).max(100000),
       model: z.string().optional(),
+      autoApprove: z.boolean().optional(),
     })
   )
   .output(
@@ -109,6 +110,7 @@ const startGeneration = protectedProcedure
       content: input.content,
       model: input.model,
       userId: context.user.id,
+      autoApprove: input.autoApprove,
     });
 
     return result;

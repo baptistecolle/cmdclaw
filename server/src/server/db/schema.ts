@@ -149,6 +149,8 @@ export const conversation = pgTable(
     // Generation tracking
     generationStatus: generationStatusEnum("generation_status").default("idle").notNull(),
     currentGenerationId: text("current_generation_id"),
+    // Auto-approve sensitive operations without user confirmation
+    autoApprove: boolean("auto_approve").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useRef } from "react";
 import { client } from "./client";
 import type { ChatEvent } from "@/server/orpc/routers/chat";
 
@@ -190,6 +191,19 @@ export function useUpdateConversationTitle() {
   return useMutation({
     mutationFn: ({ id, title }: { id: string; title: string }) =>
       client.conversation.updateTitle({ id, title }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversation"] });
+    },
+  });
+}
+
+// Hook for updating conversation auto-approve setting
+export function useUpdateAutoApprove() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, autoApprove }: { id: string; autoApprove: boolean }) =>
+      client.conversation.updateAutoApprove({ id, autoApprove }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conversation"] });
     },
@@ -499,11 +513,10 @@ export type GenerationCallbacks = {
 // Hook for generation-based streaming (new persistent generation system)
 export function useGeneration() {
   const queryClient = useQueryClient();
-  const abortControllerRef = { current: null as AbortController | null };
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  return {
-    startGeneration: async (
-      input: { conversationId?: string; content: string; model?: string },
+  const startGeneration = useCallback(async (
+      input: { conversationId?: string; content: string; model?: string; autoApprove?: boolean },
       callbacks: GenerationCallbacks
     ): Promise<{ generationId: string; conversationId: string } | null> => {
       abortControllerRef.current = new AbortController();
@@ -609,114 +622,115 @@ export function useGeneration() {
       } finally {
         abortControllerRef.current = null;
       }
-    },
+  }, [queryClient]);
 
-    subscribeToGeneration: async (
-      generationId: string,
-      callbacks: GenerationCallbacks
-    ) => {
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
+  const subscribeToGeneration = useCallback(async (
+    generationId: string,
+    callbacks: GenerationCallbacks
+  ) => {
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
-      try {
-        const iterator = await client.generation.subscribeGeneration(
-          { generationId },
-          { signal }
-        );
+    try {
+      const iterator = await client.generation.subscribeGeneration(
+        { generationId },
+        { signal }
+      );
 
-        for await (const event of iterator) {
-          if (signal.aborted) {
+      for await (const event of iterator) {
+        if (signal.aborted) {
+          break;
+        }
+
+        switch (event.type) {
+          case "text":
+            callbacks.onText?.(event.content);
             break;
-          }
-
-          switch (event.type) {
-            case "text":
-              callbacks.onText?.(event.content);
-              break;
-            case "thinking":
-              callbacks.onThinking?.({
-                content: event.content,
-                thinkingId: event.thinkingId,
-              });
-              break;
-            case "tool_use":
-              callbacks.onToolUse?.({
-                toolName: event.toolName,
-                toolInput: event.toolInput,
-                toolUseId: event.toolUseId,
-                integration: event.integration,
-                operation: event.operation,
-                isWrite: event.isWrite,
-              });
-              break;
-            case "tool_result":
-              callbacks.onToolResult?.(event.toolName, event.result);
-              break;
-            case "pending_approval":
-              callbacks.onPendingApproval?.({
-                generationId: event.generationId,
-                conversationId: event.conversationId,
-                toolUseId: event.toolUseId,
-                toolName: event.toolName,
-                toolInput: event.toolInput,
-                integration: event.integration,
-                operation: event.operation,
-                command: event.command,
-              });
-              break;
-            case "approval_result":
-              callbacks.onApprovalResult?.(event.toolUseId, event.decision);
-              break;
-            case "auth_needed":
-              callbacks.onAuthNeeded?.({
-                generationId: event.generationId,
-                conversationId: event.conversationId,
-                integrations: event.integrations,
-                reason: event.reason,
-              });
-              break;
-            case "auth_progress":
-              callbacks.onAuthProgress?.(event.connected, event.remaining);
-              break;
-            case "auth_result":
-              callbacks.onAuthResult?.(event.success, event.integrations);
-              break;
-            case "done":
-              callbacks.onDone?.(
-                event.generationId,
-                event.conversationId,
-                event.messageId,
-                event.usage
-              );
-              queryClient.invalidateQueries({ queryKey: ["conversation"] });
-              break;
-            case "error":
-              callbacks.onError?.(event.message);
-              break;
-            case "cancelled":
-              callbacks.onCancelled?.();
-              break;
-            case "status_change":
-              callbacks.onStatusChange?.(event.status);
-              break;
-          }
+          case "thinking":
+            callbacks.onThinking?.({
+              content: event.content,
+              thinkingId: event.thinkingId,
+            });
+            break;
+          case "tool_use":
+            callbacks.onToolUse?.({
+              toolName: event.toolName,
+              toolInput: event.toolInput,
+              toolUseId: event.toolUseId,
+              integration: event.integration,
+              operation: event.operation,
+              isWrite: event.isWrite,
+            });
+            break;
+          case "tool_result":
+            callbacks.onToolResult?.(event.toolName, event.result);
+            break;
+          case "pending_approval":
+            callbacks.onPendingApproval?.({
+              generationId: event.generationId,
+              conversationId: event.conversationId,
+              toolUseId: event.toolUseId,
+              toolName: event.toolName,
+              toolInput: event.toolInput,
+              integration: event.integration,
+              operation: event.operation,
+              command: event.command,
+            });
+            break;
+          case "approval_result":
+            callbacks.onApprovalResult?.(event.toolUseId, event.decision);
+            break;
+          case "auth_needed":
+            callbacks.onAuthNeeded?.({
+              generationId: event.generationId,
+              conversationId: event.conversationId,
+              integrations: event.integrations,
+              reason: event.reason,
+            });
+            break;
+          case "auth_progress":
+            callbacks.onAuthProgress?.(event.connected, event.remaining);
+            break;
+          case "auth_result":
+            callbacks.onAuthResult?.(event.success, event.integrations);
+            break;
+          case "done":
+            callbacks.onDone?.(
+              event.generationId,
+              event.conversationId,
+              event.messageId,
+              event.usage
+            );
+            queryClient.invalidateQueries({ queryKey: ["conversation"] });
+            break;
+          case "error":
+            callbacks.onError?.(event.message);
+            break;
+          case "cancelled":
+            callbacks.onCancelled?.();
+            break;
+          case "status_change":
+            callbacks.onStatusChange?.(event.status);
+            break;
         }
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
-          return;
-        }
-        callbacks.onError?.(
-          error instanceof Error ? error.message : "Unknown error"
-        );
-      } finally {
-        abortControllerRef.current = null;
       }
-    },
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+      callbacks.onError?.(
+        error instanceof Error ? error.message : "Unknown error"
+      );
+    } finally {
+      abortControllerRef.current = null;
+    }
+  }, [queryClient]);
 
-    abort: () => {
-      abortControllerRef.current?.abort();
-    },
-  };
+  const abort = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
+
+  return { startGeneration, subscribeToGeneration, abort };
 }
 
 // Hook for canceling a generation

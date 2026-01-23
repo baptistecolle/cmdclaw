@@ -139,8 +139,9 @@ class GenerationManager {
     content: string;
     model?: string;
     userId: string;
+    autoApprove?: boolean;
   }): Promise<{ generationId: string; conversationId: string }> {
-    const { content, userId, model } = params;
+    const { content, userId, model, autoApprove } = params;
 
     // Check for existing active generation on this conversation
     if (params.conversationId) {
@@ -177,6 +178,7 @@ class GenerationManager {
           userId,
           title,
           model: model ?? "claude-sonnet-4-20250514",
+          autoApprove: autoApprove ?? false,
         })
         .returning();
       conv = newConv;
@@ -803,6 +805,19 @@ class GenerationManager {
   }
 
   private async handleApprovalNeeded(ctx: GenerationContext, event: SDKAgentEvent): Promise<void> {
+    // Check if conversation has auto-approve enabled
+    const conv = await db.query.conversation.findFirst({
+      where: eq(conversation.id, ctx.conversationId),
+      columns: { autoApprove: true, userId: true },
+    });
+
+    if (conv?.autoApprove && conv.userId) {
+      // Auto-approve the tool use
+      console.log(`[GenerationManager] Auto-approving tool use for generation ${ctx.id}`);
+      await this.submitApproval(ctx.id, event.toolUseId || "", "approve", conv.userId);
+      return;
+    }
+
     ctx.status = "awaiting_approval";
     ctx.pendingApproval = {
       toolUseId: event.toolUseId || "",

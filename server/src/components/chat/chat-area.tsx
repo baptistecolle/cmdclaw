@@ -17,12 +17,14 @@ import {
   useGetAuthUrl,
   useActiveGeneration,
   useCancelGeneration,
+  useUpdateAutoApprove,
   type GenerationPendingApprovalData,
   type AuthNeededData,
 } from "@/orpc/hooks";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import { useRouter } from "next/navigation";
-import { MessageSquare, AlertCircle, Activity } from "lucide-react";
+import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useHotkeys } from "react-hotkeys-hook";
 import type { IntegrationType } from "@/lib/integration-icons";
 
@@ -81,6 +83,7 @@ export function ChatArea({ conversationId }: Props) {
   const [streamingParts, setStreamingParts] = useState<MessagePart[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const [localAutoApprove, setLocalAutoApprove] = useState(false);
 
   // Segmented activity feed state
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
@@ -98,12 +101,20 @@ export function ChatArea({ conversationId }: Props) {
   const isRecordingRef = useRef(false);
   const isNearBottomRef = useRef(true);
 
+  // Auto-approve mutation
+  const { mutateAsync: updateAutoApprove } = useUpdateAutoApprove();
+
   // Voice recording
   const { isRecording, error: voiceError, startRecording, stopRecording } = useVoiceRecording();
   const { mutateAsync: transcribe } = useTranscribe();
 
   // Load existing messages
   useEffect(() => {
+    // Don't load messages for new chat - let the reset effect handle clearing
+    if (!conversationId) {
+      return;
+    }
+
     const conv = existingConversation as {
       messages?: Array<{
         id: string;
@@ -162,10 +173,13 @@ export function ChatArea({ conversationId }: Props) {
         })
       );
     }
-  }, [existingConversation]);
+  }, [existingConversation, conversationId]);
 
   // Reset when conversation changes
   useEffect(() => {
+    // Always sync the ref with the prop
+    currentConversationIdRef.current = conversationId;
+
     if (!conversationId) {
       setMessages([]);
       setStreamingParts([]);
@@ -546,7 +560,7 @@ export function ChatArea({ conversationId }: Props) {
     };
 
     const result = await startGeneration(
-      { conversationId, content },
+      { conversationId, content, autoApprove: !conversationId ? localAutoApprove : undefined },
       {
         onText: (text) => {
           // Check if the last part is a text part - if so, append to it
@@ -1227,6 +1241,30 @@ export function ChatArea({ conversationId }: Props) {
             />
           )}
           <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="auto-approve"
+                checked={
+                  conversationId
+                    ? (existingConversation as { autoApprove?: boolean } | undefined)?.autoApprove ?? false
+                    : localAutoApprove
+                }
+                onCheckedChange={(checked) => {
+                  if (conversationId) {
+                    updateAutoApprove({ id: conversationId, autoApprove: checked });
+                  } else {
+                    setLocalAutoApprove(checked);
+                  }
+                }}
+              />
+              <label
+                htmlFor="auto-approve"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none"
+              >
+                <CircleCheck className="h-3.5 w-3.5" />
+                <span>Auto-approve</span>
+              </label>
+            </div>
             <div className="flex-1">
               <ChatInput
                 onSend={handleSend}
