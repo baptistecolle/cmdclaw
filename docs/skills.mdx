@@ -1,0 +1,46 @@
+---
+title: "Custom Skills"
+description: "Create reusable skills to tailor Bap to your workflow."
+---
+
+Skills are reusable instructions that teach Bap how to perform specific tasks. Instead of repeating the same context every conversation, you create a skill once and Bap can use it whenever relevant.
+
+## Creating a skill
+
+Go to **Settings > Skills** in the app and click **Create Skill**. You need to provide:
+
+- **Name** -- A display name for the skill (e.g., "Weekly Report")
+- **Description** -- A short description of what the skill does
+
+Bap automatically generates a `SKILL.md` file with your skill's instructions. This is the core of your skill -- it tells Bap exactly what to do.
+
+## The SKILL.md file
+
+Every skill has a `SKILL.md` file that contains frontmatter and instructions in Markdown:
+
+```markdown
+---
+name: weekly-report
+description: Generate a weekly status report from Linear and Slack
+---
+
+# Weekly Report
+
+1. Pull my completed Linear issues from the past 7 days
+2. Summarize key Slack messages from #engineering
+3. Format as a status report with sections: Completed, In Progress, Blockers
+```
+
+You edit this file directly in the built-in editor, which supports headings, lists, code blocks, and other Markdown formatting.
+
+## Adding files
+
+You can add extra files to a skill beyond `SKILL.md`. This is useful for templates, examples, or reference material that Bap should follow when executing the skill.
+
+## Uploading documents
+
+Skills support document uploads (PDFs, images, etc.) that Bap can reference. This is useful for providing brand guidelines, templates, or any reference material.
+
+## Enabling and disabling
+
+Each skill has an enabled/disabled toggle. Disabled skills are not available to Bap during conversations. This lets you keep skills around without them cluttering your active set.

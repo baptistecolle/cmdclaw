@@ -1,0 +1,100 @@
+---
+title: "Self-Hosting"
+description: "Deploy your own Bap instance with Docker, PostgreSQL, and Redis."
+---
+
+## Prerequisites
+
+- [Bun](https://bun.sh) (recommended) or Node.js
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- API keys for the AI providers you want to use (Anthropic, OpenAI, or Google)
+
+## Setup
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/baptistecolle/bap.git
+    cd bap/app
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    ```bash
+    bun install
+    ```
+  </Step>
+  <Step title="Start local services">
+    This starts PostgreSQL, Redis, and MinIO (S3-compatible storage):
+
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+  <Step title="Configure environment variables">
+    ```bash
+    cp .env.example .env
+    ```
+
+    Edit `.env` and fill in your API keys and configuration. At minimum you need:
+
+    - `DATABASE_URL` -- PostgreSQL connection string
+    - `REDIS_URL` -- Redis connection string
+    - `ANTHROPIC_API_KEY` -- For Claude
+    - `BETTER_AUTH_SECRET` -- Authentication secret
+  </Step>
+  <Step title="Set up the database">
+    Push the schema to your database:
+
+    ```bash
+    bun db:push
+    ```
+
+    Optionally seed with initial data:
+
+    ```bash
+    bun db:seed
+    ```
+  </Step>
+  <Step title="Start the app">
+    ```bash
+    bun dev
+    ```
+
+    The app will be available at `http://localhost:3000`.
+  </Step>
+</Steps>
+
+## Background worker
+
+Bap uses BullMQ for background jobs (e.g., processing integrations). Start the worker in a separate terminal:
+
+```bash
+bun worker
+```
+
+## Useful commands
+
+| Command | Description |
+|---------|-------------|
+| `bun dev` | Start the dev server |
+| `bun build` | Production build |
+| `bun worker` | Start the background job worker |
+| `bun db:push` | Push schema changes to the database |
+| `bun db:studio` | Open Drizzle Studio (database browser) |
+| `bun db:seed` | Seed the database |
+| `bun lint:fix` | Fix linting issues |
+| `bun typecheck` | Run the TypeScript type checker |
+| `bun test` | Run unit tests |
+| `bun test:e2e` | Run end-to-end tests |
+
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| Web | Next.js 16, React 19, Tailwind CSS 4 |
+| API | ORPC, Better Auth |
+| Database | PostgreSQL, Drizzle ORM |
+| AI | Anthropic Claude, OpenAI, Google Gemini |
+| Queue | BullMQ, Redis |
+| Storage | S3 / MinIO |
+| Sandbox | E2B |
