@@ -44,7 +44,7 @@ function SkillsPageContent() {
         description: "Add a description for this skill",
       });
       // Navigate to the editor page
-      router.push(`/settings/skills/${result.id}`);
+      router.push(`/skills/${result.id}`);
     } catch (error) {
       setNotification({
         type: "error",
@@ -178,7 +178,7 @@ function SkillsPageContent() {
                   <span className="text-sm">Enabled</span>
                 </label>
                 <Button variant="ghost" size="icon" asChild>
-                  <Link href={`/settings/skills/${skill.id}`}>
+                  <Link href={`/skills/${skill.id}`}>
                     <Pencil className="h-4 w-4" />
                   </Link>
                 </Button>

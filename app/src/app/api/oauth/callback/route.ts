@@ -14,13 +14,13 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error("OAuth error:", error);
     return NextResponse.redirect(
-      new URL(`/settings/integrations?error=${error}`, request.url)
+      new URL(`/integrations?error=${error}`, request.url)
     );
   }
 
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL("/settings/integrations?error=missing_params", request.url)
+      new URL("/integrations?error=missing_params", request.url)
     );
   }
 
@@ -42,13 +42,13 @@ export async function GET(request: NextRequest) {
     stateData = JSON.parse(Buffer.from(state, "base64url").toString());
   } catch {
     return NextResponse.redirect(
-      new URL("/settings/integrations?error=invalid_state", request.url)
+      new URL("/integrations?error=invalid_state", request.url)
     );
   }
 
   // Helper to build redirect URL with the correct base path
   const buildRedirectUrl = (params: string) => {
-    const baseUrl = stateData.redirectUrl || "/settings/integrations";
+    const baseUrl = stateData.redirectUrl || "/integrations";
     return new URL(`${baseUrl}?${params}`, request.url);
   };
 

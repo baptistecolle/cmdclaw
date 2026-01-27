@@ -305,7 +305,7 @@ function SkillEditorPageContent() {
 
     try {
       await deleteSkill.mutateAsync(skillId);
-      router.push("/settings/skills");
+      router.push("/skills");
     } catch (error) {
       setNotification({ type: "error", message: "Failed to delete skill" });
     }
@@ -460,7 +460,7 @@ function SkillEditorPageContent() {
       <div className="py-12 text-center">
         <p className="text-muted-foreground">Skill not found</p>
         <Button asChild className="mt-4">
-          <Link href="/settings/skills">Back to Skills</Link>
+          <Link href="/skills">Back to Skills</Link>
         </Button>
       </div>
     );
@@ -474,7 +474,7 @@ function SkillEditorPageContent() {
       {/* Header with back button and delete */}
       <div className="mb-6 flex items-center justify-between shrink-0">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/settings/skills">
+          <Link href="/skills">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>

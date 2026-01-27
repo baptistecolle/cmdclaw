@@ -141,7 +141,7 @@ function IntegrationsPageContent() {
           });
         })
         .finally(() => {
-          window.history.replaceState({}, "", "/settings/integrations");
+          window.history.replaceState({}, "", "/integrations");
         });
     }
   }, [searchParams, linkLinkedIn, refetch]);
@@ -157,14 +157,14 @@ function IntegrationsPageContent() {
         message: "Integration connected successfully!",
       });
       // Clear the URL params
-      window.history.replaceState({}, "", "/settings/integrations");
+      window.history.replaceState({}, "", "/integrations");
       refetch();
     } else if (error) {
       setNotification({
         type: "error",
         message: `Failed to connect: ${error.replace(/_/g, " ")}`,
       });
-      window.history.replaceState({}, "", "/settings/integrations");
+      window.history.replaceState({}, "", "/integrations");
     }
   }, [searchParams, refetch]);
 

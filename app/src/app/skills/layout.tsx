@@ -2,7 +2,7 @@
 
 import { AppShell } from "@/components/app-shell";
 
-export default function SettingsLayout({
+export default function SkillsLayout({
   children,
 }: {
   children: React.ReactNode;

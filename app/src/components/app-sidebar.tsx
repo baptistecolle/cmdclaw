@@ -7,13 +7,21 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type SessionData = Awaited<ReturnType<typeof authClient.getSession>>["data"];
 
 const navItems = [
   { icon: MessageSquare, label: "Chat", href: "/chat" },
-  { icon: Plug, label: "Integrations", href: "/settings/integrations" },
-  { icon: Sparkles, label: "Skills", href: "/settings/skills" },
+  { icon: Plug, label: "Integrations", href: "/integrations" },
+  { icon: Sparkles, label: "Skills", href: "/skills" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
@@ -96,25 +104,46 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Footer: user avatar + sign out */}
-      <div className="flex flex-col items-center gap-1">
-        {session?.user && (
+      {/* Footer: user avatar with dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
           <button
-            onClick={handleSignOut}
-            title="Log out"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground hover:ring-2 hover:ring-sidebar-accent-foreground/20 transition-all"
+            title={userEmail}
           >
-            <LogOut className="h-4 w-4" />
-            <span className="sr-only">Log out</span>
+            {avatarInitial}
           </button>
-        )}
-        <div
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground"
-          title={userEmail}
-        >
-          {avatarInitial}
-        </div>
-      </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" align="end" className="min-w-48">
+          {userEmail && (
+            <>
+              <DropdownMenuLabel className="font-normal">
+                <span className="text-xs text-muted-foreground">{userEmail}</span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          <DropdownMenuItem asChild>
+            <Link href="/settings" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              <span>Settings</span>
+            </Link>
+          </DropdownMenuItem>
+          {session?.user ? (
+            <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+              <LogOut className="h-4 w-4" />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem asChild>
+              <Link href="/login" className="flex items-center gap-2">
+                <LogOut className="h-4 w-4" />
+                <span>Log in</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
