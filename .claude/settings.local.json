@@ -23,7 +23,9 @@
       "Bash(bfg:*)",
       "Bash(git reflog:*)",
       "Bash(git gc:*)",
-      "Bash(gitleaks detect:*)"
+      "Bash(gitleaks detect:*)",
+      "WebFetch(domain:heybap.com)",
+      "Bash(git -C /Users/baptiste/Git/bap log --oneline)"
     ]
   }
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, Settings, Trash2, LogOut, ChevronUp, MoreHorizontal, Plug, Sparkles } from "lucide-react";
+import { Plus, Trash2, LogOut, ChevronUp, MoreHorizontal } from "lucide-react";
 import Image from "next/image";
 import {
   Sidebar,
@@ -23,7 +23,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -207,25 +206,6 @@ export function ChatSidebar() {
                 align="start"
                 className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
               >
-                <DropdownMenuItem asChild>
-                  <Link href="/settings/integrations" className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings/integrations" className="flex items-center gap-2">
-                    <Plug className="h-4 w-4" />
-                    <span>Add Integration</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings/skills" className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" />
-                    <span>Add Skills</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 {session?.user ? (
                   <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
                     <LogOut className="h-4 w-4" />

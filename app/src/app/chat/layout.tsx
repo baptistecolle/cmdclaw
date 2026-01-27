@@ -1,6 +1,7 @@
 "use client";
 
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { AppShell } from "@/components/app-shell";
 import {
   SidebarProvider,
   SidebarInset,
@@ -131,16 +132,18 @@ export default function ChatLayout({
   }
 
   return (
-    <SidebarProvider className="bg-background text-foreground">
-      <ChatSidebar />
-      <SidebarInset>
-        <header className="flex h-14 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-          <span className="text-sm font-medium">Chat</span>
-          {isAdmin && <CopyButton />}
-        </header>
-        <div className="flex h-[calc(100vh-3.5rem)] flex-col">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <AppShell>
+      <SidebarProvider className="bg-background text-foreground">
+        <ChatSidebar />
+        <SidebarInset>
+          <header className="flex h-14 items-center gap-2 border-b px-4">
+            <SidebarTrigger />
+            <span className="text-sm font-medium">Chat</span>
+            {isAdmin && <CopyButton />}
+          </header>
+          <div className="flex h-[calc(100vh-3.5rem)] flex-col">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </AppShell>
   );
 }

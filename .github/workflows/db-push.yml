@@ -28,4 +28,5 @@ jobs:
         working-directory: app
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SKIP_ENV_VALIDATION: "1"
         run: bun run db:push --strict
