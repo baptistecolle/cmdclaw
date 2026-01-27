@@ -17,7 +17,13 @@
       "Bash(bun add:*)",
       "Bash(bun run typecheck:*)",
       "Bash(git show:*)",
-      "Bash(convert:*)"
+      "Bash(convert:*)",
+      "Bash(git mv:*)",
+      "Bash(brew list:*)",
+      "Bash(bfg:*)",
+      "Bash(git reflog:*)",
+      "Bash(git gc:*)",
+      "Bash(gitleaks detect:*)"
     ]
   }
 }

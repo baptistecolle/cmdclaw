@@ -1,5 +1,5 @@
 # Bap
 
-Server contains the backend for the Bap application.
+App contains the Next.js web application.
 
-App contains the macos and ios applications.
+Apple contains the macOS and iOS applications.

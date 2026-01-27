@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'server/src/server/db/schema.ts'
+      - 'app/src/server/db/schema.ts'
   workflow_dispatch:
 
 jobs:
@@ -21,11 +21,11 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        working-directory: server
+        working-directory: app
         run: bun install
 
       - name: Push DB changes
-        working-directory: server
+        working-directory: app
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: bun run db:push --strict
