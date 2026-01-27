@@ -2,9 +2,10 @@ import { Sandbox } from "e2b";
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
-import { skill, message, conversation } from "@/server/db/schema";
+import { skill, message, conversation, providerAuth } from "@/server/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { downloadFromS3 } from "@/server/storage/s3-client";
+import { decrypt } from "@/server/utils/encryption";
 
 // Use custom template with OpenCode pre-installed
 const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-agent-dev";
@@ -23,6 +24,7 @@ const activeSandboxes = new Map<string, SandboxState>();
 
 export interface SandboxConfig {
   conversationId: string;
+  userId?: string;
   anthropicApiKey: string;
   integrationEnvs?: Record<string, string>;
 }
@@ -153,6 +155,11 @@ export async function getOrCreateSession(
   const sessionId = sessionResult.data.id;
   state.sessionId = sessionId;
 
+  // Inject subscription provider tokens if userId is available
+  if (config.userId) {
+    await injectProviderAuth(state.client, config.userId);
+  }
+
   // Replay conversation history if needed
   if (options?.replayHistory) {
     await replayConversationHistory(
@@ -221,6 +228,41 @@ async function replayConversationHistory(
       noReply: true,
     },
   });
+}
+
+/**
+ * Inject stored subscription provider OAuth tokens into an OpenCode server.
+ * Called after sandbox creation to give OpenCode access to the user's
+ * ChatGPT/Gemini subscriptions.
+ */
+export async function injectProviderAuth(
+  client: OpencodeClient,
+  userId: string
+): Promise<void> {
+  try {
+    const auths = await db.query.providerAuth.findMany({
+      where: eq(providerAuth.userId, userId),
+    });
+
+    for (const auth of auths) {
+      try {
+        await client.auth.set({
+          path: { id: auth.provider },
+          body: {
+            type: "oauth",
+            access: decrypt(auth.accessToken),
+            refresh: decrypt(auth.refreshToken),
+            expires: auth.expiresAt.getTime(),
+          },
+        });
+        console.log(`[E2B] Injected ${auth.provider} auth for user ${userId}`);
+      } catch (err) {
+        console.error(`[E2B] Failed to inject ${auth.provider} auth:`, err);
+      }
+    }
+  } catch (err) {
+    console.error("[E2B] Failed to load provider auths:", err);
+  }
 }
 
 /**

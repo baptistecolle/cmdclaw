@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageList, type Message, type MessagePart } from "./message-list";
 import { ChatInput } from "./chat-input";
+import { ModelSelector } from "./model-selector";
 import { VoiceIndicator, VoiceHint } from "./voice-indicator";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { AuthRequestCard } from "./auth-request-card";
@@ -84,6 +85,7 @@ export function ChatArea({ conversationId }: Props) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [localAutoApprove, setLocalAutoApprove] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-20250514");
 
   // Segmented activity feed state
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
@@ -116,6 +118,7 @@ export function ChatArea({ conversationId }: Props) {
     }
 
     const conv = existingConversation as {
+      model?: string;
       messages?: Array<{
         id: string;
         role: string;
@@ -128,6 +131,11 @@ export function ChatArea({ conversationId }: Props) {
         >;
       }>;
     } | null | undefined;
+
+    // Sync model from existing conversation
+    if (conv?.model) {
+      setSelectedModel(conv.model);
+    }
 
     if (conv?.messages) {
       setMessages(
@@ -560,7 +568,7 @@ export function ChatArea({ conversationId }: Props) {
     };
 
     const result = await startGeneration(
-      { conversationId, content, autoApprove: !conversationId ? localAutoApprove : undefined },
+      { conversationId, content, model: selectedModel, autoApprove: !conversationId ? localAutoApprove : undefined },
       {
         onText: (text) => {
           // Check if the last part is a text part - if so, append to it
@@ -1242,6 +1250,11 @@ export function ChatArea({ conversationId }: Props) {
           )}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
+              <ModelSelector
+                selectedModel={selectedModel}
+                onModelChange={setSelectedModel}
+                disabled={isStreaming}
+              />
               <Switch
                 id="auto-approve"
                 checked={

@@ -8,6 +8,7 @@ import {
   jsonb,
   integer,
   pgEnum,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -90,6 +91,7 @@ export const userRelations = relations(user, ({ many }) => ({
   conversations: many(conversation),
   integrations: many(integration),
   skills: many(skill),
+  providerAuths: many(providerAuth),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -466,6 +468,41 @@ export const skillDocumentRelations = relations(skillDocument, ({ one }) => ({
   skill: one(skill, {
     fields: [skillDocument.skillId],
     references: [skill.id],
+  }),
+}));
+
+// ========== PROVIDER AUTH SCHEMA ==========
+// Stores encrypted OAuth tokens for subscription providers (ChatGPT, Gemini)
+
+export const providerAuth = pgTable(
+  "provider_auth",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(), // "openai" | "google"
+    accessToken: text("access_token").notNull(), // encrypted
+    refreshToken: text("refresh_token").notNull(), // encrypted
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    unique("provider_auth_user_provider_idx").on(table.userId, table.provider),
+    index("provider_auth_user_id_idx").on(table.userId),
+  ]
+);
+
+export const providerAuthRelations = relations(providerAuth, ({ one }) => ({
+  user: one(user, {
+    fields: [providerAuth.userId],
+    references: [user.id],
   }),
 }));
 

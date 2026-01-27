@@ -66,6 +66,8 @@ export const env = createEnv({
     FAL_KEY: z.string().optional(),
     // Gemini (title generation)
     GEMINI_API_KEY: z.string().optional(),
+    // Encryption key for provider OAuth tokens (32-byte hex string)
+    ENCRYPTION_KEY: z.string().optional(),
     // OpenCode plugin callback secret
     BAP_SERVER_SECRET: z.string().optional(),
     // S3/MinIO Configuration
@@ -134,6 +136,7 @@ export const env = createEnv({
     APPLE_APP_BUNDLE_IDENTIFIER: process.env.APPLE_APP_BUNDLE_IDENTIFIER,
     FAL_KEY: process.env.FAL_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
     BAP_SERVER_SECRET: process.env.BAP_SERVER_SECRET,
     S3_ENDPOINT: process.env.S3_ENDPOINT,
     S3_REGION: process.env.S3_REGION,

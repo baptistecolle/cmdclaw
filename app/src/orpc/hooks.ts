@@ -329,6 +329,37 @@ export function useCompleteOnboarding() {
   });
 }
 
+// ========== PROVIDER AUTH HOOKS ==========
+
+// Hook for getting connected subscription providers status
+export function useProviderAuthStatus() {
+  return useQuery({
+    queryKey: ["providerAuth", "status"],
+    queryFn: () => client.providerAuth.status(),
+  });
+}
+
+// Hook for initiating subscription provider OAuth connection
+export function useConnectProvider() {
+  return useMutation({
+    mutationFn: (provider: "openai" | "google") =>
+      client.providerAuth.connect({ provider }),
+  });
+}
+
+// Hook for disconnecting a subscription provider
+export function useDisconnectProvider() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (provider: "openai" | "google") =>
+      client.providerAuth.disconnect({ provider }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["providerAuth"] });
+    },
+  });
+}
+
 // ========== GENERATION HOOKS ==========
 
 export type GenerationPendingApprovalData = {

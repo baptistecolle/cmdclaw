@@ -614,6 +614,7 @@ class GenerationManager {
       const { client, sessionId, sandbox } = await getOrCreateSession(
         {
           conversationId: ctx.conversationId,
+          userId: ctx.userId,
           anthropicApiKey: env.ANTHROPIC_API_KEY,
           integrationEnvs: cliEnv,
         },
@@ -644,10 +645,9 @@ class GenerationManager {
       const eventResult = await client.event.subscribe();
       const eventStream = eventResult.stream;
 
-      // Parse model string into provider/model format
-      // e.g., "claude-sonnet-4-20250514" -> { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" }
+      // Resolve provider from model ID
       const modelConfig = {
-        providerID: "anthropic",
+        providerID: resolveProviderID(ctx.model),
         modelID: ctx.model,
       };
 
@@ -1265,6 +1265,23 @@ class GenerationManager {
       }
     }
   }
+}
+
+/**
+ * Map a model ID to its provider ID.
+ */
+function resolveProviderID(modelID: string): string {
+  if (modelID.startsWith("claude")) return "anthropic";
+  if (
+    modelID.startsWith("gpt") ||
+    modelID.startsWith("o3") ||
+    modelID.startsWith("o4") ||
+    modelID.startsWith("codex")
+  ) {
+    return "openai";
+  }
+  if (modelID.startsWith("gemini")) return "google";
+  return "anthropic"; // default
 }
 
 // Singleton instance
