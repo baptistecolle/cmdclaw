@@ -110,6 +110,8 @@ interface GenerationContext {
   isNewConversation: boolean;
   model: string;
   userMessageContent: string;
+  // Track assistant message IDs to filter out user message parts
+  assistantMessageIds: Set<string>;
 }
 
 // Approval timeout: 5 minutes before pausing sandbox
@@ -222,6 +224,7 @@ class GenerationManager {
       isNewConversation,
       model: model ?? conv.model ?? "claude-sonnet-4-20250514",
       userMessageContent: content,
+      assistantMessageIds: new Set(),
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
@@ -635,6 +638,7 @@ class GenerationManager {
       const systemPrompt = systemPromptParts.join("\n\n");
 
       let currentTextPart: { type: "text"; text: string } | null = null;
+      let currentTextPartId: string | null = null;
 
       // Subscribe to SSE events BEFORE sending the prompt
       const eventResult = await client.event.subscribe();
@@ -665,11 +669,24 @@ class GenerationManager {
         }
 
         // Log events for debugging
-        console.log("[OpenCode Event]", event.type, JSON.stringify(event.properties || {}).slice(0, 200));
+        const eventJson = JSON.stringify(event.properties || {});
+        if (event.type === "message.part.updated") {
+          const part = (event.properties as any)?.part;
+          if (part?.type === "tool") {
+            // Log tool state for debugging (state contains input/output)
+            console.log("[OpenCode Event] TOOL:", {
+              callID: part.callID,
+              tool: part.tool,
+              state: part.state,
+            });
+          }
+        }
+        console.log("[OpenCode Event]", event.type, eventJson.slice(0, 200));
 
         // Transform OpenCode events to GenerationEvents
-        await this.processOpencodeEvent(ctx, event, currentTextPart, (part) => {
+        await this.processOpencodeEvent(ctx, event, currentTextPart, currentTextPartId, (part, partId) => {
           currentTextPart = part;
+          currentTextPartId = partId;
         });
 
         // Check for session idle (generation complete)
@@ -710,74 +727,116 @@ class GenerationManager {
     ctx: GenerationContext,
     event: { type: string; properties?: unknown },
     currentTextPart: { type: "text"; text: string } | null,
-    setCurrentTextPart: (part: { type: "text"; text: string } | null) => void
+    currentTextPartId: string | null,
+    setCurrentTextPart: (part: { type: "text"; text: string } | null, partId: string | null) => void
   ): Promise<void> {
     const props = event.properties as Record<string, unknown>;
 
     switch (event.type) {
+      case "message.updated": {
+        // Track assistant message IDs to filter out user message parts
+        const info = props.info as Record<string, unknown>;
+        if (info?.role === "assistant" && info?.id) {
+          ctx.assistantMessageIds.add(info.id as string);
+        }
+        break;
+      }
+
       case "message.part.updated": {
         const part = props.part as Record<string, unknown>;
         if (!part) return;
 
-        // Text content
-        if (part.type === "text") {
-          const text = part.text as string;
-          if (text) {
-            ctx.assistantContent += text;
-            this.broadcast(ctx, { type: "text", content: text });
+        // Only process parts from assistant messages (filter out user message parts)
+        const messageID = part.messageID as string;
+        if (messageID && !ctx.assistantMessageIds.has(messageID)) {
+          // This is a user message part, skip it
+          return;
+        }
 
-            if (currentTextPart) {
-              currentTextPart.text += text;
-            } else {
-              const newPart = { type: "text" as const, text };
-              ctx.contentParts.push(newPart);
-              setCurrentTextPart(newPart);
+        const partId = part.id as string;
+
+        // Text content
+        // NOTE: OpenCode sends the FULL cumulative text with each update, not deltas
+        // We need to calculate the delta ourselves
+        if (part.type === "text") {
+          const fullText = part.text as string;
+          if (fullText) {
+            // Check if this is a new text part (different part ID)
+            const isNewPart = partId !== currentTextPartId;
+
+            // Calculate delta from the previous text
+            const previousLength = isNewPart ? 0 : (currentTextPart?.text.length ?? 0);
+            const delta = fullText.slice(previousLength);
+
+            // Only process if there's new content
+            if (delta) {
+              ctx.assistantContent += delta;
+              this.broadcast(ctx, { type: "text", content: delta });
+
+              if (currentTextPart && !isNewPart) {
+                // Update to the full cumulative text
+                currentTextPart.text = fullText;
+              } else {
+                // New text part - create a new entry
+                const newPart = { type: "text" as const, text: fullText };
+                ctx.contentParts.push(newPart);
+                setCurrentTextPart(newPart, partId);
+              }
+              this.scheduleSave(ctx);
             }
-            this.scheduleSave(ctx);
           }
         }
 
-        // Tool invocation
-        if (part.type === "tool-invocation") {
-          setCurrentTextPart(null);
-          const toolName = part.toolName as string;
-          const toolInput = part.input as Record<string, unknown>;
-          const toolUseId = part.toolInvocationId as string;
+        // Tool call (OpenCode uses "tool" type with callID, tool, and state properties)
+        // See @opencode-ai/sdk ToolPart type: state contains input/output
+        // Status flow: pending (no input) -> running (has input) -> completed (has output)
+        if (part.type === "tool") {
+          setCurrentTextPart(null, null);
+          const toolUseId = part.callID as string;
+          const toolName = part.tool as string;
+          const state = part.state as Record<string, unknown> | undefined;
 
-          this.broadcast(ctx, {
-            type: "tool_use",
-            toolName,
-            toolInput,
-            toolUseId,
-          });
+          // Input is inside state.input
+          const toolInput = (state?.input || {}) as Record<string, unknown>;
+          const status = state?.status as string;
+          // Output is inside state.output when completed
+          const result = state?.output;
 
-          ctx.contentParts.push({
-            type: "tool_use",
-            id: toolUseId || "",
-            name: toolName,
-            input: toolInput || {},
-          });
-          await this.saveProgress(ctx);
-        }
-
-        // Tool result
-        if (part.type === "tool-result") {
-          const toolUseId = part.toolInvocationId as string;
-          const result = part.result;
-          const toolUse = ctx.contentParts.find(
+          const existingToolUse = ctx.contentParts.find(
             (p): p is ContentPart & { type: "tool_use" } =>
               p.type === "tool_use" && p.id === toolUseId
           );
-          if (toolUse) {
+
+          if (status === "completed" && result !== undefined) {
+            // Tool completed - broadcast result
+            if (existingToolUse) {
+              this.broadcast(ctx, {
+                type: "tool_result",
+                toolName: existingToolUse.name,
+                result,
+              });
+              ctx.contentParts.push({
+                type: "tool_result",
+                tool_use_id: toolUseId,
+                content: result,
+              });
+              await this.saveProgress(ctx);
+            }
+          } else if (status === "running" && !existingToolUse) {
+            // Tool is running - now we have the actual input
+            // Only capture on "running" status, not "pending" (which has empty input)
             this.broadcast(ctx, {
-              type: "tool_result",
-              toolName: toolUse.name,
-              result,
+              type: "tool_use",
+              toolName,
+              toolInput,
+              toolUseId,
             });
+
             ctx.contentParts.push({
-              type: "tool_result",
-              tool_use_id: toolUseId,
-              content: result,
+              type: "tool_use",
+              id: toolUseId || "",
+              name: toolName,
+              input: toolInput || {},
             });
             await this.saveProgress(ctx);
           }
@@ -787,9 +846,9 @@ class GenerationManager {
 
       case "session.updated": {
         // Track session metadata if needed
-        const session = props.session as Record<string, unknown>;
-        if (session?.id) {
-          ctx.sessionId = session.id as string;
+        const info = props.info as Record<string, unknown>;
+        if (info?.id) {
+          ctx.sessionId = info.id as string;
         }
         break;
       }
