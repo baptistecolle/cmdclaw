@@ -9,10 +9,8 @@ export default function SettingsLayout({
 }) {
   return (
     <AppShell>
-      <div className="min-h-screen bg-background">
-        <div className="container px-4 py-6">
-          <main className="mx-auto max-w-4xl">{children}</main>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <main className="w-full max-w-4xl px-4">{children}</main>
       </div>
     </AppShell>
   );

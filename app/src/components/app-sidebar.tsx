@@ -8,6 +8,11 @@ import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/animate-ui/components/radix/tooltip";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -86,20 +91,25 @@ export function AppSidebar() {
         {navItems.map((item) => {
           const active = isActive(item.href);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={item.label}
-              className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
-                active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              <span className="sr-only">{item.label}</span>
-            </Link>
+            <Tooltip key={item.href}>
+              <TooltipTrigger asChild>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span className="sr-only">{item.label}</span>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {item.label}
+              </TooltipContent>
+            </Tooltip>
           );
         })}
       </nav>
