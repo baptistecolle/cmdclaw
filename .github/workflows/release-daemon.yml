@@ -1,15 +1,76 @@
 name: Release Daemon
 
 on:
-  push:
-    tags:
-      - "daemon-v*"
+  schedule:
+    - cron: "0 0 * * *" # Daily at midnight UTC
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      new_tag: ${{ steps.check.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for tag comparison
+
+      - name: Check for daemon changes and determine tag
+        id: check
+        run: |
+          # Get the latest daemon release tag (v* format)
+          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous release tag found, will create first release"
+            SHOULD_RELEASE=true
+          else
+            # Check if there are changes in daemon directory since last tag
+            CHANGES=$(git diff --name-only "$LATEST_TAG"..HEAD -- app/src/daemon/)
+            if [ -n "$CHANGES" ]; then
+              echo "Changes detected in daemon since $LATEST_TAG:"
+              echo "$CHANGES"
+              SHOULD_RELEASE=true
+            else
+              echo "No changes in daemon since $LATEST_TAG"
+              SHOULD_RELEASE=false
+            fi
+          fi
+
+          # For workflow_dispatch, always release
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SHOULD_RELEASE=true
+          fi
+
+          if [ "$SHOULD_RELEASE" = "true" ]; then
+            # Determine the new tag with format vYYYY.MM.DD
+            TODAY=$(date -u +%Y.%m.%d)
+            BASE_TAG="v$TODAY"
+
+            # Check if base tag exists, if so find next available suffix
+            if git rev-parse "$BASE_TAG" >/dev/null 2>&1; then
+              SUFFIX=1
+              while git rev-parse "${BASE_TAG}-${SUFFIX}" >/dev/null 2>&1; do
+                SUFFIX=$((SUFFIX + 1))
+              done
+              NEW_TAG="${BASE_TAG}-${SUFFIX}"
+            else
+              NEW_TAG="$BASE_TAG"
+            fi
+
+            echo "New tag will be: $NEW_TAG"
+            echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          fi
+
+          echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+
   build:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_release == 'true'
     strategy:
       matrix:
         include:
@@ -44,7 +105,7 @@ jobs:
           path: app/src/daemon/dist/
 
   release:
-    needs: build
+    needs: [check-changes, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,8 +114,16 @@ jobs:
         with:
           path: artifacts
 
+      - name: Create tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ needs.check-changes.outputs.new_tag }}
+          git push origin ${{ needs.check-changes.outputs.new_tag }}
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.check-changes.outputs.new_tag }}
           files: artifacts/**/*
           generate_release_notes: true
