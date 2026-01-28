@@ -16,6 +16,7 @@ const list = protectedProcedure
     const conversations = await context.db.query.conversation.findMany({
       where: and(
         eq(conversation.userId, context.user.id),
+        eq(conversation.type, "chat"),
         isNull(conversation.archivedAt)
       ),
       orderBy: desc(conversation.updatedAt),
@@ -49,7 +50,8 @@ const get = protectedProcedure
     const conv = await context.db.query.conversation.findFirst({
       where: and(
         eq(conversation.id, input.id),
-        eq(conversation.userId, context.user.id)
+        eq(conversation.userId, context.user.id),
+        eq(conversation.type, "chat")
       ),
       with: {
         messages: {
@@ -94,7 +96,8 @@ const updateTitle = protectedProcedure
       .where(
         and(
           eq(conversation.id, input.id),
-          eq(conversation.userId, context.user.id)
+          eq(conversation.userId, context.user.id),
+          eq(conversation.type, "chat")
         )
       )
       .returning({ id: conversation.id });
@@ -121,7 +124,8 @@ const updateAutoApprove = protectedProcedure
       .where(
         and(
           eq(conversation.id, input.id),
-          eq(conversation.userId, context.user.id)
+          eq(conversation.userId, context.user.id),
+          eq(conversation.type, "chat")
         )
       )
       .returning({ id: conversation.id, autoApprove: conversation.autoApprove });
@@ -143,7 +147,8 @@ const archive = protectedProcedure
       .where(
         and(
           eq(conversation.id, input.id),
-          eq(conversation.userId, context.user.id)
+          eq(conversation.userId, context.user.id),
+          eq(conversation.type, "chat")
         )
       )
       .returning({ id: conversation.id });
@@ -164,7 +169,8 @@ const del = protectedProcedure
       .where(
         and(
           eq(conversation.id, input.id),
-          eq(conversation.userId, context.user.id)
+          eq(conversation.userId, context.user.id),
+          eq(conversation.type, "chat")
         )
       )
       .returning({ id: conversation.id });

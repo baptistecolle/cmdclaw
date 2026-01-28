@@ -60,6 +60,14 @@ const approvalRequest = baseProcedure
       return { decision: "deny" as const };
     }
 
+    const allowedIntegrations = generationManager.getAllowedIntegrationsForConversation(
+      input.conversationId
+    );
+    if (allowedIntegrations && !allowedIntegrations.includes(input.integration as any)) {
+      console.warn("[Internal] Integration not allowed for workflow:", input.integration);
+      return { decision: "deny" as const };
+    }
+
     // Wait for user approval via GenerationManager
     const decision = await generationManager.waitForApproval(genId, {
       toolInput: input.toolInput as Record<string, unknown>,
@@ -107,6 +115,14 @@ const authRequest = baseProcedure
     const genId = generationManager.getGenerationForConversation(input.conversationId);
     if (!genId) {
       console.error("[Internal] No active generation for conversation:", input.conversationId);
+      return { success: false };
+    }
+
+    const allowedIntegrations = generationManager.getAllowedIntegrationsForConversation(
+      input.conversationId
+    );
+    if (allowedIntegrations && !allowedIntegrations.includes(input.integration as any)) {
+      console.warn("[Internal] Integration not allowed for workflow:", input.integration);
       return { success: false };
     }
 

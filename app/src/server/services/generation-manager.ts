@@ -4,6 +4,8 @@ import {
   conversation,
   generation,
   message,
+  workflowRun,
+  workflowRunEvent,
   type ContentPart,
   type PendingApproval,
   type PendingAuth,
@@ -27,7 +29,8 @@ import { OpenAIBackend } from "@/server/ai/openai-backend";
 import { LocalLLMBackend } from "@/server/ai/local-backend";
 import type { LLMBackend, ChatMessage, ContentBlock, StreamEvent } from "@/server/ai/llm-backend";
 import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
-import { checkToolPermissions } from "@/server/ai/permission-checker";
+import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
+import type { IntegrationType } from "@/server/oauth/config";
 
 // Event types for generation stream
 export type GenerationEvent =
@@ -125,6 +128,13 @@ interface GenerationContext {
   // BYOC fields
   backendType: BackendType;
   deviceId?: string;
+  // Workflow fields
+  workflowRunId?: string;
+  allowedIntegrations?: IntegrationType[];
+  workflowPrompt?: string;
+  workflowPromptDo?: string;
+  workflowPromptDont?: string;
+  triggerPayload?: unknown;
 }
 
 // Approval timeout: 5 minutes before pausing sandbox
@@ -185,6 +195,7 @@ class GenerationManager {
         .values({
           userId,
           title,
+          type: "chat",
           model: model ?? "claude-sonnet-4-20250514",
           autoApprove: autoApprove ?? false,
         })
@@ -257,6 +268,99 @@ class GenerationManager {
     return {
       generationId: genRecord.id,
       conversationId: conv.id,
+    };
+  }
+
+  /**
+   * Start a new workflow generation.
+   */
+  async startWorkflowGeneration(params: {
+    workflowRunId: string;
+    content: string;
+    model?: string;
+    userId: string;
+    allowedIntegrations: IntegrationType[];
+    workflowPrompt: string;
+    workflowPromptDo?: string | null;
+    workflowPromptDont?: string | null;
+    triggerPayload: unknown;
+  }): Promise<{ generationId: string; conversationId: string }> {
+    const { content, userId, model } = params;
+
+    const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
+    const [newConv] = await db
+      .insert(conversation)
+      .values({
+        userId,
+        title: title || "Workflow run",
+        type: "workflow",
+        model: model ?? "claude-sonnet-4-20250514",
+        autoApprove: false,
+      })
+      .returning();
+
+    await db.insert(message).values({
+      conversationId: newConv.id,
+      role: "user",
+      content,
+    });
+
+    const [genRecord] = await db
+      .insert(generation)
+      .values({
+        conversationId: newConv.id,
+        status: "running",
+        contentParts: [],
+        inputTokens: 0,
+        outputTokens: 0,
+      })
+      .returning();
+
+    await db
+      .update(conversation)
+      .set({
+        generationStatus: "generating",
+        currentGenerationId: genRecord.id,
+      })
+      .where(eq(conversation.id, newConv.id));
+
+    const ctx: GenerationContext = {
+      id: genRecord.id,
+      conversationId: newConv.id,
+      userId,
+      status: "running",
+      contentParts: [],
+      assistantContent: "",
+      subscribers: new Map(),
+      abortController: new AbortController(),
+      pendingApproval: null,
+      pendingAuth: null,
+      usage: { inputTokens: 0, outputTokens: 0, totalCostUsd: 0 },
+      startedAt: new Date(),
+      lastSaveAt: new Date(),
+      isNewConversation: true,
+      model: model ?? "claude-sonnet-4-20250514",
+      userMessageContent: content,
+      assistantMessageIds: new Set(),
+      backendType: "opencode",
+      workflowRunId: params.workflowRunId,
+      allowedIntegrations: params.allowedIntegrations,
+      workflowPrompt: params.workflowPrompt,
+      workflowPromptDo: params.workflowPromptDo ?? undefined,
+      workflowPromptDont: params.workflowPromptDont ?? undefined,
+      triggerPayload: params.triggerPayload,
+    };
+
+    this.activeGenerations.set(genRecord.id, ctx);
+    this.conversationToGeneration.set(newConv.id, genRecord.id);
+
+    this.runGeneration(ctx).catch((err) => {
+      console.error("[GenerationManager] runGeneration error:", err);
+    });
+
+    return {
+      generationId: genRecord.id,
+      conversationId: newConv.id,
     };
   }
 
@@ -553,6 +657,13 @@ class GenerationManager {
       .set({ generationStatus: "generating" })
       .where(eq(conversation.id, ctx.conversationId));
 
+    if (ctx.workflowRunId) {
+      await db
+        .update(workflowRun)
+        .set({ status: "running" })
+        .where(eq(workflowRun.id, ctx.workflowRunId));
+    }
+
     // Notify subscribers
     this.broadcast(ctx, {
       type: "approval_result",
@@ -568,6 +679,17 @@ class GenerationManager {
    */
   getGenerationForConversation(conversationId: string): string | undefined {
     return this.conversationToGeneration.get(conversationId);
+  }
+
+  /**
+   * Get allowed integrations for a conversation (if restricted).
+   */
+  getAllowedIntegrationsForConversation(conversationId: string): IntegrationType[] | null {
+    const genId = this.conversationToGeneration.get(conversationId);
+    if (!genId) return null;
+    const ctx = this.activeGenerations.get(genId);
+    if (!ctx || ctx.allowedIntegrations === undefined) return null;
+    return ctx.allowedIntegrations;
   }
 
   /**
@@ -632,7 +754,39 @@ class GenerationManager {
         getEnabledIntegrationTypes(ctx.userId),
       ]);
 
-      const cliInstructions = getCliInstructions(enabledIntegrations);
+      const allowedIntegrations = ctx.allowedIntegrations ?? enabledIntegrations;
+
+      const cliInstructions = getCliInstructions(allowedIntegrations);
+      const filteredCliEnv =
+        ctx.allowedIntegrations !== undefined
+          ? Object.fromEntries(
+              Object.entries(cliEnv).filter(([key]) => {
+                const envToIntegration: Record<string, IntegrationType> = {
+                  GMAIL_ACCESS_TOKEN: "gmail",
+                  GOOGLE_CALENDAR_ACCESS_TOKEN: "google_calendar",
+                  GOOGLE_DOCS_ACCESS_TOKEN: "google_docs",
+                  GOOGLE_SHEETS_ACCESS_TOKEN: "google_sheets",
+                  GOOGLE_DRIVE_ACCESS_TOKEN: "google_drive",
+                  NOTION_ACCESS_TOKEN: "notion",
+                  LINEAR_ACCESS_TOKEN: "linear",
+                  GITHUB_ACCESS_TOKEN: "github",
+                  AIRTABLE_ACCESS_TOKEN: "airtable",
+                  SLACK_ACCESS_TOKEN: "slack",
+                  HUBSPOT_ACCESS_TOKEN: "hubspot",
+                  SALESFORCE_ACCESS_TOKEN: "salesforce",
+                  LINKEDIN_ACCOUNT_ID: "linkedin",
+                  UNIPILE_API_KEY: "linkedin",
+                  UNIPILE_DSN: "linkedin",
+                };
+                const integration = envToIntegration[key];
+                return integration ? ctx.allowedIntegrations!.includes(integration) : true;
+              })
+            )
+          : cliEnv;
+
+      if (ctx.allowedIntegrations !== undefined) {
+        filteredCliEnv.ALLOWED_INTEGRATIONS = ctx.allowedIntegrations.join(",");
+      }
 
       // Get conversation for existing session info
       const conv = await db.query.conversation.findFirst({
@@ -648,7 +802,7 @@ class GenerationManager {
           conversationId: ctx.conversationId,
           userId: ctx.userId,
           anthropicApiKey: env.ANTHROPIC_API_KEY,
-          integrationEnvs: cliEnv,
+          integrationEnvs: filteredCliEnv,
         },
         {
           title: conv?.title || "Conversation",
@@ -665,7 +819,8 @@ class GenerationManager {
 
       // Build system prompt
       const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
-      const systemPromptParts = [baseSystemPrompt, cliInstructions, skillsInstructions].filter(
+      const workflowPrompt = this.buildWorkflowPrompt(ctx);
+      const systemPromptParts = [baseSystemPrompt, cliInstructions, skillsInstructions, workflowPrompt].filter(
         Boolean
       );
       const systemPrompt = systemPromptParts.join("\n\n");
@@ -776,10 +931,12 @@ class GenerationManager {
 
       // 3. Get integration environment and build system prompt
       const enabledIntegrations = await getEnabledIntegrationTypes(ctx.userId);
-      const cliInstructions = getCliInstructions(enabledIntegrations);
+      const allowedIntegrations = ctx.allowedIntegrations ?? enabledIntegrations;
+      const cliInstructions = getCliInstructions(allowedIntegrations);
 
       const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
-      const systemPromptParts = [baseSystemPrompt, cliInstructions].filter(Boolean);
+      const workflowPrompt = this.buildWorkflowPrompt(ctx);
+      const systemPromptParts = [baseSystemPrompt, cliInstructions, workflowPrompt].filter(Boolean);
       const systemPrompt = systemPromptParts.join("\n\n");
 
       // 4. Build message history from DB
@@ -934,11 +1091,38 @@ class GenerationManager {
           for (const block of assistantContentBlocks) {
             if (block.type !== "tool_use") continue;
 
+            if (ctx.allowedIntegrations !== undefined && block.name === "bash") {
+              const command = (block.input.command as string) || "";
+              const parsed = parseBashCommand(command);
+              if (parsed && !ctx.allowedIntegrations.includes(parsed.integration as IntegrationType)) {
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: `Integration "${parsed.integration}" is not allowed for this workflow.`,
+                  is_error: true,
+                });
+
+                this.broadcast(ctx, {
+                  type: "tool_result",
+                  toolName: block.name,
+                  result: "Integration not allowed",
+                });
+
+                ctx.contentParts.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: "Integration not allowed",
+                });
+
+                continue;
+              }
+            }
+
             // Check permissions
             const permCheck = checkToolPermissions(
               block.name,
               block.input,
-              enabledIntegrations
+              allowedIntegrations
             );
 
             if (permCheck.needsAuth) {
@@ -1420,6 +1604,13 @@ class GenerationManager {
         .update(conversation)
         .set({ generationStatus: "generating" })
         .where(eq(conversation.id, ctx.conversationId));
+
+      if (ctx.workflowRunId) {
+        await db
+          .update(workflowRun)
+          .set({ status: "running" })
+          .where(eq(workflowRun.id, ctx.workflowRunId));
+      }
     } else {
       // Still waiting for more integrations - broadcast progress
       this.broadcast(ctx, {
@@ -1478,6 +1669,13 @@ class GenerationManager {
             .update(conversation)
             .set({ generationStatus: "awaiting_approval" })
             .where(eq(conversation.id, ctx.conversationId));
+        })
+        .then(() => {
+          if (!ctx.workflowRunId) return;
+          return db
+            .update(workflowRun)
+            .set({ status: "awaiting_approval" })
+            .where(eq(workflowRun.id, ctx.workflowRunId));
         })
         .catch((err) => console.error("[GenerationManager] DB update error:", err));
 
@@ -1544,6 +1742,13 @@ class GenerationManager {
             .update(conversation)
             .set({ generationStatus: "awaiting_auth" })
             .where(eq(conversation.id, ctx.conversationId));
+        })
+        .then(() => {
+          if (!ctx.workflowRunId) return;
+          return db
+            .update(workflowRun)
+            .set({ status: "awaiting_auth" })
+            .where(eq(workflowRun.id, ctx.workflowRunId));
         })
         .catch((err) => console.error("[GenerationManager] DB update error:", err));
 
@@ -1653,6 +1858,22 @@ class GenerationManager {
       })
       .where(eq(conversation.id, ctx.conversationId));
 
+    if (ctx.workflowRunId) {
+      await db
+        .update(workflowRun)
+        .set({
+          status:
+            status === "completed"
+              ? "completed"
+              : status === "cancelled"
+                ? "cancelled"
+                : "error",
+          finishedAt: new Date(),
+          errorMessage: ctx.errorMessage,
+        })
+        .where(eq(workflowRun.id, ctx.workflowRunId));
+    }
+
     // Notify subscribers BEFORE setting status to avoid race condition
     if (status === "completed" && messageId) {
       this.broadcast(ctx, {
@@ -1708,6 +1929,53 @@ class GenerationManager {
         console.error("[GenerationManager] Subscriber callback error:", err);
       }
     }
+
+    if (ctx.workflowRunId) {
+      void this.recordWorkflowRunEvent(ctx.workflowRunId, event);
+    }
+  }
+
+  private buildWorkflowPrompt(ctx: GenerationContext): string | null {
+    if (!ctx.workflowPrompt && ctx.triggerPayload === undefined) return null;
+
+    const sections = [
+      ctx.workflowPrompt ? `## Workflow Instructions\n${ctx.workflowPrompt}` : null,
+      ctx.workflowPromptDo ? `## Do\n${ctx.workflowPromptDo}` : null,
+      ctx.workflowPromptDont ? `## Don't\n${ctx.workflowPromptDont}` : null,
+      ctx.triggerPayload !== undefined
+        ? `## Trigger Payload\n${JSON.stringify(ctx.triggerPayload, null, 2)}`
+        : null,
+    ].filter(Boolean);
+
+    if (sections.length === 0) return null;
+    return sections.join("\n\n");
+  }
+
+  private async recordWorkflowRunEvent(
+    workflowRunId: string,
+    event: GenerationEvent
+  ): Promise<void> {
+    const loggableEvents = new Set([
+      "tool_use",
+      "tool_result",
+      "pending_approval",
+      "approval_result",
+      "auth_needed",
+      "auth_progress",
+      "auth_result",
+      "done",
+      "error",
+      "cancelled",
+      "status_change",
+    ]);
+
+    if (!loggableEvents.has(event.type)) return;
+
+    await db.insert(workflowRunEvent).values({
+      workflowRunId,
+      type: event.type,
+      payload: event,
+    });
   }
 }
 

@@ -243,6 +243,128 @@ export function useUpdateSkillFile() {
   });
 }
 
+// ========== WORKFLOW HOOKS ==========
+
+export function useWorkflowList() {
+  return useQuery({
+    queryKey: ["workflow", "list"],
+    queryFn: () => client.workflow.list(),
+  });
+}
+
+export function useWorkflow(id: string | undefined) {
+  return useQuery({
+    queryKey: ["workflow", "get", id],
+    queryFn: () => client.workflow.get({ id: id! }),
+    enabled: !!id,
+  });
+}
+
+export function useCreateWorkflow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      name: string;
+      triggerType: string;
+      prompt: string;
+      promptDo?: string;
+      promptDont?: string;
+      allowedIntegrations: (
+        "gmail"
+        | "google_calendar"
+        | "google_docs"
+        | "google_sheets"
+        | "google_drive"
+        | "notion"
+        | "linear"
+        | "github"
+        | "airtable"
+        | "slack"
+        | "hubspot"
+        | "linkedin"
+        | "salesforce"
+      )[];
+    }) => client.workflow.create(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflow"] });
+    },
+  });
+}
+
+export function useUpdateWorkflow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      name?: string;
+      status?: "on" | "off";
+      triggerType?: string;
+      prompt?: string;
+      promptDo?: string | null;
+      promptDont?: string | null;
+      allowedIntegrations?: (
+        "gmail"
+        | "google_calendar"
+        | "google_docs"
+        | "google_sheets"
+        | "google_drive"
+        | "notion"
+        | "linear"
+        | "github"
+        | "airtable"
+        | "slack"
+        | "hubspot"
+        | "linkedin"
+        | "salesforce"
+      )[];
+    }) => client.workflow.update(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflow"] });
+    },
+  });
+}
+
+export function useDeleteWorkflow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => client.workflow.delete({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflow"] });
+    },
+  });
+}
+
+export function useTriggerWorkflow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { id: string; payload?: unknown }) =>
+      client.workflow.trigger(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflow"] });
+    },
+  });
+}
+
+export function useWorkflowRun(id: string | undefined) {
+  return useQuery({
+    queryKey: ["workflow", "run", id],
+    queryFn: () => client.workflow.getRun({ id: id! }),
+    enabled: !!id,
+  });
+}
+
+export function useWorkflowRuns(workflowId: string | undefined, limit = 20) {
+  return useQuery({
+    queryKey: ["workflow", "runs", workflowId, limit],
+    queryFn: () => client.workflow.listRuns({ workflowId: workflowId!, limit }),
+    enabled: !!workflowId,
+  });
+}
+
 // Hook for deleting a file
 export function useDeleteSkillFile() {
   const queryClient = useQueryClient();

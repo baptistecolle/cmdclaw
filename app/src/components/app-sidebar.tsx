@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, Plug, Sparkles, Settings, LogOut } from "lucide-react";
+import { MessageSquare, Plug, Sparkles, Settings, LogOut, Workflow } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
@@ -25,6 +25,7 @@ type SessionData = Awaited<ReturnType<typeof authClient.getSession>>["data"];
 
 const navItems = [
   { icon: MessageSquare, label: "Chat", href: "/chat" },
+  { icon: Workflow, label: "Workflows", href: "/workflows" },
   { icon: Plug, label: "Integrations", href: "/integrations" },
   { icon: Sparkles, label: "Skills", href: "/skills" },
   { icon: Settings, label: "Settings", href: "/settings" },

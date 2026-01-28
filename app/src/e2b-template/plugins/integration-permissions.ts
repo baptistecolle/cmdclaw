@@ -332,6 +332,16 @@ export const IntegrationPermissionsPlugin = async () => {
       }
 
       const { integration, operation } = parsed;
+      const allowedRaw = process.env.ALLOWED_INTEGRATIONS || "";
+      const allowedList = allowedRaw
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (allowedList.length > 0 && !allowedList.includes(integration)) {
+        throw new Error(`Integration "${integration}" is not allowed for this workflow`);
+      }
+
       console.log(`[Plugin] Detected integration command: ${integration} ${operation}`);
 
       // Check if integration token is available
