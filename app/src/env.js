@@ -79,6 +79,8 @@ export const env = createEnv({
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_BUCKET_NAME: z.string().default("bap-documents"),
     S3_FORCE_PATH_STYLE: z.string().transform(v => v === "true").default("true"),
+    // Autumn (Billing)
+    AUTUMN_SECRET_KEY: z.string().optional(),
   },
 
   /**
@@ -147,6 +149,7 @@ export const env = createEnv({
     S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
     S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
     S3_FORCE_PATH_STYLE: process.env.S3_FORCE_PATH_STYLE,
+    AUTUMN_SECRET_KEY: process.env.AUTUMN_SECRET_KEY,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,

@@ -91,6 +91,7 @@ export const userRelations = relations(user, ({ many }) => ({
   conversations: many(conversation),
   integrations: many(integration),
   skills: many(skill),
+  workflows: many(workflow),
   providerAuths: many(providerAuth),
   devices: many(device),
 }));
@@ -138,6 +139,11 @@ export const generationRecordStatusEnum = pgEnum("generation_record_status", [
   "error",
 ]);
 
+export const conversationTypeEnum = pgEnum("conversation_type", [
+  "chat",
+  "workflow",
+]);
+
 export const conversation = pgTable(
   "conversation",
   {
@@ -145,6 +151,7 @@ export const conversation = pgTable(
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
     userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    type: conversationTypeEnum("type").default("chat").notNull(),
     title: text("title").default("New conversation"),
     // OpenCode session ID for resuming conversations
     opencodeSessionId: text("opencode_session_id"),
@@ -252,7 +259,8 @@ export const generation = pgTable(
   ]
 );
 
-// ========== INTEGRATION SCHEMA ==========
+// ========== INTEGRATION TYPE ENUM ==========
+// Defined early because workflow schema depends on it
 
 export const integrationTypeEnum = pgEnum("integration_type", [
   "gmail",
@@ -269,6 +277,90 @@ export const integrationTypeEnum = pgEnum("integration_type", [
   "linkedin",
   "salesforce",
 ]);
+
+// ========== WORKFLOW SCHEMA ==========
+
+export const workflowStatusEnum = pgEnum("workflow_status", ["on", "off"]);
+
+export const workflowRunStatusEnum = pgEnum("workflow_run_status", [
+  "running",
+  "awaiting_approval",
+  "awaiting_auth",
+  "completed",
+  "error",
+  "cancelled",
+]);
+
+export const workflow = pgTable(
+  "workflow",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    status: workflowStatusEnum("status").default("off").notNull(),
+    triggerType: text("trigger_type").notNull(),
+    prompt: text("prompt").notNull(),
+    promptDo: text("prompt_do"),
+    promptDont: text("prompt_dont"),
+    allowedIntegrations: integrationTypeEnum("allowed_integrations").array().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("workflow_owner_id_idx").on(table.ownerId),
+    index("workflow_status_idx").on(table.status),
+  ]
+);
+
+export const workflowRun = pgTable(
+  "workflow_run",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workflowId: text("workflow_id")
+      .notNull()
+      .references(() => workflow.id, { onDelete: "cascade" }),
+    status: workflowRunStatusEnum("status").default("running").notNull(),
+    triggerPayload: jsonb("trigger_payload").notNull(),
+    generationId: text("generation_id").references(() => generation.id, { onDelete: "set null" }),
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    finishedAt: timestamp("finished_at"),
+    errorMessage: text("error_message"),
+  },
+  (table) => [
+    index("workflow_run_workflow_id_idx").on(table.workflowId),
+    index("workflow_run_status_idx").on(table.status),
+    index("workflow_run_started_at_idx").on(table.startedAt),
+  ]
+);
+
+export const workflowRunEvent = pgTable(
+  "workflow_run_event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workflowRunId: text("workflow_run_id")
+      .notNull()
+      .references(() => workflowRun.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("workflow_run_event_run_id_idx").on(table.workflowRunId),
+  ]
+);
+
+// ========== INTEGRATION SCHEMA ==========
 
 export const integration = pgTable(
   "integration",
@@ -355,6 +447,30 @@ export const generationRelations = relations(generation, ({ one }) => ({
   message: one(message, {
     fields: [generation.messageId],
     references: [message.id],
+  }),
+}));
+
+export const workflowRelations = relations(workflow, ({ one, many }) => ({
+  owner: one(user, { fields: [workflow.ownerId], references: [user.id] }),
+  runs: many(workflowRun),
+}));
+
+export const workflowRunRelations = relations(workflowRun, ({ one, many }) => ({
+  workflow: one(workflow, {
+    fields: [workflowRun.workflowId],
+    references: [workflow.id],
+  }),
+  generation: one(generation, {
+    fields: [workflowRun.generationId],
+    references: [generation.id],
+  }),
+  events: many(workflowRunEvent),
+}));
+
+export const workflowRunEventRelations = relations(workflowRunEvent, ({ one }) => ({
+  run: one(workflowRun, {
+    fields: [workflowRunEvent.workflowRunId],
+    references: [workflowRun.id],
   }),
 }));
 

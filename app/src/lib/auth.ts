@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { bearer, deviceAuthorization, lastLoginMethod, magicLink } from "better-auth/plugins";
+import { autumn } from "autumn-js/better-auth";
 import { Resend } from "resend";
 
 import { env } from "@/env";
@@ -49,6 +50,9 @@ export const auth = betterAuth({
       verificationUri: "/connect",
     }),
     lastLoginMethod(),
+    autumn({
+      secretKey: env.AUTUMN_SECRET_KEY,
+    }),
     magicLink({
       expiresIn: 3600, // 1 hour
       async sendMagicLink({ email, url }) {
