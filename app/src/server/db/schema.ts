@@ -507,14 +507,30 @@ export const providerAuthRelations = relations(providerAuth, ({ one }) => ({
   }),
 }));
 
-// ========== DEVICE (BYOC) SCHEMA ==========
+// ========== DEVICE CODE (Better Auth plugin) ==========
 
-export const deviceCodeStatusEnum = pgEnum("device_code_status", [
-  "pending",
-  "approved",
-  "expired",
-  "denied",
-]);
+export const deviceCode = pgTable(
+  "device_code",
+  {
+    id: text("id").primaryKey(),
+    deviceCode: text("device_code").notNull(),
+    userCode: text("user_code").notNull(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    clientId: text("client_id"),
+    scope: text("scope"),
+    status: text("status").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    lastPolledAt: timestamp("last_polled_at"),
+    pollingInterval: integer("polling_interval"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+);
+
+// ========== DEVICE (BYOC) SCHEMA ==========
 
 export const device = pgTable(
   "device",
@@ -547,37 +563,8 @@ export const device = pgTable(
   ]
 );
 
-export const deviceCode = pgTable(
-  "device_code",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    /** Short human-readable code shown to user (e.g. "ABCD-1234") */
-    userCode: text("user_code").notNull().unique(),
-    /** Longer code used by daemon to poll (UUID) */
-    deviceCode: text("device_code").notNull().unique(),
-    /** Set when user approves the code */
-    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
-    /** Set when device is created after approval */
-    deviceId: text("device_id").references(() => device.id, { onDelete: "cascade" }),
-    status: deviceCodeStatusEnum("status").default("pending").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("device_code_user_code_idx").on(table.userCode),
-    index("device_code_device_code_idx").on(table.deviceCode),
-  ]
-);
-
 export const deviceRelations = relations(device, ({ one }) => ({
   user: one(user, { fields: [device.userId], references: [user.id] }),
-}));
-
-export const deviceCodeRelations = relations(deviceCode, ({ one }) => ({
-  user: one(user, { fields: [deviceCode.userId], references: [user.id] }),
-  device: one(device, { fields: [deviceCode.deviceId], references: [device.id] }),
 }));
 
 // Aggregated schema used by better-auth's drizzle adapter.
@@ -586,4 +573,5 @@ export const authSchema = {
   session,
   account,
   verification,
+  deviceCode,
 };

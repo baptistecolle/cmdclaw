@@ -21,13 +21,15 @@ export class WSClient {
   private ws: WebSocket | null = null;
   private serverUrl: string;
   private token: string;
+  private deviceId: string;
   private reconnectDelay = MIN_RECONNECT_MS;
   private shouldReconnect = true;
   private connected = false;
 
-  constructor(serverUrl: string, token: string) {
+  constructor(serverUrl: string, token: string, deviceId: string) {
     this.serverUrl = serverUrl;
     this.token = token;
+    this.deviceId = deviceId;
   }
 
   connect(): void {
@@ -36,7 +38,7 @@ export class WSClient {
       .replace(/^http:\/\//, "ws://")
       .replace(/\/$/, "");
 
-    const url = `${wsUrl}/ws?token=${encodeURIComponent(this.token)}`;
+    const url = `${wsUrl}/ws?token=${encodeURIComponent(this.token)}&deviceId=${encodeURIComponent(this.deviceId)}`;
     logger.info("ws", `Connecting to ${wsUrl}/ws`);
 
     try {

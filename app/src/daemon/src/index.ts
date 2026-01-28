@@ -127,7 +127,7 @@ async function startDaemon(serverUrlOverride?: string): Promise<void> {
     wsServerUrl = wsServerUrl.replace(":3000", ":4097");
   }
 
-  const client = new WSClient(wsServerUrl, config.token);
+  const client = new WSClient(wsServerUrl, config.token, config.deviceId);
   client.connect();
 
   // Handle shutdown

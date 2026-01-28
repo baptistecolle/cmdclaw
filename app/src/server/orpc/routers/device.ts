@@ -3,55 +3,16 @@ import { baseProcedure, protectedProcedure } from "../middleware";
 import { db } from "@/server/db/client";
 import { device } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import {
-  generateDeviceCode,
-  approveDevice,
-  pollDeviceCode,
-} from "@/server/services/device-auth";
+import { auth } from "@/lib/auth";
 
 /**
- * Request a new device code pair (called by daemon, no auth required).
+ * Register a new device (called by daemon after Better Auth device code flow).
+ * The daemon sends its Bearer token from the device code flow.
  */
-const requestCode = baseProcedure
-  .output(
-    z.object({
-      userCode: z.string(),
-      deviceCode: z.string(),
-      expiresAt: z.string(),
-    })
-  )
-  .handler(async () => {
-    const result = await generateDeviceCode();
-    return {
-      userCode: result.userCode,
-      deviceCode: result.deviceCode,
-      expiresAt: result.expiresAt.toISOString(),
-    };
-  });
-
-/**
- * Poll for device code approval (called by daemon, no auth required).
- */
-const poll = baseProcedure
-  .input(z.object({ deviceCode: z.string() }))
-  .output(
-    z.object({
-      status: z.enum(["pending", "approved", "expired", "denied"]),
-      token: z.string().optional(),
-      deviceId: z.string().optional(),
-    })
-  )
-  .handler(async ({ input }) => {
-    return await pollDeviceCode(input.deviceCode);
-  });
-
-/**
- * Approve a device code (called by user from web UI, requires auth).
- */
-const approve = protectedProcedure
+const register = baseProcedure
   .input(
     z.object({
-      userCode: z.string().min(1),
+      token: z.string(),
       deviceName: z.string().optional(),
       platform: z.string().optional(),
     })
@@ -59,16 +20,31 @@ const approve = protectedProcedure
   .output(
     z.object({
       success: z.boolean(),
+      deviceId: z.string().optional(),
       error: z.string().optional(),
     })
   )
-  .handler(async ({ input, context }) => {
-    return await approveDevice({
-      userCode: input.userCode,
-      userId: context.user.id,
-      deviceName: input.deviceName,
-      platform: input.platform,
+  .handler(async ({ input }) => {
+    // Verify the Bearer token via Better Auth
+    const session = await auth.api.getSession({
+      headers: new Headers({ Authorization: `Bearer ${input.token}` }),
     });
+
+    if (!session?.user?.id) {
+      return { success: false, error: "Invalid token" };
+    }
+
+    // Create device record
+    const [newDevice] = await db
+      .insert(device)
+      .values({
+        userId: session.user.id,
+        name: input.deviceName || "My Device",
+        platform: input.platform || "unknown",
+      })
+      .returning();
+
+    return { success: true, deviceId: newDevice.id };
   });
 
 /**
@@ -124,9 +100,7 @@ const revoke = protectedProcedure
   });
 
 export const deviceRouter = {
-  requestCode,
-  poll,
-  approve,
+  register,
   list,
   revoke,
 };

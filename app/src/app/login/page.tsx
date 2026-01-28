@@ -41,6 +41,14 @@ function AppleIcon() {
   );
 }
 
+function LastUsedBadge() {
+  return (
+    <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+      Last used
+    </span>
+  );
+}
+
 function LoginContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -50,6 +58,7 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<SignInState>("idle");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const lastMethod = authClient.getLastUsedLoginMethod();
 
   useEffect(() => {
     authClient.getSession().then((res) => {
@@ -130,6 +139,7 @@ function LoginContent() {
             >
               <GoogleIcon />
               <span className="ml-2">Continue with Google</span>
+              {lastMethod === "google" && <LastUsedBadge />}
             </Button>
             <Button
               type="button"
@@ -139,6 +149,7 @@ function LoginContent() {
             >
               <AppleIcon />
               <span className="ml-2">Continue with Apple</span>
+              {lastMethod === "apple" && <LastUsedBadge />}
             </Button>
           </div>
 
@@ -167,6 +178,7 @@ function LoginContent() {
             />
             <Button type="submit" className="w-full" disabled={!email || status === "sending" || status === "sent"}>
               {status === "sending" ? "Sending..." : status === "sent" ? "Email sent, check your inbox" : "Send magic link"}
+              {lastMethod === "email" && <LastUsedBadge />}
             </Button>
           </form>
       </div>

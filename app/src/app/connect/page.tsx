@@ -4,12 +4,11 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/app-shell";
-import { client } from "@/orpc/client";
+import { authClient } from "@/lib/auth-client";
 import { CheckCircle2, Loader2, Monitor, XCircle } from "lucide-react";
 
 export default function ConnectDevicePage() {
   const [code, setCode] = useState("");
-  const [deviceName, setDeviceName] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -22,17 +21,31 @@ export default function ConnectDevicePage() {
     setErrorMsg("");
 
     try {
-      const result = await client.device.approve({
-        userCode: code.trim().toUpperCase(),
-        deviceName: deviceName.trim() || undefined,
+      const formattedCode = code.trim().replace(/-/g, "").toUpperCase();
+
+      // Verify the code is valid
+      const verifyResponse = await authClient.device({
+        query: { user_code: formattedCode },
       });
 
-      if (result.success) {
-        setStatus("success");
-      } else {
+      if (!verifyResponse.data) {
         setStatus("error");
-        setErrorMsg(result.error || "Failed to approve device");
+        setErrorMsg("Invalid or expired code");
+        return;
       }
+
+      // Approve the device
+      const approveResponse = await authClient.device.approve({
+        userCode: formattedCode,
+      });
+
+      if (approveResponse.error) {
+        setStatus("error");
+        setErrorMsg("Failed to approve device");
+        return;
+      }
+
+      setStatus("success");
     } catch (err) {
       setStatus("error");
       setErrorMsg("An error occurred. Please try again.");
@@ -75,24 +88,10 @@ export default function ConnectDevicePage() {
                   type="text"
                   value={code}
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="ABCD-1234"
-                  maxLength={9}
+                  placeholder="ABCD1234"
+                  maxLength={12}
                   className="text-center text-lg font-mono tracking-widest"
                   autoFocus
-                  disabled={status === "submitting"}
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Device Name{" "}
-                  <span className="text-muted-foreground">(optional)</span>
-                </label>
-                <Input
-                  type="text"
-                  value={deviceName}
-                  onChange={(e) => setDeviceName(e.target.value)}
-                  placeholder="e.g. MacBook Pro"
                   disabled={status === "submitting"}
                 />
               </div>

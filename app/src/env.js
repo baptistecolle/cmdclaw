@@ -70,8 +70,6 @@ export const env = createEnv({
     ENCRYPTION_KEY: z.string().optional(),
     // OpenCode plugin callback secret
     BAP_SERVER_SECRET: z.string().optional(),
-    // BYOC daemon WebSocket auth
-    BYOC_JWT_SECRET: z.string().optional(),
     // BYOC WebSocket server port
     WS_PORT: z.string().default("4097"),
     // S3/MinIO Configuration
@@ -142,7 +140,6 @@ export const env = createEnv({
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
     BAP_SERVER_SECRET: process.env.BAP_SERVER_SECRET,
-    BYOC_JWT_SECRET: process.env.BYOC_JWT_SECRET,
     WS_PORT: process.env.WS_PORT,
     S3_ENDPOINT: process.env.S3_ENDPOINT,
     S3_REGION: process.env.S3_REGION,

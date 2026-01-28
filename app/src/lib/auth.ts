@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { bearer, magicLink } from "better-auth/plugins";
+import { bearer, deviceAuthorization, lastLoginMethod, magicLink } from "better-auth/plugins";
 import { Resend } from "resend";
 
 import { env } from "@/env";
@@ -40,9 +40,15 @@ export const auth = betterAuth({
     "https://localcan.baptistecolle.com",
     "bap://",
   ],
+  // Don't forget to regenerate the schema if you add a new plugin
+  // Run "bun auth:generate" to regenerate the schema
   plugins: [
     nextCookies(),
     bearer(),
+    deviceAuthorization({
+      verificationUri: "/connect",
+    }),
+    lastLoginMethod(),
     magicLink({
       expiresIn: 3600, // 1 hour
       async sendMagicLink({ email, url }) {

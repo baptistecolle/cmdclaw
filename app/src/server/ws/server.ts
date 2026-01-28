@@ -114,9 +114,10 @@ export function getOnlineDevicesForUser(userId: string): string[] {
 
 async function handleAuthentication(
   ws: ServerWebSocket<WebSocketData>,
-  token: string
+  token: string,
+  deviceId: string
 ): Promise<boolean> {
-  const result = await verifyDeviceToken(token);
+  const result = await verifyDeviceToken(token, deviceId);
   if (!result) {
     ws.send(JSON.stringify({ type: "error", error: "Invalid token" }));
     ws.close(4001, "Invalid token");
@@ -235,13 +236,14 @@ export function startWebSocketServer(port: number = 4097): void {
       // WebSocket upgrade
       if (url.pathname === "/ws") {
         const token = url.searchParams.get("token");
-        if (!token) {
-          return new Response("Missing token", { status: 401 });
+        const deviceId = url.searchParams.get("deviceId");
+        if (!token || !deviceId) {
+          return new Response("Missing token or deviceId", { status: 401 });
         }
 
         const upgraded = server.upgrade(req, {
           data: {
-            deviceId: "",
+            deviceId,
             userId: "",
             authenticated: false,
             token,
@@ -259,13 +261,13 @@ export function startWebSocketServer(port: number = 4097): void {
 
     websocket: {
       async open(ws) {
-        // Authenticate on connect using the token from query params
-        const token = ws.data.token;
-        if (token) {
-          const ok = await handleAuthentication(ws, token);
+        // Authenticate on connect using the token and deviceId from query params
+        const { token, deviceId } = ws.data;
+        if (token && deviceId) {
+          const ok = await handleAuthentication(ws, token, deviceId);
           if (!ok) return;
         } else {
-          ws.close(4001, "No token provided");
+          ws.close(4001, "Missing token or deviceId");
         }
       },
 

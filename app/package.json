@@ -21,7 +21,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "worker": "tsx --require dotenv/config scripts/bullmq-worker.ts",
-    "auth:generate": "npx @better-auth/cli generate",
+    "auth:generate": "bun x @better-auth/cli@latest generate --output src/server/db/auth-schema.ts -y",
     "docker-up:local": "docker compose up",
     "e2b:build:dev": "tsx src/e2b-template/build.dev.ts",
     "e2b:build:prod": "tsx src/e2b-template/build.prod.ts",
