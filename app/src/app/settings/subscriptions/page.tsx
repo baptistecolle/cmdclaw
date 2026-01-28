@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
@@ -34,9 +34,38 @@ const PROVIDERS: {
   },
 ];
 
-export default function SubscriptionsPage() {
+function SearchParamsHandler({
+  onNotification,
+}: {
+  onNotification: (notification: { type: "success" | "error"; message: string }) => void;
+}) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const connected = searchParams.get("provider_connected");
+    const error = searchParams.get("provider_error");
+
+    if (connected) {
+      onNotification({
+        type: "success",
+        message: `${connected === "openai" ? "ChatGPT" : "Gemini"} connected successfully!`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["providerAuth"] });
+      window.history.replaceState({}, "", "/settings/subscriptions");
+    } else if (error) {
+      onNotification({
+        type: "error",
+        message: `Connection failed: ${error.replace(/_/g, " ")}`,
+      });
+      window.history.replaceState({}, "", "/settings/subscriptions");
+    }
+  }, [searchParams, queryClient, onNotification]);
+
+  return null;
+}
+
+export default function SubscriptionsPage() {
   const { data, isLoading } = useProviderAuthStatus();
   const connectProvider = useConnectProvider();
   const disconnectProvider = useDisconnectProvider();
@@ -46,27 +75,12 @@ export default function SubscriptionsPage() {
     message: string;
   } | null>(null);
 
-  // Handle OAuth callback query params
-  useEffect(() => {
-    const connected = searchParams.get("provider_connected");
-    const error = searchParams.get("provider_error");
-
-    if (connected) {
-      setNotification({
-        type: "success",
-        message: `${connected === "openai" ? "ChatGPT" : "Gemini"} connected successfully!`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["providerAuth"] });
-      // Clean URL
-      window.history.replaceState({}, "", "/settings/subscriptions");
-    } else if (error) {
-      setNotification({
-        type: "error",
-        message: `Connection failed: ${error.replace(/_/g, " ")}`,
-      });
-      window.history.replaceState({}, "", "/settings/subscriptions");
-    }
-  }, [searchParams, queryClient]);
+  const handleNotification = useCallback(
+    (newNotification: { type: "success" | "error"; message: string }) => {
+      setNotification(newNotification);
+    },
+    []
+  );
 
   // Auto-dismiss notifications
   useEffect(() => {
@@ -120,6 +134,9 @@ export default function SubscriptionsPage() {
 
   return (
     <div>
+      <Suspense fallback={null}>
+        <SearchParamsHandler onNotification={handleNotification} />
+      </Suspense>
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Subscriptions</h2>
         <p className="mt-1 text-sm text-muted-foreground">
