@@ -8,6 +8,7 @@ import {
   useUpdateWorkflow,
   useWorkflowRuns,
   useTriggerWorkflow,
+  type WorkflowSchedule,
 } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -15,12 +16,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
   INTEGRATION_DISPLAY_NAMES,
-  INTEGRATION_ICONS,
+  INTEGRATION_LOGOS,
   type IntegrationType,
 } from "@/lib/integration-icons";
-import { Loader2, Play, ArrowLeft } from "lucide-react";
+import { Loader2, Play, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 
 const TRIGGERS = [
+  { value: "schedule", label: "Run on a schedule" },
   { value: "gmail.new_email", label: "New Gmail email" },
   { value: "hubspot.new_contact", label: "New HubSpot contact" },
 ];
@@ -42,25 +44,46 @@ export default function WorkflowEditorPage() {
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState(TRIGGERS[0].value);
   const [prompt, setPrompt] = useState("");
-  const [promptDo, setPromptDo] = useState("");
-  const [promptDont, setPromptDont] = useState("");
   const [allowedIntegrations, setAllowedIntegrations] = useState<IntegrationType[]>([]);
   const [status, setStatus] = useState<"on" | "off">("off");
   const [saving, setSaving] = useState(false);
+  const [showAllIntegrations, setShowAllIntegrations] = useState(false);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  // Schedule state (only used when triggerType is "schedule")
+  const [scheduleType, setScheduleType] = useState<"interval" | "daily" | "weekly" | "monthly">("daily");
+  const [intervalMinutes, setIntervalMinutes] = useState(60);
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleDaysOfWeek, setScheduleDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]); // Mon-Fri
+  const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState(1);
 
   useEffect(() => {
     if (!workflow) return;
     setName(workflow.name);
     setTriggerType(workflow.triggerType);
     setPrompt(workflow.prompt);
-    setPromptDo(workflow.promptDo ?? "");
-    setPromptDont(workflow.promptDont ?? "");
     setAllowedIntegrations((workflow.allowedIntegrations ?? []) as IntegrationType[]);
     setStatus(workflow.status);
+
+    // Initialize schedule state (when trigger is "schedule")
+    const schedule = workflow.schedule as WorkflowSchedule | null;
+    if (schedule) {
+      setScheduleType(schedule.type);
+      if (schedule.type === "interval") {
+        setIntervalMinutes(schedule.intervalMinutes);
+      } else if (schedule.type === "daily") {
+        setScheduleTime(schedule.time);
+      } else if (schedule.type === "weekly") {
+        setScheduleTime(schedule.time);
+        setScheduleDaysOfWeek(schedule.daysOfWeek);
+      } else if (schedule.type === "monthly") {
+        setScheduleTime(schedule.time);
+        setScheduleDayOfMonth(schedule.dayOfMonth);
+      }
+    }
   }, [workflow]);
 
   useEffect(() => {
@@ -74,7 +97,7 @@ export default function WorkflowEditorPage() {
       (Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[]).map((key) => ({
         key,
         name: INTEGRATION_DISPLAY_NAMES[key],
-        Icon: INTEGRATION_ICONS[key],
+        logo: INTEGRATION_LOGOS[key],
       })),
     []
   );
@@ -83,6 +106,23 @@ export default function WorkflowEditorPage() {
     setAllowedIntegrations((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
     );
+  };
+
+  const buildSchedule = (): WorkflowSchedule | null => {
+    if (triggerType !== "schedule") return null;
+
+    switch (scheduleType) {
+      case "interval":
+        return { type: "interval", intervalMinutes };
+      case "daily":
+        return { type: "daily", time: scheduleTime, timezone: "UTC" };
+      case "weekly":
+        return { type: "weekly", time: scheduleTime, daysOfWeek: scheduleDaysOfWeek, timezone: "UTC" };
+      case "monthly":
+        return { type: "monthly", time: scheduleTime, dayOfMonth: scheduleDayOfMonth, timezone: "UTC" };
+      default:
+        return null;
+    }
   };
 
   const handleSave = async () => {
@@ -95,9 +135,8 @@ export default function WorkflowEditorPage() {
         status,
         triggerType,
         prompt,
-        promptDo: promptDo || null,
-        promptDont: promptDont || null,
         allowedIntegrations,
+        schedule: buildSchedule(),
       });
       setNotification({ type: "success", message: "Workflow saved." });
     } catch (error) {
@@ -194,6 +233,110 @@ export default function WorkflowEditorPage() {
           </div>
         </div>
 
+        {triggerType === "schedule" && (
+          <div className="rounded-md border p-4 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Frequency</label>
+              <select
+                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                value={scheduleType}
+                onChange={(e) => setScheduleType(e.target.value as typeof scheduleType)}
+              >
+                <option value="interval">Every X minutes/hours</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+
+            {scheduleType === "interval" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Run every</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={10080}
+                    className="h-9 w-24 rounded-md border bg-transparent px-3 text-sm"
+                    value={intervalMinutes}
+                    onChange={(e) => setIntervalMinutes(Math.max(1, parseInt(e.target.value) || 1))}
+                  />
+                  <select
+                    className="h-9 rounded-md border bg-transparent px-3 text-sm"
+                    value={intervalMinutes >= 60 && intervalMinutes % 60 === 0 ? "hours" : "minutes"}
+                    onChange={(e) => {
+                      if (e.target.value === "hours") {
+                        setIntervalMinutes(Math.max(1, Math.round(intervalMinutes / 60)) * 60);
+                      }
+                    }}
+                  >
+                    <option value="minutes">minutes</option>
+                    <option value="hours">hours</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {(scheduleType === "daily" || scheduleType === "weekly" || scheduleType === "monthly") && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Time (UTC)</label>
+                <input
+                  type="time"
+                  className="h-9 w-32 rounded-md border bg-transparent px-3 text-sm"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                />
+              </div>
+            )}
+
+            {scheduleType === "weekly" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Days of the week</label>
+                <div className="flex flex-wrap gap-2">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => (
+                    <button
+                      key={day}
+                      type="button"
+                      className={cn(
+                        "h-9 w-12 rounded-md border text-sm font-medium transition-colors",
+                        scheduleDaysOfWeek.includes(index)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-transparent hover:bg-muted"
+                      )}
+                      onClick={() => {
+                        setScheduleDaysOfWeek((prev) =>
+                          prev.includes(index)
+                            ? prev.filter((d) => d !== index)
+                            : [...prev, index].sort()
+                        );
+                      }}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {scheduleType === "monthly" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Day of the month</label>
+                <select
+                  className="h-9 w-24 rounded-md border bg-transparent px-3 text-sm"
+                  value={scheduleDayOfMonth}
+                  onChange={(e) => setScheduleDayOfMonth(parseInt(e.target.value))}
+                >
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                    <option key={day} value={day}>
+                      {day}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="space-y-2">
           <label className="text-sm font-medium">Agent instructions</label>
           <textarea
@@ -203,29 +346,10 @@ export default function WorkflowEditorPage() {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Do</label>
-            <textarea
-              className="min-h-[90px] w-full rounded-md border bg-transparent px-3 py-2 text-sm"
-              value={promptDo}
-              onChange={(e) => setPromptDo(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Don't</label>
-            <textarea
-              className="min-h-[90px] w-full rounded-md border bg-transparent px-3 py-2 text-sm"
-              value={promptDont}
-              onChange={(e) => setPromptDont(e.target.value)}
-            />
-          </div>
-        </div>
-
         <div className="space-y-3">
           <label className="text-sm font-medium">Allowed tools</label>
           <div className="grid gap-3 md:grid-cols-2">
-            {integrationEntries.map(({ key, name: label, Icon }) => (
+            {(showAllIntegrations ? integrationEntries : integrationEntries.slice(0, 4)).map(({ key, name: label, logo }) => (
               <label
                 key={key}
                 className="flex items-center gap-3 rounded-md border p-3 text-sm"
@@ -234,11 +358,31 @@ export default function WorkflowEditorPage() {
                   checked={allowedIntegrations.includes(key)}
                   onCheckedChange={() => toggleIntegration(key)}
                 />
-                <Icon className="h-4 w-4 text-muted-foreground" />
+                <img src={logo} alt={label} className="h-4 w-4" />
                 <span>{label}</span>
               </label>
             ))}
           </div>
+          {integrationEntries.length > 4 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAllIntegrations(!showAllIntegrations)}
+              className="text-muted-foreground"
+            >
+              {showAllIntegrations ? (
+                <>
+                  <ChevronUp className="mr-1 h-4 w-4" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="mr-1 h-4 w-4" />
+                  Show more ({integrationEntries.length - 4} more)
+                </>
+              )}
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

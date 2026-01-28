@@ -23,6 +23,31 @@ const integrationTypeSchema = z.enum([
 
 const triggerTypeSchema = z.string().min(1).max(128);
 
+// Schedule configuration schema
+const scheduleSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("interval"),
+    intervalMinutes: z.number().min(1).max(10080), // max 1 week in minutes
+  }),
+  z.object({
+    type: z.literal("daily"),
+    time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/), // HH:MM format
+    timezone: z.string().default("UTC"),
+  }),
+  z.object({
+    type: z.literal("weekly"),
+    time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
+    daysOfWeek: z.array(z.number().min(0).max(6)).min(1), // 0=Sunday, 6=Saturday
+    timezone: z.string().default("UTC"),
+  }),
+  z.object({
+    type: z.literal("monthly"),
+    time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
+    dayOfMonth: z.number().min(1).max(31),
+    timezone: z.string().default("UTC"),
+  }),
+]);
+
 const list = protectedProcedure.handler(async ({ context }) => {
   const workflows = await context.db.query.workflow.findMany({
     where: eq(workflow.ownerId, context.user.id),
@@ -42,6 +67,7 @@ const list = protectedProcedure.handler(async ({ context }) => {
         status: wf.status,
         triggerType: wf.triggerType,
         allowedIntegrations: wf.allowedIntegrations,
+        schedule: wf.schedule,
         updatedAt: wf.updatedAt,
         lastRunStatus: lastRun?.status ?? null,
         lastRunAt: lastRun?.startedAt ?? null,
@@ -78,6 +104,7 @@ const get = protectedProcedure
       promptDo: wf.promptDo,
       promptDont: wf.promptDont,
       allowedIntegrations: wf.allowedIntegrations,
+      schedule: wf.schedule,
       createdAt: wf.createdAt,
       updatedAt: wf.updatedAt,
       runs: runs.map((run) => ({
@@ -99,6 +126,7 @@ const create = protectedProcedure
       promptDo: z.string().max(2000).optional(),
       promptDont: z.string().max(2000).optional(),
       allowedIntegrations: z.array(integrationTypeSchema).default([]),
+      schedule: scheduleSchema.nullish(),
     })
   )
   .handler(async ({ input, context }) => {
@@ -113,6 +141,7 @@ const create = protectedProcedure
         promptDo: input.promptDo,
         promptDont: input.promptDont,
         allowedIntegrations: input.allowedIntegrations,
+        schedule: input.schedule ?? null,
       })
       .returning();
 
@@ -134,6 +163,7 @@ const update = protectedProcedure
       promptDo: z.string().max(2000).nullish(),
       promptDont: z.string().max(2000).nullish(),
       allowedIntegrations: z.array(integrationTypeSchema).optional(),
+      schedule: scheduleSchema.nullish(),
     })
   )
   .handler(async ({ input, context }) => {
@@ -146,6 +176,9 @@ const update = protectedProcedure
     if (input.promptDont !== undefined) updates.promptDont = input.promptDont ?? null;
     if (input.allowedIntegrations !== undefined) {
       updates.allowedIntegrations = input.allowedIntegrations;
+    }
+    if (input.schedule !== undefined) {
+      updates.schedule = input.schedule ?? null;
     }
 
     const result = await context.db

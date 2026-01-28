@@ -292,6 +292,12 @@ export function useCreateWorkflow() {
   });
 }
 
+export type WorkflowSchedule =
+  | { type: "interval"; intervalMinutes: number }
+  | { type: "daily"; time: string; timezone?: string }
+  | { type: "weekly"; time: string; daysOfWeek: number[]; timezone?: string }
+  | { type: "monthly"; time: string; dayOfMonth: number; timezone?: string };
+
 export function useUpdateWorkflow() {
   const queryClient = useQueryClient();
 
@@ -319,6 +325,7 @@ export function useUpdateWorkflow() {
         | "linkedin"
         | "salesforce"
       )[];
+      schedule?: WorkflowSchedule | null;
     }) => client.workflow.update(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workflow"] });
