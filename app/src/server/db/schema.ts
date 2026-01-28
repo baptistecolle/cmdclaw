@@ -92,6 +92,7 @@ export const userRelations = relations(user, ({ many }) => ({
   integrations: many(integration),
   skills: many(skill),
   providerAuths: many(providerAuth),
+  devices: many(device),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -504,6 +505,79 @@ export const providerAuthRelations = relations(providerAuth, ({ one }) => ({
     fields: [providerAuth.userId],
     references: [user.id],
   }),
+}));
+
+// ========== DEVICE (BYOC) SCHEMA ==========
+
+export const deviceCodeStatusEnum = pgEnum("device_code_status", [
+  "pending",
+  "approved",
+  "expired",
+  "denied",
+]);
+
+export const device = pgTable(
+  "device",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    platform: text("platform").notNull(),
+    isOnline: boolean("is_online").default(false).notNull(),
+    lastSeenAt: timestamp("last_seen_at"),
+    capabilities: jsonb("capabilities").$type<{
+      sandbox: boolean;
+      llmProxy: boolean;
+      localModels?: string[];
+      platform: string;
+      arch: string;
+    }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("device_user_id_idx").on(table.userId),
+  ]
+);
+
+export const deviceCode = pgTable(
+  "device_code",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    /** Short human-readable code shown to user (e.g. "ABCD-1234") */
+    userCode: text("user_code").notNull().unique(),
+    /** Longer code used by daemon to poll (UUID) */
+    deviceCode: text("device_code").notNull().unique(),
+    /** Set when user approves the code */
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    /** Set when device is created after approval */
+    deviceId: text("device_id").references(() => device.id, { onDelete: "cascade" }),
+    status: deviceCodeStatusEnum("status").default("pending").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("device_code_user_code_idx").on(table.userCode),
+    index("device_code_device_code_idx").on(table.deviceCode),
+  ]
+);
+
+export const deviceRelations = relations(device, ({ one }) => ({
+  user: one(user, { fields: [device.userId], references: [user.id] }),
+}));
+
+export const deviceCodeRelations = relations(deviceCode, ({ one }) => ({
+  user: one(user, { fields: [deviceCode.userId], references: [user.id] }),
+  device: one(device, { fields: [deviceCode.deviceId], references: [device.id] }),
 }));
 
 // Aggregated schema used by better-auth's drizzle adapter.

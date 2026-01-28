@@ -96,6 +96,7 @@ const startGeneration = protectedProcedure
       content: z.string().min(1).max(100000),
       model: z.string().optional(),
       autoApprove: z.boolean().optional(),
+      deviceId: z.string().optional(),
     })
   )
   .output(
@@ -111,6 +112,7 @@ const startGeneration = protectedProcedure
       model: input.model,
       userId: context.user.id,
       autoApprove: input.autoApprove,
+      deviceId: input.deviceId,
     });
 
     return result;

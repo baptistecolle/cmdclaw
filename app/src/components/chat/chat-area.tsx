@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { MessageList, type Message, type MessagePart } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
+import { DeviceSelector } from "./device-selector";
 import { VoiceIndicator, VoiceHint } from "./voice-indicator";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { AuthRequestCard } from "./auth-request-card";
@@ -86,6 +87,7 @@ export function ChatArea({ conversationId }: Props) {
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [localAutoApprove, setLocalAutoApprove] = useState(false);
   const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-20250514");
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
 
   // Segmented activity feed state
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
@@ -568,7 +570,7 @@ export function ChatArea({ conversationId }: Props) {
     };
 
     const result = await startGeneration(
-      { conversationId, content, model: selectedModel, autoApprove: !conversationId ? localAutoApprove : undefined },
+      { conversationId, content, model: selectedModel, autoApprove: !conversationId ? localAutoApprove : undefined, deviceId: selectedDeviceId },
       {
         onText: (text) => {
           // Check if the last part is a text part - if so, append to it
@@ -1254,6 +1256,10 @@ export function ChatArea({ conversationId }: Props) {
                 selectedModel={selectedModel}
                 onModelChange={setSelectedModel}
                 disabled={isStreaming}
+              />
+              <DeviceSelector
+                selectedDeviceId={selectedDeviceId}
+                onSelect={setSelectedDeviceId}
               />
               <Switch
                 id="auto-approve"

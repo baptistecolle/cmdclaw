@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const settingsTabs = [
   { label: "General", href: "/settings" },
   { label: "Subscriptions", href: "/settings/subscriptions" },
+  { label: "Devices", href: "/settings/devices" },
 ];
 
 export default function SettingsLayout({

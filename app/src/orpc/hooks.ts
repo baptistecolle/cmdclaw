@@ -411,7 +411,7 @@ export function useGeneration() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const startGeneration = useCallback(async (
-      input: { conversationId?: string; content: string; model?: string; autoApprove?: boolean },
+      input: { conversationId?: string; content: string; model?: string; autoApprove?: boolean; deviceId?: string },
       callbacks: GenerationCallbacks
     ): Promise<{ generationId: string; conversationId: string } | null> => {
       abortControllerRef.current = new AbortController();

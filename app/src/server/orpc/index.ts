@@ -1,5 +1,6 @@
 import { baseProcedure } from "./middleware";
 import { conversationRouter } from "./routers/conversation";
+import { deviceRouter } from "./routers/device";
 import { generationRouter } from "./routers/generation";
 import { integrationRouter } from "./routers/integration";
 import { internalRouter } from "./routers/internal";
@@ -15,6 +16,7 @@ const ping = baseProcedure.handler(async () => ({
 
 export const appRouter = {
   conversation: conversationRouter,
+  device: deviceRouter,
   generation: generationRouter,
   integration: integrationRouter,
   internal: internalRouter,

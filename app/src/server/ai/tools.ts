@@ -1,0 +1,197 @@
+/**
+ * Tool definitions for direct LLM calls (BYOC mode).
+ * These match the tools that OpenCode provides to the model.
+ */
+
+import type { ToolDefinition } from "./llm-backend";
+
+export const bashTool: ToolDefinition = {
+  name: "bash",
+  description:
+    "Execute a bash command in the sandbox. Use this for running scripts, installing packages, " +
+    "file operations, git commands, and any other shell operations. The working directory persists " +
+    "between calls. Commands run with a 2-minute timeout by default.",
+  input_schema: {
+    type: "object",
+    properties: {
+      command: {
+        type: "string",
+        description: "The bash command to execute",
+      },
+      timeout: {
+        type: "number",
+        description: "Optional timeout in milliseconds (default: 120000)",
+      },
+    },
+    required: ["command"],
+  },
+};
+
+export const writeFileTool: ToolDefinition = {
+  name: "write_file",
+  description:
+    "Write content to a file, creating it if it doesn't exist or overwriting if it does. " +
+    "Use this for creating new files or completely replacing file contents.",
+  input_schema: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "The absolute path to the file to write",
+      },
+      content: {
+        type: "string",
+        description: "The content to write to the file",
+      },
+    },
+    required: ["path", "content"],
+  },
+};
+
+export const readFileTool: ToolDefinition = {
+  name: "read_file",
+  description:
+    "Read the contents of a file. Returns the full file content as a string.",
+  input_schema: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "The absolute path to the file to read",
+      },
+    },
+    required: ["path"],
+  },
+};
+
+export const listFilesTool: ToolDefinition = {
+  name: "list_files",
+  description:
+    "List files and directories at a given path. Returns a listing similar to 'ls -la'.",
+  input_schema: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "The directory path to list (default: current directory)",
+      },
+    },
+    required: [],
+  },
+};
+
+export const searchFilesTool: ToolDefinition = {
+  name: "search_files",
+  description:
+    "Search for files matching a pattern using glob syntax. " +
+    "Returns matching file paths.",
+  input_schema: {
+    type: "object",
+    properties: {
+      pattern: {
+        type: "string",
+        description: "Glob pattern to match (e.g. '**/*.ts', 'src/**/*.tsx')",
+      },
+      path: {
+        type: "string",
+        description: "Directory to search in (default: current directory)",
+      },
+    },
+    required: ["pattern"],
+  },
+};
+
+export const searchContentTool: ToolDefinition = {
+  name: "search_content",
+  description:
+    "Search file contents for a text pattern using grep/ripgrep. " +
+    "Returns matching lines with file paths and line numbers.",
+  input_schema: {
+    type: "object",
+    properties: {
+      pattern: {
+        type: "string",
+        description: "The search pattern (supports regex)",
+      },
+      path: {
+        type: "string",
+        description: "File or directory to search in (default: current directory)",
+      },
+      include: {
+        type: "string",
+        description: "File glob pattern to include (e.g. '*.ts')",
+      },
+    },
+    required: ["pattern"],
+  },
+};
+
+/**
+ * Get all tool definitions for direct mode.
+ */
+export function getDirectModeTools(): ToolDefinition[] {
+  return [
+    bashTool,
+    writeFileTool,
+    readFileTool,
+    listFilesTool,
+    searchFilesTool,
+    searchContentTool,
+  ];
+}
+
+/**
+ * Map a tool call to a bash command for sandbox execution.
+ * Some tools (write_file, read_file, etc.) are implemented as
+ * bash commands under the hood.
+ */
+export function toolCallToCommand(
+  toolName: string,
+  input: Record<string, unknown>
+): { command: string; isWrite: boolean } | null {
+  switch (toolName) {
+    case "bash":
+      return {
+        command: input.command as string,
+        isWrite: false, // permission checker will determine
+      };
+
+    case "write_file":
+      // Use heredoc for safe file writing
+      return {
+        command: `mkdir -p "$(dirname "${input.path}")" && cat > "${input.path}" << 'BAPEOF'\n${input.content}\nBAPEOF`,
+        isWrite: true,
+      };
+
+    case "read_file":
+      return {
+        command: `cat "${input.path}"`,
+        isWrite: false,
+      };
+
+    case "list_files":
+      return {
+        command: `ls -la "${input.path || "."}"`,
+        isWrite: false,
+      };
+
+    case "search_files":
+      return {
+        command: input.path
+          ? `find "${input.path}" -name "${input.pattern}" 2>/dev/null | head -100`
+          : `find . -name "${input.pattern}" 2>/dev/null | head -100`,
+        isWrite: false,
+      };
+
+    case "search_content": {
+      const include = input.include ? `--include="${input.include}"` : "";
+      return {
+        command: `grep -rn ${include} "${input.pattern}" "${input.path || "."}" 2>/dev/null | head -100`,
+        isWrite: false,
+      };
+    }
+
+    default:
+      return null;
+  }
+}

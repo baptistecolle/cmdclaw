@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import {
   conversation,
@@ -20,6 +20,14 @@ import {
 } from "@/server/integrations/cli-env";
 import { generateConversationTitle } from "@/server/utils/generate-title";
 import { env } from "@/env";
+import { getSandboxBackend } from "@/server/sandbox/factory";
+import type { SandboxBackend } from "@/server/sandbox/types";
+import { AnthropicBackend } from "@/server/ai/anthropic-backend";
+import { OpenAIBackend } from "@/server/ai/openai-backend";
+import { LocalLLMBackend } from "@/server/ai/local-backend";
+import type { LLMBackend, ChatMessage, ContentBlock, StreamEvent } from "@/server/ai/llm-backend";
+import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
+import { checkToolPermissions } from "@/server/ai/permission-checker";
 
 // Event types for generation stream
 export type GenerationEvent =
@@ -85,6 +93,8 @@ interface Subscriber {
   callback: (event: GenerationEvent) => void;
 }
 
+type BackendType = "opencode" | "direct";
+
 interface GenerationContext {
   id: string;
   conversationId: string;
@@ -112,6 +122,9 @@ interface GenerationContext {
   userMessageContent: string;
   // Track assistant message IDs to filter out user message parts
   assistantMessageIds: Set<string>;
+  // BYOC fields
+  backendType: BackendType;
+  deviceId?: string;
 }
 
 // Approval timeout: 5 minutes before pausing sandbox
@@ -134,6 +147,7 @@ class GenerationManager {
     model?: string;
     userId: string;
     autoApprove?: boolean;
+    deviceId?: string;
   }): Promise<{ generationId: string; conversationId: string }> {
     const { content, userId, model, autoApprove } = params;
 
@@ -206,6 +220,9 @@ class GenerationManager {
       })
       .where(eq(conversation.id, conv.id));
 
+    // Determine backend type: if deviceId is provided, use direct mode
+    const backendType: BackendType = params.deviceId ? "direct" : "opencode";
+
     // Create generation context
     const ctx: GenerationContext = {
       id: genRecord.id,
@@ -225,6 +242,8 @@ class GenerationManager {
       model: model ?? conv.model ?? "claude-sonnet-4-20250514",
       userMessageContent: content,
       assistantMessageIds: new Set(),
+      backendType,
+      deviceId: params.deviceId,
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
@@ -588,7 +607,20 @@ class GenerationManager {
 
   // ========== Private Methods ==========
 
+  /**
+   * Dispatch generation to the appropriate backend.
+   */
   private async runGeneration(ctx: GenerationContext): Promise<void> {
+    if (ctx.backendType === "direct") {
+      return this.runDirectGeneration(ctx);
+    }
+    return this.runOpenCodeGeneration(ctx);
+  }
+
+  /**
+   * Original E2B/OpenCode generation flow. Delegates everything to OpenCode inside E2B sandbox.
+   */
+  private async runOpenCodeGeneration(ctx: GenerationContext): Promise<void> {
     try {
       if (!env.ANTHROPIC_API_KEY) {
         throw new Error("ANTHROPIC_API_KEY is not configured");
@@ -718,6 +750,418 @@ class GenerationManager {
       ctx.errorMessage = error instanceof Error ? error.message : "Unknown error";
       await this.finishGeneration(ctx, "error");
     }
+  }
+
+  /**
+   * Direct LLM generation flow for BYOC.
+   * Server calls LLM APIs directly and routes tool execution to the daemon via WebSocket.
+   *
+   * Tool loop:
+   * 1. Get SandboxBackend via factory
+   * 2. Get LLMBackend for the model
+   * 3. Build message history from DB
+   * 4. Call LLM -> stream response -> extract tool_use -> check permissions
+   *    -> execute on daemon -> send tool_result back to LLM -> repeat until done
+   */
+  private async runDirectGeneration(ctx: GenerationContext): Promise<void> {
+    let sandbox: SandboxBackend | null = null;
+
+    try {
+      // 1. Get sandbox backend
+      sandbox = getSandboxBackend(ctx.conversationId, ctx.userId, ctx.deviceId);
+      await sandbox.setup(ctx.conversationId);
+
+      // 2. Get LLM backend
+      const llm = await this.getLLMBackend(ctx);
+
+      // 3. Get integration environment and build system prompt
+      const enabledIntegrations = await getEnabledIntegrationTypes(ctx.userId);
+      const cliInstructions = getCliInstructions(enabledIntegrations);
+
+      const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
+      const systemPromptParts = [baseSystemPrompt, cliInstructions].filter(Boolean);
+      const systemPrompt = systemPromptParts.join("\n\n");
+
+      // 4. Build message history from DB
+      const chatMessages = await this.buildMessageHistory(ctx);
+
+      // 5. Get tool definitions
+      const tools = getDirectModeTools();
+
+      // 6. Agentic tool loop
+      let loopMessages = [...chatMessages];
+      let hasToolCalls = true;
+      let iterationCount = 0;
+      const MAX_ITERATIONS = 50;
+
+      while (hasToolCalls && iterationCount < MAX_ITERATIONS) {
+        if (ctx.abortController.signal.aborted) {
+          await this.finishGeneration(ctx, "cancelled");
+          return;
+        }
+
+        iterationCount++;
+        hasToolCalls = false;
+
+        // Call LLM
+        const assistantContentBlocks: ContentBlock[] = [];
+        let currentToolUseId = "";
+        let currentToolName = "";
+        let currentToolJson = "";
+
+        const stream = llm.chat({
+          messages: loopMessages,
+          tools,
+          system: systemPrompt,
+          model: ctx.model,
+          signal: ctx.abortController.signal,
+        });
+
+        for await (const event of stream) {
+          if (ctx.abortController.signal.aborted) break;
+
+          switch (event.type) {
+            case "text_delta": {
+              ctx.assistantContent += event.text;
+              this.broadcast(ctx, { type: "text", content: event.text });
+
+              // Accumulate text into content parts
+              const lastPart = ctx.contentParts[ctx.contentParts.length - 1];
+              if (lastPart && lastPart.type === "text") {
+                lastPart.text += event.text;
+              } else {
+                ctx.contentParts.push({ type: "text", text: event.text });
+              }
+
+              // Also accumulate for the response blocks
+              const lastBlock = assistantContentBlocks[assistantContentBlocks.length - 1];
+              if (lastBlock && lastBlock.type === "text") {
+                lastBlock.text += event.text;
+              } else {
+                assistantContentBlocks.push({ type: "text", text: event.text });
+              }
+
+              this.scheduleSave(ctx);
+              break;
+            }
+
+            case "tool_use_start": {
+              currentToolUseId = event.toolUseId;
+              currentToolName = event.toolName;
+              currentToolJson = "";
+              break;
+            }
+
+            case "tool_use_delta": {
+              currentToolJson += event.jsonDelta;
+              break;
+            }
+
+            case "tool_use_end": {
+              // Parse the accumulated JSON
+              let toolInput: Record<string, unknown> = {};
+              try {
+                toolInput = JSON.parse(currentToolJson);
+              } catch {
+                toolInput = { raw: currentToolJson };
+              }
+
+              const toolBlock: ContentBlock = {
+                type: "tool_use",
+                id: currentToolUseId,
+                name: currentToolName,
+                input: toolInput,
+              };
+              assistantContentBlocks.push(toolBlock);
+
+              // Broadcast tool use
+              this.broadcast(ctx, {
+                type: "tool_use",
+                toolName: currentToolName,
+                toolInput,
+                toolUseId: currentToolUseId,
+              });
+
+              ctx.contentParts.push({
+                type: "tool_use",
+                id: currentToolUseId,
+                name: currentToolName,
+                input: toolInput,
+              });
+
+              await this.saveProgress(ctx);
+              hasToolCalls = true;
+              break;
+            }
+
+            case "thinking": {
+              this.broadcast(ctx, {
+                type: "thinking",
+                content: event.text,
+                thinkingId: event.thinkingId,
+              });
+              break;
+            }
+
+            case "usage": {
+              ctx.usage.inputTokens += event.inputTokens;
+              ctx.usage.outputTokens += event.outputTokens;
+              break;
+            }
+
+            case "error": {
+              throw new Error(event.error);
+            }
+          }
+        }
+
+        if (ctx.abortController.signal.aborted) {
+          await this.finishGeneration(ctx, "cancelled");
+          return;
+        }
+
+        // If there are tool calls, execute them and loop
+        if (hasToolCalls) {
+          // Add assistant response to messages
+          loopMessages.push({
+            role: "assistant",
+            content: assistantContentBlocks,
+          });
+
+          // Execute tool calls
+          const toolResults: ContentBlock[] = [];
+
+          for (const block of assistantContentBlocks) {
+            if (block.type !== "tool_use") continue;
+
+            // Check permissions
+            const permCheck = checkToolPermissions(
+              block.name,
+              block.input,
+              enabledIntegrations
+            );
+
+            if (permCheck.needsAuth) {
+              // Request auth from user
+              const authResult = await this.waitForAuth(ctx.id, {
+                integration: permCheck.integration!,
+                reason: permCheck.reason,
+              });
+
+              if (!authResult.success) {
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: `Authentication not completed for ${permCheck.integrationName}. The user needs to connect this integration first.`,
+                  is_error: true,
+                });
+
+                this.broadcast(ctx, {
+                  type: "tool_result",
+                  toolName: block.name,
+                  result: "Authentication not completed",
+                });
+
+                ctx.contentParts.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: "Authentication not completed",
+                });
+
+                continue;
+              }
+            }
+
+            if (permCheck.needsApproval) {
+              // Request user approval for write operations
+              const decision = await this.waitForApproval(ctx.id, {
+                toolInput: block.input,
+                integration: permCheck.integration || "",
+                operation: "",
+                command: (block.input.command as string) || "",
+              });
+
+              if (decision === "deny") {
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: "User denied this action",
+                  is_error: true,
+                });
+
+                this.broadcast(ctx, {
+                  type: "tool_result",
+                  toolName: block.name,
+                  result: "User denied this action",
+                });
+
+                ctx.contentParts.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: "User denied this action",
+                });
+
+                continue;
+              }
+            }
+
+            // Execute the tool
+            const cmdInfo = toolCallToCommand(block.name, block.input);
+            let resultContent: string;
+
+            if (cmdInfo) {
+              try {
+                const execResult = await sandbox!.execute(cmdInfo.command, {
+                  timeout: (block.input.timeout as number) || 120_000,
+                });
+
+                resultContent = execResult.stdout || execResult.stderr || "(no output)";
+                if (execResult.exitCode !== 0 && execResult.stderr) {
+                  resultContent = `Exit code: ${execResult.exitCode}\n${execResult.stderr}\n${execResult.stdout}`;
+                }
+              } catch (err) {
+                resultContent = `Error: ${err instanceof Error ? err.message : "Unknown error"}`;
+              }
+            } else {
+              resultContent = `Unknown tool: ${block.name}`;
+            }
+
+            // Truncate very long outputs
+            if (resultContent.length > 100_000) {
+              resultContent = resultContent.slice(0, 100_000) + "\n... (output truncated)";
+            }
+
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              content: resultContent,
+            });
+
+            this.broadcast(ctx, {
+              type: "tool_result",
+              toolName: block.name,
+              result: resultContent,
+            });
+
+            ctx.contentParts.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              content: resultContent,
+            });
+
+            await this.saveProgress(ctx);
+          }
+
+          // Add tool results as a user message for the next loop
+          loopMessages.push({
+            role: "user",
+            content: toolResults,
+          });
+        }
+      }
+
+      if (iterationCount >= MAX_ITERATIONS) {
+        console.warn("[GenerationManager] Hit max iterations in tool loop");
+      }
+
+      // Complete the generation
+      await this.finishGeneration(ctx, "completed");
+    } catch (error) {
+      console.error("[GenerationManager] Direct generation error:", error);
+      ctx.errorMessage = error instanceof Error ? error.message : "Unknown error";
+      await this.finishGeneration(ctx, "error");
+    } finally {
+      if (sandbox) {
+        sandbox.teardown().catch((err) =>
+          console.error("[GenerationManager] Sandbox teardown error:", err)
+        );
+      }
+    }
+  }
+
+  /**
+   * Get the appropriate LLM backend for a generation context.
+   */
+  private async getLLMBackend(ctx: GenerationContext): Promise<LLMBackend> {
+    const providerID = resolveProviderID(ctx.model);
+
+    switch (providerID) {
+      case "anthropic":
+        return new AnthropicBackend();
+
+      case "openai": {
+        // Check for user's subscription token
+        const { providerAuth } = await import("@/server/db/schema");
+        const { decrypt } = await import("@/server/utils/encryption");
+        const auth = await db.query.providerAuth.findFirst({
+          where: eq(providerAuth.userId, ctx.userId),
+        });
+        if (auth) {
+          return new OpenAIBackend(decrypt(auth.accessToken));
+        }
+        // Fall back to server API key
+        if (env.OPENAI_API_KEY) {
+          return new OpenAIBackend(env.OPENAI_API_KEY);
+        }
+        throw new Error("No OpenAI API key or subscription available");
+      }
+
+      default:
+        // If we have a device, try local LLM
+        if (ctx.deviceId) {
+          return new LocalLLMBackend(ctx.deviceId);
+        }
+        // Default to Anthropic
+        return new AnthropicBackend();
+    }
+  }
+
+  /**
+   * Build chat message history from the database for direct mode.
+   */
+  private async buildMessageHistory(ctx: GenerationContext): Promise<ChatMessage[]> {
+    const messages = await db.query.message.findMany({
+      where: eq(message.conversationId, ctx.conversationId),
+      orderBy: asc(message.createdAt),
+    });
+
+    const chatMessages: ChatMessage[] = [];
+
+    for (const m of messages) {
+      if (m.role === "user") {
+        chatMessages.push({ role: "user", content: m.content });
+      } else if (m.role === "assistant") {
+        if (m.contentParts && m.contentParts.length > 0) {
+          // Convert ContentPart[] to ContentBlock[]
+          const blocks: ContentBlock[] = m.contentParts.map((p): ContentBlock => {
+            switch (p.type) {
+              case "text":
+                return { type: "text", text: p.text };
+              case "tool_use":
+                return { type: "tool_use", id: p.id, name: p.name, input: p.input };
+              case "tool_result":
+                return {
+                  type: "tool_result",
+                  tool_use_id: p.tool_use_id,
+                  content: typeof p.content === "string" ? p.content : JSON.stringify(p.content),
+                };
+              case "thinking":
+                return { type: "thinking", thinking: p.content, signature: "" };
+              default:
+                return { type: "text", text: "" };
+            }
+          });
+          chatMessages.push({ role: "assistant", content: blocks });
+        } else {
+          chatMessages.push({ role: "assistant", content: m.content });
+        }
+      }
+    }
+
+    // Add the current user message
+    chatMessages.push({ role: "user", content: ctx.userMessageContent });
+
+    return chatMessages;
   }
 
   /**
