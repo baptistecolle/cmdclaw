@@ -19,15 +19,12 @@ const PROVIDERS: {
   name: string;
   description: string;
   models: string[];
-  warning?: string;
 }[] = [
   {
     id: "openai",
     name: "ChatGPT",
     description: "Use your ChatGPT Plus/Pro/Max subscription",
     models: ["GPT-5.1 Codex Max", "GPT-5.1 Codex Mini", "GPT-5.2", "GPT-5.2 Codex", "GPT-5.1 Codex"],
-    warning:
-      "Using your subscription through Bap consumes quota faster than native ChatGPT/Codex.",
   },
   {
     id: "google",
@@ -188,11 +185,6 @@ export default function SubscriptionsPage() {
                       </span>
                     ))}
                   </div>
-                  {provider.warning && (
-                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-                      {provider.warning}
-                    </p>
-                  )}
                 </div>
 
                 <div className="shrink-0">
