@@ -646,6 +646,7 @@ export type GenerationCallbacks = {
       totalCostUsd: number;
     }
   ) => void;
+  onStarted?: (generationId: string, conversationId: string) => void;
   onError?: (message: string) => void;
   onCancelled?: () => void;
   onStatusChange?: (status: string) => void;
@@ -666,6 +667,10 @@ export function useGeneration() {
       try {
         // Start the generation
         const { generationId, conversationId } = await client.generation.startGeneration(input);
+
+        // Notify caller and invalidate sidebar immediately
+        callbacks.onStarted?.(generationId, conversationId);
+        queryClient.invalidateQueries({ queryKey: ["conversation", "list"] });
 
         // Subscribe to the generation stream
         const iterator = await client.generation.subscribeGeneration(

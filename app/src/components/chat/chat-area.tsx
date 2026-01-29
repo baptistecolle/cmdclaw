@@ -24,7 +24,6 @@ import {
   type AuthNeededData,
 } from "@/orpc/hooks";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
-import { useRouter } from "next/navigation";
 import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -66,7 +65,6 @@ type Props = {
 };
 
 export function ChatArea({ conversationId }: Props) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { data: existingConversation, isLoading } = useConversation(
     conversationId
@@ -210,9 +208,27 @@ export function ChatArea({ conversationId }: Props) {
       setSegments([]);
       setIntegrationsUsed(new Set());
       setTraceStatus("complete");
+      setIsStreaming(false);
       currentGenerationIdRef.current = undefined;
     }
   }, [conversationId]);
+
+  // Listen for "new-chat" event to reset state when user clicks New Chat
+  useEffect(() => {
+    const handleNewChat = () => {
+      abort();
+      setMessages([]);
+      setStreamingParts([]);
+      setSegments([]);
+      setIntegrationsUsed(new Set());
+      setTraceStatus("complete");
+      setIsStreaming(false);
+      currentGenerationIdRef.current = undefined;
+      currentConversationIdRef.current = undefined;
+    };
+    window.addEventListener("new-chat", handleNewChat);
+    return () => window.removeEventListener("new-chat", handleNewChat);
+  }, [abort]);
 
   // Reconnect to active generation on mount
   useEffect(() => {
@@ -617,6 +633,12 @@ export function ChatArea({ conversationId }: Props) {
     const result = await startGeneration(
       { conversationId, content, model: selectedModel, autoApprove: !conversationId ? localAutoApprove : undefined, deviceId: selectedDeviceId, attachments },
       {
+        onStarted: (generationId, newConversationId) => {
+          currentGenerationIdRef.current = generationId;
+          if (!conversationId && newConversationId) {
+            currentConversationIdRef.current = newConversationId;
+          }
+        },
         onText: (text) => {
           // Check if the last part is a text part - if so, append to it
           const lastPart = allParts[allParts.length - 1];
@@ -931,11 +953,12 @@ export function ChatArea({ conversationId }: Props) {
           setTraceStatus("complete");
           currentGenerationIdRef.current = undefined;
 
-          // Update the ref and navigate to new conversation if this was a new chat
+          // Invalidate conversation queries to refresh sidebar
+          queryClient.invalidateQueries({ queryKey: ["conversation"] });
+
+          // Update URL for new conversations without remounting
           if (!conversationId && newConversationId) {
-            currentConversationIdRef.current = newConversationId;
-            queryClient.invalidateQueries({ queryKey: ["conversation"] });
-            router.push(`/chat/${newConversationId}`);
+            window.history.replaceState(null, "", `/chat/${newConversationId}`);
           }
         },
         onError: (message) => {
@@ -977,16 +1000,7 @@ export function ChatArea({ conversationId }: Props) {
       }
     );
 
-    // Store the generation ID from the result
-    if (result) {
-      currentGenerationIdRef.current = result.generationId;
-      // Always invalidate so sidebar shows the updated conversation
-      queryClient.invalidateQueries({ queryKey: ["conversation"] });
-      if (!conversationId && result.conversationId) {
-        currentConversationIdRef.current = result.conversationId;
-      }
-    }
-  }, [conversationId, router, startGeneration, queryClient]);
+  }, [conversationId, startGeneration, queryClient]);
 
   // Handle approval/denial of tool use
   const handleApprove = useCallback(

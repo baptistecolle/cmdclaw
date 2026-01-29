@@ -56,14 +56,16 @@ export function ChatSidebar() {
     <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader>
         <Button
-          asChild
           variant="outline"
           className="w-full justify-start gap-2 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+          onClick={() => {
+            // Dispatch event to reset chat state if already on /chat
+            window.dispatchEvent(new CustomEvent("new-chat"));
+            router.push("/chat");
+          }}
         >
-          <Link href="/chat">
-            <Plus className="h-4 w-4 shrink-0" />
-            <span className="group-data-[collapsible=icon]:hidden">New chat</span>
-          </Link>
+          <Plus className="h-4 w-4 shrink-0" />
+          <span className="group-data-[collapsible=icon]:hidden">New chat</span>
         </Button>
       </SidebarHeader>
 

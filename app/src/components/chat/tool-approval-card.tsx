@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   getIntegrationIcon,
+  getIntegrationLogo,
   getIntegrationDisplayName,
   getIntegrationColor,
 } from "@/lib/integration-icons";
@@ -44,6 +45,7 @@ export function ToolApprovalCard({
   const [showRawCommand, setShowRawCommand] = useState(false);
 
   const Icon = getIntegrationIcon(integration);
+  const logo = getIntegrationLogo(integration);
   const displayName = getIntegrationDisplayName(integration);
   const colorClass = getIntegrationColor(integration);
 
@@ -88,7 +90,9 @@ export function ToolApprovalCard({
         ) : (
           <ChevronRight className="h-4 w-4" />
         )}
-        {Icon ? (
+        {logo ? (
+          <img src={logo} alt={displayName} className="h-4 w-4" />
+        ) : Icon ? (
           <Icon className={cn("h-4 w-4", colorClass)} />
         ) : (
           <ShieldAlert className="h-4 w-4 text-amber-500" />
