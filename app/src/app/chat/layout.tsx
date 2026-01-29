@@ -141,7 +141,7 @@ export default function ChatLayout({
             <span className="text-sm font-medium">Chat</span>
             {isAdmin && <CopyButton />}
           </header>
-          <div className="flex h-[calc(100vh-3.5rem)] flex-col">{children}</div>
+          <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">{children}</div>
         </SidebarInset>
       </SidebarProvider>
     </AppShell>
