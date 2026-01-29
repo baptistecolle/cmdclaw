@@ -18,8 +18,11 @@ import {
 import {
   getCliEnvForUser,
   getCliInstructions,
+  getCliInstructionsWithCustom,
   getEnabledIntegrationTypes,
 } from "@/server/integrations/cli-env";
+import { customIntegration, customIntegrationCredential } from "@/server/db/schema";
+import { and } from "drizzle-orm";
 import { generateConversationTitle } from "@/server/utils/generate-title";
 import { env } from "@/env";
 import { getSandboxBackend } from "@/server/sandbox/factory";
@@ -131,6 +134,7 @@ interface GenerationContext {
   // Workflow fields
   workflowRunId?: string;
   allowedIntegrations?: IntegrationType[];
+  allowedCustomIntegrations?: string[];
   workflowPrompt?: string;
   workflowPromptDo?: string;
   workflowPromptDont?: string;
@@ -280,6 +284,7 @@ class GenerationManager {
     model?: string;
     userId: string;
     allowedIntegrations: IntegrationType[];
+    allowedCustomIntegrations?: string[];
     workflowPrompt: string;
     workflowPromptDo?: string | null;
     workflowPromptDont?: string | null;
@@ -345,6 +350,7 @@ class GenerationManager {
       backendType: "opencode",
       workflowRunId: params.workflowRunId,
       allowedIntegrations: params.allowedIntegrations,
+      allowedCustomIntegrations: params.allowedCustomIntegrations,
       workflowPrompt: params.workflowPrompt,
       workflowPromptDo: params.workflowPromptDo ?? undefined,
       workflowPromptDont: params.workflowPromptDont ?? undefined,
@@ -756,7 +762,7 @@ class GenerationManager {
 
       const allowedIntegrations = ctx.allowedIntegrations ?? enabledIntegrations;
 
-      const cliInstructions = getCliInstructions(allowedIntegrations);
+      const cliInstructions = await getCliInstructionsWithCustom(allowedIntegrations, ctx.userId);
       const filteredCliEnv =
         ctx.allowedIntegrations !== undefined
           ? Object.fromEntries(
@@ -816,6 +822,44 @@ class GenerationManager {
       // Write skills to sandbox
       const writtenSkills = await writeSkillsToSandbox(sandbox, ctx.userId);
       const skillsInstructions = getSkillsSystemPrompt(writtenSkills);
+
+      // Write custom integration CLI code to sandbox
+      try {
+        const customCreds = await db.query.customIntegrationCredential.findMany({
+          where: and(
+            eq(customIntegrationCredential.userId, ctx.userId),
+            eq(customIntegrationCredential.enabled, true)
+          ),
+          with: { customIntegration: true },
+        });
+
+        const customPerms: Record<string, { read: string[]; write: string[] }> = {};
+
+        for (const cred of customCreds) {
+          const integ = cred.customIntegration;
+          // Filter by allowed custom integrations if set
+          if (ctx.allowedCustomIntegrations && !ctx.allowedCustomIntegrations.includes(integ.slug)) {
+            continue;
+          }
+          // Write CLI code to sandbox
+          const cliPath = `/app/cli/custom-${integ.slug}.ts`;
+          await sandbox.files.write(cliPath, integ.cliCode);
+          // Collect permissions
+          customPerms[`custom-${integ.slug}`] = {
+            read: integ.permissions.readOps,
+            write: integ.permissions.writeOps,
+          };
+        }
+
+        if (Object.keys(customPerms).length > 0) {
+          // Set the permissions env var on the sandbox
+          await sandbox.commands.run(
+            `echo 'export CUSTOM_INTEGRATION_PERMISSIONS=${JSON.stringify(JSON.stringify(customPerms)).slice(1, -1)}' >> ~/.bashrc`
+          );
+        }
+      } catch (e) {
+        console.error("[Generation] Failed to write custom integration CLI code:", e);
+      }
 
       // Build system prompt
       const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
