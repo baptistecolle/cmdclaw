@@ -4,6 +4,7 @@ import {
   conversation,
   generation,
   message,
+  messageAttachment,
   workflowRun,
   workflowRunEvent,
   type ContentPart,
@@ -211,11 +212,35 @@ class GenerationManager {
     }
 
     // Save user message
-    await db.insert(message).values({
+    const [userMsg] = await db.insert(message).values({
       conversationId: conv.id,
       role: "user",
       content,
-    });
+    }).returning();
+
+    // Upload attachments to S3 and save metadata
+    if (params.attachments && params.attachments.length > 0) {
+      try {
+        const { uploadToS3, ensureBucket } = await import("@/server/storage/s3-client");
+        await ensureBucket();
+        for (const a of params.attachments) {
+          const base64Data = a.dataUrl.split(",")[1] || "";
+          const buffer = Buffer.from(base64Data, "base64");
+          const sanitizedFilename = a.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+          const storageKey = `attachments/${conv.id}/${userMsg.id}/${Date.now()}-${sanitizedFilename}`;
+          await uploadToS3(storageKey, buffer, a.mimeType);
+          await db.insert(messageAttachment).values({
+            messageId: userMsg.id,
+            filename: a.name,
+            mimeType: a.mimeType,
+            sizeBytes: buffer.length,
+            storageKey,
+          });
+        }
+      } catch (err) {
+        console.error("[GenerationManager] Failed to upload attachments:", err);
+      }
+    }
 
     // Create generation record
     const [genRecord] = await db

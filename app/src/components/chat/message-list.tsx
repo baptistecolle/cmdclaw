@@ -30,6 +30,8 @@ export type AttachmentData = {
   name: string;
   mimeType: string;
   dataUrl: string;
+  /** Set for persisted attachments loaded from DB */
+  id?: string;
 };
 
 export type Message = {

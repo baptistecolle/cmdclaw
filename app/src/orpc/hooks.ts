@@ -937,3 +937,11 @@ export function useGenerationStatus(generationId: string | undefined) {
     enabled: !!generationId,
   });
 }
+
+// Hook for downloading an attachment (returns presigned URL)
+export function useDownloadAttachment() {
+  return useMutation({
+    mutationFn: (attachmentId: string) =>
+      client.conversation.downloadAttachment({ attachmentId }),
+  });
+}

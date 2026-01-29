@@ -174,11 +174,24 @@ export function ChatArea({ conversationId }: Props) {
                 }
               });
           }
+          // Map persisted attachments
+          let attachments: AttachmentData[] | undefined;
+          const mAny = m as Record<string, unknown>;
+          if (Array.isArray(mAny.attachments) && (mAny.attachments as unknown[]).length > 0) {
+            attachments = (mAny.attachments as Array<{ id: string; filename: string; mimeType: string; sizeBytes: number }>).map((a) => ({
+              id: a.id,
+              name: a.filename,
+              mimeType: a.mimeType,
+              dataUrl: "", // No data URL for persisted attachments
+            }));
+          }
+
           return {
             id: m.id,
             role: m.role as Message["role"],
             content: m.content,
             parts,
+            attachments,
           };
         })
       );

@@ -434,7 +434,25 @@ export const conversationRelations = relations(conversation, ({ one, many }) => 
   generations: many(generation),
 }));
 
-export const messageRelations = relations(message, ({ one }) => ({
+export const messageAttachment = pgTable(
+  "message_attachment",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => message.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    storageKey: text("storage_key").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("message_attachment_message_id_idx").on(table.messageId)]
+);
+
+export const messageRelations = relations(message, ({ one, many }) => ({
   conversation: one(conversation, {
     fields: [message.conversationId],
     references: [conversation.id],
@@ -443,6 +461,14 @@ export const messageRelations = relations(message, ({ one }) => ({
     fields: [message.parentMessageId],
     references: [message.id],
     relationName: "parentMessage",
+  }),
+  attachments: many(messageAttachment),
+}));
+
+export const messageAttachmentRelations = relations(messageAttachment, ({ one }) => ({
+  message: one(message, {
+    fields: [messageAttachment.messageId],
+    references: [message.id],
   }),
 }));
 

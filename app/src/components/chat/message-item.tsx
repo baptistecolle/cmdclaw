@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Download } from "lucide-react";
 import { MessageBubble } from "./message-bubble";
 import { CollapsedTrace } from "./collapsed-trace";
 import { ToolApprovalCard } from "./tool-approval-card";
 import type { MessagePart, AttachmentData } from "./message-list";
 import type { IntegrationType } from "@/lib/integration-icons";
 import type { ActivityItemData } from "./activity-item";
+import { useDownloadAttachment } from "@/orpc/hooks";
 
 // Display segment for saved messages
 type DisplaySegment = {
@@ -36,6 +37,24 @@ type Props = {
 export function MessageItem({ id, role, content, parts, integrationsUsed, attachments }: Props) {
   // Track expanded state for each segment
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
+  const { mutateAsync: downloadAttachment } = useDownloadAttachment();
+
+  const handleDownload = async (attachment: AttachmentData) => {
+    if (!attachment.id) return;
+    try {
+      const result = await downloadAttachment(attachment.id);
+      // Open presigned URL in new tab to trigger download
+      const link = document.createElement("a");
+      link.href = result.url;
+      link.download = attachment.name;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Failed to download attachment:", err);
+    }
+  };
 
   // For user messages, show simple bubble + attachments
   if (role === "user") {
@@ -44,21 +63,32 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
         {attachments && attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 justify-end">
             {attachments.map((a, i) =>
-              a.mimeType.startsWith("image/") ? (
-                <img
-                  key={i}
-                  src={a.dataUrl}
-                  alt={a.name}
-                  className="max-h-48 max-w-xs rounded-lg border object-cover"
-                />
+              a.mimeType.startsWith("image/") && a.dataUrl ? (
+                <div key={i} className="relative group">
+                  <img
+                    src={a.dataUrl}
+                    alt={a.name}
+                    className="max-h-48 max-w-xs rounded-lg border object-cover"
+                  />
+                  {a.id && (
+                    <button
+                      onClick={() => handleDownload(a)}
+                      className="absolute top-1 right-1 rounded-md bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               ) : (
-                <div
+                <button
                   key={i}
-                  className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs"
+                  onClick={a.id ? () => handleDownload(a) : undefined}
+                  className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs hover:bg-muted/80 transition-colors"
                 >
                   <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="max-w-[200px] truncate">{a.name}</span>
-                </div>
+                  {a.id && <Download className="h-3 w-3 text-muted-foreground" />}
+                </button>
               )
             )}
           </div>

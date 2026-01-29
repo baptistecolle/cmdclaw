@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import { conversation, message } from "@/server/db/schema";
+import { conversation, message, messageAttachment } from "@/server/db/schema";
 import { eq, desc, and, isNull, asc } from "drizzle-orm";
 
 // List conversations for current user
@@ -56,6 +56,9 @@ const get = protectedProcedure
       with: {
         messages: {
           orderBy: asc(message.createdAt),
+          with: {
+            attachments: true,
+          },
         },
       },
     });
@@ -75,6 +78,12 @@ const get = protectedProcedure
         content: m.content,
         contentParts: m.contentParts,
         createdAt: m.createdAt,
+        attachments: m.attachments?.map((a) => ({
+          id: a.id,
+          filename: a.filename,
+          mimeType: a.mimeType,
+          sizeBytes: a.sizeBytes,
+        })),
       })),
       createdAt: conv.createdAt,
       updatedAt: conv.updatedAt,
@@ -182,6 +191,32 @@ const del = protectedProcedure
     return { success: true };
   });
 
+// Download attachment (returns presigned URL)
+const downloadAttachment = protectedProcedure
+  .input(z.object({ attachmentId: z.string() }))
+  .handler(async ({ input, context }) => {
+    // Find the attachment and verify ownership
+    const attachment = await context.db.query.messageAttachment.findFirst({
+      where: eq(messageAttachment.id, input.attachmentId),
+      with: {
+        message: {
+          with: {
+            conversation: true,
+          },
+        },
+      },
+    });
+
+    if (!attachment || attachment.message.conversation.userId !== context.user.id) {
+      throw new ORPCError("NOT_FOUND", { message: "Attachment not found" });
+    }
+
+    const { getPresignedDownloadUrl } = await import("@/server/storage/s3-client");
+    const url = await getPresignedDownloadUrl(attachment.storageKey);
+
+    return { url, filename: attachment.filename, mimeType: attachment.mimeType };
+  });
+
 export const conversationRouter = {
   list,
   get,
@@ -189,4 +224,5 @@ export const conversationRouter = {
   updateAutoApprove,
   archive,
   delete: del,
+  downloadAttachment,
 };
