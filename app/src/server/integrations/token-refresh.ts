@@ -1,7 +1,8 @@
 import { db } from "@/server/db/client";
-import { integration, integrationToken } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { integration, integrationToken, customIntegrationCredential } from "@/server/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
+import { decrypt } from "@/server/lib/encryption";
 
 // Refresh tokens 5 minutes before expiry
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
@@ -52,7 +53,7 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
   };
 
   // Notion, Airtable, and Reddit require Basic auth header for token refresh
-  if (token.type === "notion" || token.type === "airtable" || token.type === "reddit" || token.type === "discord") {
+  if (token.type === "notion" || token.type === "airtable" || token.type === "reddit") {
     headers["Authorization"] = `Basic ${Buffer.from(
       `${config.clientId}:${config.clientSecret}`
     ).toString("base64")}`;
@@ -168,6 +169,115 @@ export async function getValidTokensForUser(
         });
 
         tokens.set(row.type, validToken);
+      })
+  );
+
+  return tokens;
+}
+
+/**
+ * Refresh a custom integration's OAuth token
+ */
+async function refreshCustomToken(
+  credId: string,
+  accessToken: string,
+  refreshToken: string,
+  oauthConfig: { tokenUrl: string; authStyle?: "header" | "params" },
+  encryptedClientId: string,
+  encryptedClientSecret: string
+): Promise<string> {
+  const clientId = decrypt(encryptedClientId);
+  const clientSecret = decrypt(encryptedClientSecret);
+
+  const tokenBody = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  if (oauthConfig.authStyle === "header") {
+    headers["Authorization"] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+  } else {
+    tokenBody.set("client_id", clientId);
+    tokenBody.set("client_secret", clientSecret);
+  }
+
+  const response = await fetch(oauthConfig.tokenUrl, {
+    method: "POST",
+    headers,
+    body: tokenBody,
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error(`[Custom Token Refresh] Failed:`, error);
+    throw new Error(`Failed to refresh custom token: ${error}`);
+  }
+
+  const tokens = await response.json();
+  const newAccessToken = tokens.access_token;
+  const newRefreshToken = tokens.refresh_token || refreshToken;
+
+  await db
+    .update(customIntegrationCredential)
+    .set({
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
+    })
+    .where(eq(customIntegrationCredential.id, credId));
+
+  return newAccessToken;
+}
+
+/**
+ * Get valid tokens for all custom OAuth integrations, refreshing as needed
+ * Returns Map<credentialId, accessToken>
+ */
+export async function getValidCustomTokens(userId: string): Promise<Map<string, string>> {
+  const tokens = new Map<string, string>();
+
+  const creds = await db.query.customIntegrationCredential.findMany({
+    where: and(
+      eq(customIntegrationCredential.userId, userId),
+      eq(customIntegrationCredential.enabled, true)
+    ),
+    with: {
+      customIntegration: true,
+    },
+  });
+
+  await Promise.all(
+    creds
+      .filter((c) => c.customIntegration.authType === "oauth2" && c.accessToken)
+      .map(async (c) => {
+        const oauth = c.customIntegration.oauthConfig;
+        if (!oauth || !c.refreshToken || !c.clientId || !c.clientSecret) {
+          if (c.accessToken) tokens.set(c.id, c.accessToken);
+          return;
+        }
+
+        // Check if needs refresh
+        if (c.expiresAt && Date.now() >= c.expiresAt.getTime() - EXPIRY_BUFFER_MS) {
+          try {
+            const newToken = await refreshCustomToken(
+              c.id,
+              c.accessToken!,
+              c.refreshToken,
+              oauth,
+              c.clientId,
+              c.clientSecret
+            );
+            tokens.set(c.id, newToken);
+          } catch {
+            if (c.accessToken) tokens.set(c.id, c.accessToken);
+          }
+        } else if (c.accessToken) {
+          tokens.set(c.id, c.accessToken);
+        }
       })
   );
 

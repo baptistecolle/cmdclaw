@@ -21,7 +21,6 @@ const integrationTypeSchema = z.enum([
   "salesforce",
   "reddit",
   "twitter",
-  "discord",
 ]);
 
 const triggerTypeSchema = z.string().min(1).max(128);
@@ -70,6 +69,7 @@ const list = protectedProcedure.handler(async ({ context }) => {
         status: wf.status,
         triggerType: wf.triggerType,
         allowedIntegrations: wf.allowedIntegrations,
+        allowedCustomIntegrations: wf.allowedCustomIntegrations,
         schedule: wf.schedule,
         updatedAt: wf.updatedAt,
         lastRunStatus: lastRun?.status ?? null,
@@ -107,6 +107,7 @@ const get = protectedProcedure
       promptDo: wf.promptDo,
       promptDont: wf.promptDont,
       allowedIntegrations: wf.allowedIntegrations,
+      allowedCustomIntegrations: wf.allowedCustomIntegrations,
       schedule: wf.schedule,
       createdAt: wf.createdAt,
       updatedAt: wf.updatedAt,
@@ -129,6 +130,7 @@ const create = protectedProcedure
       promptDo: z.string().max(2000).optional(),
       promptDont: z.string().max(2000).optional(),
       allowedIntegrations: z.array(integrationTypeSchema).default([]),
+      allowedCustomIntegrations: z.array(z.string()).default([]),
       schedule: scheduleSchema.nullish(),
     })
   )
@@ -144,6 +146,7 @@ const create = protectedProcedure
         promptDo: input.promptDo,
         promptDont: input.promptDont,
         allowedIntegrations: input.allowedIntegrations,
+        allowedCustomIntegrations: input.allowedCustomIntegrations,
         schedule: input.schedule ?? null,
       })
       .returning();
@@ -166,6 +169,7 @@ const update = protectedProcedure
       promptDo: z.string().max(2000).nullish(),
       promptDont: z.string().max(2000).nullish(),
       allowedIntegrations: z.array(integrationTypeSchema).optional(),
+      allowedCustomIntegrations: z.array(z.string()).optional(),
       schedule: scheduleSchema.nullish(),
     })
   )
@@ -179,6 +183,9 @@ const update = protectedProcedure
     if (input.promptDont !== undefined) updates.promptDont = input.promptDont ?? null;
     if (input.allowedIntegrations !== undefined) {
       updates.allowedIntegrations = input.allowedIntegrations;
+    }
+    if (input.allowedCustomIntegrations !== undefined) {
+      updates.allowedCustomIntegrations = input.allowedCustomIntegrations;
     }
     if (input.schedule !== undefined) {
       updates.schedule = input.schedule ?? null;

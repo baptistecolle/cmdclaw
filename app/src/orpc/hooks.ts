@@ -114,7 +114,7 @@ export function useGetAuthUrl() {
       type,
       redirectUrl,
     }: {
-      type: "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce" | "reddit" | "twitter" | "discord";
+      type: "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce" | "reddit" | "twitter";
       redirectUrl: string;
     }) => client.integration.getAuthUrl({ type, redirectUrl }),
   });
@@ -129,6 +129,119 @@ export function useLinkLinkedIn() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integration"] });
     },
+  });
+}
+
+// ========== CUSTOM INTEGRATION HOOKS ==========
+
+export function useCustomIntegrationList() {
+  return useQuery({
+    queryKey: ["customIntegration", "list"],
+    queryFn: () => client.integration.listCustomIntegrations(),
+  });
+}
+
+export function useCustomIntegration(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["customIntegration", "get", slug],
+    queryFn: () => client.integration.getCustomIntegration({ slug: slug! }),
+    enabled: !!slug,
+  });
+}
+
+export function useCreateCustomIntegration() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      slug: string;
+      name: string;
+      description: string;
+      iconUrl?: string | null;
+      baseUrl: string;
+      authType: "oauth2" | "api_key" | "bearer_token";
+      oauthConfig?: {
+        authUrl: string;
+        tokenUrl: string;
+        scopes: string[];
+        pkce?: boolean;
+        authStyle?: "header" | "params";
+        extraAuthParams?: Record<string, string>;
+      } | null;
+      apiKeyConfig?: {
+        method: "header" | "query";
+        headerName?: string;
+        queryParam?: string;
+      } | null;
+      cliCode?: string;
+      cliInstructions?: string;
+      permissions?: { readOps: string[]; writeOps: string[] };
+      clientId?: string | null;
+      clientSecret?: string | null;
+      apiKey?: string | null;
+    }) => client.integration.createCustomIntegration(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customIntegration"] });
+    },
+  });
+}
+
+export function useSetCustomCredentials() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      customIntegrationId: string;
+      clientId?: string | null;
+      clientSecret?: string | null;
+      apiKey?: string | null;
+      displayName?: string | null;
+    }) => client.integration.setCustomCredentials(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customIntegration"] });
+    },
+  });
+}
+
+export function useDisconnectCustomIntegration() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (customIntegrationId: string) =>
+      client.integration.disconnectCustomIntegration({ customIntegrationId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customIntegration"] });
+    },
+  });
+}
+
+export function useToggleCustomIntegration() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ customIntegrationId, enabled }: { customIntegrationId: string; enabled: boolean }) =>
+      client.integration.toggleCustomIntegration({ customIntegrationId, enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customIntegration"] });
+    },
+  });
+}
+
+export function useDeleteCustomIntegration() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => client.integration.deleteCustomIntegration({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customIntegration"] });
+    },
+  });
+}
+
+export function useGetCustomAuthUrl() {
+  return useMutation({
+    mutationFn: ({ slug, redirectUrl }: { slug: string; redirectUrl: string }) =>
+      client.integration.getCustomAuthUrl({ slug, redirectUrl }),
   });
 }
 
@@ -286,7 +399,6 @@ export function useCreateWorkflow() {
         | "salesforce"
         | "reddit"
         | "twitter"
-        | "discord"
       )[];
     }) => client.workflow.create(input),
     onSuccess: () => {
@@ -329,7 +441,6 @@ export function useUpdateWorkflow() {
         | "salesforce"
         | "reddit"
         | "twitter"
-        | "discord"
       )[];
       schedule?: WorkflowSchedule | null;
     }) => client.workflow.update(input),

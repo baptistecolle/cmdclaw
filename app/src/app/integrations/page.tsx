@@ -10,10 +10,17 @@ import {
   useToggleIntegration,
   useDisconnectIntegration,
   useLinkLinkedIn,
+  useCustomIntegrationList,
+  useCreateCustomIntegration,
+  useSetCustomCredentials,
+  useDisconnectCustomIntegration,
+  useToggleCustomIntegration,
+  useDeleteCustomIntegration,
+  useGetCustomAuthUrl,
 } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ExternalLink, CheckCircle2, XCircle, Loader2, Search, ChevronDown } from "lucide-react";
+import { ExternalLink, CheckCircle2, XCircle, Loader2, Search, ChevronDown, Plus, Trash2, Puzzle } from "lucide-react";
 import { getIntegrationActions } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -111,12 +118,6 @@ const integrationConfig = {
     icon: "/integrations/twitter.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
-  discord: {
-    name: "Discord",
-    description: "List guilds, channels, and send messages",
-    icon: "/integrations/discord.svg",
-    bgColor: "bg-white dark:bg-gray-800",
-  },
 } as const;
 
 type IntegrationType = keyof typeof integrationConfig;
@@ -124,10 +125,17 @@ type IntegrationType = keyof typeof integrationConfig;
 function IntegrationsPageContent() {
   const searchParams = useSearchParams();
   const { data: integrations, isLoading, refetch } = useIntegrationList();
+  const { data: customIntegrations, refetch: refetchCustom } = useCustomIntegrationList();
   const getAuthUrl = useGetAuthUrl();
   const toggleIntegration = useToggleIntegration();
   const disconnectIntegration = useDisconnectIntegration();
   const linkLinkedIn = useLinkLinkedIn();
+  const createCustom = useCreateCustomIntegration();
+  const setCustomCreds = useSetCustomCredentials();
+  const disconnectCustom = useDisconnectCustomIntegration();
+  const toggleCustom = useToggleCustomIntegration();
+  const deleteCustom = useDeleteCustomIntegration();
+  const getCustomAuthUrl = useGetCustomAuthUrl();
   const [connectingType, setConnectingType] = useState<string | null>(null);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
@@ -137,6 +145,20 @@ function IntegrationsPageContent() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const linkedInLinkingRef = useRef(false);
+  const [showAddCustom, setShowAddCustom] = useState(false);
+  const [customForm, setCustomForm] = useState({
+    slug: "",
+    name: "",
+    description: "",
+    baseUrl: "",
+    authType: "api_key" as "oauth2" | "api_key" | "bearer_token",
+    apiKey: "",
+    clientId: "",
+    clientSecret: "",
+    authUrl: "",
+    tokenUrl: "",
+    scopes: "",
+  });
 
   // Handle LinkedIn account_id from redirect (Unipile hosted auth)
   useEffect(() => {
@@ -466,6 +488,282 @@ function IntegrationsPageContent() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Custom Integrations Section */}
+      <div className="mt-10">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Custom Integrations</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Add your own API integrations with custom credentials.
+            </p>
+          </div>
+          <Button onClick={() => setShowAddCustom(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Custom
+          </Button>
+        </div>
+
+        {customIntegrations && customIntegrations.length > 0 ? (
+          <div className="space-y-4">
+            {customIntegrations.map((ci) => (
+              <div key={ci.id} className="rounded-lg border overflow-hidden">
+                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                    <div className="flex shrink-0 items-center justify-center rounded-lg p-2 shadow-sm border bg-white dark:bg-gray-800">
+                      {ci.iconUrl ? (
+                        <Image src={ci.iconUrl} alt={ci.name} width={24} height={24} />
+                      ) : (
+                        <Puzzle className="h-6 w-6 text-indigo-500" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-medium">{ci.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {ci.connected ? (
+                          <>Connected{ci.displayName ? ` as ${ci.displayName}` : ""}</>
+                        ) : (
+                          ci.description
+                        )}
+                      </p>
+                      {ci.communityStatus && (
+                        <span className={cn(
+                          "mt-1 inline-block rounded-full px-2 py-0.5 text-xs",
+                          ci.communityStatus === "approved" ? "bg-green-100 text-green-700" :
+                          ci.communityStatus === "pending" ? "bg-yellow-100 text-yellow-700" :
+                          "bg-red-100 text-red-700"
+                        )}>
+                          Community: {ci.communityStatus}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    {ci.connected ? (
+                      <>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <Checkbox
+                            checked={ci.enabled}
+                            onCheckedChange={(checked) => {
+                              toggleCustom.mutateAsync({ customIntegrationId: ci.id, enabled: checked === true })
+                                .then(() => refetchCustom());
+                            }}
+                          />
+                          <span className="text-sm">Enabled</span>
+                        </label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            disconnectCustom.mutateAsync(ci.id).then(() => refetchCustom());
+                          }}
+                        >
+                          Disconnect
+                        </Button>
+                      </>
+                    ) : ci.authType === "oauth2" ? (
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const result = await getCustomAuthUrl.mutateAsync({
+                              slug: ci.slug,
+                              redirectUrl: window.location.href,
+                            });
+                            window.location.href = result.authUrl;
+                          } catch {
+                            setNotification({ type: "error", message: "Failed to start OAuth flow" });
+                          }
+                        }}
+                      >
+                        Connect <ExternalLink className="ml-2 h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Credentials saved</span>
+                    )}
+                    {!ci.isBuiltIn && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          deleteCustom.mutateAsync(ci.id).then(() => refetchCustom());
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            No custom integrations yet. Click "Add Custom" to create one.
+          </div>
+        )}
+      </div>
+
+      {/* Add Custom Integration Dialog */}
+      {showAddCustom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowAddCustom(false)}>
+          <div className="w-full max-w-lg rounded-lg bg-background p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-4 text-lg font-semibold">Add Custom Integration</h3>
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              <div>
+                <label className="text-sm font-medium">Slug</label>
+                <Input
+                  placeholder="e.g. trello"
+                  value={customForm.slug}
+                  onChange={(e) => setCustomForm({ ...customForm, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Name</label>
+                <Input
+                  placeholder="e.g. Trello"
+                  value={customForm.name}
+                  onChange={(e) => setCustomForm({ ...customForm, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Description</label>
+                <Input
+                  placeholder="What does this integration do?"
+                  value={customForm.description}
+                  onChange={(e) => setCustomForm({ ...customForm, description: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Base URL</label>
+                <Input
+                  placeholder="https://api.example.com"
+                  value={customForm.baseUrl}
+                  onChange={(e) => setCustomForm({ ...customForm, baseUrl: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Auth Type</label>
+                <select
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  value={customForm.authType}
+                  onChange={(e) => setCustomForm({ ...customForm, authType: e.target.value as any })}
+                >
+                  <option value="api_key">API Key</option>
+                  <option value="bearer_token">Bearer Token</option>
+                  <option value="oauth2">OAuth 2.0</option>
+                </select>
+              </div>
+
+              {customForm.authType === "api_key" && (
+                <div>
+                  <label className="text-sm font-medium">API Key</label>
+                  <Input
+                    type="password"
+                    placeholder="Your API key"
+                    value={customForm.apiKey}
+                    onChange={(e) => setCustomForm({ ...customForm, apiKey: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {customForm.authType === "bearer_token" && (
+                <div>
+                  <label className="text-sm font-medium">Bearer Token</label>
+                  <Input
+                    type="password"
+                    placeholder="Your bearer token"
+                    value={customForm.apiKey}
+                    onChange={(e) => setCustomForm({ ...customForm, apiKey: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {customForm.authType === "oauth2" && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium">Client ID</label>
+                    <Input
+                      value={customForm.clientId}
+                      onChange={(e) => setCustomForm({ ...customForm, clientId: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Client Secret</label>
+                    <Input
+                      type="password"
+                      value={customForm.clientSecret}
+                      onChange={(e) => setCustomForm({ ...customForm, clientSecret: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Auth URL</label>
+                    <Input
+                      placeholder="https://example.com/oauth/authorize"
+                      value={customForm.authUrl}
+                      onChange={(e) => setCustomForm({ ...customForm, authUrl: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Token URL</label>
+                    <Input
+                      placeholder="https://example.com/oauth/token"
+                      value={customForm.tokenUrl}
+                      onChange={(e) => setCustomForm({ ...customForm, tokenUrl: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Scopes (comma-separated)</label>
+                    <Input
+                      placeholder="read,write"
+                      value={customForm.scopes}
+                      onChange={(e) => setCustomForm({ ...customForm, scopes: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setShowAddCustom(false)}>Cancel</Button>
+              <Button
+                disabled={!customForm.slug || !customForm.name || !customForm.baseUrl}
+                onClick={async () => {
+                  try {
+                    await createCustom.mutateAsync({
+                      slug: customForm.slug,
+                      name: customForm.name,
+                      description: customForm.description || customForm.name,
+                      baseUrl: customForm.baseUrl,
+                      authType: customForm.authType,
+                      oauthConfig: customForm.authType === "oauth2" ? {
+                        authUrl: customForm.authUrl,
+                        tokenUrl: customForm.tokenUrl,
+                        scopes: customForm.scopes.split(",").map(s => s.trim()).filter(Boolean),
+                      } : null,
+                      apiKeyConfig: customForm.authType === "api_key" ? {
+                        method: "header" as const,
+                        headerName: "Authorization",
+                      } : null,
+                      clientId: customForm.clientId || null,
+                      clientSecret: customForm.clientSecret || null,
+                      apiKey: customForm.apiKey || null,
+                    });
+                    setShowAddCustom(false);
+                    setCustomForm({ slug: "", name: "", description: "", baseUrl: "", authType: "api_key", apiKey: "", clientId: "", clientSecret: "", authUrl: "", tokenUrl: "", scopes: "" });
+                    refetchCustom();
+                    setNotification({ type: "success", message: "Custom integration created!" });
+                  } catch (error: any) {
+                    setNotification({ type: "error", message: error?.message || "Failed to create integration" });
+                  }
+                }}
+              >
+                Create
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

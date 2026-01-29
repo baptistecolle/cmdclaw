@@ -1,9 +1,10 @@
 import { db } from "@/server/db/client";
-import { integration } from "@/server/db/schema";
+import { integration, customIntegration, customIntegrationCredential } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getValidTokensForUser } from "./token-refresh";
+import { getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
 import type { IntegrationType } from "@/server/oauth/config";
 import { env } from "@/env";
+import { decrypt } from "@/server/lib/encryption";
 
 // Token-based integrations map to their access token env var
 const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
@@ -21,7 +22,6 @@ const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
   salesforce: "SALESFORCE_ACCESS_TOKEN",
   reddit: "REDDIT_ACCESS_TOKEN",
   twitter: "TWITTER_ACCESS_TOKEN",
-  discord: "DISCORD_ACCESS_TOKEN",
 };
 
 export async function getCliEnvForUser(userId: string): Promise<Record<string, string>> {
@@ -69,7 +69,99 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
     }
   }
 
+  // Discord bot token - server-level, not per-user OAuth
+  if (env.DISCORD_BOT_TOKEN) {
+    cliEnv.DISCORD_BOT_TOKEN = env.DISCORD_BOT_TOKEN;
+  }
+
+  // Custom integrations
+  try {
+    const customCreds = await db.query.customIntegrationCredential.findMany({
+      where: and(
+        eq(customIntegrationCredential.userId, userId),
+        eq(customIntegrationCredential.enabled, true)
+      ),
+      with: {
+        customIntegration: true,
+      },
+    });
+
+    // Refresh OAuth tokens for custom integrations
+    const refreshedTokens = await getValidCustomTokens(userId);
+
+    for (const cred of customCreds) {
+      const slug = cred.customIntegration.slug.toUpperCase().replace(/-/g, "_");
+      const integ = cred.customIntegration;
+
+      // Set base URL
+      cliEnv[`${slug}_BASE_URL`] = integ.baseUrl;
+
+      if (integ.authType === "api_key" && cred.apiKey) {
+        try {
+          cliEnv[`${slug}_API_KEY`] = decrypt(cred.apiKey);
+          if (integ.apiKeyConfig) {
+            cliEnv[`${slug}_API_KEY_METHOD`] = integ.apiKeyConfig.method;
+            if (integ.apiKeyConfig.headerName) {
+              cliEnv[`${slug}_API_KEY_HEADER`] = integ.apiKeyConfig.headerName;
+            }
+            if (integ.apiKeyConfig.queryParam) {
+              cliEnv[`${slug}_API_KEY_PARAM`] = integ.apiKeyConfig.queryParam;
+            }
+          }
+        } catch (e) {
+          console.error(`Failed to decrypt API key for custom integration ${integ.slug}:`, e);
+        }
+      } else if (integ.authType === "bearer_token" && cred.apiKey) {
+        try {
+          cliEnv[`${slug}_ACCESS_TOKEN`] = decrypt(cred.apiKey);
+        } catch (e) {
+          console.error(`Failed to decrypt bearer token for custom integration ${integ.slug}:`, e);
+        }
+      } else if (integ.authType === "oauth2") {
+        // Use refreshed token if available, otherwise use stored token
+        const refreshedToken = refreshedTokens.get(cred.id);
+        if (refreshedToken) {
+          cliEnv[`${slug}_ACCESS_TOKEN`] = refreshedToken;
+        } else if (cred.accessToken) {
+          cliEnv[`${slug}_ACCESS_TOKEN`] = cred.accessToken;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Failed to load custom integration credentials:", e);
+  }
+
   return cliEnv;
+}
+
+export async function getCliInstructionsWithCustom(
+  connectedIntegrations: IntegrationType[],
+  userId: string
+): Promise<string> {
+  const base = getCliInstructions(connectedIntegrations);
+
+  try {
+    const customCreds = await db.query.customIntegrationCredential.findMany({
+      where: and(
+        eq(customIntegrationCredential.userId, userId),
+        eq(customIntegrationCredential.enabled, true)
+      ),
+      with: {
+        customIntegration: true,
+      },
+    });
+
+    if (customCreds.length === 0) return base;
+
+    const customSections = customCreds.map((cred) => {
+      const integ = cred.customIntegration;
+      return `\n## ${integ.name} CLI (Custom) [✓ Connected]\n${integ.cliInstructions}\n`;
+    });
+
+    return base + "\n" + customSections.join("\n");
+  } catch {
+    return base;
+  }
 }
 
 export function getCliInstructions(connectedIntegrations: IntegrationType[]): string {
@@ -317,12 +409,12 @@ Browse, vote, comment, and post on Reddit.
 - t4_ = message
 - t5_ = subreddit
 
-## Discord CLI [${statusTag("discord")}]
+## Discord CLI (Bot Token)
 
-Interact with Discord guilds, channels, and messages.
+Interact with Discord guilds, channels, and messages via bot token.
 
 ### Commands
-- discord guilds - List your guilds (servers)
+- discord guilds - List guilds the bot is in
 - discord channels <guildId> - List channels in a guild
 - discord messages <channelId> [-l limit] - Get messages from a channel
 - discord send <channelId> --text <message> - Send a message to a channel

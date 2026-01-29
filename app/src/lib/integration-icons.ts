@@ -20,7 +20,6 @@ import {
   Cloud,
   MessageCircle,
   Twitter,
-  Gamepad2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,8 +38,7 @@ export type IntegrationType =
   | "linkedin"
   | "salesforce"
   | "reddit"
-  | "twitter"
-  | "discord";
+  | "twitter";
 
 export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   gmail: Mail,
@@ -58,7 +56,6 @@ export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   salesforce: Cloud,
   reddit: MessageCircle,
   twitter: Twitter,
-  discord: Gamepad2,
 };
 
 export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
@@ -77,7 +74,6 @@ export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
   salesforce: "Salesforce",
   reddit: "Reddit",
   twitter: "X (Twitter)",
-  discord: "Discord",
 };
 
 export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
@@ -96,7 +92,6 @@ export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
   salesforce: "text-[#00A1E0]",
   reddit: "text-[#FF4500]",
   twitter: "text-gray-900 dark:text-gray-100",
-  discord: "text-[#5865F2]",
 };
 
 export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
@@ -115,7 +110,6 @@ export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
   salesforce: "/integrations/salesforce.svg",
   reddit: "/integrations/reddit.svg",
   twitter: "/integrations/twitter.svg",
-  discord: "/integrations/discord.svg",
 };
 
 // Human-readable descriptions for integration operations
@@ -309,12 +303,6 @@ export const INTEGRATION_OPERATION_LABELS: Record<IntegrationType, Record<string
     follow: "Following user",
     unfollow: "Unfollowing user",
   },
-  discord: {
-    guilds: "Listing guilds",
-    channels: "Listing channels",
-    messages: "Getting messages",
-    send: "Sending message",
-  },
 };
 
 /**
@@ -325,14 +313,14 @@ export function getIntegrationIcon(integration: string): LucideIcon | null {
 }
 
 /**
- * Get the display name for an integration
+ * Get the display name for an integration (with custom integration fallback)
  */
 export function getIntegrationDisplayName(integration: string): string {
   return INTEGRATION_DISPLAY_NAMES[integration as IntegrationType] || integration;
 }
 
 /**
- * Get the color class for an integration icon
+ * Get the color class for an integration icon (with custom fallback)
  */
 export function getIntegrationColor(integration: string): string {
   return INTEGRATION_COLORS[integration as IntegrationType] || "text-muted-foreground";
@@ -343,6 +331,17 @@ export function getIntegrationColor(integration: string): string {
  */
 export function getIntegrationLogo(integration: string): string | null {
   return INTEGRATION_LOGOS[integration as IntegrationType] || null;
+}
+
+/**
+ * Get display info for a custom integration (fallback defaults)
+ */
+export function getCustomIntegrationDisplayInfo(name: string, iconUrl?: string | null) {
+  return {
+    displayName: name,
+    color: "text-indigo-500",
+    iconUrl: iconUrl || null,
+  };
 }
 
 /**

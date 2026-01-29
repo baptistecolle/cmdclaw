@@ -1,15 +1,15 @@
 import { parseArgs } from "util";
 
-const TOKEN = process.env.DISCORD_ACCESS_TOKEN;
+const TOKEN = process.env.DISCORD_BOT_TOKEN;
 if (!TOKEN) {
-  console.error("Error: DISCORD_ACCESS_TOKEN environment variable required");
+  console.error("Error: DISCORD_BOT_TOKEN environment variable required");
   process.exit(1);
 }
 
 const API_BASE = "https://discord.com/api/v10";
 
 const headers = {
-  Authorization: `Bearer ${TOKEN}`,
+  Authorization: `Bot ${TOKEN}`,
   "Content-Type": "application/json",
 };
 
@@ -68,7 +68,7 @@ async function getGuilds() {
 async function getChannels(guildId: string) {
   const data = await api(`/guilds/${guildId}/channels`);
   const channels = data
-    .filter((c: any) => c.type === 0 || c.type === 2 || c.type === 5) // text, voice, announcement
+    .filter((c: any) => c.type === 0 || c.type === 2 || c.type === 5)
     .map((c: any) => ({
       id: c.id,
       name: c.name,
@@ -92,6 +92,7 @@ async function getMessages(channelId: string) {
       id: m.author.id,
       username: m.author.username,
       globalName: m.author.global_name,
+      bot: m.author.bot || false,
     },
     content: m.content,
     timestamp: m.timestamp,
@@ -124,10 +125,10 @@ async function sendMessage(channelId: string) {
 }
 
 function showHelp() {
-  console.log(`Discord CLI - Commands:
+  console.log(`Discord CLI (Bot Token) - Commands:
 
 Reading:
-  guilds                                List your guilds (servers)
+  guilds                                List guilds the bot is in
   channels <guildId>                    List channels in a guild
   messages <channelId> [-l limit]       Get messages from a channel
 

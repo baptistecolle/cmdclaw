@@ -156,7 +156,7 @@ const TOKEN_ENV_VARS: Record<string, string> = {
   linkedin: "LINKEDIN_ACCOUNT_ID",
   salesforce: "SALESFORCE_ACCESS_TOKEN",
   twitter: "TWITTER_ACCESS_TOKEN",
-  discord: "DISCORD_ACCESS_TOKEN",
+  discord: "DISCORD_BOT_TOKEN",
 };
 
 // Display names for integrations
@@ -178,6 +178,20 @@ const INTEGRATION_NAMES: Record<string, string> = {
   discord: "Discord",
 };
 
+// Custom integration permissions loaded from env var
+let customPermissions: Record<string, { read: string[]; write: string[] }> = {};
+
+function loadCustomPermissions() {
+  const raw = process.env.CUSTOM_INTEGRATION_PERMISSIONS;
+  if (raw) {
+    try {
+      customPermissions = JSON.parse(raw);
+    } catch {
+      console.error("[Plugin] Failed to parse CUSTOM_INTEGRATION_PERMISSIONS");
+    }
+  }
+}
+
 /**
  * Parse a Bash command to extract integration and operation
  */
@@ -189,7 +203,12 @@ function parseBashCommand(
   if (parts.length === 0) return null;
 
   const cliName = parts[0];
-  const integration = CLI_TO_INTEGRATION[cliName];
+  let integration = CLI_TO_INTEGRATION[cliName];
+
+  // Check for custom integrations (custom-{slug} pattern)
+  if (!integration && cliName.startsWith("custom-")) {
+    integration = cliName; // Use full name as integration identifier
+  }
 
   if (!integration) return null;
 
@@ -223,9 +242,15 @@ function parseBashCommand(
  * Check if an operation requires approval (is a write operation)
  */
 function isWriteOperation(integration: string, operation: string): boolean {
+  // Check built-in permissions
   const permissions = TOOL_PERMISSIONS[integration];
-  if (!permissions) return false;
-  return permissions.write.includes(operation);
+  if (permissions) return permissions.write.includes(operation);
+
+  // Check custom integration permissions
+  const customPerms = customPermissions[integration];
+  if (customPerms) return customPerms.write.includes(operation);
+
+  return false;
 }
 
 /**
@@ -327,6 +352,7 @@ async function requestAuth(params: {
  * OpenCode Plugin Export
  */
 export const IntegrationPermissionsPlugin = async () => {
+  loadCustomPermissions();
   return {
     "tool.execute.before": async (
       input: { tool: string },
@@ -360,7 +386,12 @@ export const IntegrationPermissionsPlugin = async () => {
 
       // Check if integration token is available
       const tokenEnvVar = TOKEN_ENV_VARS[integration];
-      const hasToken = tokenEnvVar ? !!process.env[tokenEnvVar] : false;
+      // For custom integrations, check {SLUG}_ACCESS_TOKEN or {SLUG}_API_KEY
+      let hasToken = tokenEnvVar ? !!process.env[tokenEnvVar] : false;
+      if (!hasToken && integration.startsWith("custom-")) {
+        const slug = integration.replace("custom-", "").toUpperCase().replace(/-/g, "_");
+        hasToken = !!(process.env[`${slug}_ACCESS_TOKEN`] || process.env[`${slug}_API_KEY`]);
+      }
 
       if (!hasToken) {
         console.log(`[Plugin] No token for ${integration}, requesting auth...`);

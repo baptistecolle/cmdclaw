@@ -1,6 +1,6 @@
 import { env } from "@/env";
 
-export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce" | "reddit" | "twitter" | "discord";
+export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce" | "reddit" | "twitter";
 
 export type OAuthConfig = {
   clientId: string;
@@ -380,34 +380,6 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
           username: data.data?.username,
           name: data.data?.name,
           profileImageUrl: data.data?.profile_image_url,
-        },
-      };
-    },
-  }),
-  discord: () => ({
-    clientId: env.DISCORD_CLIENT_ID ?? "",
-    clientSecret: env.DISCORD_CLIENT_SECRET ?? "",
-    authUrl: "https://discord.com/api/oauth2/authorize",
-    tokenUrl: "https://discord.com/api/oauth2/token",
-    redirectUri: `${getAppUrl()}/api/oauth/callback`,
-    scopes: [
-      "identify",
-      "guilds",
-      "guilds.members.read",
-    ],
-    getUserInfo: async (accessToken: string) => {
-      const res = await fetch("https://discord.com/api/v10/users/@me", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const data = await res.json();
-      return {
-        id: data.id,
-        displayName: data.username ?? "Discord User",
-        metadata: {
-          username: data.username,
-          discriminator: data.discriminator,
-          avatar: data.avatar,
-          globalName: data.global_name,
         },
       };
     },
