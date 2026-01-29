@@ -104,6 +104,7 @@ export function ChatArea({ conversationId }: Props) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isRecordingRef = useRef(false);
   const isNearBottomRef = useRef(true);
+  const userScrolledUpRef = useRef(false);
 
   // Auto-approve mutation
   const { mutateAsync: updateAutoApprove } = useUpdateAutoApprove();
@@ -482,11 +483,38 @@ export function ChatArea({ conversationId }: Props) {
     const threshold = 100; // pixels from bottom
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     isNearBottomRef.current = distanceFromBottom < threshold;
+
+    // If user scrolls back to bottom, reset the scrolled-up flag
+    if (isNearBottomRef.current) {
+      userScrolledUpRef.current = false;
+    }
   }, []);
 
-  // Auto-scroll only if user is near bottom
+  // Detect user-initiated scroll up via wheel/touch
   useEffect(() => {
-    if (isNearBottomRef.current) {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleUserScroll = () => {
+      // Check after a tick so the scroll position has updated
+      requestAnimationFrame(() => {
+        if (!isNearBottomRef.current) {
+          userScrolledUpRef.current = true;
+        }
+      });
+    };
+
+    container.addEventListener("wheel", handleUserScroll, { passive: true });
+    container.addEventListener("touchmove", handleUserScroll, { passive: true });
+    return () => {
+      container.removeEventListener("wheel", handleUserScroll);
+      container.removeEventListener("touchmove", handleUserScroll);
+    };
+  }, []);
+
+  // Auto-scroll only if user hasn't scrolled up
+  useEffect(() => {
+    if (isNearBottomRef.current && !userScrolledUpRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, streamingParts]);
@@ -542,6 +570,8 @@ export function ChatArea({ conversationId }: Props) {
   }, []);
 
   const handleSend = useCallback(async (content: string, attachments?: AttachmentData[]) => {
+    // Reset scroll lock so auto-scroll works for the new response
+    userScrolledUpRef.current = false;
     const userMessage: Message = {
       id: `temp-${Date.now()}`,
       role: "user",
@@ -1154,11 +1184,11 @@ export function ChatArea({ conversationId }: Props) {
   }
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col min-h-0">
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4"
+        className="flex-1 overflow-y-auto p-4 min-h-0"
       >
         <div className="mx-auto max-w-3xl">
           {messages.length === 0 && !isStreaming ? (
