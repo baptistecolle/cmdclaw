@@ -8,16 +8,23 @@ PizzaDrivenGPU
 
 **What benefit/purpose will the bot/app have for Redditors?**
 
-The app is a personal productivity and workflow automation platform that allows users to manage their Reddit account alongside other services (email, calendar, CRM, etc.) from a single interface. It helps Redditors:
+It allows Redditors to manage their Reddit activity from a unified productivity platform alongside their other tools (email, calendar, CRM, etc.), saving time by not having to switch between apps. The app acts on behalf of the authenticated user only — no scraping, mass-posting, or automated actions.
 
-- Browse their home feed and subreddit posts
-- Vote, comment, and reply to discussions
-- Submit new posts (text and link)
-- Manage subreddit subscriptions
+**Provide a detailed description of what the Bot/App will be doing on the Reddit platform.**
+
+The app will perform the following actions on behalf of the authenticated user:
+
+- Browse home feed, subreddit posts, and user profiles
+- Vote on posts and comments (upvote/downvote)
+- Comment on posts and reply to comments
+- Submit new text and link posts to subreddits
+- Save and unsave posts/comments
+- Manage subreddit subscriptions (subscribe/unsubscribe)
 - Read and send private messages
-- Search across Reddit
+- Search Reddit for posts and content
+- Edit and delete the user's own posts/comments
 
-The app acts on behalf of the authenticated user only — it does not scrape, mass-post, or perform any automated actions without explicit user intent. Each action is manually triggered by the user through a CLI or workflow interface.
+All actions are manually triggered by the user through a CLI or workflow interface. The app never acts autonomously — every API call corresponds to an explicit user action.
 
 **What is missing from Devvit that prevents building on that platform?**
 
