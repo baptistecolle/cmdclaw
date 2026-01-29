@@ -19,6 +19,9 @@ const integrationTypeSchema = z.enum([
   "hubspot",
   "linkedin",
   "salesforce",
+  "reddit",
+  "twitter",
+  "discord",
 ]);
 
 const triggerTypeSchema = z.string().min(1).max(128);

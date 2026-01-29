@@ -99,6 +99,24 @@ const integrationConfig = {
     icon: "/integrations/salesforce.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
+  reddit: {
+    name: "Reddit",
+    description: "Browse, vote, comment, and post on Reddit",
+    icon: "/integrations/reddit.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
+  twitter: {
+    name: "X (Twitter)",
+    description: "Post tweets, manage followers, and search content",
+    icon: "/integrations/twitter.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
+  discord: {
+    name: "Discord",
+    description: "List guilds, channels, and send messages",
+    icon: "/integrations/discord.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
 } as const;
 
 type IntegrationType = keyof typeof integrationConfig;

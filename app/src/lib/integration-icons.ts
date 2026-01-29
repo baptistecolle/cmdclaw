@@ -18,6 +18,9 @@ import {
   Users,
   Linkedin,
   Cloud,
+  MessageCircle,
+  Twitter,
+  Gamepad2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,7 +37,10 @@ export type IntegrationType =
   | "slack"
   | "hubspot"
   | "linkedin"
-  | "salesforce";
+  | "salesforce"
+  | "reddit"
+  | "twitter"
+  | "discord";
 
 export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   gmail: Mail,
@@ -50,6 +56,9 @@ export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   hubspot: Users,
   linkedin: Linkedin,
   salesforce: Cloud,
+  reddit: MessageCircle,
+  twitter: Twitter,
+  discord: Gamepad2,
 };
 
 export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
@@ -66,6 +75,9 @@ export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
   hubspot: "HubSpot",
   linkedin: "LinkedIn",
   salesforce: "Salesforce",
+  reddit: "Reddit",
+  twitter: "X (Twitter)",
+  discord: "Discord",
 };
 
 export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
@@ -82,6 +94,9 @@ export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
   hubspot: "text-orange-500",
   linkedin: "text-[#0A66C2]",
   salesforce: "text-[#00A1E0]",
+  reddit: "text-[#FF4500]",
+  twitter: "text-gray-900 dark:text-gray-100",
+  discord: "text-[#5865F2]",
 };
 
 export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
@@ -98,6 +113,9 @@ export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
   hubspot: "/integrations/hubspot.svg",
   linkedin: "/integrations/linkedin.svg",
   salesforce: "/integrations/salesforce.svg",
+  reddit: "/integrations/reddit.svg",
+  twitter: "/integrations/twitter.svg",
+  discord: "/integrations/discord.svg",
 };
 
 // Human-readable descriptions for integration operations
@@ -248,6 +266,54 @@ export const INTEGRATION_OPERATION_LABELS: Record<IntegrationType, Record<string
     search: "Searching records",
     create: "Creating record",
     update: "Updating record",
+  },
+  reddit: {
+    feed: "Getting home feed",
+    subreddit: "Getting subreddit posts",
+    post: "Getting post",
+    user: "Getting user profile",
+    search: "Searching Reddit",
+    multireddit: "Getting multireddit",
+    vote: "Voting",
+    comment: "Adding comment",
+    reply: "Replying to comment",
+    save: "Saving content",
+    unsave: "Unsaving content",
+    submit: "Submitting post",
+    delete: "Deleting content",
+    edit: "Editing content",
+    inbox: "Listing messages",
+    message: "Sending message",
+    read: "Marking as read",
+    subscriptions: "Listing subscriptions",
+    subscribe: "Subscribing",
+    unsubscribe: "Unsubscribing",
+  },
+  twitter: {
+    me: "Getting my profile",
+    user: "Getting user profile",
+    "user-id": "Getting user by ID",
+    timeline: "Getting timeline",
+    mentions: "Getting mentions",
+    search: "Searching tweets",
+    likes: "Getting liked tweets",
+    followers: "Listing followers",
+    following: "Listing following",
+    post: "Posting tweet",
+    reply: "Replying to tweet",
+    quote: "Quoting tweet",
+    like: "Liking tweet",
+    unlike: "Unliking tweet",
+    retweet: "Retweeting",
+    unretweet: "Removing retweet",
+    follow: "Following user",
+    unfollow: "Unfollowing user",
+  },
+  discord: {
+    guilds: "Listing guilds",
+    channels: "Listing channels",
+    messages: "Getting messages",
+    send: "Sending message",
   },
 };
 

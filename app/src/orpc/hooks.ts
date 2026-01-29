@@ -114,7 +114,7 @@ export function useGetAuthUrl() {
       type,
       redirectUrl,
     }: {
-      type: "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce";
+      type: "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce" | "reddit" | "twitter" | "discord";
       redirectUrl: string;
     }) => client.integration.getAuthUrl({ type, redirectUrl }),
   });
@@ -284,6 +284,9 @@ export function useCreateWorkflow() {
         | "hubspot"
         | "linkedin"
         | "salesforce"
+        | "reddit"
+        | "twitter"
+        | "discord"
       )[];
     }) => client.workflow.create(input),
     onSuccess: () => {
@@ -324,6 +327,9 @@ export function useUpdateWorkflow() {
         | "hubspot"
         | "linkedin"
         | "salesforce"
+        | "reddit"
+        | "twitter"
+        | "discord"
       )[];
       schedule?: WorkflowSchedule | null;
     }) => client.workflow.update(input),

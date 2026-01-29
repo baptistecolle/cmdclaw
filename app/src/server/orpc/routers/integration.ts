@@ -30,6 +30,9 @@ const integrationTypeSchema = z.enum([
   "hubspot",
   "linkedin",
   "salesforce",
+  "reddit",
+  "twitter",
+  "discord",
 ]);
 
 // List user's integrations
@@ -66,7 +69,7 @@ const getAuthUrl = protectedProcedure
     const config = getOAuthConfig(input.type as IntegrationType);
 
     // Generate PKCE code_verifier for providers that require it
-    const pkceProviders = ["airtable", "salesforce"];
+    const pkceProviders = ["airtable", "salesforce", "twitter"];
     const codeVerifier = pkceProviders.includes(input.type) ? generateCodeVerifier() : undefined;
 
     const state = Buffer.from(
@@ -101,6 +104,11 @@ const getAuthUrl = protectedProcedure
 
     if (input.type === "notion") {
       params.set("owner", "user");
+    }
+
+    // Reddit requires duration=permanent for refresh tokens
+    if (input.type === "reddit") {
+      params.set("duration", "permanent");
     }
 
     // Airtable and Salesforce require PKCE
@@ -157,13 +165,18 @@ const handleCallback = protectedProcedure
       "Content-Type": "application/x-www-form-urlencoded",
     };
 
-    // Notion and Airtable require Basic auth header
-    if (stateData.type === "notion" || stateData.type === "airtable") {
+    // Notion, Airtable, Reddit, and Twitter require Basic auth header
+    if (stateData.type === "notion" || stateData.type === "airtable" || stateData.type === "reddit" || stateData.type === "twitter" || stateData.type === "discord") {
       headers["Authorization"] = `Basic ${Buffer.from(
         `${config.clientId}:${config.clientSecret}`
       ).toString("base64")}`;
       tokenBody.delete("client_id");
       tokenBody.delete("client_secret");
+    }
+
+    // Reddit requires User-Agent header for all API calls
+    if (stateData.type === "reddit") {
+      headers["User-Agent"] = "bap-app:v1.0.0 (by /u/bap-integration)";
     }
 
     // GitHub needs Accept header

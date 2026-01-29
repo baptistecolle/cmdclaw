@@ -276,6 +276,9 @@ export const integrationTypeEnum = pgEnum("integration_type", [
   "hubspot",
   "linkedin",
   "salesforce",
+  "reddit",
+  "twitter",
+  "discord",
 ]);
 
 // ========== WORKFLOW SCHEMA ==========

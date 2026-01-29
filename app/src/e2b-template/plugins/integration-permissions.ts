@@ -22,6 +22,8 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   hubspot: "hubspot",
   linkedin: "linkedin",
   salesforce: "salesforce",
+  twitter: "twitter",
+  discord: "discord",
 };
 
 // Tool permissions: read operations auto-approve, write operations require approval
@@ -128,6 +130,14 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
     read: ["query", "get", "describe", "objects", "search"],
     write: ["create", "update"],
   },
+  twitter: {
+    read: ["me", "user", "user-id", "timeline", "mentions", "search", "likes", "followers", "following"],
+    write: ["post", "reply", "quote", "like", "unlike", "retweet", "unretweet", "follow", "unfollow"],
+  },
+  discord: {
+    read: ["guilds", "channels", "messages"],
+    write: ["send"],
+  },
 };
 
 // Environment variable names for integration tokens
@@ -145,6 +155,8 @@ const TOKEN_ENV_VARS: Record<string, string> = {
   hubspot: "HUBSPOT_ACCESS_TOKEN",
   linkedin: "LINKEDIN_ACCOUNT_ID",
   salesforce: "SALESFORCE_ACCESS_TOKEN",
+  twitter: "TWITTER_ACCESS_TOKEN",
+  discord: "DISCORD_ACCESS_TOKEN",
 };
 
 // Display names for integrations
@@ -162,6 +174,8 @@ const INTEGRATION_NAMES: Record<string, string> = {
   hubspot: "HubSpot",
   linkedin: "LinkedIn",
   salesforce: "Salesforce",
+  twitter: "X (Twitter)",
+  discord: "Discord",
 };
 
 /**

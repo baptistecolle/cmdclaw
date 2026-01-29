@@ -19,6 +19,9 @@ const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
   slack: "SLACK_ACCESS_TOKEN",
   hubspot: "HUBSPOT_ACCESS_TOKEN",
   salesforce: "SALESFORCE_ACCESS_TOKEN",
+  reddit: "REDDIT_ACCESS_TOKEN",
+  twitter: "TWITTER_ACCESS_TOKEN",
+  discord: "DISCORD_ACCESS_TOKEN",
 };
 
 export async function getCliEnvForUser(userId: string): Promise<Record<string, string>> {
@@ -273,6 +276,88 @@ salesforce search "FIND {Acme} IN ALL FIELDS RETURNING Account(Id, Name), Contac
 - Date literals: \`TODAY\`, \`THIS_MONTH\`, \`LAST_N_DAYS:30\`
 - Custom objects end with \`__c\` (e.g., \`Invoice__c\`)
 - Custom fields end with \`__c\` (e.g., \`Custom_Field__c\`)
+
+## Reddit CLI [${statusTag("reddit")}]
+
+Browse, vote, comment, and post on Reddit.
+
+### Reading
+- reddit feed [-l limit] [-s hot|new|top|rising] - Get home feed
+- reddit subreddit <name> [-l limit] [-s hot|new|top|rising] - Get subreddit posts
+- reddit post <id> [-l limit] - Get post with comments
+- reddit user <username> - Get user profile and recent activity
+- reddit search -q <query> [-l limit] [-t all|year|month|week|day|hour] - Search Reddit
+- reddit multireddit <user> <name> - Get multireddit posts
+
+### Engagement
+- reddit vote <id> -d up|down|none - Vote on post/comment (t1_xxx for comment, t3_xxx for post)
+- reddit comment <postId> --text <text> - Add comment to post
+- reddit reply <commentId> --text <text> - Reply to comment
+- reddit save <id> - Save post/comment
+- reddit unsave <id> - Unsave post/comment
+
+### Creating Content
+- reddit submit <subreddit> --title <title> [--text <body>] [--url <link>] - Submit post
+- reddit delete <id> - Delete own post/comment
+- reddit edit <id> --text <newText> - Edit own post/comment
+
+### Messaging
+- reddit inbox [-l limit] - List messages
+- reddit message <username> -s <subject> --text <body> - Send private message
+- reddit read <id> - Mark message as read
+
+### Subscriptions
+- reddit subscriptions [-l limit] - List subscribed subreddits
+- reddit subscribe <subreddit> - Subscribe to subreddit
+- reddit unsubscribe <subreddit> - Unsubscribe from subreddit
+
+### Thing ID Prefixes
+- t1_ = comment
+- t3_ = post/link
+- t4_ = message
+- t5_ = subreddit
+
+## Discord CLI [${statusTag("discord")}]
+
+Interact with Discord guilds, channels, and messages.
+
+### Commands
+- discord guilds - List your guilds (servers)
+- discord channels <guildId> - List channels in a guild
+- discord messages <channelId> [-l limit] - Get messages from a channel
+- discord send <channelId> --text <message> - Send a message to a channel
+
+## X (Twitter) CLI [${statusTag("twitter")}]
+
+Post tweets, manage followers, and interact with content on X (Twitter).
+
+### User Profile
+- twitter me - Get your profile
+- twitter user <username> - Get user by username
+- twitter user-id <id> - Get user by ID
+
+### Reading
+- twitter timeline [-l limit] - Get your home timeline
+- twitter mentions [-l limit] - Get your mentions
+- twitter search -q <query> [-l limit] - Search tweets
+- twitter likes [-l limit] - Get your liked tweets
+- twitter followers [-l limit] - List your followers
+- twitter following [-l limit] - List accounts you follow
+
+### Posting
+- twitter post -t <text> - Post a tweet
+- twitter reply <tweetId> -t <text> - Reply to a tweet
+- twitter quote <tweetId> -t <text> - Quote tweet
+
+### Engagement
+- twitter like <tweetId> - Like a tweet
+- twitter unlike <tweetId> - Unlike a tweet
+- twitter retweet <tweetId> - Retweet
+- twitter unretweet <tweetId> - Remove retweet
+
+### Following
+- twitter follow <userId> - Follow a user
+- twitter unfollow <userId> - Unfollow a user
 `;
 
   return `

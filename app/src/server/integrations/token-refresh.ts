@@ -51,13 +51,18 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
     "Content-Type": "application/x-www-form-urlencoded",
   };
 
-  // Notion and Airtable require Basic auth header for token refresh
-  if (token.type === "notion" || token.type === "airtable") {
+  // Notion, Airtable, and Reddit require Basic auth header for token refresh
+  if (token.type === "notion" || token.type === "airtable" || token.type === "reddit" || token.type === "discord") {
     headers["Authorization"] = `Basic ${Buffer.from(
       `${config.clientId}:${config.clientSecret}`
     ).toString("base64")}`;
     tokenBody.delete("client_id");
     tokenBody.delete("client_secret");
+  }
+
+  // Reddit requires User-Agent header for all API calls
+  if (token.type === "reddit") {
+    headers["User-Agent"] = "bap-app:v1.0.0 (by /u/bap-integration)";
   }
 
   // Salesforce uses standard OAuth refresh but may return updated instance_url

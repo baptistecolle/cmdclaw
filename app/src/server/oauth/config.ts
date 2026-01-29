@@ -1,6 +1,6 @@
 import { env } from "@/env";
 
-export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce";
+export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce" | "reddit" | "twitter" | "discord";
 
 export type OAuthConfig = {
   clientId: string;
@@ -309,6 +309,105 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
         metadata: {
           organizationId: data.organization_id,
           email: data.email,
+        },
+      };
+    },
+  }),
+
+  reddit: () => ({
+    clientId: env.REDDIT_CLIENT_ID ?? "",
+    clientSecret: env.REDDIT_CLIENT_SECRET ?? "",
+    authUrl: "https://www.reddit.com/api/v1/authorize",
+    tokenUrl: "https://www.reddit.com/api/v1/access_token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "identity",
+      "read",
+      "submit",
+      "vote",
+      "save",
+      "subscribe",
+      "privatemessages",
+      "history",
+      "mysubreddits",
+    ],
+    getUserInfo: async (accessToken: string) => {
+      const res = await fetch("https://oauth.reddit.com/api/v1/me", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "User-Agent": "bap-app:v1.0.0 (by /u/bap-integration)",
+        },
+      });
+      const data = await res.json();
+      return {
+        id: data.id,
+        displayName: data.name,
+        metadata: {
+          username: data.name,
+          iconImg: data.icon_img,
+        },
+      };
+    },
+  }),
+
+  twitter: () => ({
+    clientId: env.TWITTER_CLIENT_ID ?? "",
+    clientSecret: env.TWITTER_CLIENT_SECRET ?? "",
+    authUrl: "https://twitter.com/i/oauth2/authorize",
+    tokenUrl: "https://api.twitter.com/2/oauth2/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "tweet.read",
+      "tweet.write",
+      "users.read",
+      "like.read",
+      "like.write",
+      "follows.read",
+      "follows.write",
+      "offline.access",
+    ],
+    getUserInfo: async (accessToken: string) => {
+      const res = await fetch("https://api.twitter.com/2/users/me?user.fields=profile_image_url,username", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const data = await res.json();
+      return {
+        id: data.data?.id,
+        displayName: data.data?.username ?? data.data?.name ?? "Twitter User",
+        metadata: {
+          username: data.data?.username,
+          name: data.data?.name,
+          profileImageUrl: data.data?.profile_image_url,
+        },
+      };
+    },
+  }),
+  discord: () => ({
+    clientId: env.DISCORD_CLIENT_ID ?? "",
+    clientSecret: env.DISCORD_CLIENT_SECRET ?? "",
+    authUrl: "https://discord.com/api/oauth2/authorize",
+    tokenUrl: "https://discord.com/api/oauth2/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "identify",
+      "guilds",
+      "guilds.members.read",
+    ],
+    getUserInfo: async (accessToken: string) => {
+      const res = await fetch("https://discord.com/api/v10/users/@me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      return {
+        id: data.id,
+        displayName: data.username ?? "Discord User",
+        metadata: {
+          username: data.username,
+          discriminator: data.discriminator,
+          avatar: data.avatar,
+          globalName: data.global_name,
         },
       };
     },
