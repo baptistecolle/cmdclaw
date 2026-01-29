@@ -1243,7 +1243,7 @@ export function ChatArea({ conversationId }: Props) {
       </div>
 
       <div className="border-t bg-background p-4">
-        <div className="mx-auto max-w-3xl space-y-2">
+        <div className="mx-auto max-w-4xl space-y-2">
           {(isRecording || isProcessingVoice || voiceError) && (
             <VoiceIndicator
               isRecording={isRecording}
@@ -1251,7 +1251,16 @@ export function ChatArea({ conversationId }: Props) {
               error={voiceError}
             />
           )}
-          <div className="flex items-center gap-3">
+          <ChatInput
+            onSend={handleSend}
+            onStop={handleStop}
+            disabled={isStreaming || isRecording || isProcessingVoice}
+            isStreaming={isStreaming}
+            isRecording={isRecording}
+            onStartRecording={handleStartRecording}
+            onStopRecording={stopRecordingAndTranscribe}
+          />
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ModelSelector
                 selectedModel={selectedModel}
@@ -1262,6 +1271,8 @@ export function ChatArea({ conversationId }: Props) {
                 selectedDeviceId={selectedDeviceId}
                 onSelect={setSelectedDeviceId}
               />
+            </div>
+            <div className="flex items-center gap-2">
               <Switch
                 id="auto-approve"
                 checked={
@@ -1284,19 +1295,8 @@ export function ChatArea({ conversationId }: Props) {
                 <CircleCheck className="h-3.5 w-3.5" />
                 <span>Auto-approve</span>
               </label>
+              <VoiceHint />
             </div>
-            <div className="flex-1">
-              <ChatInput
-                onSend={handleSend}
-                onStop={handleStop}
-                disabled={isStreaming || isRecording || isProcessingVoice}
-                isStreaming={isStreaming}
-                isRecording={isRecording}
-                onStartRecording={handleStartRecording}
-                onStopRecording={stopRecordingAndTranscribe}
-              />
-            </div>
-            <VoiceHint />
           </div>
         </div>
       </div>
