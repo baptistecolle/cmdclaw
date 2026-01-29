@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageList, type Message, type MessagePart } from "./message-list";
+import { MessageList, type Message, type MessagePart, type AttachmentData } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
 import { DeviceSelector } from "./device-selector";
@@ -528,11 +528,12 @@ export function ChatArea({ conversationId }: Props) {
     );
   }, []);
 
-  const handleSend = useCallback(async (content: string) => {
+  const handleSend = useCallback(async (content: string, attachments?: AttachmentData[]) => {
     const userMessage: Message = {
       id: `temp-${Date.now()}`,
       role: "user",
       content,
+      attachments,
     };
     setMessages((prev) => [...prev, userMessage]);
     setIsStreaming(true);
@@ -570,7 +571,7 @@ export function ChatArea({ conversationId }: Props) {
     };
 
     const result = await startGeneration(
-      { conversationId, content, model: selectedModel, autoApprove: !conversationId ? localAutoApprove : undefined, deviceId: selectedDeviceId },
+      { conversationId, content, model: selectedModel, autoApprove: !conversationId ? localAutoApprove : undefined, deviceId: selectedDeviceId, attachments },
       {
         onText: (text) => {
           // Check if the last part is a text part - if so, append to it

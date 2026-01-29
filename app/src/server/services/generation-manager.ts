@@ -126,6 +126,8 @@ interface GenerationContext {
   isNewConversation: boolean;
   model: string;
   userMessageContent: string;
+  // File attachments from user
+  attachments?: { name: string; mimeType: string; dataUrl: string }[];
   // Track assistant message IDs to filter out user message parts
   assistantMessageIds: Set<string>;
   // BYOC fields
@@ -162,6 +164,7 @@ class GenerationManager {
     userId: string;
     autoApprove?: boolean;
     deviceId?: string;
+    attachments?: { name: string; mimeType: string; dataUrl: string }[];
   }): Promise<{ generationId: string; conversationId: string }> {
     const { content, userId, model, autoApprove } = params;
 
@@ -259,6 +262,7 @@ class GenerationManager {
       assistantMessageIds: new Set(),
       backendType,
       deviceId: params.deviceId,
+      attachments: params.attachments,
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
@@ -882,12 +886,22 @@ class GenerationManager {
         modelID: ctx.model,
       };
 
+      // Build prompt parts (text + file attachments)
+      const promptParts: Array<{ type: string; text?: string; mime?: string; url?: string; filename?: string }> = [
+        { type: "text", text: ctx.userMessageContent },
+      ];
+      if (ctx.attachments && ctx.attachments.length > 0) {
+        for (const a of ctx.attachments) {
+          promptParts.push({ type: "file", mime: a.mimeType, url: a.dataUrl, filename: a.name });
+        }
+      }
+
       // Send the prompt to OpenCode
       console.log("[GenerationManager] Sending prompt to OpenCode session:", sessionId);
       const promptPromise = client.session.prompt({
         path: { id: sessionId },
         body: {
-          parts: [{ type: "text", text: ctx.userMessageContent }],
+          parts: promptParts as any,
           system: systemPrompt,
           model: modelConfig,
         },
@@ -1386,8 +1400,32 @@ class GenerationManager {
       }
     }
 
-    // Add the current user message
-    chatMessages.push({ role: "user", content: ctx.userMessageContent });
+    // Add the current user message (with attachments if any)
+    if (ctx.attachments && ctx.attachments.length > 0) {
+      const blocks: ContentBlock[] = [{ type: "text", text: ctx.userMessageContent }];
+      for (const a of ctx.attachments) {
+        if (a.mimeType.startsWith("image/")) {
+          // Extract base64 data from data URL
+          const base64Data = a.dataUrl.split(",")[1] || "";
+          blocks.push({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: a.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+              data: base64Data,
+            },
+          });
+        } else {
+          // For non-image files, include as text with filename header
+          const base64Data = a.dataUrl.split(",")[1] || "";
+          const textContent = Buffer.from(base64Data, "base64").toString("utf-8");
+          blocks.push({ type: "text", text: `[File: ${a.name}]\n${textContent}` });
+        }
+      }
+      chatMessages.push({ role: "user", content: blocks });
+    } else {
+      chatMessages.push({ role: "user", content: ctx.userMessageContent });
+    }
 
     return chatMessages;
   }

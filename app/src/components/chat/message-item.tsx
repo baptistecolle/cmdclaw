@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Paperclip } from "lucide-react";
 import { MessageBubble } from "./message-bubble";
 import { CollapsedTrace } from "./collapsed-trace";
 import { ToolApprovalCard } from "./tool-approval-card";
-import type { MessagePart } from "./message-list";
+import type { MessagePart, AttachmentData } from "./message-list";
 import type { IntegrationType } from "@/lib/integration-icons";
 import type { ActivityItemData } from "./activity-item";
 
@@ -29,16 +30,39 @@ type Props = {
   content: string;
   parts?: MessagePart[];
   integrationsUsed?: string[];
+  attachments?: AttachmentData[];
 };
 
-export function MessageItem({ id, role, content, parts, integrationsUsed }: Props) {
+export function MessageItem({ id, role, content, parts, integrationsUsed, attachments }: Props) {
   // Track expanded state for each segment
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
 
-  // For user messages, show simple bubble
+  // For user messages, show simple bubble + attachments
   if (role === "user") {
     return (
-      <div className="py-4">
+      <div className="py-4 space-y-2">
+        {attachments && attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 justify-end">
+            {attachments.map((a, i) =>
+              a.mimeType.startsWith("image/") ? (
+                <img
+                  key={i}
+                  src={a.dataUrl}
+                  alt={a.name}
+                  className="max-h-48 max-w-xs rounded-lg border object-cover"
+                />
+              ) : (
+                <div
+                  key={i}
+                  className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs"
+                >
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="max-w-[200px] truncate">{a.name}</span>
+                </div>
+              )
+            )}
+          </div>
+        )}
         <MessageBubble role="user" content={content} />
       </div>
     );

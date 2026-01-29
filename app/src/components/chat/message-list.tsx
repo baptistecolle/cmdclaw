@@ -26,12 +26,19 @@ export type MessagePart =
       status: "approved" | "denied";
     };
 
+export type AttachmentData = {
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   parts?: MessagePart[];
   integrationsUsed?: string[];
+  attachments?: AttachmentData[];
 };
 
 type Props = {
@@ -53,6 +60,7 @@ export function MessageList({ messages }: Props) {
           content={message.content}
           parts={message.parts}
           integrationsUsed={message.integrationsUsed}
+          attachments={message.attachments}
         />
       ))}
     </div>

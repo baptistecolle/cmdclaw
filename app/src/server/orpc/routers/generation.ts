@@ -97,6 +97,11 @@ const startGeneration = protectedProcedure
       model: z.string().optional(),
       autoApprove: z.boolean().optional(),
       deviceId: z.string().optional(),
+      attachments: z.array(z.object({
+        name: z.string(),
+        mimeType: z.string(),
+        dataUrl: z.string(),
+      })).optional(),
     })
   )
   .output(
@@ -113,6 +118,7 @@ const startGeneration = protectedProcedure
       userId: context.user.id,
       autoApprove: input.autoApprove,
       deviceId: input.deviceId,
+      attachments: input.attachments,
     });
 
     return result;

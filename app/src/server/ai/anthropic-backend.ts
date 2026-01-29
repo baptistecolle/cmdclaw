@@ -111,6 +111,11 @@ function convertContentBlocks(blocks: ContentBlock[]): Anthropic.ContentBlockPar
         };
       case "thinking":
         return { type: "thinking", thinking: block.thinking, signature: block.signature } as any;
+      case "image":
+        return {
+          type: "image",
+          source: block.source,
+        } as any;
       default:
         return { type: "text", text: "" };
     }
