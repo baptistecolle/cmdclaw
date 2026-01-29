@@ -273,7 +273,7 @@ async function requestApproval(params: {
   }
 
   try {
-    const response = await fetch(`${serverUrl}/api/rpc/internal.approvalRequest`, {
+    const response = await fetch(`${serverUrl}/api/internal/approval-request`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -319,7 +319,7 @@ async function requestAuth(params: {
   }
 
   try {
-    const response = await fetch(`${serverUrl}/api/rpc/internal.authRequest`, {
+    const response = await fetch(`${serverUrl}/api/internal/auth-request`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

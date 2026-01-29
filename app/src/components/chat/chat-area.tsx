@@ -340,6 +340,7 @@ export function ChatArea({ conversationId }: Props) {
           updateSegmentsState();
         },
         onPendingApproval: (data) => {
+          console.log("[ApprovalCard] Showing approval card", { toolUseId: data.toolUseId, toolName: data.toolName, integration: data.integration, operation: data.operation, command: data.command });
           currentGenerationIdRef.current = data.generationId;
 
           const currentSeg = getCurrentSegment();

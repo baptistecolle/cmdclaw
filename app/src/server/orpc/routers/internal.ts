@@ -41,20 +41,22 @@ const approvalRequest = baseProcedure
     })
   )
   .handler(async ({ input }) => {
+    console.log("[Internal] approvalRequest received:", {
+      conversationId: input.conversationId,
+      integration: input.integration,
+      operation: input.operation,
+      hasAuthHeader: !!input.authHeader,
+    });
+
     // Verify auth
     if (!verifyPluginSecret(input.authHeader)) {
       console.error("[Internal] Invalid plugin auth for approval request");
       return { decision: "deny" as const };
     }
 
-    console.log("[Internal] Approval request:", {
-      conversationId: input.conversationId,
-      integration: input.integration,
-      operation: input.operation,
-    });
-
     // Find the active generation for this conversation
     const genId = generationManager.getGenerationForConversation(input.conversationId);
+    console.log("[Internal] Generation lookup:", { conversationId: input.conversationId, genId: genId ?? "NOT FOUND" });
     if (!genId) {
       console.error("[Internal] No active generation for conversation:", input.conversationId);
       return { decision: "deny" as const };

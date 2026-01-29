@@ -15,6 +15,7 @@ type ChatConfig = {
 type Args = {
   serverUrl?: string;
   conversationId?: string;
+  message?: string;
   autoApprove: boolean;
   showThinking: boolean;
   authOnly: boolean;
@@ -45,6 +46,11 @@ function parseArgs(argv: string[]): Args {
       case "--conversation":
       case "-c":
         args.conversationId = argv[i + 1];
+        i += 1;
+        break;
+      case "--message":
+      case "-m":
+        args.message = argv[i + 1];
         i += 1;
         break;
       case "--auto-approve":
@@ -292,11 +298,13 @@ async function runGeneration(
           break;
         case "pending_approval":
           process.stdout.write(`\n[approval_needed] ${event.toolName}\n`);
-          if (options.autoApprove) {
+          if (options.autoApprove || !rl) {
+            const decision = options.autoApprove ? "approve" : "deny";
+            process.stdout.write(` -> auto-${decision}\n`);
             await client.generation.submitApproval({
               generationId: event.generationId,
               toolUseId: event.toolUseId,
-              decision: "approve",
+              decision,
             });
           } else {
             const decision = (await ask(rl, "Approve? (y/n) ")).trim().toLowerCase();
@@ -366,6 +374,16 @@ async function main(): Promise<void> {
   }
 
   const client = createClient(serverUrl, config.token);
+
+  if (args.message) {
+    // Non-interactive: send a single message and exit
+    const result = await runGeneration(client, null as any, args.message, args.conversationId, args);
+    if (result) {
+      console.log(`\n[conversation] ${result.conversationId}`);
+    }
+    process.exit(result ? 0 : 1);
+  }
+
   const rl = createPrompt();
 
   rl.on("SIGINT", () => {
