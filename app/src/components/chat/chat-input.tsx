@@ -13,10 +13,6 @@ export type AttachmentData = {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 5;
-const ALLOWED_TYPES = [
-  "image/png", "image/jpeg", "image/gif", "image/webp",
-  "text/plain", "text/csv", "application/pdf",
-];
 
 type AttachmentItem = { file: File; preview?: string };
 
@@ -61,7 +57,6 @@ export function ChatInput({
       const toAdd: AttachmentItem[] = [];
       for (const file of fileArray.slice(0, remaining)) {
         if (file.size > MAX_FILE_SIZE) continue;
-        if (!ALLOWED_TYPES.includes(file.type)) continue;
         const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
         toAdd.push({ file, preview });
       }
@@ -185,7 +180,6 @@ export function ChatInput({
           ref={fileInputRef}
           type="file"
           multiple
-          accept={ALLOWED_TYPES.join(",")}
           className="hidden"
           onChange={(e) => {
             if (e.target.files) addFiles(e.target.files);
