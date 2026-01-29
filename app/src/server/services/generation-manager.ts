@@ -494,8 +494,9 @@ class GenerationManager {
           toolUseId: genRecord.pendingApproval.toolUseId,
           toolName: genRecord.pendingApproval.toolName,
           toolInput: genRecord.pendingApproval.toolInput,
-          integration: "",
-          operation: "",
+          integration: genRecord.pendingApproval.integration ?? "",
+          operation: genRecord.pendingApproval.operation ?? "",
+          command: genRecord.pendingApproval.command,
         };
       }
       if (genRecord.pendingAuth) {
@@ -568,8 +569,9 @@ class GenerationManager {
         toolUseId: ctx.pendingApproval.toolUseId,
         toolName: ctx.pendingApproval.toolName,
         toolInput: ctx.pendingApproval.toolInput,
-        integration: "",
-        operation: "",
+        integration: ctx.pendingApproval.integration ?? "",
+        operation: ctx.pendingApproval.operation ?? "",
+        command: ctx.pendingApproval.command,
       });
     }
 
@@ -1760,6 +1762,9 @@ class GenerationManager {
         toolName: "Bash",
         toolInput: request.toolInput,
         requestedAt: new Date().toISOString(),
+        integration: request.integration,
+        operation: request.operation,
+        command: request.command,
       };
       ctx.approvalResolver = resolve;
 

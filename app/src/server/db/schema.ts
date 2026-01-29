@@ -217,6 +217,9 @@ export type PendingApproval = {
   toolName: string;
   toolInput: Record<string, unknown>;
   requestedAt: string;
+  integration: string;
+  operation: string;
+  command?: string;
 };
 
 // Auth state stored in generation

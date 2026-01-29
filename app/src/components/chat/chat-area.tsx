@@ -630,8 +630,9 @@ export function ChatArea({ conversationId }: Props) {
       setSegments(clonedSegments);
     };
 
+    const effectiveConversationId = currentConversationIdRef.current ?? conversationId;
     const result = await startGeneration(
-      { conversationId, content, model: selectedModel, autoApprove: !conversationId ? localAutoApprove : undefined, deviceId: selectedDeviceId, attachments },
+      { conversationId: effectiveConversationId, content, model: selectedModel, autoApprove: !effectiveConversationId ? localAutoApprove : undefined, deviceId: selectedDeviceId, attachments },
       {
         onStarted: (generationId, newConversationId) => {
           currentGenerationIdRef.current = generationId;

@@ -146,6 +146,12 @@ export async function getOrCreateSession(
     throw new Error("Sandbox state not found after creation");
   }
 
+  // Reuse existing session if one already exists for this conversation
+  if (state.sessionId) {
+    console.log(`[E2B] Reusing existing session ${state.sessionId} for conversation ${config.conversationId}`);
+    return { client: state.client, sessionId: state.sessionId, sandbox: state.sandbox };
+  }
+
   // Create a new session
   const sessionResult = await state.client.session.create({
     body: { title: options?.title || "Conversation" },
