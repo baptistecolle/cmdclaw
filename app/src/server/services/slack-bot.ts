@@ -1,0 +1,298 @@
+import { db } from "@/server/db/client";
+import {
+  slackUserLink,
+  slackConversation,
+  conversation,
+} from "@/server/db/schema";
+import { eq, and } from "drizzle-orm";
+import { env } from "@/env";
+import { generationManager } from "@/server/services/generation-manager";
+
+// ─── Event deduplication (in-memory, 5-min TTL) ─────────────
+
+const processedEvents = new Map<string, number>();
+const DEDUP_TTL_MS = 5 * 60 * 1000;
+
+function isDuplicate(eventId: string): boolean {
+  const now = Date.now();
+  // Cleanup old entries
+  for (const [id, ts] of processedEvents) {
+    if (now - ts > DEDUP_TTL_MS) processedEvents.delete(id);
+  }
+  if (processedEvents.has(eventId)) return true;
+  processedEvents.set(eventId, now);
+  return false;
+}
+
+// ─── Slack API helpers ───────────────────────────────────────
+
+async function slackApi(method: string, body: Record<string, unknown>) {
+  const res = await fetch(`https://slack.com/api/${method}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  return res.json() as Promise<{ ok: boolean; [key: string]: unknown }>;
+}
+
+async function addReaction(channel: string, timestamp: string, name: string) {
+  await slackApi("reactions.add", { channel, timestamp, name });
+}
+
+async function removeReaction(
+  channel: string,
+  timestamp: string,
+  name: string
+) {
+  await slackApi("reactions.remove", { channel, timestamp, name }).catch(
+    () => {}
+  );
+}
+
+async function postMessage(channel: string, threadTs: string, text: string) {
+  await slackApi("chat.postMessage", {
+    channel,
+    thread_ts: threadTs,
+    text,
+  });
+}
+
+async function getSlackUserInfo(
+  userId: string
+): Promise<{ displayName: string }> {
+  const res = await slackApi("users.info", { user: userId });
+  const user = res.user as
+    | { profile?: { display_name?: string; real_name?: string } }
+    | undefined;
+  return {
+    displayName:
+      user?.profile?.display_name || user?.profile?.real_name || "Unknown User",
+  };
+}
+
+// ─── Markdown conversion ────────────────────────────────────
+
+export function convertMarkdownToSlack(text: string): string {
+  // Bold: **text** → *text*
+  let result = text.replace(/\*\*(.+?)\*\*/g, "*$1*");
+  // Italic: _text_ stays the same in Slack
+  // Strikethrough: ~~text~~ → ~text~
+  result = result.replace(/~~(.+?)~~/g, "~$1~");
+  // Links: [text](url) → <url|text>
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<$2|$1>");
+  // Headers: # text → *text*
+  result = result.replace(/^#{1,6}\s+(.+)$/gm, "*$1*");
+  return result;
+}
+
+// ─── Core event handler ─────────────────────────────────────
+
+interface SlackEvent {
+  type: string;
+  event_id: string;
+  team_id: string;
+  event: {
+    type: string;
+    user: string;
+    text: string;
+    channel: string;
+    ts: string;
+    thread_ts?: string;
+    bot_id?: string;
+  };
+}
+
+export async function handleSlackEvent(payload: SlackEvent) {
+  const { event, event_id, team_id } = payload;
+
+  // Skip bot messages
+  if (event.bot_id) return;
+
+  // Deduplicate
+  if (isDuplicate(event_id)) return;
+
+  // Only handle app_mention and message (DM)
+  if (event.type !== "app_mention" && event.type !== "message") return;
+
+  const slackUserId = event.user;
+  const channel = event.channel;
+  const threadTs = event.thread_ts ?? event.ts;
+  const messageText = event.text
+    // Strip bot mention from text
+    .replace(/<@[A-Z0-9]+>/g, "")
+    .trim();
+
+  if (!messageText) return;
+
+  // Look up linked Bap user
+  const link = await resolveUser(team_id, slackUserId);
+
+  if (!link) {
+    const appUrl = env.NEXT_PUBLIC_APP_URL ?? "https://heybap.com";
+    const linkUrl = `${appUrl}/api/slack/link?slackUserId=${slackUserId}&slackTeamId=${team_id}`;
+    await postMessage(
+      channel,
+      threadTs,
+      `To use @bap, connect your account first: ${linkUrl}`
+    );
+    return;
+  }
+
+  // Add typing indicator
+  await addReaction(channel, event.ts, "hourglass_flowing_sand");
+
+  try {
+    // Get or create Bap conversation for this Slack thread
+    const convId = await getOrCreateConversation(
+      team_id,
+      channel,
+      threadTs,
+      link.userId
+    );
+
+    // Get Slack user display name for context
+    const { displayName } = await getSlackUserInfo(slackUserId);
+
+    // Start generation via generation manager
+    const { generationId } = await generationManager.startGeneration({
+      conversationId: convId,
+      content: `[Slack message from ${displayName}]: ${messageText}`,
+      userId: link.userId,
+      autoApprove: true,
+    });
+
+    // Wait for generation to complete and collect response
+    const responseText = await collectGenerationResponse(
+      generationId,
+      link.userId
+    );
+
+    // Send response to Slack
+    if (responseText) {
+      const slackText = convertMarkdownToSlack(responseText);
+      // Split long messages (Slack limit ~4000 chars)
+      const chunks = splitMessage(slackText, 3900);
+      for (const chunk of chunks) {
+        await postMessage(channel, threadTs, chunk);
+      }
+    }
+  } catch (err) {
+    console.error("[slack-bot] Error handling event:", err);
+    await postMessage(
+      channel,
+      threadTs,
+      "Sorry, something went wrong processing your message."
+    );
+  } finally {
+    // Remove typing indicator
+    await removeReaction(channel, event.ts, "hourglass_flowing_sand");
+  }
+}
+
+// ─── User resolution ────────────────────────────────────────
+
+async function resolveUser(slackTeamId: string, slackUserId: string) {
+  return db.query.slackUserLink.findFirst({
+    where: and(
+      eq(slackUserLink.slackTeamId, slackTeamId),
+      eq(slackUserLink.slackUserId, slackUserId)
+    ),
+  });
+}
+
+// ─── Conversation mapping ───────────────────────────────────
+
+async function getOrCreateConversation(
+  teamId: string,
+  channelId: string,
+  threadTs: string,
+  userId: string
+): Promise<string> {
+  // Look up existing mapping
+  const existing = await db.query.slackConversation.findFirst({
+    where: and(
+      eq(slackConversation.teamId, teamId),
+      eq(slackConversation.channelId, channelId),
+      eq(slackConversation.threadTs, threadTs)
+    ),
+  });
+
+  if (existing) return existing.conversationId;
+
+  // Create a new Bap conversation
+  const [newConv] = await db
+    .insert(conversation)
+    .values({
+      userId,
+      type: "chat",
+      title: "Slack conversation",
+    })
+    .returning();
+
+  // Map Slack thread to Bap conversation
+  await db.insert(slackConversation).values({
+    teamId,
+    channelId,
+    threadTs,
+    conversationId: newConv!.id,
+    userId,
+  });
+
+  return newConv!.id;
+}
+
+// ─── Generation response collection ─────────────────────────
+
+async function collectGenerationResponse(
+  generationId: string,
+  userId: string
+): Promise<string> {
+  const parts: string[] = [];
+
+  for await (const event of generationManager.subscribeToGeneration(
+    generationId,
+    userId
+  )) {
+    if (event.type === "text") {
+      parts.push(event.content);
+    } else if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
+      break;
+    }
+  }
+
+  return parts.join("");
+}
+
+// ─── Message splitting ──────────────────────────────────────
+
+function splitMessage(text: string, maxLen: number): string[] {
+  if (text.length <= maxLen) return [text];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLen) {
+      chunks.push(remaining);
+      break;
+    }
+
+    // Try to split at a newline
+    let splitIdx = remaining.lastIndexOf("\n", maxLen);
+    if (splitIdx < maxLen / 2) {
+      // Try space
+      splitIdx = remaining.lastIndexOf(" ", maxLen);
+    }
+    if (splitIdx < maxLen / 2) {
+      splitIdx = maxLen;
+    }
+
+    chunks.push(remaining.slice(0, splitIdx));
+    remaining = remaining.slice(splitIdx).trimStart();
+  }
+
+  return chunks;
+}

@@ -94,6 +94,8 @@ export const userRelations = relations(user, ({ many }) => ({
   workflows: many(workflow),
   providerAuths: many(providerAuth),
   devices: many(device),
+  customIntegrations: many(customIntegration),
+  customIntegrationCredentials: many(customIntegrationCredential),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -278,7 +280,6 @@ export const integrationTypeEnum = pgEnum("integration_type", [
   "salesforce",
   "reddit",
   "twitter",
-  "discord",
 ]);
 
 // ========== WORKFLOW SCHEMA ==========
@@ -310,6 +311,7 @@ export const workflow = pgTable(
     promptDo: text("prompt_do"),
     promptDont: text("prompt_dont"),
     allowedIntegrations: integrationTypeEnum("allowed_integrations").array().notNull(),
+    allowedCustomIntegrations: text("allowed_custom_integrations").array().notNull().default([]),
     // Schedule configuration for time-based triggers (JSON object)
     schedule: jsonb("schedule"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -687,6 +689,176 @@ export const device = pgTable(
 export const deviceRelations = relations(device, ({ one }) => ({
   user: one(user, { fields: [device.userId], references: [user.id] }),
 }));
+
+// ─── Custom Integrations ─────────────────────────────────────
+
+export const customIntegration = pgTable(
+  "custom_integration",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    description: text("description").notNull(),
+    iconUrl: text("icon_url"),
+    baseUrl: text("base_url").notNull(),
+    authType: text("auth_type").notNull(), // oauth2, api_key, bearer_token
+    oauthConfig: jsonb("oauth_config").$type<{
+      authUrl: string;
+      tokenUrl: string;
+      scopes: string[];
+      pkce?: boolean;
+      authStyle?: "header" | "params";
+      extraAuthParams?: Record<string, string>;
+    }>(),
+    apiKeyConfig: jsonb("api_key_config").$type<{
+      method: "header" | "query";
+      headerName?: string;
+      queryParam?: string;
+    }>(),
+    cliCode: text("cli_code").notNull(),
+    cliInstructions: text("cli_instructions").notNull(),
+    permissions: jsonb("permissions").$type<{
+      readOps: string[];
+      writeOps: string[];
+    }>().notNull(),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    communityPrUrl: text("community_pr_url"),
+    communityStatus: text("community_status"), // pending, approved, rejected
+    isBuiltIn: boolean("is_built_in").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("custom_integration_slug_idx").on(table.slug),
+    index("custom_integration_created_by_idx").on(table.createdByUserId),
+  ]
+);
+
+export const customIntegrationCredential = pgTable(
+  "custom_integration_credential",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    customIntegrationId: text("custom_integration_id")
+      .notNull()
+      .references(() => customIntegration.id, { onDelete: "cascade" }),
+    clientId: text("client_id"),
+    clientSecret: text("client_secret"),
+    apiKey: text("api_key"),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    expiresAt: timestamp("expires_at"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    enabled: boolean("enabled").default(true).notNull(),
+    displayName: text("display_name"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("custom_cred_user_id_idx").on(table.userId),
+    index("custom_cred_integration_id_idx").on(table.customIntegrationId),
+    unique("custom_cred_user_integration_idx").on(table.userId, table.customIntegrationId),
+  ]
+);
+
+export const customIntegrationRelations = relations(customIntegration, ({ one, many }) => ({
+  createdBy: one(user, { fields: [customIntegration.createdByUserId], references: [user.id] }),
+  credentials: many(customIntegrationCredential),
+}));
+
+export const customIntegrationCredentialRelations = relations(customIntegrationCredential, ({ one }) => ({
+  user: one(user, { fields: [customIntegrationCredential.userId], references: [user.id] }),
+  customIntegration: one(customIntegration, {
+    fields: [customIntegrationCredential.customIntegrationId],
+    references: [customIntegration.id],
+  }),
+}));
+
+// ─── Slack Bot ───────────────────────────────────────────────
+
+export const slackUserLink = pgTable(
+  "slack_user_link",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    slackTeamId: text("slack_team_id").notNull(),
+    slackUserId: text("slack_user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("slack_user_link_team_user_idx").on(
+      table.slackTeamId,
+      table.slackUserId
+    ),
+    index("slack_user_link_user_id_idx").on(table.userId),
+  ]
+);
+
+export const slackUserLinkRelations = relations(slackUserLink, ({ one }) => ({
+  user: one(user, {
+    fields: [slackUserLink.userId],
+    references: [user.id],
+  }),
+}));
+
+export const slackConversation = pgTable(
+  "slack_conversation",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    teamId: text("team_id").notNull(),
+    channelId: text("channel_id").notNull(),
+    threadTs: text("thread_ts").notNull(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("slack_conversation_thread_idx").on(
+      table.teamId,
+      table.channelId,
+      table.threadTs
+    ),
+    index("slack_conversation_conversation_id_idx").on(table.conversationId),
+  ]
+);
+
+export const slackConversationRelations = relations(
+  slackConversation,
+  ({ one }) => ({
+    conversation: one(conversation, {
+      fields: [slackConversation.conversationId],
+      references: [conversation.id],
+    }),
+    user: one(user, {
+      fields: [slackConversation.userId],
+      references: [user.id],
+    }),
+  })
+);
 
 // Aggregated schema used by better-auth's drizzle adapter.
 export const authSchema = {

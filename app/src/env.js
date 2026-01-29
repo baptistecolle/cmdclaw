@@ -59,8 +59,7 @@ export const env = createEnv({
     REDDIT_CLIENT_SECRET: z.string().optional(),
     TWITTER_CLIENT_ID: z.string().optional(),
     TWITTER_CLIENT_SECRET: z.string().optional(),
-    DISCORD_CLIENT_ID: z.string().optional(),
-    DISCORD_CLIENT_SECRET: z.string().optional(),
+    DISCORD_BOT_TOKEN: z.string().optional(),
     // Unipile (LinkedIn integration)
     UNIPILE_API_KEY: z.string().optional(),
     UNIPILE_DSN: z.string().optional(),
@@ -87,6 +86,14 @@ export const env = createEnv({
     S3_FORCE_PATH_STYLE: z.string().transform(v => v === "true").default("true"),
     // Autumn (Billing)
     AUTUMN_SECRET_KEY: z.string().optional(),
+    // Slack Bot
+    SLACK_BOT_TOKEN: z.string().optional(),
+    SLACK_SIGNING_SECRET: z.string().optional(),
+    SLACK_BOT_OWNER_USER_ID: z.string().optional(),
+    // Community Integration Repo
+    COMMUNITY_REPO_GITHUB_TOKEN: z.string().optional(),
+    COMMUNITY_REPO_OWNER: z.string().default("bap-community"),
+    COMMUNITY_REPO_NAME: z.string().default("bap-community-integrations"),
   },
 
   /**
@@ -143,8 +150,7 @@ export const env = createEnv({
     REDDIT_CLIENT_SECRET: process.env.REDDIT_CLIENT_SECRET,
     TWITTER_CLIENT_ID: process.env.TWITTER_CLIENT_ID,
     TWITTER_CLIENT_SECRET: process.env.TWITTER_CLIENT_SECRET,
-    DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
-    DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
+    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
     UNIPILE_API_KEY: process.env.UNIPILE_API_KEY,
     UNIPILE_DSN: process.env.UNIPILE_DSN,
     APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
@@ -162,6 +168,12 @@ export const env = createEnv({
     S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
     S3_FORCE_PATH_STYLE: process.env.S3_FORCE_PATH_STYLE,
     AUTUMN_SECRET_KEY: process.env.AUTUMN_SECRET_KEY,
+    SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,
+    SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET,
+    SLACK_BOT_OWNER_USER_ID: process.env.SLACK_BOT_OWNER_USER_ID,
+    COMMUNITY_REPO_GITHUB_TOKEN: process.env.COMMUNITY_REPO_GITHUB_TOKEN,
+    COMMUNITY_REPO_OWNER: process.env.COMMUNITY_REPO_OWNER,
+    COMMUNITY_REPO_NAME: process.env.COMMUNITY_REPO_NAME,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
