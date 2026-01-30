@@ -1,7 +1,7 @@
 import { env } from "@/env";
 
 const getUnipileBaseUrl = () => `https://${env.UNIPILE_DSN}`;
-const getAppUrl = () => env.APP_URL ?? "http://localhost:3000";
+const getAppUrl = () => env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 interface UnipileAccount {
   id: string;

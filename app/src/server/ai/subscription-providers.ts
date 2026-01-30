@@ -1,6 +1,6 @@
 import { env } from "@/env";
 
-const getAppUrl = () => env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const getAppUrl = () => env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 export type SubscriptionProviderID = "openai" | "google";
 

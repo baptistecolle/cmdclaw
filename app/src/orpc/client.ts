@@ -7,7 +7,7 @@ function getBaseUrl() {
   if (typeof window !== "undefined") {
     return window.location.origin;
   }
-  return "http://localhost:3000";
+  return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
 // Custom fetch that handles 401 errors by redirecting to login

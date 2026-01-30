@@ -122,9 +122,11 @@ async function startDaemon(serverUrlOverride?: string): Promise<void> {
   // In prod, it might be the same server or a different subdomain.
   let wsServerUrl = config.serverUrl;
 
-  // If connecting to localhost Next.js (port 3000), use WS port 4097
-  if (wsServerUrl.includes("localhost:3000") || wsServerUrl.includes("127.0.0.1:3000")) {
-    wsServerUrl = wsServerUrl.replace(":3000", ":4097");
+  // If connecting to localhost Next.js, use WS port 4097
+  const localhostMatch = wsServerUrl.match(/localhost:(\d+)|127\.0\.0\.1:(\d+)/);
+  if (localhostMatch) {
+    const port = localhostMatch[1] || localhostMatch[2];
+    wsServerUrl = wsServerUrl.replace(`:${port}`, ":4097");
   }
 
   const client = new WSClient(wsServerUrl, config.token, config.deviceId);

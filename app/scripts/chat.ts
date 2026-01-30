@@ -16,6 +16,7 @@ type Args = {
   serverUrl?: string;
   conversationId?: string;
   message?: string;
+  token?: string;
   autoApprove: boolean;
   showThinking: boolean;
   authOnly: boolean;
@@ -65,6 +66,10 @@ function parseArgs(argv: string[]): Args {
       case "--reset-auth":
         args.resetAuth = true;
         break;
+      case "--token":
+        args.token = argv[i + 1];
+        i += 1;
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -90,6 +95,7 @@ function printHelp(): void {
   console.log("  --auto-approve            Auto-approve tool calls");
   console.log("  --show-thinking           Print thinking events");
   console.log("  --auth                    Run auth flow and exit");
+  console.log("  --token <token>            Use provided auth token directly");
   console.log("  --reset-auth              Clear saved token and re-auth");
   console.log("  -h, --help                Show help\n");
 }
@@ -363,7 +369,10 @@ async function main(): Promise<void> {
   const serverUrl = args.serverUrl || loaded?.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
 
   let config = loaded;
-  if (!config || !config.token || config.serverUrl !== serverUrl || args.authOnly || args.resetAuth) {
+  if (args.token) {
+    config = { serverUrl, token: args.token };
+    saveConfig(config);
+  } else if (!config || !config.token || config.serverUrl !== serverUrl || args.authOnly || args.resetAuth) {
     config = await authenticate(serverUrl);
     if (!config) {
       process.exit(1);

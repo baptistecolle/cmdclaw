@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { bearer, deviceAuthorization, lastLoginMethod, magicLink } from "better-auth/plugins";
+import { admin, bearer, deviceAuthorization, lastLoginMethod, magicLink } from "better-auth/plugins";
 import { autumn } from "autumn-js/better-auth";
 import { Resend } from "resend";
 
@@ -12,11 +12,19 @@ import { authSchema } from "@/server/db/schema";
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
 const appUrl =
-  env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 export const auth = betterAuth({
   appName: "Bap",
   baseURL: appUrl,
+  user: {
+    additionalFields: {
+      phoneNumber: {
+        type: "string",
+        required: false,
+      },
+    },
+  },
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: authSchema,
@@ -37,7 +45,7 @@ export const auth = betterAuth({
     "https://heybap.com",
     "https://www.heybap.com",
     "https://app.heybap.com",
-    "http://localhost:3000",
+    `http://localhost:${process.env.PORT ?? 3000}`,
     "https://localcan.baptistecolle.com",
     "bap://",
   ],
@@ -46,6 +54,13 @@ export const auth = betterAuth({
   plugins: [
     nextCookies(),
     bearer(),
+    admin({
+      defaultRole: "user",
+      adminRoles: ["admin"],
+      adminUserIds: env.ADMIN_USER_IDS
+        ? env.ADMIN_USER_IDS.split(",").map((id) => id.trim()).filter(Boolean)
+        : undefined,
+    }),
     deviceAuthorization({
       verificationUri: "/connect",
     }),

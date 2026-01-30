@@ -18,6 +18,11 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  phoneNumber: text("phone_number"),
+  role: text("role").default("user"),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -41,6 +46,7 @@ export const session = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    impersonatedBy: text("impersonated_by"),
   },
   (table) => [index("session_userId_idx").on(table.userId)],
 );
@@ -96,6 +102,9 @@ export const userRelations = relations(user, ({ many }) => ({
   devices: many(device),
   customIntegrations: many(customIntegration),
   customIntegrationCredentials: many(customIntegrationCredential),
+  whatsappLinks: many(whatsappUserLink),
+  whatsappConversations: many(whatsappConversation),
+  whatsappLinkCodes: many(whatsappLinkCode),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -814,6 +823,107 @@ export const customIntegrationCredentialRelations = relations(customIntegrationC
   customIntegration: one(customIntegration, {
     fields: [customIntegrationCredential.customIntegrationId],
     references: [customIntegration.id],
+  }),
+}));
+
+// ─── WhatsApp ───────────────────────────────────────────────
+
+export const whatsappAuthState = pgTable(
+  "whatsapp_auth_state",
+  {
+    id: text("id").primaryKey(),
+    data: text("data").notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("whatsapp_auth_state_updated_at_idx").on(table.updatedAt)]
+);
+
+export const whatsappUserLink = pgTable(
+  "whatsapp_user_link",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    waJid: text("wa_jid").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("whatsapp_user_link_wa_jid_idx").on(table.waJid),
+    uniqueIndex("whatsapp_user_link_user_id_idx").on(table.userId),
+  ]
+);
+
+export const whatsappUserLinkRelations = relations(whatsappUserLink, ({ one }) => ({
+  user: one(user, {
+    fields: [whatsappUserLink.userId],
+    references: [user.id],
+  }),
+}));
+
+export const whatsappLinkCode = pgTable(
+  "whatsapp_link_code",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("whatsapp_link_code_code_idx").on(table.code),
+    index("whatsapp_link_code_user_id_idx").on(table.userId),
+  ]
+);
+
+export const whatsappLinkCodeRelations = relations(whatsappLinkCode, ({ one }) => ({
+  user: one(user, {
+    fields: [whatsappLinkCode.userId],
+    references: [user.id],
+  }),
+}));
+
+export const whatsappConversation = pgTable(
+  "whatsapp_conversation",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    waJid: text("wa_jid").notNull(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("whatsapp_conversation_wa_jid_idx").on(table.waJid),
+    index("whatsapp_conversation_conversation_id_idx").on(table.conversationId),
+    index("whatsapp_conversation_user_id_idx").on(table.userId),
+  ]
+);
+
+export const whatsappConversationRelations = relations(whatsappConversation, ({ one }) => ({
+  conversation: one(conversation, {
+    fields: [whatsappConversation.conversationId],
+    references: [conversation.id],
+  }),
+  user: one(user, {
+    fields: [whatsappConversation.userId],
+    references: [user.id],
   }),
 }));
 

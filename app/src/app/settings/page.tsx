@@ -14,7 +14,11 @@ export default function SettingsPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [saving, setSaving] = useState(false);
+  const [linkCode, setLinkCode] = useState<string | null>(null);
+  const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
@@ -29,6 +33,9 @@ export default function SettingsPage() {
           const nameParts = res.data.user.name.split(" ");
           setFirstName(nameParts[0] || "");
           setLastName(nameParts.slice(1).join(" ") || "");
+        }
+        if (res?.data?.user?.phoneNumber) {
+          setPhoneNumber(res.data.user.phoneNumber);
         }
         setStatus("ready");
       })
@@ -48,13 +55,36 @@ export default function SettingsPage() {
 
     try {
       const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
-      await authClient.updateUser({ name: fullName });
+      const normalizedPhone = phoneNumber.replace(/\D/g, "");
+      await authClient.updateUser({
+        name: fullName,
+        phoneNumber: normalizedPhone || undefined,
+      });
       setNotification({ type: "success", message: "Settings saved" });
     } catch (error) {
       console.error("Failed to update user:", error);
       setNotification({ type: "error", message: "Failed to save settings" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGenerateLinkCode = async () => {
+    setLinkLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp/link-code", { method: "POST" });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      const data = (await res.json()) as { code: string; expiresAt: string };
+      setLinkCode(data.code);
+      setLinkExpiresAt(data.expiresAt);
+      setNotification({ type: "success", message: "WhatsApp link code generated" });
+    } catch (error) {
+      console.error("Failed to generate link code:", error);
+      setNotification({ type: "error", message: "Failed to generate link code" });
+    } finally {
+      setLinkLoading(false);
     }
   };
 
@@ -135,6 +165,19 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">Phone number</label>
+            <Input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="Enter your WhatsApp phone number"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use your WhatsApp number with country code (digits only).
+            </p>
+          </div>
         </div>
 
         <Button type="submit" disabled={saving}>
@@ -148,6 +191,35 @@ export default function SettingsPage() {
           )}
         </Button>
       </form>
+
+      <div className="mt-10 border-t pt-6">
+        <h3 className="text-lg font-semibold">WhatsApp Linking</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Generate a link code, then send it from your WhatsApp number to connect.
+        </p>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button onClick={handleGenerateLinkCode} disabled={linkLoading}>
+            {linkLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              "Generate link code"
+            )}
+          </Button>
+          {linkCode && (
+            <div className="rounded-md border bg-muted/40 px-4 py-2 text-sm">
+              <div className="font-medium">Code: {linkCode}</div>
+              {linkExpiresAt && (
+                <div className="text-xs text-muted-foreground">
+                  Expires at {new Date(linkExpiresAt).toLocaleTimeString()}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

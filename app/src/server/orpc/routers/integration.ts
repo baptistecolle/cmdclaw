@@ -658,7 +658,7 @@ const getCustomAuthUrl = protectedProcedure
       })
     ).toString("base64url");
 
-    const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+    const appUrl = process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -725,7 +725,7 @@ const handleCustomCallback = protectedProcedure
     const clientId = decrypt(cred.clientId);
     const clientSecret = decrypt(cred.clientSecret);
     const oauth = integ.oauthConfig;
-    const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+    const appUrl = process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
     const tokenBody = new URLSearchParams({
       grant_type: "authorization_code",

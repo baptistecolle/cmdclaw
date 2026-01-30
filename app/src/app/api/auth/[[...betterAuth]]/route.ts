@@ -8,7 +8,7 @@ const trustedOrigins = [
   "https://heybap.com",
   "https://app.heybap.com",
   "https://www.heybap.com",
-  "http://localhost:3000",
+  `http://localhost:${process.env.PORT ?? 3000}`,
 ];
 
 function getCorsHeaders(origin: string | null) {
@@ -29,6 +29,19 @@ async function withCors(request: NextRequest, handler: (req: NextRequest) => Pro
   const corsHeaders = getCorsHeaders(origin);
 
   const newResponse = new NextResponse(response.body, response);
+
+  // Preserve Set-Cookie headers from the original response.
+  // new NextResponse(body, init) can drop multi-value Set-Cookie headers,
+  // so we re-apply them explicitly.
+  const setCookies = response.headers.getSetCookie();
+  if (setCookies.length > 0) {
+    // Clear any partially-copied cookies first
+    newResponse.headers.delete("set-cookie");
+    for (const cookie of setCookies) {
+      newResponse.headers.append("set-cookie", cookie);
+    }
+  }
+
   Object.entries(corsHeaders).forEach(([key, value]) => {
     newResponse.headers.set(key, value);
   });

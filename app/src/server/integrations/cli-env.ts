@@ -456,7 +456,7 @@ Post tweets, manage followers, and interact with content on X (Twitter).
 # Available Integration CLIs
 
 You have access to CLI tools for the following integrations.
-For integrations marked [⚡ Auth Required], authentication will be requested when you try to use them.
+For integrations marked [⚡ Auth Required], authentication will be requested automatically when you try to use them — the user will be prompted to connect the service. IMPORTANT: You MUST still attempt to use the CLI tool even if the integration is marked as [⚡ Auth Required]. Never refuse or tell the user to connect a service manually. Just proceed with the bash command and the system will handle the authentication flow automatically.
 Source code for each tool is available at /app/cli/<name>.ts
 
 ${instructions}

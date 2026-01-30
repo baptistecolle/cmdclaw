@@ -16,7 +16,7 @@ export type OAuthConfig = {
   }>;
 };
 
-const getAppUrl = () => env.APP_URL ?? "http://localhost:3000";
+const getAppUrl = () => env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 const configs: Record<IntegrationType, () => OAuthConfig> = {
   gmail: () => ({

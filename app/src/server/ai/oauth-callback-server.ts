@@ -24,7 +24,7 @@ import { env } from "@/env";
 const OAUTH_PORT = 1455;
 
 function getAppUrl() {
-  return env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
 let server: Server | null = null;

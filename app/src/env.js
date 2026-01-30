@@ -86,6 +86,8 @@ export const env = createEnv({
     S3_FORCE_PATH_STYLE: z.string().transform(v => v === "true").default("true"),
     // Autumn (Billing)
     AUTUMN_SECRET_KEY: z.string().optional(),
+    // Better Auth Admin
+    ADMIN_USER_IDS: z.string().optional(),
     // Slack Bot
     SLACK_BOT_TOKEN: z.string().optional(),
     SLACK_SIGNING_SECRET: z.string().optional(),
@@ -168,6 +170,7 @@ export const env = createEnv({
     S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
     S3_FORCE_PATH_STYLE: process.env.S3_FORCE_PATH_STYLE,
     AUTUMN_SECRET_KEY: process.env.AUTUMN_SECRET_KEY,
+    ADMIN_USER_IDS: process.env.ADMIN_USER_IDS,
     SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,
     SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET,
     SLACK_BOT_OWNER_USER_ID: process.env.SLACK_BOT_OWNER_USER_ID,
