@@ -970,7 +970,8 @@ class GenerationManager {
         // Check for session error
         if (event.type === "session.error") {
           const error = (event.properties as any)?.error || "Unknown error";
-          throw new Error(error);
+          const errorMessage = typeof error === 'string' ? error : (error?.data?.message || error?.message || JSON.stringify(error));
+          throw new Error(errorMessage);
         }
       }
 
