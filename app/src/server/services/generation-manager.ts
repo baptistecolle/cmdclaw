@@ -914,12 +914,35 @@ class GenerationManager {
       };
 
       // Build prompt parts (text + file attachments)
+      // For non-image files, write them to the sandbox so the LLM can process them
+      // via sandbox tools, rather than passing unsupported media types directly.
       const promptParts: Array<{ type: string; text?: string; mime?: string; url?: string; filename?: string }> = [
         { type: "text", text: ctx.userMessageContent },
       ];
       if (ctx.attachments && ctx.attachments.length > 0) {
         for (const a of ctx.attachments) {
-          promptParts.push({ type: "file", mime: a.mimeType, url: a.dataUrl, filename: a.name });
+          if (a.mimeType.startsWith("image/")) {
+            promptParts.push({ type: "file", mime: a.mimeType, url: a.dataUrl, filename: a.name });
+          } else {
+            // Write non-image file to sandbox and tell the LLM where it is
+            const sandboxPath = `/home/user/uploads/${a.name}`;
+            try {
+              const base64Data = a.dataUrl.split(",")[1] || "";
+              const buffer = Buffer.from(base64Data, "base64");
+              await sandbox.files.write(sandboxPath, buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer);
+              promptParts.push({
+                type: "text",
+                text: `The user uploaded a file: ${sandboxPath} (${a.mimeType}). You can read and process it using the sandbox tools.`,
+              });
+              console.log(`[GenerationManager] Wrote uploaded file to sandbox: ${sandboxPath}`);
+            } catch (err) {
+              console.error(`[GenerationManager] Failed to write file to sandbox: ${sandboxPath}`, err);
+              promptParts.push({
+                type: "text",
+                text: `The user tried to upload a file "${a.name}" but it could not be written to the sandbox.`,
+              });
+            }
+          }
         }
       }
 
@@ -960,6 +983,29 @@ class GenerationManager {
           currentTextPart = part;
           currentTextPartId = partId;
         });
+
+        // Auto-approve permission requests only for uploaded files directory
+        if ((event.type as string) === "permission.asked") {
+          const permProps = (event as any).properties as Record<string, unknown>;
+          const permissionID = permProps.id as string;
+          const patterns = permProps.patterns as string[] | undefined;
+          const allPatternsAllowed = patterns?.every(
+            (p) => p.startsWith("/home/user/uploads/")
+          );
+          if (permissionID && allPatternsAllowed) {
+            console.log("[GenerationManager] Auto-approving upload permission:", permissionID, patterns);
+            try {
+              await client.postSessionIdPermissionsPermissionId({
+                path: { id: sessionId, permissionID },
+                body: { response: "always" },
+              });
+            } catch (err) {
+              console.error("[GenerationManager] Failed to approve permission:", err);
+            }
+          } else {
+            console.log("[GenerationManager] Skipping permission (not uploads):", permissionID, permProps.permission, patterns);
+          }
+        }
 
         // Check for session idle (generation complete)
         if (event.type === "session.idle") {
