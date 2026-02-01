@@ -978,7 +978,7 @@ export function ChatArea({ conversationId }: Props) {
             {
               id: `error-${Date.now()}`,
               role: "assistant",
-              content: `Error: ${message}`,
+              content: `Error: ${typeof message === 'string' ? message : JSON.stringify(message, null, 2)}`,
             },
           ]);
         },
@@ -1164,7 +1164,7 @@ export function ChatArea({ conversationId }: Props) {
   useHotkeys(
     "mod+k",
     handleStartRecording,
-    { keydown: true, keyup: false, preventDefault: true },
+    { keydown: true, keyup: false, preventDefault: true, enableOnFormTags: true },
     [handleStartRecording]
   );
 
