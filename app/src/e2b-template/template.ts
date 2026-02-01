@@ -20,9 +20,12 @@ export const template = Template()
   .copy("opencode.json", "/app/opencode.json")
   .runCmd('mkdir -p /app/.opencode/plugins')
   .copy("plugins/integration-permissions.ts", "/app/.opencode/plugins/integration-permissions.ts")
-  // Copy CLI tools directory
-  .copy("cli", "/app/cli")
+  // Copy skills into .claude/skills
+  .runCmd('mkdir -p /app/.claude/skills')
+  .copy("skills", "/app/.claude/skills")
+  // Copy setup script
+  .copy("setup.sh", "/app/setup.sh")
   // allow to install packages from pip
   .runCmd('mkdir -p $HOME/.config/pip && echo -e "[global]\nbreak-system-packages = true" > $HOME/.config/pip/pip.conf')
-  .runCmd('/app/cli/setup.sh')
+  .runCmd('/app/setup.sh')
 
