@@ -137,6 +137,10 @@ interface GenerationContext {
   // Workflow fields
   workflowRunId?: string;
   allowedIntegrations?: IntegrationType[];
+  // OpenCode permission request fields (for forwarding approval to OpenCode SDK)
+  opencodePermissionId?: string;
+  opencodeClient?: any;
+  opencodeSessionId?: string;
   allowedCustomIntegrations?: string[];
   workflowPrompt?: string;
   workflowPromptDo?: string;
@@ -676,6 +680,22 @@ class GenerationManager {
       ctx.approvalResolver = undefined;
     }
 
+    // Forward decision to OpenCode SDK if this was an OpenCode permission request
+    if (ctx.opencodePermissionId && ctx.opencodeClient && ctx.opencodeSessionId) {
+      try {
+        await ctx.opencodeClient.postSessionIdPermissionsPermissionId({
+          path: { id: ctx.opencodeSessionId, permissionID: ctx.opencodePermissionId },
+          body: { response: decision === "approve" ? "always" : "reject" },
+        });
+        console.log("[GenerationManager] OpenCode permission", decision === "approve" ? "approved" : "denied", ctx.opencodePermissionId);
+      } catch (err) {
+        console.error("[GenerationManager] Failed to submit OpenCode permission:", err);
+      }
+      ctx.opencodePermissionId = undefined;
+      ctx.opencodeClient = undefined;
+      ctx.opencodeSessionId = undefined;
+    }
+
     // Clear pending approval
     ctx.pendingApproval = null;
     ctx.status = "running";
@@ -1003,7 +1023,65 @@ class GenerationManager {
               console.error("[GenerationManager] Failed to approve permission:", err);
             }
           } else {
-            console.log("[GenerationManager] Skipping permission (not uploads):", permissionID, permProps.permission, patterns);
+            console.log("[GenerationManager] Surfacing permission request to UI:", permissionID, permProps.permission, patterns);
+            const toolUseId = `opencode-perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const permissionType = (permProps.permission as string) || "file access";
+            const command = patterns?.length
+              ? `${permissionType}: ${patterns.join(", ")}`
+              : permissionType;
+
+            ctx.status = "awaiting_approval";
+            ctx.pendingApproval = {
+              toolUseId,
+              toolName: "Permission",
+              toolInput: permProps as Record<string, unknown>,
+              requestedAt: new Date().toISOString(),
+              integration: "Bap",
+              operation: permissionType,
+              command,
+            };
+            ctx.opencodePermissionId = permissionID;
+            ctx.opencodeClient = client;
+            ctx.opencodeSessionId = sessionId;
+
+            // Update database
+            db.update(generation)
+              .set({ status: "awaiting_approval", pendingApproval: ctx.pendingApproval })
+              .where(eq(generation.id, ctx.id))
+              .then(() => db.update(conversation).set({ generationStatus: "awaiting_approval" }).where(eq(conversation.id, ctx.conversationId)))
+              .then(() => {
+                if (!ctx.workflowRunId) return;
+                return db.update(workflowRun).set({ status: "awaiting_approval" }).where(eq(workflowRun.id, ctx.workflowRunId));
+              })
+              .catch((err) => console.error("[GenerationManager] DB update error:", err));
+
+            // Notify frontend
+            this.broadcast(ctx, {
+              type: "pending_approval",
+              generationId: ctx.id,
+              conversationId: ctx.conversationId,
+              toolUseId,
+              toolName: "Permission",
+              toolInput: permProps as Record<string, unknown>,
+              integration: "Bap",
+              operation: permissionType,
+              command,
+            });
+
+            // Start approval timeout
+            ctx.approvalTimeoutId = setTimeout(() => {
+              // Auto-deny on timeout
+              if (ctx.opencodePermissionId && ctx.opencodeClient && ctx.opencodeSessionId) {
+                client.postSessionIdPermissionsPermissionId({
+                  path: { id: ctx.opencodeSessionId, permissionID: ctx.opencodePermissionId },
+                  body: { response: "reject" },
+                }).catch((err: any) => console.error("[GenerationManager] Failed to reject permission on timeout:", err));
+                ctx.opencodePermissionId = undefined;
+                ctx.opencodeClient = undefined;
+                ctx.opencodeSessionId = undefined;
+              }
+              this.handleApprovalTimeout(ctx);
+            }, APPROVAL_TIMEOUT_MS);
           }
         }
 
