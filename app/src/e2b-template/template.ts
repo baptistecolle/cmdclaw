@@ -22,7 +22,7 @@ export const template = Template()
   .copy("plugins/integration-permissions.ts", "/app/.opencode/plugins/integration-permissions.ts")
   // Copy skills into .claude/skills
   .runCmd('mkdir -p /app/.claude')
-  .copyItems([{ src: "skills/", dest: "/app/.claude/skills/" }])
+  .copy("skills", "/app/.claude/skills")
   // Copy setup script
   .copy("setup.sh", "/app/setup.sh")
   // allow to install packages from pip
