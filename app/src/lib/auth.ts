@@ -14,6 +14,8 @@ const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 const appUrl =
   env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
+const ADMIN_EMAILS = ["baptiste@heybap.com"];
+
 export const auth = betterAuth({
   appName: "Bap",
   baseURL: appUrl,
@@ -57,9 +59,6 @@ export const auth = betterAuth({
     admin({
       defaultRole: "user",
       adminRoles: ["admin"],
-      adminUserIds: env.ADMIN_USER_IDS
-        ? env.ADMIN_USER_IDS.split(",").map((id) => id.trim()).filter(Boolean)
-        : undefined,
     }),
     deviceAuthorization({
       verificationUri: "/connect",
@@ -116,4 +115,16 @@ export const auth = betterAuth({
       },
     }),
   ],
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          if (ADMIN_EMAILS.includes(user.email)) {
+            return { data: { ...user, role: "admin" } };
+          }
+          return { data: user };
+        },
+      },
+    },
+  },
 });
