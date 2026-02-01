@@ -1,7 +1,7 @@
 import readline from "node:readline";
 import { homedir, hostname, platform, arch } from "node:os";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename, resolve, extname } from "node:path";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { RouterClient } from "@orpc/server";
@@ -17,6 +17,7 @@ type Args = {
   conversationId?: string;
   message?: string;
   token?: string;
+  files: string[];
   autoApprove: boolean;
   showThinking: boolean;
   authOnly: boolean;
@@ -30,6 +31,7 @@ const CONFIG_PATH = join(BAP_DIR, "chat-config.json");
 
 function parseArgs(argv: string[]): Args {
   const args: Args = {
+    files: [],
     autoApprove: false,
     showThinking: false,
     authOnly: false,
@@ -70,6 +72,11 @@ function parseArgs(argv: string[]): Args {
         args.token = argv[i + 1];
         i += 1;
         break;
+      case "--file":
+      case "-f":
+        args.files.push(argv[i + 1]!);
+        i += 1;
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -97,6 +104,7 @@ function printHelp(): void {
   console.log("  --auth                    Run auth flow and exit");
   console.log("  --token <token>            Use provided auth token directly");
   console.log("  --reset-auth              Clear saved token and re-auth");
+  console.log("  -f, --file <path>         Attach file (can be used multiple times)");
   console.log("  -h, --help                Show help\n");
 }
 
@@ -251,6 +259,18 @@ async function runChatLoop(
 ): Promise<void> {
   let conversationId = options.conversationId;
 
+  let pendingFiles: { name: string; mimeType: string; dataUrl: string }[] = [];
+
+  // Attach files passed via --file on the first message
+  for (const f of options.files) {
+    try {
+      pendingFiles.push(fileToAttachment(f));
+      console.log(`Attached: ${basename(f)}`);
+    } catch (e) {
+      console.error(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   while (true) {
     const input = (await ask(rl, conversationId ? "followup> " : "chat> ")).trim();
     if (!input) {
@@ -258,7 +278,22 @@ async function runChatLoop(
       return;
     }
 
-    const result = await runGeneration(client, rl, input, conversationId, options);
+    // /file <path> command to attach a file before sending
+    if (input.startsWith("/file ")) {
+      const filePath = input.slice(6).trim();
+      try {
+        pendingFiles.push(fileToAttachment(filePath));
+        console.log(`Attached: ${basename(filePath)} (${pendingFiles.length} file(s) pending)`);
+      } catch (e) {
+        console.error(e instanceof Error ? e.message : String(e));
+      }
+      continue;
+    }
+
+    const attachments = pendingFiles.length ? pendingFiles : undefined;
+    pendingFiles = [];
+
+    const result = await runGeneration(client, rl, input, conversationId, options, attachments);
     if (!result) {
       return;
     }
@@ -272,7 +307,8 @@ async function runGeneration(
   rl: readline.Interface,
   content: string,
   conversationId: string | undefined,
-  options: Args
+  options: Args,
+  attachments?: { name: string; mimeType: string; dataUrl: string }[],
 ): Promise<{ generationId: string; conversationId: string } | null> {
   let outputStarted = false;
 
@@ -281,6 +317,7 @@ async function runGeneration(
       conversationId,
       content,
       autoApprove: options.autoApprove,
+      attachments: attachments?.length ? attachments : undefined,
     });
 
     const iterator = await client.generation.subscribeGeneration({ generationId });
@@ -386,7 +423,8 @@ async function main(): Promise<void> {
 
   if (args.message) {
     // Non-interactive: send a single message and exit
-    const result = await runGeneration(client, null as any, args.message, args.conversationId, args);
+    const attachments = args.files.map(f => fileToAttachment(f));
+    const result = await runGeneration(client, null as any, args.message, args.conversationId, args, attachments.length ? attachments : undefined);
     if (result) {
       console.log(`\n[conversation] ${result.conversationId}`);
     }
@@ -407,6 +445,35 @@ async function main(): Promise<void> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const MIME_MAP: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+  ".json": "application/json",
+  ".csv": "text/csv",
+};
+
+function fileToAttachment(filePath: string): { name: string; mimeType: string; dataUrl: string } {
+  const resolved = resolve(filePath);
+  if (!existsSync(resolved)) {
+    throw new Error(`File not found: ${resolved}`);
+  }
+  const ext = extname(resolved).toLowerCase();
+  const mimeType = MIME_MAP[ext] || "application/octet-stream";
+  const data = readFileSync(resolved);
+  const base64 = data.toString("base64");
+  return {
+    name: basename(resolved),
+    mimeType,
+    dataUrl: `data:${mimeType};base64,${base64}`,
+  };
 }
 
 void main();
