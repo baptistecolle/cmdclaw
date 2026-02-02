@@ -35,6 +35,13 @@ import type { LLMBackend, ChatMessage, ContentBlock, StreamEvent } from "@/serve
 import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
 import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
 import type { IntegrationType } from "@/server/oauth/config";
+import {
+  buildMemorySystemPrompt,
+  readMemoryFile,
+  searchMemory,
+  syncMemoryToSandbox,
+  writeMemoryEntry,
+} from "@/server/services/memory-service";
 
 // Event types for generation stream
 export type GenerationEvent =
@@ -874,6 +881,19 @@ class GenerationManager {
       const writtenSkills = await writeSkillsToSandbox(sandbox, ctx.userId);
       const skillsInstructions = getSkillsSystemPrompt(writtenSkills);
 
+      // Write memory files to sandbox
+      let memoryInstructions = buildMemorySystemPrompt();
+      try {
+        await syncMemoryToSandbox(
+          ctx.userId,
+          (path, content) => sandbox.files.write(path, content),
+          (dir) => sandbox.commands.run(`mkdir -p "${dir}"`)
+        );
+      } catch (err) {
+        console.error("[GenerationManager] Failed to sync memory to sandbox:", err);
+        memoryInstructions = buildMemorySystemPrompt();
+      }
+
       // Write custom integration CLI code to sandbox
       try {
         const customCreds = await db.query.customIntegrationCredential.findMany({
@@ -915,7 +935,13 @@ class GenerationManager {
       // Build system prompt
       const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
-      const systemPromptParts = [baseSystemPrompt, cliInstructions, skillsInstructions, workflowPrompt].filter(
+      const systemPromptParts = [
+        baseSystemPrompt,
+        cliInstructions,
+        skillsInstructions,
+        memoryInstructions,
+        workflowPrompt,
+      ].filter(
         Boolean
       );
       const systemPrompt = systemPromptParts.join("\n\n");
@@ -1136,6 +1162,17 @@ class GenerationManager {
       sandbox = getSandboxBackend(ctx.conversationId, ctx.userId, ctx.deviceId);
       await sandbox.setup(ctx.conversationId);
 
+      // Sync memory files to sandbox
+      try {
+        await syncMemoryToSandbox(
+          ctx.userId,
+          (path, content) => sandbox!.writeFile(path, content),
+          (dir) => sandbox!.execute(`mkdir -p "${dir}"`)
+        );
+      } catch (err) {
+        console.error("[GenerationManager] Failed to sync memory to sandbox:", err);
+      }
+
       // 2. Get LLM backend
       const llm = await this.getLLMBackend(ctx);
 
@@ -1146,7 +1183,8 @@ class GenerationManager {
 
       const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
-      const systemPromptParts = [baseSystemPrompt, cliInstructions, workflowPrompt].filter(Boolean);
+      const memoryPrompt = buildMemorySystemPrompt();
+      const systemPromptParts = [baseSystemPrompt, cliInstructions, memoryPrompt, workflowPrompt].filter(Boolean);
       const systemPrompt = systemPromptParts.join("\n\n");
 
       // 4. Build message history from DB
@@ -1301,6 +1339,31 @@ class GenerationManager {
           for (const block of assistantContentBlocks) {
             if (block.type !== "tool_use") continue;
 
+            if (block.name.startsWith("memory_")) {
+              const memoryResult = await this.executeMemoryTool(ctx, sandbox!, block);
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: memoryResult.content,
+                is_error: memoryResult.isError,
+              });
+
+              this.broadcast(ctx, {
+                type: "tool_result",
+                toolName: block.name,
+                result: memoryResult.content,
+              });
+
+              ctx.contentParts.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: memoryResult.content,
+              });
+
+              await this.saveProgress(ctx);
+              continue;
+            }
+
             if (ctx.allowedIntegrations !== undefined && block.name === "bash") {
               const command = (block.input.command as string) || "";
               const parsed = parseBashCommand(command);
@@ -1402,6 +1465,7 @@ class GenerationManager {
             // Execute the tool
             const cmdInfo = toolCallToCommand(block.name, block.input);
             let resultContent: string;
+            let isError = false;
 
             if (cmdInfo) {
               try {
@@ -1412,12 +1476,15 @@ class GenerationManager {
                 resultContent = execResult.stdout || execResult.stderr || "(no output)";
                 if (execResult.exitCode !== 0 && execResult.stderr) {
                   resultContent = `Exit code: ${execResult.exitCode}\n${execResult.stderr}\n${execResult.stdout}`;
+                  isError = true;
                 }
               } catch (err) {
                 resultContent = `Error: ${err instanceof Error ? err.message : "Unknown error"}`;
+                isError = true;
               }
             } else {
               resultContent = `Unknown tool: ${block.name}`;
+              isError = true;
             }
 
             // Truncate very long outputs
@@ -1429,6 +1496,7 @@ class GenerationManager {
               type: "tool_result",
               tool_use_id: block.id,
               content: resultContent,
+              is_error: isError,
             });
 
             this.broadcast(ctx, {
@@ -1470,6 +1538,75 @@ class GenerationManager {
           console.error("[GenerationManager] Sandbox teardown error:", err)
         );
       }
+    }
+  }
+
+  private async executeMemoryTool(
+    ctx: GenerationContext,
+    sandbox: SandboxBackend,
+    block: Extract<ContentBlock, { type: "tool_use" }>
+  ): Promise<{ content: string; isError?: boolean }> {
+    try {
+      const input = block.input as Record<string, unknown>;
+
+      switch (block.name) {
+        case "memory_search": {
+          const query = String(input.query || "").trim();
+          if (!query) {
+            return { content: "Error: memory_search requires a query", isError: true };
+          }
+          const results = await searchMemory({
+            userId: ctx.userId,
+            query,
+            limit: input.limit ? Number(input.limit) : undefined,
+            type: input.type as any,
+            date: input.date as string | undefined,
+          });
+          return { content: JSON.stringify({ results }, null, 2) };
+        }
+
+        case "memory_get": {
+          const path = String(input.path || "").trim();
+          if (!path) {
+            return { content: "Error: memory_get requires a path", isError: true };
+          }
+          const result = await readMemoryFile({ userId: ctx.userId, path });
+          if (!result) {
+            return { content: "Error: memory file not found", isError: true };
+          }
+          return { content: JSON.stringify(result, null, 2) };
+        }
+
+        case "memory_write": {
+          const content = String(input.content || "").trim();
+          if (!content) {
+            return { content: "Error: memory_write requires content", isError: true };
+          }
+          const entry = await writeMemoryEntry({
+            userId: ctx.userId,
+            path: input.path as string | undefined,
+            type: input.type as any,
+            date: input.date as string | undefined,
+            title: input.title as string | undefined,
+            tags: input.tags as string[] | undefined,
+            content,
+          });
+
+          await syncMemoryToSandbox(
+            ctx.userId,
+            (path, fileContent) => sandbox.writeFile(path, fileContent),
+            (dir) => sandbox.execute(`mkdir -p "${dir}"`)
+          );
+
+          return { content: JSON.stringify({ success: true, entryId: entry.id }, null, 2) };
+        }
+
+        default:
+          return { content: `Unknown memory tool: ${block.name}`, isError: true };
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return { content: `Error: ${message}`, isError: true };
     }
   }
 

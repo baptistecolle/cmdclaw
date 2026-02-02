@@ -126,6 +126,74 @@ export const searchContentTool: ToolDefinition = {
   },
 };
 
+export const memorySearchTool: ToolDefinition = {
+  name: "memory_search",
+  description:
+    "Search persistent memory (long-term and daily logs) using semantic + keyword search.",
+  input_schema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Search query" },
+      limit: { type: "number", description: "Max results (default: 8)" },
+      type: {
+        type: "string",
+        enum: ["longterm", "daily"],
+        description: "Optional memory type filter",
+      },
+      date: {
+        type: "string",
+        description: "Optional date filter for daily logs (YYYY-MM-DD)",
+      },
+    },
+    required: ["query"],
+  },
+};
+
+export const memoryGetTool: ToolDefinition = {
+  name: "memory_get",
+  description: "Read a specific memory file by path (MEMORY.md or memory/YYYY-MM-DD.md).",
+  input_schema: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "Memory file path" },
+    },
+    required: ["path"],
+  },
+};
+
+export const memoryWriteTool: ToolDefinition = {
+  name: "memory_write",
+  description:
+    "Write durable information to memory. Use type=longterm for persistent facts, " +
+    "type=daily (or date) for daily logs.",
+  input_schema: {
+    type: "object",
+    properties: {
+      content: { type: "string", description: "Memory content to store" },
+      type: {
+        type: "string",
+        enum: ["longterm", "daily"],
+        description: "Memory file type",
+      },
+      date: {
+        type: "string",
+        description: "Date for daily memory (YYYY-MM-DD, default: today)",
+      },
+      title: { type: "string", description: "Optional title for the entry" },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description: "Optional tags",
+      },
+      path: {
+        type: "string",
+        description: "Optional path override (MEMORY.md or memory/YYYY-MM-DD.md)",
+      },
+    },
+    required: ["content"],
+  },
+};
+
 /**
  * Get all tool definitions for direct mode.
  */
@@ -137,6 +205,9 @@ export function getDirectModeTools(): ToolDefinition[] {
     listFilesTool,
     searchFilesTool,
     searchContentTool,
+    memorySearchTool,
+    memoryGetTool,
+    memoryWriteTool,
   ];
 }
 

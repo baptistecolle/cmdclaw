@@ -7,6 +7,8 @@ import {
   index,
   jsonb,
   integer,
+  date,
+  vector,
   pgEnum,
   unique,
   uniqueIndex,
@@ -97,6 +99,10 @@ export const userRelations = relations(user, ({ many }) => ({
   conversations: many(conversation),
   integrations: many(integration),
   skills: many(skill),
+  memoryFiles: many(memoryFile),
+  memoryEntries: many(memoryEntry),
+  memoryChunks: many(memoryChunk),
+  memorySettings: many(memorySettings),
   workflows: many(workflow),
   providerAuths: many(providerAuth),
   devices: many(device),
@@ -631,6 +637,142 @@ export const skillDocumentRelations = relations(skillDocument, ({ one }) => ({
     fields: [skillDocument.skillId],
     references: [skill.id],
   }),
+}));
+
+// ========== MEMORY SCHEMA ==========
+
+export const memoryFileTypeEnum = pgEnum("memory_file_type", ["longterm", "daily"]);
+
+export const memoryFile = pgTable(
+  "memory_file",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: memoryFileTypeEnum("type").notNull(),
+    date: date("date", { mode: "date" }),
+    title: text("title"),
+    tags: jsonb("tags").$type<string[]>(),
+    hash: text("hash"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("memory_file_user_id_idx").on(table.userId),
+    unique("memory_file_user_type_date_idx").on(table.userId, table.type, table.date),
+  ]
+);
+
+export const memoryEntry = pgTable(
+  "memory_entry",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    fileId: text("file_id")
+      .notNull()
+      .references(() => memoryFile.id, { onDelete: "cascade" }),
+    title: text("title"),
+    tags: jsonb("tags").$type<string[]>(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("memory_entry_user_id_idx").on(table.userId),
+    index("memory_entry_file_id_idx").on(table.fileId),
+  ]
+);
+
+export const memoryChunk = pgTable(
+  "memory_chunk",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    fileId: text("file_id")
+      .notNull()
+      .references(() => memoryFile.id, { onDelete: "cascade" }),
+    entryId: text("entry_id")
+      .references(() => memoryEntry.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    contentHash: text("content_hash").notNull(),
+    startLine: integer("start_line"),
+    endLine: integer("end_line"),
+    embedding: vector("embedding", { dimensions: 1536 }),
+    embeddingProvider: text("embedding_provider"),
+    embeddingModel: text("embedding_model"),
+    embeddingDimensions: integer("embedding_dimensions"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("memory_chunk_user_id_idx").on(table.userId),
+    index("memory_chunk_file_id_idx").on(table.fileId),
+    index("memory_chunk_entry_id_idx").on(table.entryId),
+    index("memory_chunk_hash_idx").on(table.contentHash),
+  ]
+);
+
+export const memorySettings = pgTable(
+  "memory_settings",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider").default("openai").notNull(),
+    model: text("model").default("text-embedding-3-small").notNull(),
+    dimensions: integer("dimensions").default(1536).notNull(),
+    chunkTokens: integer("chunk_tokens").default(400).notNull(),
+    chunkOverlap: integer("chunk_overlap").default(80).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    unique("memory_settings_user_id_idx").on(table.userId),
+  ]
+);
+
+export const memoryFileRelations = relations(memoryFile, ({ one, many }) => ({
+  user: one(user, { fields: [memoryFile.userId], references: [user.id] }),
+  entries: many(memoryEntry),
+  chunks: many(memoryChunk),
+}));
+
+export const memoryEntryRelations = relations(memoryEntry, ({ one, many }) => ({
+  user: one(user, { fields: [memoryEntry.userId], references: [user.id] }),
+  file: one(memoryFile, { fields: [memoryEntry.fileId], references: [memoryFile.id] }),
+  chunks: many(memoryChunk),
+}));
+
+export const memoryChunkRelations = relations(memoryChunk, ({ one }) => ({
+  user: one(user, { fields: [memoryChunk.userId], references: [user.id] }),
+  file: one(memoryFile, { fields: [memoryChunk.fileId], references: [memoryFile.id] }),
+  entry: one(memoryEntry, { fields: [memoryChunk.entryId], references: [memoryEntry.id] }),
+}));
+
+export const memorySettingsRelations = relations(memorySettings, ({ one }) => ({
+  user: one(user, { fields: [memorySettings.userId], references: [user.id] }),
 }));
 
 // ========== PROVIDER AUTH SCHEMA ==========

@@ -20,6 +20,7 @@
     "bash": "allow"
   },
   "plugin": [
-    "integration-permissions"
+    "integration-permissions",
+    "memory"
   ]
 }

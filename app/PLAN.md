@@ -11,7 +11,7 @@
 - `app/src/e2b-template/opencode.json` — OpenCode tool permissions inside E2B sandbox.
 - `app/openclaw-memory.md` — your blog summary of OpenClaw memory mechanics.
 
-### OpenClaw repo (memory architecture)
+### OpenClaw repo (memory architecture) - located at /Users/baptiste/Git/openclaw
 - `src/memory/manager.ts` — indexing, watcher, session transcript ingestion, hybrid search.
 - `src/memory/memory-schema.ts` — SQLite schema for chunks/files/embedding cache.
 - `src/memory/internal.ts` — file discovery, chunking, hashing, memory file rules.
@@ -106,6 +106,5 @@
 - OpenCode supports custom tools via plugins and exposes session events including `session.compacted` and `experimental.session.compacting`, which gives us a hook for a pre-compaction memory flush and/or context injection.
 - Plugins can be loaded from project `.opencode/plugins/` or via npm packages configured in `opencode.json`.
 
-## Next steps once you answer
-- I’ll draft a concrete technical plan with exact file changes, schema definitions, and a migration checklist.
-- Then I’ll start implementing in small increments (schema → service → tools → sandbox sync → prompts → tests).
+## Next steps
+- Implement in small increments (schema → memory service → pgvector search → OpenCode plugin/tools → sandbox sync → prompts → tests).

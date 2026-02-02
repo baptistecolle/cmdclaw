@@ -33,6 +33,9 @@ async function reset() {
 				EXECUTE 'DROP TYPE IF EXISTS ' || quote_ident(r.enum_name);
 			END LOOP;
 		END $$;
+
+		-- Ensure pgvector extension exists for memory embeddings
+		CREATE EXTENSION IF NOT EXISTS vector;
 		
 		`;
 
