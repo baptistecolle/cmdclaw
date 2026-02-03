@@ -3,6 +3,7 @@ import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
 import { skill, message, conversation, providerAuth } from "@/server/db/schema";
+import { COMPACTION_SUMMARY_PREFIX, SESSION_BOUNDARY_PREFIX } from "@/server/services/session-constants";
 import { eq, and, asc } from "drizzle-orm";
 import { downloadFromS3 } from "@/server/storage/s3-client";
 import { decrypt } from "@/server/utils/encryption";
@@ -130,6 +131,13 @@ export function getSandboxState(conversationId: string): SandboxState | undefine
   return activeSandboxes.get(conversationId);
 }
 
+export function resetOpencodeSession(conversationId: string): void {
+  const state = activeSandboxes.get(conversationId);
+  if (state) {
+    state.sessionId = null;
+  }
+}
+
 /**
  * Get or create an OpenCode session within a sandbox
  * Handles conversation replay for session recovery
@@ -198,8 +206,31 @@ async function replayConversationHistory(
 
   if (messages.length === 0) return;
 
+  const boundaryIndex = messages
+    .map((m, idx) => (m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1))
+    .filter((idx) => idx >= 0)
+    .pop();
+
+  const sessionMessages = boundaryIndex !== undefined
+    ? messages.slice(boundaryIndex + 1)
+    : messages;
+
+  const summaryIndex = sessionMessages
+    .map((m, idx) => (m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX) ? idx : -1))
+    .filter((idx) => idx >= 0)
+    .pop();
+
+  const summaryMessage = summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
+  const summaryText = summaryMessage
+    ? summaryMessage.content.replace(COMPACTION_SUMMARY_PREFIX, "").trim()
+    : null;
+
+  const messagesAfterSummary = summaryIndex !== undefined
+    ? sessionMessages.slice(summaryIndex + 1)
+    : sessionMessages;
+
   // Build conversation context
-  const historyContext = messages
+  const historyContext = messagesAfterSummary
     .map((m) => {
       if (m.role === "user") {
         return `User: ${m.content}`;
@@ -224,6 +255,10 @@ async function replayConversationHistory(
     .filter(Boolean)
     .join("\n\n");
 
+  const summaryBlock = summaryText
+    ? `Summary of previous conversation:\n${summaryText}\n\n`
+    : "";
+
   // Inject history as context using noReply: true
   await client.session.prompt({
     path: { id: sessionId },
@@ -231,7 +266,7 @@ async function replayConversationHistory(
       parts: [
         {
           type: "text",
-          text: `<conversation_history>\n${historyContext}\n</conversation_history>\n\nContinue this conversation. The user's next message follows.`,
+          text: `<conversation_history>\n${summaryBlock}${historyContext}\n</conversation_history>\n\nContinue this conversation. The user's next message follows.`,
         },
       ],
       noReply: true,
@@ -487,4 +522,3 @@ export class E2BSandboxBackend implements SandboxBackend {
     return isE2BConfigured();
   }
 }
-

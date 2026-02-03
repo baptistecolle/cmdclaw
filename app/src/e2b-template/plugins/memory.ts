@@ -12,7 +12,7 @@ const MEMORY_TOOLS = [
   {
     name: "memory_search",
     description:
-      "Search persistent memory (long-term and daily logs) using semantic + keyword search.",
+      "Search persistent memory (long-term, daily logs, and session transcripts) using semantic + keyword search.",
     input_schema: {
       type: "object",
       properties: {
@@ -26,7 +26,8 @@ const MEMORY_TOOLS = [
   },
   {
     name: "memory_get",
-    description: "Read a specific memory file by path (MEMORY.md or memory/YYYY-MM-DD.md).",
+    description:
+      "Read a specific memory file by path (MEMORY.md, memory/YYYY-MM-DD.md, or sessions/YYYY-MM-DD-HHMMSS-<slug>.md).",
     input_schema: {
       type: "object",
       properties: { path: { type: "string" } },

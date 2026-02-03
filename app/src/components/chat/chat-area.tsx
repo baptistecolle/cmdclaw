@@ -22,6 +22,7 @@ import {
   useUpdateAutoApprove,
   type GenerationPendingApprovalData,
   type AuthNeededData,
+  type SandboxFileData,
 } from "@/orpc/hooks";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react";
@@ -91,6 +92,9 @@ export function ChatArea({ conversationId }: Props) {
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
   const [integrationsUsed, setIntegrationsUsed] = useState<Set<IntegrationType>>(new Set());
   const [traceStatus, setTraceStatus] = useState<TraceStatus>("complete");
+
+  // Sandbox files collected during streaming
+  const [streamingSandboxFiles, setStreamingSandboxFiles] = useState<SandboxFileData[]>([]);
 
   // Track tool call start times for duration display
   const toolCallStartTimes = useRef<Map<string, number>>(new Map());
@@ -185,12 +189,25 @@ export function ChatArea({ conversationId }: Props) {
             }));
           }
 
+          // Map persisted sandbox files
+          let sandboxFiles: SandboxFileData[] | undefined;
+          if (Array.isArray(mAny.sandboxFiles) && (mAny.sandboxFiles as unknown[]).length > 0) {
+            sandboxFiles = (mAny.sandboxFiles as Array<{ fileId: string; path: string; filename: string; mimeType: string; sizeBytes: number | null }>).map((f) => ({
+              fileId: f.fileId,
+              path: f.path,
+              filename: f.filename,
+              mimeType: f.mimeType,
+              sizeBytes: f.sizeBytes,
+            }));
+          }
+
           return {
             id: m.id,
             role: m.role as Message["role"],
             content: m.content,
             parts,
             attachments,
+            sandboxFiles,
           };
         })
       );
@@ -209,6 +226,7 @@ export function ChatArea({ conversationId }: Props) {
       setIntegrationsUsed(new Set());
       setTraceStatus("complete");
       setIsStreaming(false);
+      setStreamingSandboxFiles([]);
       currentGenerationIdRef.current = undefined;
     }
   }, [conversationId]);
@@ -223,6 +241,7 @@ export function ChatArea({ conversationId }: Props) {
       setIntegrationsUsed(new Set());
       setTraceStatus("complete");
       setIsStreaming(false);
+      setStreamingSandboxFiles([]);
       currentGenerationIdRef.current = undefined;
       currentConversationIdRef.current = undefined;
     };
@@ -444,6 +463,9 @@ export function ChatArea({ conversationId }: Props) {
           }
           updateSegmentsState();
         },
+        onSandboxFile: (file) => {
+          setStreamingSandboxFiles((prev) => [...prev, file]);
+        },
         onDone: (generationId, newConversationId, messageId, usage) => {
           const fullContent = allParts
             .filter((p): p is MessagePart & { type: "text" } => p.type === "text")
@@ -461,6 +483,7 @@ export function ChatArea({ conversationId }: Props) {
             } as Message & { integrationsUsed?: IntegrationType[] },
           ]);
           setStreamingParts([]);
+          setStreamingSandboxFiles([]);
           setIsStreaming(false);
           setSegments([]);
           setTraceStatus("complete");
@@ -598,6 +621,7 @@ export function ChatArea({ conversationId }: Props) {
     setMessages((prev) => [...prev, userMessage]);
     setIsStreaming(true);
     setStreamingParts([]);
+    setStreamingSandboxFiles([]);
 
     // Reset segments for new message
     setSegments([]);
@@ -607,6 +631,7 @@ export function ChatArea({ conversationId }: Props) {
 
     const allParts: MessagePart[] = [];
     const usedIntegrations = new Set<IntegrationType>();
+    const allSandboxFiles: SandboxFileData[] = [];
     let toolCallCounter = 0;
     let activityCounter = 0;
     let segmentCounter = 0;
@@ -859,6 +884,10 @@ export function ChatArea({ conversationId }: Props) {
           }
           updateSegmentsState();
         },
+        onSandboxFile: (file) => {
+          allSandboxFiles.push(file);
+          setStreamingSandboxFiles([...allSandboxFiles]);
+        },
         onDone: (generationId, newConversationId, messageId) => {
           // Compute full content from text parts
           const fullContent = allParts
@@ -937,7 +966,7 @@ export function ChatArea({ conversationId }: Props) {
             }
           }
 
-          // Add assistant message to list with integrations used
+          // Add assistant message to list with integrations used and sandbox files
           setMessages((prev) => [
             ...prev,
             {
@@ -946,9 +975,11 @@ export function ChatArea({ conversationId }: Props) {
               content: fullContent,
               parts: partsWithApprovals.length > 0 ? partsWithApprovals : allParts,
               integrationsUsed: Array.from(usedIntegrations),
-            } as Message & { integrationsUsed?: IntegrationType[] },
+              sandboxFiles: allSandboxFiles.length > 0 ? allSandboxFiles : undefined,
+            } as Message & { integrationsUsed?: IntegrationType[]; sandboxFiles?: SandboxFileData[] },
           ]);
           setStreamingParts([]);
+          setStreamingSandboxFiles([]);
           setIsStreaming(false);
           setSegments([]); // Clear segments when done
           setTraceStatus("complete");

@@ -382,6 +382,9 @@ async function runGeneration(
         case "status_change":
           process.stdout.write(`\n[status] ${event.status}\n`);
           break;
+        case "sandbox_file":
+          process.stdout.write(`\n[file] ${event.filename} (${event.path})\n`);
+          break;
         default:
           break;
       }

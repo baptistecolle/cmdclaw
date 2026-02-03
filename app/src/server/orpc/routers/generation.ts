@@ -86,6 +86,14 @@ const generationEventSchema = z.discriminatedUnion("type", [
     type: z.literal("status_change"),
     status: z.string(),
   }),
+  z.object({
+    type: z.literal("sandbox_file"),
+    fileId: z.string(),
+    path: z.string(),
+    filename: z.string(),
+    mimeType: z.string(),
+    sizeBytes: z.number().nullable(),
+  }),
 ]);
 
 // Start a new generation (returns immediately with generationId)

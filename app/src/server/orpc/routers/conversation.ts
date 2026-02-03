@@ -1,8 +1,9 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import { conversation, message, messageAttachment } from "@/server/db/schema";
+import { conversation, message, messageAttachment, sandboxFile } from "@/server/db/schema";
 import { eq, desc, and, isNull, asc } from "drizzle-orm";
+import { writeSessionTranscriptFromConversation } from "@/server/services/memory-service";
 
 // List conversations for current user
 const list = protectedProcedure
@@ -58,6 +59,7 @@ const get = protectedProcedure
           orderBy: asc(message.createdAt),
           with: {
             attachments: true,
+            sandboxFiles: true,
           },
         },
       },
@@ -72,19 +74,28 @@ const get = protectedProcedure
       title: conv.title,
       model: conv.model,
       autoApprove: conv.autoApprove,
-      messages: conv.messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        contentParts: m.contentParts,
-        createdAt: m.createdAt,
-        attachments: m.attachments?.map((a) => ({
-          id: a.id,
-          filename: a.filename,
-          mimeType: a.mimeType,
-          sizeBytes: a.sizeBytes,
+      messages: conv.messages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          contentParts: m.contentParts,
+          createdAt: m.createdAt,
+          attachments: m.attachments?.map((a) => ({
+            id: a.id,
+            filename: a.filename,
+            mimeType: a.mimeType,
+            sizeBytes: a.sizeBytes,
+          })),
+          sandboxFiles: m.sandboxFiles?.map((f) => ({
+            fileId: f.id,
+            path: f.path,
+            filename: f.filename,
+            mimeType: f.mimeType,
+            sizeBytes: f.sizeBytes,
+          })),
         })),
-      })),
       createdAt: conv.createdAt,
       updatedAt: conv.updatedAt,
     };
@@ -150,6 +161,17 @@ const updateAutoApprove = protectedProcedure
 const archive = protectedProcedure
   .input(z.object({ id: z.string() }))
   .handler(async ({ input, context }) => {
+    try {
+      await writeSessionTranscriptFromConversation({
+        userId: context.user.id,
+        conversationId: input.id,
+        source: "archive",
+        messageLimit: 15,
+      });
+    } catch (err) {
+      console.error("[Conversation] Failed to write session transcript on archive:", err);
+    }
+
     const result = await context.db
       .update(conversation)
       .set({ archivedAt: new Date() })
@@ -173,6 +195,17 @@ const archive = protectedProcedure
 const del = protectedProcedure
   .input(z.object({ id: z.string() }))
   .handler(async ({ input, context }) => {
+    try {
+      await writeSessionTranscriptFromConversation({
+        userId: context.user.id,
+        conversationId: input.id,
+        source: "delete",
+        messageLimit: 15,
+      });
+    } catch (err) {
+      console.error("[Conversation] Failed to write session transcript on delete:", err);
+    }
+
     const result = await context.db
       .delete(conversation)
       .where(
@@ -217,6 +250,72 @@ const downloadAttachment = protectedProcedure
     return { url, filename: attachment.filename, mimeType: attachment.mimeType };
   });
 
+// Download sandbox file (returns presigned URL)
+const downloadSandboxFile = protectedProcedure
+  .input(z.object({ fileId: z.string() }))
+  .handler(async ({ input, context }) => {
+    // Find the sandbox file and verify ownership
+    const file = await context.db.query.sandboxFile.findFirst({
+      where: eq(sandboxFile.id, input.fileId),
+      with: {
+        conversation: true,
+      },
+    });
+
+    if (!file || file.conversation.userId !== context.user.id) {
+      throw new ORPCError("NOT_FOUND", { message: "File not found" });
+    }
+
+    if (!file.storageKey) {
+      throw new ORPCError("NOT_FOUND", { message: "File not uploaded" });
+    }
+
+    const { getPresignedDownloadUrl } = await import("@/server/storage/s3-client");
+    const url = await getPresignedDownloadUrl(file.storageKey);
+
+    return {
+      url,
+      filename: file.filename,
+      mimeType: file.mimeType,
+      path: file.path,
+      sizeBytes: file.sizeBytes,
+    };
+  });
+
+// Get sandbox files for a conversation
+const getSandboxFiles = protectedProcedure
+  .input(z.object({ conversationId: z.string() }))
+  .handler(async ({ input, context }) => {
+    // Verify ownership
+    const conv = await context.db.query.conversation.findFirst({
+      where: and(
+        eq(conversation.id, input.conversationId),
+        eq(conversation.userId, context.user.id)
+      ),
+    });
+
+    if (!conv) {
+      throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }
+
+    const files = await context.db.query.sandboxFile.findMany({
+      where: eq(sandboxFile.conversationId, input.conversationId),
+      orderBy: asc(sandboxFile.createdAt),
+    });
+
+    return {
+      files: files.map((f) => ({
+        id: f.id,
+        path: f.path,
+        filename: f.filename,
+        mimeType: f.mimeType,
+        sizeBytes: f.sizeBytes,
+        messageId: f.messageId,
+        createdAt: f.createdAt,
+      })),
+    };
+  });
+
 export const conversationRouter = {
   list,
   get,
@@ -225,4 +324,6 @@ export const conversationRouter = {
   archive,
   delete: del,
   downloadAttachment,
+  downloadSandboxFile,
+  getSandboxFiles,
 };

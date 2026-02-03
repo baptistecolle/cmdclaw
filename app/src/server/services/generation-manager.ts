@@ -15,6 +15,7 @@ import {
   getOrCreateSession,
   writeSkillsToSandbox,
   getSkillsSystemPrompt,
+  resetOpencodeSession,
 } from "@/server/sandbox/e2b";
 import {
   getCliEnvForUser,
@@ -38,10 +39,18 @@ import type { IntegrationType } from "@/server/oauth/config";
 import {
   buildMemorySystemPrompt,
   readMemoryFile,
-  searchMemory,
+  searchMemoryWithSessions,
   syncMemoryToSandbox,
   writeMemoryEntry,
+  writeSessionTranscriptFromConversation,
 } from "@/server/services/memory-service";
+import { COMPACTION_SUMMARY_PREFIX, SESSION_BOUNDARY_PREFIX } from "@/server/services/session-constants";
+import {
+  uploadSandboxFile,
+  collectNewSandboxFiles,
+  collectNewE2BFiles,
+} from "@/server/services/sandbox-file-service";
+import path from "path";
 
 // Event types for generation stream
 export type GenerationEvent =
@@ -82,6 +91,14 @@ export type GenerationEvent =
       remaining: string[];
     }
   | { type: "auth_result"; success: boolean; integrations?: string[] }
+  | {
+      type: "sandbox_file";
+      fileId: string;
+      path: string;
+      filename: string;
+      mimeType: string;
+      sizeBytes: number | null;
+    }
   | {
       type: "done";
       generationId: string;
@@ -153,6 +170,11 @@ interface GenerationContext {
   workflowPromptDo?: string;
   workflowPromptDont?: string;
   triggerPayload?: unknown;
+  // Sandbox file collection
+  generationMarkerTime?: number;
+  sandbox?: SandboxBackend;
+  e2bSandbox?: import("e2b").Sandbox;
+  sentFilePaths?: Set<string>;
 }
 
 // Approval timeout: 5 minutes before pausing sandbox
@@ -161,6 +183,63 @@ const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
 // Save debounce interval for text chunks
 const SAVE_DEBOUNCE_MS = 2000;
+// Compaction + memory flush defaults
+const COMPACTION_TRIGGER_TOKENS = 120_000;
+const COMPACTION_KEEP_LAST_MESSAGES = 12;
+const COMPACTION_MIN_MESSAGES = 8;
+const MEMORY_FLUSH_TRIGGER_TOKENS = 100_000;
+const COMPACTION_SUMMARY_MAX_TOKENS = 1800;
+const MEMORY_FLUSH_MAX_ITERATIONS = 4;
+const SESSION_RESET_COMMANDS = new Set(["/new"]);
+
+const MEMORY_FLUSH_SYSTEM_PROMPT = [
+  "You are performing a silent memory flush before compaction.",
+  "Review the conversation and write durable facts, preferences, decisions, and TODOs using memory_write.",
+  "Do not call any tools other than memory_write/memory_search/memory_get.",
+  "Respond with NO_REPLY when finished.",
+].join("\n");
+
+const COMPACTION_SUMMARY_SYSTEM_PROMPT = [
+  "Summarize the conversation so far for future context.",
+  "Capture decisions, preferences, TODOs, open questions, important constraints, and key tool outputs.",
+  "Be concise, factual, and keep the summary under 400 words.",
+].join("\n");
+
+type MessageRow = typeof message.$inferSelect;
+
+function estimateTokensFromText(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+function estimateTokensFromContentParts(parts: ContentPart[] | null | undefined): number {
+  if (!parts || parts.length === 0) return 0;
+  let total = 0;
+  for (const part of parts) {
+    switch (part.type) {
+      case "text":
+        total += estimateTokensFromText(part.text);
+        break;
+      case "tool_use":
+        total += estimateTokensFromText(JSON.stringify(part.input ?? {}));
+        break;
+      case "tool_result":
+        total += estimateTokensFromText(
+          typeof part.content === "string" ? part.content : JSON.stringify(part.content ?? {})
+        );
+        break;
+      case "thinking":
+        total += estimateTokensFromText(part.content);
+        break;
+    }
+  }
+  return total;
+}
+
+function estimateTokensForMessageRow(m: MessageRow): number {
+  const contentTokens = estimateTokensFromText(m.content || "");
+  const partsTokens = estimateTokensFromContentParts(m.contentParts as ContentPart[] | undefined);
+  return Math.max(contentTokens, partsTokens);
+}
 
 class GenerationManager {
   private activeGenerations = new Map<string, GenerationContext>();
@@ -797,10 +876,48 @@ class GenerationManager {
    * Dispatch generation to the appropriate backend.
    */
   private async runGeneration(ctx: GenerationContext): Promise<void> {
+    const trimmed = ctx.userMessageContent.trim();
+    if (SESSION_RESET_COMMANDS.has(trimmed)) {
+      await this.handleSessionReset(ctx);
+      return;
+    }
     if (ctx.backendType === "direct") {
       return this.runDirectGeneration(ctx);
     }
     return this.runOpenCodeGeneration(ctx);
+  }
+
+  private async handleSessionReset(ctx: GenerationContext): Promise<void> {
+    try {
+      await writeSessionTranscriptFromConversation({
+        userId: ctx.userId,
+        conversationId: ctx.conversationId,
+        source: "manual_reset",
+        messageLimit: 15,
+        excludeUserMessages: Array.from(SESSION_RESET_COMMANDS),
+      });
+    } catch (err) {
+      console.error("[GenerationManager] Failed to write session transcript:", err);
+    }
+
+    await db.insert(message).values({
+      conversationId: ctx.conversationId,
+      role: "system",
+      content: `${SESSION_BOUNDARY_PREFIX}\n${new Date().toISOString()}`,
+    });
+
+    await db
+      .update(conversation)
+      .set({ opencodeSessionId: null })
+      .where(eq(conversation.id, ctx.conversationId));
+
+    resetOpencodeSession(ctx.conversationId);
+    ctx.sessionId = undefined;
+
+    ctx.assistantContent = "Started a new session.";
+    ctx.contentParts = [{ type: "text", text: ctx.assistantContent }];
+
+    await this.finishGeneration(ctx, "completed");
   }
 
   /**
@@ -877,6 +994,11 @@ class GenerationManager {
       // Store session ID
       ctx.sessionId = sessionId;
 
+      // Record marker time for file collection and store sandbox reference
+      ctx.generationMarkerTime = Date.now();
+      ctx.e2bSandbox = sandbox;
+      ctx.sentFilePaths = new Set();
+
       // Write skills to sandbox
       const writtenSkills = await writeSkillsToSandbox(sandbox, ctx.userId);
       const skillsInstructions = getSkillsSystemPrompt(writtenSkills);
@@ -934,9 +1056,16 @@ class GenerationManager {
 
       // Build system prompt
       const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
+      const fileShareInstructions = [
+        "## File Sharing",
+        "When you create files that the user needs (PDFs, images, documents, code files, etc.), ",
+        "save them to /app or /home/user. Files created during your response will automatically ",
+        "be made available for download in the chat interface.",
+      ].join("");
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
       const systemPromptParts = [
         baseSystemPrompt,
+        fileShareInstructions,
         cliInstructions,
         skillsInstructions,
         memoryInstructions,
@@ -1128,6 +1257,45 @@ class GenerationManager {
       // Wait for prompt to complete
       await promptPromise;
 
+      // Collect new files created in the sandbox during generation
+      if (ctx.e2bSandbox && ctx.generationMarkerTime) {
+        try {
+          const newFiles = await collectNewE2BFiles(
+            ctx.e2bSandbox,
+            ctx.generationMarkerTime,
+            Array.from(ctx.sentFilePaths || [])
+          );
+
+          console.log(`[GenerationManager] Found ${newFiles.length} new files in E2B sandbox`);
+
+          for (const file of newFiles) {
+            try {
+              const fileRecord = await uploadSandboxFile({
+                path: file.path,
+                content: file.content,
+                conversationId: ctx.conversationId,
+              });
+
+              // Broadcast sandbox_file event so UI can update
+              this.broadcast(ctx, {
+                type: "sandbox_file",
+                fileId: fileRecord.id,
+                path: file.path,
+                filename: fileRecord.filename,
+                mimeType: fileRecord.mimeType,
+                sizeBytes: fileRecord.sizeBytes,
+              });
+
+              console.log(`[GenerationManager] Uploaded sandbox file: ${file.path}`);
+            } catch (err) {
+              console.error(`[GenerationManager] Failed to upload sandbox file ${file.path}:`, err);
+            }
+          }
+        } catch (err) {
+          console.error("[GenerationManager] Failed to collect sandbox files:", err);
+        }
+      }
+
       // Check if aborted
       if (ctx.abortController.signal.aborted) {
         await this.finishGeneration(ctx, "cancelled");
@@ -1162,6 +1330,11 @@ class GenerationManager {
       sandbox = getSandboxBackend(ctx.conversationId, ctx.userId, ctx.deviceId);
       await sandbox.setup(ctx.conversationId);
 
+      // Record marker time for file collection and store sandbox reference
+      ctx.generationMarkerTime = Date.now();
+      ctx.sandbox = sandbox;
+      ctx.sentFilePaths = new Set();
+
       // Sync memory files to sandbox
       try {
         await syncMemoryToSandbox(
@@ -1188,7 +1361,7 @@ class GenerationManager {
       const systemPrompt = systemPromptParts.join("\n\n");
 
       // 4. Build message history from DB
-      const chatMessages = await this.buildMessageHistory(ctx);
+      const chatMessages = await this.buildMessageHistory(ctx, { sandbox, llm });
 
       // 5. Get tool definitions
       const tools = getDirectModeTools();
@@ -1462,6 +1635,67 @@ class GenerationManager {
               }
             }
 
+            // Handle send_file tool specially - upload file to S3 and broadcast
+            if (block.name === "send_file") {
+              const filePath = block.input.path as string;
+              let resultContent: string;
+              let isError = false;
+
+              try {
+                const content = await sandbox!.readFile(filePath);
+                if (!content) {
+                  throw new Error("File not found or empty");
+                }
+
+                const fileRecord = await uploadSandboxFile({
+                  path: filePath,
+                  content: Buffer.from(content),
+                  conversationId: ctx.conversationId,
+                  messageId: undefined, // Will be linked when message is saved
+                });
+
+                resultContent = `File sent successfully: ${path.basename(filePath)}`;
+
+                // Track this file so we don't collect it again in auto-collection
+                ctx.sentFilePaths?.add(filePath);
+
+                // Broadcast sandbox_file event so UI can update
+                this.broadcast(ctx, {
+                  type: "sandbox_file",
+                  fileId: fileRecord.id,
+                  path: filePath,
+                  filename: fileRecord.filename,
+                  mimeType: fileRecord.mimeType,
+                  sizeBytes: fileRecord.sizeBytes,
+                });
+              } catch (err) {
+                resultContent = `Failed to send file: ${err instanceof Error ? err.message : "Unknown error"}`;
+                isError = true;
+              }
+
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: resultContent,
+                is_error: isError,
+              });
+
+              this.broadcast(ctx, {
+                type: "tool_result",
+                toolName: block.name,
+                result: resultContent,
+              });
+
+              ctx.contentParts.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: resultContent,
+              });
+
+              await this.saveProgress(ctx);
+              continue;
+            }
+
             // Execute the tool
             const cmdInfo = toolCallToCommand(block.name, block.input);
             let resultContent: string;
@@ -1555,7 +1789,7 @@ class GenerationManager {
           if (!query) {
             return { content: "Error: memory_search requires a query", isError: true };
           }
-          const results = await searchMemory({
+          const results = await searchMemoryWithSessions({
             userId: ctx.userId,
             query,
             limit: input.limit ? Number(input.limit) : undefined,
@@ -1570,7 +1804,9 @@ class GenerationManager {
           if (!path) {
             return { content: "Error: memory_get requires a path", isError: true };
           }
-          const result = await readMemoryFile({ userId: ctx.userId, path });
+          const { readSessionTranscriptByPath } = await import("@/server/services/memory-service");
+          const result = await readSessionTranscriptByPath({ userId: ctx.userId, path })
+            ?? await readMemoryFile({ userId: ctx.userId, path });
           if (!result) {
             return { content: "Error: memory file not found", isError: true };
           }
@@ -1650,20 +1886,43 @@ class GenerationManager {
   /**
    * Build chat message history from the database for direct mode.
    */
-  private async buildMessageHistory(ctx: GenerationContext): Promise<ChatMessage[]> {
+  private async buildMessageHistory(
+    ctx: GenerationContext,
+    options?: { sandbox?: SandboxBackend; llm?: LLMBackend }
+  ): Promise<ChatMessage[]> {
     const messages = await db.query.message.findMany({
       where: eq(message.conversationId, ctx.conversationId),
       orderBy: asc(message.createdAt),
     });
 
+    const { summaryText, sessionMessages } = await this.maybeCompactConversation(
+      ctx,
+      messages,
+      options
+    );
+
     const chatMessages: ChatMessage[] = [];
 
-    for (const m of messages) {
+    if (summaryText) {
+      chatMessages.push({
+        role: "assistant",
+        content: `Summary of previous conversation:\n${summaryText}`,
+      });
+    }
+
+    const lastMessage = sessionMessages[sessionMessages.length - 1];
+    const skipLastUser =
+      lastMessage?.role === "user" && lastMessage.content === ctx.userMessageContent;
+
+    const messagesToRender = skipLastUser
+      ? sessionMessages.slice(0, -1)
+      : sessionMessages;
+
+    for (const m of messagesToRender) {
       if (m.role === "user") {
         chatMessages.push({ role: "user", content: m.content });
       } else if (m.role === "assistant") {
         if (m.contentParts && m.contentParts.length > 0) {
-          // Convert ContentPart[] to ContentBlock[]
           const blocks: ContentBlock[] = m.contentParts.map((p): ContentBlock => {
             switch (p.type) {
               case "text":
@@ -1689,12 +1948,10 @@ class GenerationManager {
       }
     }
 
-    // Add the current user message (with attachments if any)
     if (ctx.attachments && ctx.attachments.length > 0) {
       const blocks: ContentBlock[] = [{ type: "text", text: ctx.userMessageContent }];
       for (const a of ctx.attachments) {
         if (a.mimeType.startsWith("image/")) {
-          // Extract base64 data from data URL
           const base64Data = a.dataUrl.split(",")[1] || "";
           blocks.push({
             type: "image",
@@ -1705,18 +1962,233 @@ class GenerationManager {
             },
           });
         } else {
-          // For non-image files, include as text with filename header
           const base64Data = a.dataUrl.split(",")[1] || "";
           const textContent = Buffer.from(base64Data, "base64").toString("utf-8");
           blocks.push({ type: "text", text: `[File: ${a.name}]\n${textContent}` });
         }
       }
       chatMessages.push({ role: "user", content: blocks });
-    } else {
+    } else if (!skipLastUser) {
       chatMessages.push({ role: "user", content: ctx.userMessageContent });
     }
 
     return chatMessages;
+  }
+
+  private async maybeCompactConversation(
+    ctx: GenerationContext,
+    messages: MessageRow[],
+    options?: { sandbox?: SandboxBackend; llm?: LLMBackend }
+  ): Promise<{ summaryText: string | null; sessionMessages: MessageRow[] }> {
+    const boundaryIndex = messages
+      .map((m, idx) => (m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1))
+      .filter((idx) => idx >= 0)
+      .pop();
+
+    const sessionMessages = boundaryIndex !== undefined
+      ? messages.slice(boundaryIndex + 1)
+      : messages;
+
+    const summaryIndex = sessionMessages
+      .map((m, idx) => (m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX) ? idx : -1))
+      .filter((idx) => idx >= 0)
+      .pop();
+
+    const summaryMessage = summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
+    const summaryText = summaryMessage
+      ? summaryMessage.content.replace(COMPACTION_SUMMARY_PREFIX, "").trim()
+      : null;
+
+    const messagesAfterSummary = summaryIndex !== undefined
+      ? sessionMessages.slice(summaryIndex + 1)
+      : sessionMessages;
+
+    const conversationMessages = messagesAfterSummary.filter(
+      (m) => m.role === "user" || m.role === "assistant"
+    );
+
+    const tokenEstimate = conversationMessages.reduce(
+      (sum, m) => sum + estimateTokensForMessageRow(m),
+      0
+    );
+
+    if (
+      tokenEstimate < COMPACTION_TRIGGER_TOKENS ||
+      conversationMessages.length < COMPACTION_MIN_MESSAGES ||
+      !options?.llm
+    ) {
+      return { summaryText, sessionMessages: conversationMessages };
+    }
+
+    const messagesToSummarize = conversationMessages.slice(0, -COMPACTION_KEEP_LAST_MESSAGES);
+    const messagesToKeep = conversationMessages.slice(-COMPACTION_KEEP_LAST_MESSAGES);
+
+    if (messagesToSummarize.length < COMPACTION_MIN_MESSAGES) {
+      return { summaryText, sessionMessages: conversationMessages };
+    }
+
+    if (tokenEstimate > MEMORY_FLUSH_TRIGGER_TOKENS && options?.sandbox) {
+      await this.runMemoryFlush(ctx, options.llm, options.sandbox, conversationMessages);
+    }
+
+    const newSummary = await this.generateCompactionSummary(
+      options.llm,
+      ctx.model,
+      messagesToSummarize,
+      summaryText
+    );
+
+    if (newSummary) {
+      const anchor = messagesToKeep[0]?.createdAt ?? new Date();
+      const summaryCreatedAt = new Date(anchor.getTime() - 1);
+      await db.insert(message).values({
+        conversationId: ctx.conversationId,
+        role: "system",
+        content: `${COMPACTION_SUMMARY_PREFIX}\n${newSummary}`,
+        createdAt: summaryCreatedAt,
+      });
+    }
+
+    return { summaryText: newSummary ?? summaryText, sessionMessages: messagesToKeep };
+  }
+
+  private buildSummaryInput(
+    messages: MessageRow[],
+    previousSummary: string | null
+  ): string {
+    const parts: string[] = [];
+    if (previousSummary) {
+      parts.push("Previous summary:\n" + previousSummary.trim());
+    }
+
+    const transcript = messages
+      .map((m) => {
+        if (m.role === "assistant" && m.contentParts && m.contentParts.length > 0) {
+          const textParts = m.contentParts
+            .filter((p): p is Extract<ContentPart, { type: "text" }> => p.type === "text")
+            .map((p) => p.text)
+            .join("");
+          return `${m.role}: ${textParts || m.content}`;
+        }
+        return `${m.role}: ${m.content}`;
+      })
+      .join("\n");
+
+    parts.push("Conversation:\n" + transcript);
+    return parts.join("\n\n");
+  }
+
+  private async generateCompactionSummary(
+    llm: LLMBackend,
+    model: string,
+    messages: MessageRow[],
+    previousSummary: string | null
+  ): Promise<string | null> {
+    const input = this.buildSummaryInput(messages, previousSummary);
+    let summary = "";
+
+    const stream = llm.chat({
+      messages: [{ role: "user", content: input }],
+      system: COMPACTION_SUMMARY_SYSTEM_PROMPT,
+      model,
+      maxTokens: COMPACTION_SUMMARY_MAX_TOKENS,
+    });
+
+    try {
+      for await (const event of stream) {
+        if (event.type === "text_delta") {
+          summary += event.text;
+        }
+      }
+    } catch (err) {
+      console.error("[GenerationManager] Compaction summary error:", err);
+      return null;
+    }
+
+    return summary.trim() || null;
+  }
+
+  private async runMemoryFlush(
+    ctx: GenerationContext,
+    llm: LLMBackend,
+    sandbox: SandboxBackend,
+    messages: MessageRow[]
+  ): Promise<void> {
+    const tools = getDirectModeTools().filter((tool) => tool.name.startsWith("memory_"));
+    let loopMessages: ChatMessage[] = [
+      { role: "user", content: this.buildSummaryInput(messages, null) },
+    ];
+
+    let iterations = 0;
+    let hasToolCalls = true;
+
+    while (hasToolCalls && iterations < MEMORY_FLUSH_MAX_ITERATIONS) {
+      iterations += 1;
+      hasToolCalls = false;
+
+      const assistantBlocks: ContentBlock[] = [];
+      let currentToolUseId = "";
+      let currentToolName = "";
+      let currentToolJson = "";
+
+      const stream = llm.chat({
+        messages: loopMessages,
+        tools,
+        system: MEMORY_FLUSH_SYSTEM_PROMPT,
+        model: ctx.model,
+      });
+
+      for await (const event of stream) {
+        if (event.type === "text_delta") {
+          assistantBlocks.push({ type: "text", text: event.text });
+        } else if (event.type === "tool_use_start") {
+          currentToolUseId = event.toolUseId;
+          currentToolName = event.toolName;
+          currentToolJson = "";
+        } else if (event.type === "tool_use_delta") {
+          currentToolJson += event.jsonDelta;
+        } else if (event.type === "tool_use_end") {
+          let toolInput: Record<string, unknown> = {};
+          try {
+            toolInput = JSON.parse(currentToolJson);
+          } catch {
+            toolInput = { raw: currentToolJson };
+          }
+          assistantBlocks.push({
+            type: "tool_use",
+            id: currentToolUseId,
+            name: currentToolName,
+            input: toolInput,
+          });
+          hasToolCalls = true;
+        } else if (event.type === "usage") {
+          ctx.usage.inputTokens += event.inputTokens;
+          ctx.usage.outputTokens += event.outputTokens;
+        }
+      }
+
+      if (!hasToolCalls) break;
+
+      loopMessages.push({ role: "assistant", content: assistantBlocks });
+
+      const toolResults: ContentBlock[] = [];
+      for (const block of assistantBlocks) {
+        if (block.type !== "tool_use") continue;
+        if (!block.name.startsWith("memory_")) continue;
+
+        const memoryResult = await this.executeMemoryTool(ctx, sandbox, block);
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: memoryResult.content,
+          is_error: memoryResult.isError,
+        });
+      }
+
+      if (toolResults.length === 0) break;
+
+      loopMessages.push({ role: "user", content: toolResults });
+    }
   }
 
   /**
@@ -2176,6 +2648,42 @@ class GenerationManager {
           .where(eq(conversation.id, ctx.conversationId));
       }
 
+      // Auto-collect any new files created during generation (direct mode only)
+      const collectedFileIds: string[] = [];
+      if (ctx.sandbox && ctx.generationMarkerTime) {
+        try {
+          const excludePaths = Array.from(ctx.sentFilePaths || []);
+          const newFiles = await collectNewSandboxFiles(ctx.sandbox, ctx.generationMarkerTime, excludePaths);
+
+          for (const file of newFiles) {
+            try {
+              const fileRecord = await uploadSandboxFile({
+                path: file.path,
+                content: file.content,
+                conversationId: ctx.conversationId,
+                messageId: undefined, // Will be linked below
+              });
+
+              collectedFileIds.push(fileRecord.id);
+
+              // Broadcast sandbox_file event
+              this.broadcast(ctx, {
+                type: "sandbox_file",
+                fileId: fileRecord.id,
+                path: file.path,
+                filename: fileRecord.filename,
+                mimeType: fileRecord.mimeType,
+                sizeBytes: fileRecord.sizeBytes,
+              });
+            } catch (err) {
+              console.warn(`[GenerationManager] Failed to upload collected file ${file.path}:`, err);
+            }
+          }
+        } catch (err) {
+          console.error("[GenerationManager] Failed to collect new sandbox files:", err);
+        }
+      }
+
       // Save assistant message
       const [assistantMessage] = await db
         .insert(message)
@@ -2190,6 +2698,16 @@ class GenerationManager {
         .returning();
 
       messageId = assistantMessage.id;
+
+      // Link collected sandbox files to the message
+      if (collectedFileIds.length > 0) {
+        const { sandboxFile } = await import("@/server/db/schema");
+        const { inArray } = await import("drizzle-orm");
+        await db
+          .update(sandboxFile)
+          .set({ messageId })
+          .where(inArray(sandboxFile.id, collectedFileIds));
+      }
 
       // Generate title for new conversations
       if (ctx.isNewConversation && ctx.assistantContent) {

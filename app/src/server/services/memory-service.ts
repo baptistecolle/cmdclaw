@@ -6,13 +6,20 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
 import {
+  conversation,
   memoryChunk,
   memoryEntry,
   memoryFile,
   memorySettings,
+  message,
   providerAuth,
+  sessionTranscript,
+  sessionTranscriptChunk,
+  type ContentPart,
 } from "@/server/db/schema";
 import { decrypt } from "@/server/utils/encryption";
+import { generateConversationTitle } from "@/server/utils/generate-title";
+import { SESSION_BOUNDARY_PREFIX } from "@/server/services/session-constants";
 
 export type MemoryFileType = "longterm" | "daily";
 
@@ -47,10 +54,12 @@ export interface MemorySearchResult {
   fileId: string;
   entryId: string | null;
   entryTitle?: string | null;
+  source?: "memory" | "session";
 }
 
 type MemoryFileRow = typeof memoryFile.$inferSelect;
 type MemoryEntryRow = typeof memoryEntry.$inferSelect;
+type SessionTranscriptRow = typeof sessionTranscript.$inferSelect;
 
 const DEFAULT_EMBEDDING_PROVIDER = "openai";
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
@@ -61,9 +70,14 @@ const DEFAULT_SEARCH_LIMIT = 8;
 const DEFAULT_SCORE_THRESHOLD = 0.35;
 
 const MEMORY_BASE_PATH = "/app/bap";
+const SESSION_BASE_PATH = "/app/bap/sessions";
 
 export function getMemoryBasePath(): string {
   return MEMORY_BASE_PATH;
+}
+
+export function getSessionBasePath(): string {
+  return SESSION_BASE_PATH;
 }
 
 function hashText(value: string): string {
@@ -121,6 +135,18 @@ function getFilePath(file: MemoryFileRow): string {
   return `memory/${formatDateOnly(file.date)}.md`;
 }
 
+function getTranscriptPath(transcript: SessionTranscriptRow): string {
+  return transcript.path;
+}
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "")
+    .slice(0, 60);
+}
+
 function formatEntryMarkdown(file: MemoryFileRow, entry: MemoryEntryRow): string {
   const createdAt = entry.createdAt || new Date();
   const timeLabel = formatTimeOnly(createdAt);
@@ -146,6 +172,23 @@ function buildEntryEmbeddingText(entry: MemoryEntryRow): string {
   return lines.filter(Boolean).join("\n");
 }
 
+function formatTranscriptMarkdown(params: {
+  title: string;
+  metadata: Array<[string, string | number | null | undefined]>;
+  body: string;
+}): string {
+  const metaLines = params.metadata
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .map(([label, value]) => `- ${label}: ${value}`);
+  const metaBlock = metaLines.length > 0 ? metaLines.join("\n") : "";
+  const parts = [
+    `# ${params.title}`,
+    metaBlock ? `\n${metaBlock}\n` : "",
+    params.body.trim(),
+  ].filter(Boolean);
+  return parts.join("\n\n").trim() + "\n";
+}
+
 export function buildMemorySystemPrompt(): string {
   return `
 # Memory
@@ -158,6 +201,7 @@ You have access to persistent memory tools:
 Memory files are materialized in ${MEMORY_BASE_PATH}:
 - ${MEMORY_BASE_PATH}/MEMORY.md (long-term)
 - ${MEMORY_BASE_PATH}/memory/YYYY-MM-DD.md (daily logs)
+- ${SESSION_BASE_PATH}/YYYY-MM-DD-HHMMSS-<slug>.md (session transcripts)
 
 Use memory_search before answering questions about past work, preferences, or decisions.
 When you learn something durable, write it to memory_write (daily logs for ongoing work, MEMORY.md for long-term facts).
@@ -416,6 +460,201 @@ export async function listMemoryFiles(userId: string): Promise<Array<{ path: str
   return results;
 }
 
+export async function readSessionTranscriptByPath(
+  input: MemoryGetInput
+): Promise<{ path: string; text: string } | null> {
+  const normalized = input.path.trim().replace(/^\//, "");
+  if (!normalized.toLowerCase().startsWith("sessions/")) return null;
+
+  const transcript = await db.query.sessionTranscript.findFirst({
+    where: and(
+      eq(sessionTranscript.userId, input.userId),
+      eq(sessionTranscript.path, normalized)
+    ),
+  });
+
+  if (!transcript) return null;
+
+  return {
+    path: getTranscriptPath(transcript),
+    text: transcript.content,
+  };
+}
+
+export async function listSessionTranscripts(
+  userId: string
+): Promise<Array<{ path: string; text: string }>> {
+  const transcripts = await db.query.sessionTranscript.findMany({
+    where: eq(sessionTranscript.userId, userId),
+    orderBy: desc(sessionTranscript.createdAt),
+  });
+
+  return transcripts.map((t) => ({ path: getTranscriptPath(t), text: t.content }));
+}
+
+export async function writeSessionTranscript(input: {
+  userId: string;
+  conversationId?: string | null;
+  sessionId?: string | null;
+  title?: string | null;
+  slug?: string | null;
+  date?: Date | null;
+  source?: string | null;
+  messageCount?: number;
+  startedAt?: Date | null;
+  endedAt?: Date | null;
+  content: string;
+}): Promise<SessionTranscriptRow> {
+  const date = input.date ?? new Date();
+  const timeLabel = format(date, "HHmmss");
+  const safeSlug = input.slug ? slugify(input.slug) : "";
+  const slugPart = safeSlug ? `-${safeSlug}` : "-session";
+  const path = `sessions/${formatDateOnly(date)}-${timeLabel}${slugPart}.md`;
+
+  const [transcript] = await db
+    .insert(sessionTranscript)
+    .values({
+      userId: input.userId,
+      conversationId: input.conversationId ?? null,
+      sessionId: input.sessionId ?? null,
+      title: input.title ?? null,
+      slug: input.slug ? slugify(input.slug) : null,
+      path,
+      date,
+      source: input.source ?? null,
+      messageCount: input.messageCount ?? null,
+      startedAt: input.startedAt ?? null,
+      endedAt: input.endedAt ?? null,
+      content: input.content.trim(),
+    })
+    .returning();
+
+  const settings = await resolveMemorySettings(input.userId);
+  const chunking = { tokens: settings.chunkTokens, overlap: settings.chunkOverlap };
+  const chunks = chunkMarkdown(transcript.content, chunking);
+
+  let embeddings: number[][] | null = null;
+  if (settings.provider === "openai") {
+    embeddings = await embedTexts(input.userId, chunks.map((c) => c.text), settings.model);
+  }
+
+  if (chunks.length > 0) {
+    await db.insert(sessionTranscriptChunk).values(
+      chunks.map((chunk, idx) => ({
+        userId: input.userId,
+        transcriptId: transcript.id,
+        content: chunk.text,
+        contentHash: chunk.hash,
+        startLine: chunk.startLine,
+        endLine: chunk.endLine,
+        embedding: embeddings ? embeddings[idx] : null,
+        embeddingProvider: embeddings ? settings.provider : null,
+        embeddingModel: embeddings ? settings.model : null,
+        embeddingDimensions: embeddings ? settings.dimensions : null,
+      }))
+    );
+  }
+
+  return transcript;
+}
+
+export async function writeSessionTranscriptFromConversation(input: {
+  userId: string;
+  conversationId: string;
+  source?: string;
+  messageLimit?: number;
+  excludeUserMessages?: string[];
+}): Promise<SessionTranscriptRow | null> {
+  const convo = await db.query.conversation.findFirst({
+    where: and(eq(conversation.id, input.conversationId), eq(conversation.userId, input.userId)),
+  });
+  if (!convo) return null;
+
+  const messages = await db.query.message.findMany({
+    where: eq(message.conversationId, input.conversationId),
+    orderBy: asc(message.createdAt),
+  });
+
+  if (messages.length === 0) return null;
+
+  const boundaryIndex = messages
+    .map((m, idx) => (m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1))
+    .filter((idx) => idx >= 0)
+    .pop();
+
+  const sessionMessages = boundaryIndex !== undefined
+    ? messages.slice(boundaryIndex + 1)
+    : messages;
+
+  const trimmedMessages = input.messageLimit && sessionMessages.length > input.messageLimit
+    ? sessionMessages.slice(-input.messageLimit)
+    : sessionMessages;
+
+  const excluded = new Set(
+    (input.excludeUserMessages || []).map((value) => value.trim())
+  );
+
+  const messagesForTranscript = trimmedMessages.filter((m) => {
+    if (m.role === "user" && excluded.has(m.content.trim())) {
+      return false;
+    }
+    return m.role === "user" || m.role === "assistant";
+  });
+  if (messagesForTranscript.length === 0) return null;
+
+  const lastUser = [...messagesForTranscript].reverse().find((m) => m.role === "user");
+  const lastAssistant = [...messagesForTranscript].reverse().find((m) => m.role === "assistant");
+  const title = await generateConversationTitle(
+    lastUser?.content ?? "",
+    lastAssistant?.content ?? ""
+  );
+
+  const lines: string[] = [];
+  for (const msg of messagesForTranscript) {
+    const time = msg.createdAt ? format(msg.createdAt, "HH:mm") : "";
+    if (msg.role === "assistant" && msg.contentParts && msg.contentParts.length > 0) {
+      const textParts = msg.contentParts
+        .filter((p): p is Extract<ContentPart, { type: "text" }> => p.type === "text")
+        .map((p) => p.text)
+        .join("");
+      lines.push(`**${msg.role} ${time}**\n${textParts || msg.content}`);
+    } else {
+      lines.push(`**${msg.role} ${time}**\n${msg.content}`);
+    }
+  }
+
+  const startedAt = messagesForTranscript[0]?.createdAt ?? null;
+  const endedAt = messagesForTranscript[messagesForTranscript.length - 1]?.createdAt ?? null;
+  const transcriptTitle = title || "Session Transcript";
+  const transcriptBody = lines.join("\n\n");
+  const content = formatTranscriptMarkdown({
+    title: transcriptTitle,
+    metadata: [
+      ["conversation_id", input.conversationId],
+      ["session_id", convo.opencodeSessionId],
+      ["source", input.source || "session_boundary"],
+      ["messages", messagesForTranscript.length],
+      ["started_at", startedAt ? startedAt.toISOString() : null],
+      ["ended_at", endedAt ? endedAt.toISOString() : null],
+    ],
+    body: transcriptBody,
+  });
+
+  return writeSessionTranscript({
+    userId: input.userId,
+    conversationId: input.conversationId,
+    sessionId: convo.opencodeSessionId,
+    title: transcriptTitle,
+    slug: title || null,
+    date: endedAt ?? new Date(),
+    source: input.source || "session_boundary",
+    messageCount: messagesForTranscript.length,
+    startedAt,
+    endedAt,
+    content,
+  });
+}
+
 export async function searchMemory(input: MemorySearchInput): Promise<MemorySearchResult[]> {
   const limit = Math.max(1, Math.min(input.limit ?? DEFAULT_SEARCH_LIMIT, 20));
   const settings = await resolveMemorySettings(input.userId);
@@ -594,8 +833,153 @@ export async function searchMemory(input: MemorySearchInput): Promise<MemorySear
       path: file ? getFilePath(file) : "memory/unknown.md",
       score: Number(row.score.toFixed(4)),
       snippet,
+      source: "memory",
     };
   });
+}
+
+async function searchSessionTranscripts(
+  input: MemorySearchInput
+): Promise<MemorySearchResult[]> {
+  const settings = await resolveMemorySettings(input.userId);
+  const limit = Math.max(1, Math.min(input.limit ?? DEFAULT_SEARCH_LIMIT, 20));
+
+  let vectorRows: Array<{
+    id: string;
+    transcriptId: string;
+    content: string;
+    distance: number;
+  }> = [];
+
+  if (settings.provider === "openai") {
+    const queryEmbedding = await embedTexts(input.userId, [input.query], settings.model);
+    if (queryEmbedding && queryEmbedding[0]) {
+      const vectorLiteral = `[${queryEmbedding[0].map((v) => Number(v).toFixed(6)).join(",")}]`;
+      const distanceExpr = sql.raw(`embedding <=> '${vectorLiteral}'`);
+
+      const vectorResult = await db.execute(sql`
+        select
+          ${sessionTranscriptChunk.id} as "id",
+          ${sessionTranscriptChunk.transcriptId} as "transcriptId",
+          ${sessionTranscriptChunk.content} as "content",
+          ${distanceExpr} as "distance"
+        from ${sessionTranscriptChunk}
+        where ${sessionTranscriptChunk.userId} = ${input.userId}
+          and ${sessionTranscriptChunk.embedding} is not null
+        order by ${distanceExpr} asc
+        limit ${limit * 2}
+      `);
+
+      vectorRows = (vectorResult.rows || []) as typeof vectorRows;
+    }
+  }
+
+  const textResult = await db.execute(sql`
+    select
+      ${sessionTranscriptChunk.id} as "id",
+      ${sessionTranscriptChunk.transcriptId} as "transcriptId",
+      ${sessionTranscriptChunk.content} as "content",
+      ts_rank_cd(to_tsvector('english', ${sessionTranscriptChunk.content}), plainto_tsquery('english', ${input.query})) as "rank"
+    from ${sessionTranscriptChunk}
+    where ${sessionTranscriptChunk.userId} = ${input.userId}
+      and to_tsvector('english', ${sessionTranscriptChunk.content}) @@ plainto_tsquery('english', ${input.query})
+    order by "rank" desc
+    limit ${limit * 2}
+  `);
+
+  const textRows = (textResult.rows || []) as Array<{
+    id: string;
+    transcriptId: string;
+    content: string;
+    rank: number;
+  }>;
+
+  const maxRank = textRows.reduce((max, row) => Math.max(max, Number(row.rank) || 0), 0) || 1;
+
+  const combined = new Map<
+    string,
+    {
+      id: string;
+      transcriptId: string;
+      content: string;
+      vectorScore: number;
+      textScore: number;
+    }
+  >();
+
+  for (const row of vectorRows) {
+    combined.set(row.id, {
+      id: row.id,
+      transcriptId: row.transcriptId,
+      content: row.content,
+      vectorScore: Math.max(0, 1 - Number(row.distance)),
+      textScore: 0,
+    });
+  }
+
+  for (const row of textRows) {
+    const existing = combined.get(row.id);
+    const textScore = Math.max(0, Number(row.rank) / maxRank);
+    if (existing) {
+      existing.textScore = textScore;
+    } else {
+      combined.set(row.id, {
+        id: row.id,
+        transcriptId: row.transcriptId,
+        content: row.content,
+        vectorScore: 0,
+        textScore,
+      });
+    }
+  }
+
+  const scored = Array.from(combined.values())
+    .map((row) => ({
+      ...row,
+      score: 0.7 * row.vectorScore + 0.3 * row.textScore,
+    }))
+    .filter((row) => row.score >= DEFAULT_SCORE_THRESHOLD)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  if (scored.length === 0) return [];
+
+  const transcriptIds = Array.from(new Set(scored.map((row) => row.transcriptId)));
+  const transcripts = await db.query.sessionTranscript.findMany({
+    where: inArray(sessionTranscript.id, transcriptIds),
+  });
+  const transcriptMap = new Map(transcripts.map((t) => [t.id, t]));
+
+  return scored.map((row) => {
+    const transcript = transcriptMap.get(row.transcriptId);
+    const snippet = row.content.length > 240
+      ? `${row.content.slice(0, 240)}...`
+      : row.content;
+    return {
+      id: row.id,
+      fileId: row.transcriptId,
+      entryId: null,
+      entryTitle: transcript?.title ?? null,
+      path: transcript ? getTranscriptPath(transcript) : "sessions/unknown.md",
+      score: Number(row.score.toFixed(4)),
+      snippet,
+      source: "session",
+    };
+  });
+}
+
+export async function searchMemoryWithSessions(
+  input: MemorySearchInput
+): Promise<MemorySearchResult[]> {
+  const memoryResults = await searchMemory(input);
+  if (input.type || input.date) {
+    return memoryResults;
+  }
+
+  const sessionResults = await searchSessionTranscripts(input);
+  const merged = [...memoryResults, ...sessionResults].sort((a, b) => b.score - a.score);
+  const limit = Math.max(1, Math.min(input.limit ?? DEFAULT_SEARCH_LIMIT, 20));
+  return merged.slice(0, limit);
 }
 
 export async function syncMemoryToSandbox(
@@ -604,14 +988,21 @@ export async function syncMemoryToSandbox(
   ensureDir: (path: string) => Promise<void>
 ): Promise<string[]> {
   const files = await listMemoryFiles(userId);
-  if (files.length === 0) return [];
+  const transcripts = await listSessionTranscripts(userId);
+  if (files.length === 0 && transcripts.length === 0) return [];
 
   await ensureDir(`${MEMORY_BASE_PATH}/memory`);
+  await ensureDir(SESSION_BASE_PATH);
 
   const written: string[] = [];
   for (const file of files) {
     const fullPath = `${MEMORY_BASE_PATH}/${file.path}`;
     await writeFile(fullPath, file.text);
+    written.push(fullPath);
+  }
+  for (const transcript of transcripts) {
+    const fullPath = `${MEMORY_BASE_PATH}/${transcript.path}`;
+    await writeFile(fullPath, transcript.text);
     written.push(fullPath);
   }
   return written;

@@ -34,6 +34,14 @@ export type AttachmentData = {
   id?: string;
 };
 
+export type SandboxFileData = {
+  fileId: string;
+  path: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number | null;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant" | "system" | "tool";
@@ -41,6 +49,7 @@ export type Message = {
   parts?: MessagePart[];
   integrationsUsed?: string[];
   attachments?: AttachmentData[];
+  sandboxFiles?: SandboxFileData[];
 };
 
 type Props = {
@@ -63,6 +72,7 @@ export function MessageList({ messages }: Props) {
           parts={message.parts}
           integrationsUsed={message.integrationsUsed}
           attachments={message.attachments}
+          sandboxFiles={message.sandboxFiles}
         />
       ))}
     </div>

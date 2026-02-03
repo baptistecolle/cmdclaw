@@ -4,7 +4,8 @@ import { conversation } from "@/server/db/schema";
 import { getSandboxState } from "@/server/sandbox/e2b";
 import {
   readMemoryFile,
-  searchMemory,
+  readSessionTranscriptByPath,
+  searchMemoryWithSessions,
   syncMemoryToSandbox,
   writeMemoryEntry,
 } from "@/server/services/memory-service";
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     const payload = input.payload as Record<string, unknown>;
 
     if (operation === "search") {
-      const results = await searchMemory({
+      const results = await searchMemoryWithSessions({
         userId,
         query: String(payload.query || ""),
         limit: payload.limit ? Number(payload.limit) : undefined,
@@ -58,10 +59,9 @@ export async function POST(request: Request) {
     }
 
     if (operation === "get") {
-      const result = await readMemoryFile({
-        userId,
-        path: String(payload.path || ""),
-      });
+      const path = String(payload.path || "");
+      const result = await readSessionTranscriptByPath({ userId, path })
+        ?? await readMemoryFile({ userId, path });
       if (!result) {
         return Response.json({ success: false, error: "Not found" }, { status: 404 });
       }

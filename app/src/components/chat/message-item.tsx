@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Paperclip, Download } from "lucide-react";
+import { Paperclip, Download, FileIcon } from "lucide-react";
 import { MessageBubble } from "./message-bubble";
 import { CollapsedTrace } from "./collapsed-trace";
 import { ToolApprovalCard } from "./tool-approval-card";
-import type { MessagePart, AttachmentData } from "./message-list";
+import type { MessagePart, AttachmentData, SandboxFileData } from "./message-list";
 import type { IntegrationType } from "@/lib/integration-icons";
 import type { ActivityItemData } from "./activity-item";
-import { useDownloadAttachment } from "@/orpc/hooks";
+import { useDownloadAttachment, useDownloadSandboxFile } from "@/orpc/hooks";
 
 // Display segment for saved messages
 type DisplaySegment = {
@@ -32,12 +32,14 @@ type Props = {
   parts?: MessagePart[];
   integrationsUsed?: string[];
   attachments?: AttachmentData[];
+  sandboxFiles?: SandboxFileData[];
 };
 
-export function MessageItem({ id, role, content, parts, integrationsUsed, attachments }: Props) {
+export function MessageItem({ id, role, content, parts, integrationsUsed, attachments, sandboxFiles }: Props) {
   // Track expanded state for each segment
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
   const { mutateAsync: downloadAttachment } = useDownloadAttachment();
+  const { mutateAsync: downloadSandboxFile } = useDownloadSandboxFile();
 
   const handleDownload = async (attachment: AttachmentData) => {
     if (!attachment.id) return;
@@ -53,6 +55,22 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
       document.body.removeChild(link);
     } catch (err) {
       console.error("Failed to download attachment:", err);
+    }
+  };
+
+  const handleDownloadSandboxFile = async (file: SandboxFileData) => {
+    try {
+      const result = await downloadSandboxFile(file.fileId);
+      // Trigger download via temporary link
+      const link = document.createElement("a");
+      link.href = result.url;
+      link.download = file.filename;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Failed to download sandbox file:", err);
     }
   };
 
@@ -285,15 +303,48 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
 
       {/* Show message bubble if there's text content */}
       {textContent && (
-        <MessageBubble role="assistant" content={textContent} />
+        <MessageBubble
+          role="assistant"
+          content={textContent}
+          sandboxFiles={sandboxFiles}
+          onFileClick={handleDownloadSandboxFile}
+        />
+      )}
+
+      {/* Show sandbox files as downloadable attachments */}
+      {sandboxFiles && sandboxFiles.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {sandboxFiles.map((file) => (
+            <button
+              key={file.fileId}
+              onClick={() => handleDownloadSandboxFile(file)}
+              className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm"
+            >
+              <FileIcon className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium">{file.filename}</span>
+              {file.sizeBytes && (
+                <span className="text-xs text-muted-foreground">
+                  ({formatFileSize(file.sizeBytes)})
+                </span>
+              )}
+              <Download className="w-4 h-4 ml-1 text-muted-foreground" />
+            </button>
+          ))}
+        </div>
       )}
 
       {/* If no text and no trace, show empty indicator */}
-      {!textContent && !hasTrace && (
+      {!textContent && !hasTrace && !sandboxFiles?.length && (
         <div className="text-sm text-muted-foreground italic">
           Task completed
         </div>
       )}
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

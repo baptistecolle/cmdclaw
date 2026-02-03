@@ -2,7 +2,7 @@ name: bap-local
 
 services:
   database:
-    image: postgres
+    image: pgvector/pgvector:pg16
     container_name: bap-postgres-local
     environment:
       POSTGRES_USER: postgres

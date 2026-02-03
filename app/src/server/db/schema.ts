@@ -470,6 +470,30 @@ export const messageAttachment = pgTable(
   (table) => [index("message_attachment_message_id_idx").on(table.messageId)]
 );
 
+// Sandbox files created by the AI agent that are surfaced to users
+export const sandboxFile = pgTable(
+  "sandbox_file",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    messageId: text("message_id").references(() => message.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    path: text("path").notNull(),           // Original sandbox path: /app/output.pdf
+    filename: text("filename").notNull(),   // Just the filename: output.pdf
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes"),
+    storageKey: text("storage_key"),        // S3 key for uploaded file
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("sandbox_file_message_id_idx").on(table.messageId),
+    index("sandbox_file_conversation_id_idx").on(table.conversationId),
+  ]
+);
+
 export const messageRelations = relations(message, ({ one, many }) => ({
   conversation: one(conversation, {
     fields: [message.conversationId],
@@ -481,12 +505,24 @@ export const messageRelations = relations(message, ({ one, many }) => ({
     relationName: "parentMessage",
   }),
   attachments: many(messageAttachment),
+  sandboxFiles: many(sandboxFile),
 }));
 
 export const messageAttachmentRelations = relations(messageAttachment, ({ one }) => ({
   message: one(message, {
     fields: [messageAttachment.messageId],
     references: [message.id],
+  }),
+}));
+
+export const sandboxFileRelations = relations(sandboxFile, ({ one }) => ({
+  message: one(message, {
+    fields: [sandboxFile.messageId],
+    references: [message.id],
+  }),
+  conversation: one(conversation, {
+    fields: [sandboxFile.conversationId],
+    references: [conversation.id],
   }),
 }));
 
@@ -773,6 +809,84 @@ export const memoryChunkRelations = relations(memoryChunk, ({ one }) => ({
 
 export const memorySettingsRelations = relations(memorySettings, ({ one }) => ({
   user: one(user, { fields: [memorySettings.userId], references: [user.id] }),
+}));
+
+// ========== SESSION TRANSCRIPTS ==========
+
+export const sessionTranscript = pgTable(
+  "session_transcript",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id")
+      .references(() => conversation.id, { onDelete: "set null" }),
+    sessionId: text("session_id"),
+    title: text("title"),
+    slug: text("slug"),
+    path: text("path").notNull(),
+    date: date("date", { mode: "date" }),
+    source: text("source"),
+    messageCount: integer("message_count"),
+    startedAt: timestamp("started_at"),
+    endedAt: timestamp("ended_at"),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("session_transcript_user_id_idx").on(table.userId),
+    index("session_transcript_conversation_id_idx").on(table.conversationId),
+    unique("session_transcript_user_path_idx").on(table.userId, table.path),
+  ]
+);
+
+export const sessionTranscriptChunk = pgTable(
+  "session_transcript_chunk",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    transcriptId: text("transcript_id")
+      .notNull()
+      .references(() => sessionTranscript.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    contentHash: text("content_hash").notNull(),
+    startLine: integer("start_line"),
+    endLine: integer("end_line"),
+    embedding: vector("embedding", { dimensions: 1536 }),
+    embeddingProvider: text("embedding_provider"),
+    embeddingModel: text("embedding_model"),
+    embeddingDimensions: integer("embedding_dimensions"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("session_transcript_chunk_user_id_idx").on(table.userId),
+    index("session_transcript_chunk_transcript_id_idx").on(table.transcriptId),
+    index("session_transcript_chunk_hash_idx").on(table.contentHash),
+  ]
+);
+
+export const sessionTranscriptRelations = relations(sessionTranscript, ({ one, many }) => ({
+  user: one(user, { fields: [sessionTranscript.userId], references: [user.id] }),
+  conversation: one(conversation, {
+    fields: [sessionTranscript.conversationId],
+    references: [conversation.id],
+  }),
+  chunks: many(sessionTranscriptChunk),
+}));
+
+export const sessionTranscriptChunkRelations = relations(sessionTranscriptChunk, ({ one }) => ({
+  user: one(user, { fields: [sessionTranscriptChunk.userId], references: [user.id] }),
+  transcript: one(sessionTranscript, {
+    fields: [sessionTranscriptChunk.transcriptId],
+    references: [sessionTranscript.id],
+  }),
 }));
 
 // ========== PROVIDER AUTH SCHEMA ==========

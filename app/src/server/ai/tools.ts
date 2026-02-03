@@ -129,7 +129,7 @@ export const searchContentTool: ToolDefinition = {
 export const memorySearchTool: ToolDefinition = {
   name: "memory_search",
   description:
-    "Search persistent memory (long-term and daily logs) using semantic + keyword search.",
+    "Search persistent memory (long-term, daily logs, and session transcripts) using semantic + keyword search.",
   input_schema: {
     type: "object",
     properties: {
@@ -151,7 +151,8 @@ export const memorySearchTool: ToolDefinition = {
 
 export const memoryGetTool: ToolDefinition = {
   name: "memory_get",
-  description: "Read a specific memory file by path (MEMORY.md or memory/YYYY-MM-DD.md).",
+  description:
+    "Read a specific memory file by path (MEMORY.md, memory/YYYY-MM-DD.md, or sessions/YYYY-MM-DD-HHMMSS-<slug>.md).",
   input_schema: {
     type: "object",
     properties: {
@@ -194,6 +195,28 @@ export const memoryWriteTool: ToolDefinition = {
   },
 };
 
+export const sendFileTool: ToolDefinition = {
+  name: "send_file",
+  description:
+    "Send a file from the sandbox to the user. Use this when you've created a file " +
+    "the user needs to download (PDFs, images, documents, code files, etc). " +
+    "The file will appear as a downloadable attachment in the chat.",
+  input_schema: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Absolute path to the file in the sandbox (e.g., /app/output.pdf)",
+      },
+      description: {
+        type: "string",
+        description: "Brief description of the file for the user",
+      },
+    },
+    required: ["path"],
+  },
+};
+
 /**
  * Get all tool definitions for direct mode.
  */
@@ -208,6 +231,7 @@ export function getDirectModeTools(): ToolDefinition[] {
     memorySearchTool,
     memoryGetTool,
     memoryWriteTool,
+    sendFileTool,
   ];
 }
 

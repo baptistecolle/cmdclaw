@@ -626,6 +626,14 @@ export type AuthNeededData = {
   reason?: string;
 };
 
+export type SandboxFileData = {
+  fileId: string;
+  path: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number | null;
+};
+
 export type GenerationCallbacks = {
   onText?: (content: string) => void;
   onThinking?: (data: ThinkingData) => void;
@@ -636,6 +644,7 @@ export type GenerationCallbacks = {
   onAuthNeeded?: (data: AuthNeededData) => void;
   onAuthProgress?: (connected: string, remaining: string[]) => void;
   onAuthResult?: (success: boolean, integrations?: string[]) => void;
+  onSandboxFile?: (data: SandboxFileData) => void;
   onDone?: (
     generationId: string,
     conversationId: string,
@@ -734,6 +743,15 @@ export function useGeneration() {
               break;
             case "auth_result":
               callbacks.onAuthResult?.(event.success, event.integrations);
+              break;
+            case "sandbox_file":
+              callbacks.onSandboxFile?.({
+                fileId: event.fileId,
+                path: event.path,
+                filename: event.filename,
+                mimeType: event.mimeType,
+                sizeBytes: event.sizeBytes,
+              });
               break;
             case "done":
               callbacks.onDone?.(
@@ -839,6 +857,15 @@ export function useGeneration() {
             break;
           case "auth_result":
             callbacks.onAuthResult?.(event.success, event.integrations);
+            break;
+          case "sandbox_file":
+            callbacks.onSandboxFile?.({
+              fileId: event.fileId,
+              path: event.path,
+              filename: event.filename,
+              mimeType: event.mimeType,
+              sizeBytes: event.sizeBytes,
+            });
             break;
           case "done":
             callbacks.onDone?.(
@@ -948,5 +975,22 @@ export function useDownloadAttachment() {
   return useMutation({
     mutationFn: (attachmentId: string) =>
       client.conversation.downloadAttachment({ attachmentId }),
+  });
+}
+
+// Hook for downloading a sandbox file (returns presigned URL)
+export function useDownloadSandboxFile() {
+  return useMutation({
+    mutationFn: (fileId: string) =>
+      client.conversation.downloadSandboxFile({ fileId }),
+  });
+}
+
+// Hook for getting sandbox files for a conversation
+export function useSandboxFiles(conversationId: string | undefined) {
+  return useQuery({
+    queryKey: ["sandboxFiles", conversationId],
+    queryFn: () => client.conversation.getSandboxFiles({ conversationId: conversationId! }),
+    enabled: !!conversationId,
   });
 }
