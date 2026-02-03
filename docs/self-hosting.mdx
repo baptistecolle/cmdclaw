@@ -64,12 +64,161 @@ description: "Deploy your own Bap instance with Docker, PostgreSQL, and Redis."
   </Step>
 </Steps>
 
+## Docker Compose (all-in-one)
+
+For a fully containerized setup (app + worker + WS server + DB + Redis + MinIO),
+save the file below as `docker-compose.selfhost.yml` in `bap/app`, then run:
+
+```bash
+docker compose -f docker-compose.selfhost.yml up -d --build
+```
+
+Then open `http://localhost:3000`.
+
+### docker-compose.selfhost.yml
+
+```yaml
+name: bap-selfhost
+
+services:
+  app:
+    build: .
+    container_name: bap-app
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "3000:3000"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: bap-worker
+    env_file: .env
+    command: ["bun", "worker"]
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ws:
+    build: .
+    container_name: bap-ws
+    env_file: .env
+    command: ["bun", "scripts/start-ws.ts"]
+    environment:
+      WS_PORT: "4097"
+    ports:
+      - "4097:4097"
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+
+  database:
+    image: postgres
+    container_name: bap-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: bap
+    ports:
+      - "5432:5432"
+    volumes:
+      - bap_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:8-alpine
+    container_name: bap-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - bap_redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    container_name: bap-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - bap_minio_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bap_postgres_data:
+  bap_redis_data:
+  bap_minio_data:
+```
+
+## BYOC daemon (local compute)
+
+The BYOC daemon is meant to run on the user's local machine, not inside the
+server Docker stack. This lets the server execute tools and sandbox commands on
+their device.
+
+1. Install the daemon using the provided scripts in `src/daemon/scripts/`.
+2. Authenticate the device:
+
+```bash
+bap-daemon auth
+```
+
+3. Start the daemon:
+
+```bash
+bap-daemon start
+```
+
+If you don't want BYOC, set `E2B_API_KEY` and `E2B_TEMPLATE` to use E2B cloud
+sandboxes instead.
+
 ## Background worker
 
 Bap uses BullMQ for background jobs (e.g., processing integrations). Start the worker in a separate terminal:
 
 ```bash
 bun worker
+```
+
+## WebSocket server (BYOC)
+
+The WebSocket server handles daemon connections and runs separately from Next.js:
+
+```bash
+bun ws:dev
 ```
 
 ## Useful commands
@@ -79,6 +228,7 @@ bun worker
 | `bun dev` | Start the dev server |
 | `bun build` | Production build |
 | `bun worker` | Start the background job worker |
+| `bun ws:dev` | Start the BYOC WebSocket server |
 | `bun db:push` | Push schema changes to the database |
 | `bun db:studio` | Open Drizzle Studio (database browser) |
 | `bun db:seed` | Seed the database |
