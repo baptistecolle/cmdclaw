@@ -1,7 +1,10 @@
 import makeWASocket, {
+  type AuthenticationState,
   Browsers,
   BufferJSON,
   DisconnectReason,
+  type SignalDataSet,
+  type SignalDataTypeMap,
   initAuthCreds,
   proto,
 } from "@whiskeysockets/baileys";
@@ -89,30 +92,33 @@ async function removeAuthData(key: string): Promise<void> {
   await db.delete(whatsappAuthState).where(eq(whatsappAuthState.id, key));
 }
 
-async function useDbAuthState() {
+async function useDbAuthState(): Promise<{
+  state: AuthenticationState;
+  saveCreds: () => Promise<void>;
+}> {
   const storedCreds = (await readAuthData("creds.json")) as ReturnType<typeof initAuthCreds> | null;
   const creds = storedCreds ?? initAuthCreds();
   return {
     state: {
       creds,
       keys: {
-        get: async (type: string, ids: string[]) => {
-          const data: Record<string, unknown> = {};
+        get: async <T extends keyof SignalDataTypeMap>(type: T, ids: string[]) => {
+          const data: { [id: string]: SignalDataTypeMap[T] } = {};
           await Promise.all(
             ids.map(async (id) => {
               let value = await readAuthData(`${type}-${id}.json`);
               if (type === "app-state-sync-key" && value) {
                 value = proto.Message.AppStateSyncKeyData.fromObject(value as object);
               }
-              data[id] = value ?? null;
+              data[id] = (value ?? null) as SignalDataTypeMap[T];
             })
           );
           return data;
         },
-        set: async (data: Record<string, Record<string, unknown>>) => {
+        set: async (data: SignalDataSet) => {
           const tasks: Promise<void>[] = [];
           for (const category of Object.keys(data)) {
-            const entries = data[category] ?? {};
+            const entries = data[category as keyof SignalDataSet] ?? {};
             for (const id of Object.keys(entries)) {
               const value = entries[id];
               const key = `${category}-${id}.json`;

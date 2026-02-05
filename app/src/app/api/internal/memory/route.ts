@@ -83,8 +83,12 @@ export async function POST(request: Request) {
       if (state?.sandbox) {
         await syncMemoryToSandbox(
           userId,
-          (path, content) => state.sandbox.files.write(path, content),
-          (dir) => state.sandbox.commands.run(`mkdir -p "${dir}"`)
+          async (path, content) => {
+            await state.sandbox.files.write(path, content);
+          },
+          async (dir) => {
+            await state.sandbox.commands.run(`mkdir -p "${dir}"`);
+          }
         );
       }
 

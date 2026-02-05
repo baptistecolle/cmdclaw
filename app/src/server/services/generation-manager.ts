@@ -1008,8 +1008,12 @@ class GenerationManager {
       try {
         await syncMemoryToSandbox(
           ctx.userId,
-          (path, content) => sandbox.files.write(path, content),
-          (dir) => sandbox.commands.run(`mkdir -p "${dir}"`)
+          async (path, content) => {
+            await sandbox.files.write(path, content);
+          },
+          async (dir) => {
+            await sandbox.commands.run(`mkdir -p "${dir}"`);
+          }
         );
       } catch (err) {
         console.error("[GenerationManager] Failed to sync memory to sandbox:", err);
@@ -1339,8 +1343,12 @@ class GenerationManager {
       try {
         await syncMemoryToSandbox(
           ctx.userId,
-          (path, content) => sandbox!.writeFile(path, content),
-          (dir) => sandbox!.execute(`mkdir -p "${dir}"`)
+          async (path, content) => {
+            await sandbox!.writeFile(path, content);
+          },
+          async (dir) => {
+            await sandbox!.execute(`mkdir -p "${dir}"`);
+          }
         );
       } catch (err) {
         console.error("[GenerationManager] Failed to sync memory to sandbox:", err);
@@ -1830,8 +1838,12 @@ class GenerationManager {
 
           await syncMemoryToSandbox(
             ctx.userId,
-            (path, fileContent) => sandbox.writeFile(path, fileContent),
-            (dir) => sandbox.execute(`mkdir -p "${dir}"`)
+            async (path, fileContent) => {
+              await sandbox.writeFile(path, fileContent);
+            },
+            async (dir) => {
+              await sandbox.execute(`mkdir -p "${dir}"`);
+            }
           );
 
           return { content: JSON.stringify({ success: true, entryId: entry.id }, null, 2) };

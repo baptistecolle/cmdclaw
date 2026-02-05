@@ -9,6 +9,14 @@ import { cn } from "@/lib/utils";
 
 type SessionData = Awaited<ReturnType<typeof authClient.getSession>>["data"];
 
+function getPhoneNumber(user: unknown): string {
+  if (user && typeof user === "object" && "phoneNumber" in user) {
+    const value = (user as { phoneNumber?: string | null }).phoneNumber;
+    return typeof value === "string" ? value : "";
+  }
+  return "";
+}
+
 export default function SettingsPage() {
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -34,8 +42,9 @@ export default function SettingsPage() {
           setFirstName(nameParts[0] || "");
           setLastName(nameParts.slice(1).join(" ") || "");
         }
-        if (res?.data?.user?.phoneNumber) {
-          setPhoneNumber(res.data.user.phoneNumber);
+        const phone = getPhoneNumber(res?.data?.user);
+        if (phone) {
+          setPhoneNumber(phone);
         }
         setStatus("ready");
       })
