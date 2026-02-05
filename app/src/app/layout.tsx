@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AutumnProvider } from "autumn-js/react";
 
 import { ORPCProvider } from "@/orpc/provider";
+import { PostHogClientProvider } from "@/components/posthog-provider";
 import { env } from "@/env";
 import "./globals.css";
 
@@ -40,11 +41,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ORPCProvider>
-          <AutumnProvider betterAuthUrl={env.NEXT_PUBLIC_APP_URL}>
-            {children}
-          </AutumnProvider>
-        </ORPCProvider>
+        <PostHogClientProvider>
+          <ORPCProvider>
+            <AutumnProvider betterAuthUrl={env.NEXT_PUBLIC_APP_URL}>
+              {children}
+            </AutumnProvider>
+          </ORPCProvider>
+        </PostHogClientProvider>
       </body>
     </html>
   );
