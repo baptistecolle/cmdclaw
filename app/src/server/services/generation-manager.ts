@@ -209,6 +209,29 @@ const COMPACTION_SUMMARY_SYSTEM_PROMPT = [
   "Be concise, factual, and keep the summary under 400 words.",
 ].join("\n");
 
+function normalizePermissionPattern(pattern: string): string {
+  return pattern.replace(/[\s*]+$/g, "").replace(/\/+$/, "");
+}
+
+function shouldAutoApproveOpenCodePermission(
+  permissionType: string,
+  patterns: string[] | undefined
+): boolean {
+  if (!patterns?.length) return false;
+
+  return patterns.every((pattern) => {
+    const normalized = normalizePermissionPattern(pattern);
+
+    // Always allow access to staged uploads directory.
+    if (normalized.startsWith("/home/user/uploads")) return true;
+
+    // OpenCode may ask external_directory for user files directly in /home/user.
+    if (permissionType === "external_directory" && normalized.startsWith("/home/user")) return true;
+
+    return false;
+  });
+}
+
 type MessageRow = typeof message.$inferSelect;
 
 function estimateTokensFromText(text: string): number {
@@ -1199,12 +1222,11 @@ class GenerationManager {
           opencodePermissionCount += 1;
           const permProps = (event as any).properties as Record<string, unknown>;
           const permissionID = permProps.id as string;
+          const permissionType = (permProps.permission as string) || "file access";
           const patterns = permProps.patterns as string[] | undefined;
-          const allPatternsAllowed = patterns?.every(
-            (p) => p.startsWith("/home/user/uploads/")
-          );
+          const allPatternsAllowed = shouldAutoApproveOpenCodePermission(permissionType, patterns);
           if (permissionID && allPatternsAllowed) {
-            console.log("[GenerationManager] Auto-approving upload permission:", permissionID, patterns);
+            console.log("[GenerationManager] Auto-approving sandbox permission:", permissionID, permissionType, patterns);
             try {
               await client.postSessionIdPermissionsPermissionId({
                 path: { id: sessionId, permissionID },
@@ -1216,7 +1238,6 @@ class GenerationManager {
           } else {
             console.log("[GenerationManager] Surfacing permission request to UI:", permissionID, permProps.permission, patterns);
             const toolUseId = `opencode-perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            const permissionType = (permProps.permission as string) || "file access";
             const command = patterns?.length
               ? `${permissionType}: ${patterns.join(", ")}`
               : permissionType;
