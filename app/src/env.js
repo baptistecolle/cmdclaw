@@ -38,6 +38,7 @@ export const env = createEnv({
     // E2B Sandbox
     E2B_API_KEY: z.string().optional(),
     E2B_TEMPLATE: z.string().optional(),
+    ANVIL_API_KEY: z.string().optional(),
     // OAuth credentials
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
@@ -130,6 +131,7 @@ export const env = createEnv({
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     E2B_API_KEY: process.env.E2B_API_KEY,
     E2B_TEMPLATE: process.env.E2B_TEMPLATE,
+    ANVIL_API_KEY: process.env.ANVIL_API_KEY,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     NOTION_CLIENT_ID: process.env.NOTION_CLIENT_ID,

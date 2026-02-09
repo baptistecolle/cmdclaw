@@ -91,6 +91,7 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   const sandbox = await Sandbox.create(TEMPLATE_NAME, {
     envs: {
       ANTHROPIC_API_KEY: config.anthropicApiKey,
+      ANVIL_API_KEY: env.ANVIL_API_KEY || "",
       APP_URL: (env.APP_URL && new URL(env.APP_URL).hostname === "localhost"
         ? "https://localcan.baptistecolle.com"
         : env.APP_URL) || "",
