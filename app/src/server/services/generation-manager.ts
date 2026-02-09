@@ -1081,6 +1081,12 @@ class GenerationManager {
 
       let currentTextPart: { type: "text"; text: string } | null = null;
       let currentTextPartId: string | null = null;
+      const verboseOpenCodeEventLogs = process.env.OPENCODE_VERBOSE_EVENTS === "1";
+      let opencodeEventCount = 0;
+      let opencodeToolCallCount = 0;
+      let opencodePermissionCount = 0;
+      let stagedUploadCount = 0;
+      let stagedUploadFailureCount = 0;
 
       // Subscribe to SSE events BEFORE sending the prompt
       const eventResult = await client.event.subscribe();
@@ -1113,8 +1119,9 @@ class GenerationManager {
                 type: "text",
                 text: `The user uploaded a file: ${sandboxPath} (${a.mimeType}). You can read and process it using the sandbox tools.`,
               });
-              console.log(`[GenerationManager] Wrote uploaded file to sandbox: ${sandboxPath}`);
+              stagedUploadCount += 1;
             } catch (err) {
+              stagedUploadFailureCount += 1;
               console.error(`[GenerationManager] Failed to write file to sandbox: ${sandboxPath}`, err);
               promptParts.push({
                 type: "text",
@@ -1124,9 +1131,16 @@ class GenerationManager {
           }
         }
       }
+      if (stagedUploadCount > 0 || stagedUploadFailureCount > 0) {
+        console.info(
+          `[GenerationManager][LIFECYCLE] ATTACHMENTS_STAGED generationId=${ctx.id} conversationId=${ctx.conversationId} staged=${stagedUploadCount} failed=${stagedUploadFailureCount}`
+        );
+      }
 
       // Send the prompt to OpenCode
-      console.log("[GenerationManager] Sending prompt to OpenCode session:", sessionId);
+      console.info(
+        `[GenerationManager][LIFECYCLE] OPENCODE_PROMPT_SENT generationId=${ctx.id} conversationId=${ctx.conversationId} sessionId=${sessionId}`
+      );
       const promptPromise = client.session.prompt({
         path: { id: sessionId },
         body: {
@@ -1142,20 +1156,27 @@ class GenerationManager {
           break;
         }
 
-        // Log events for debugging
-        const eventJson = JSON.stringify(event.properties || {});
+        opencodeEventCount += 1;
+
         if (event.type === "message.part.updated") {
           const part = (event.properties as any)?.part;
-          if (part?.type === "tool") {
-            // Log tool state for debugging (state contains input/output)
-            console.log("[OpenCode Event] TOOL:", {
-              callID: part.callID,
-              tool: part.tool,
-              state: part.state,
-            });
+          if (part?.type === "tool" && part?.state?.status === "pending") {
+            opencodeToolCallCount += 1;
           }
         }
-        console.log("[OpenCode Event]", event.type, eventJson.slice(0, 200));
+
+        if (verboseOpenCodeEventLogs) {
+          const eventJson = JSON.stringify(event.properties || {});
+          console.log("[OpenCode Event]", event.type, eventJson.slice(0, 200));
+        } else if (
+          event.type === "server.connected" ||
+          event.type === "session.error" ||
+          event.type === "session.idle"
+        ) {
+          console.info(
+            `[OpenCode][EVENT] type=${event.type} generationId=${ctx.id} conversationId=${ctx.conversationId}`
+          );
+        }
 
         // Transform OpenCode events to GenerationEvents
         await this.processOpencodeEvent(ctx, event, currentTextPart, currentTextPartId, (part, partId) => {
@@ -1165,6 +1186,7 @@ class GenerationManager {
 
         // Auto-approve permission requests only for uploaded files directory
         if ((event.type as string) === "permission.asked") {
+          opencodePermissionCount += 1;
           const permProps = (event as any).properties as Record<string, unknown>;
           const permissionID = permProps.id as string;
           const patterns = permProps.patterns as string[] | undefined;
@@ -1262,6 +1284,7 @@ class GenerationManager {
       await promptPromise;
 
       // Collect new files created in the sandbox during generation
+      let uploadedSandboxFileCount = 0;
       if (ctx.e2bSandbox && ctx.generationMarkerTime) {
         try {
           const newFiles = await collectNewE2BFiles(
@@ -1290,7 +1313,7 @@ class GenerationManager {
                 sizeBytes: fileRecord.sizeBytes,
               });
 
-              console.log(`[GenerationManager] Uploaded sandbox file: ${file.path}`);
+              uploadedSandboxFileCount += 1;
             } catch (err) {
               console.error(`[GenerationManager] Failed to upload sandbox file ${file.path}:`, err);
             }
@@ -1302,15 +1325,24 @@ class GenerationManager {
 
       // Check if aborted
       if (ctx.abortController.signal.aborted) {
+        console.info(
+          `[GenerationManager][SUMMARY] status=cancelled generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`
+        );
         await this.finishGeneration(ctx, "cancelled");
         return;
       }
 
       // Complete the generation
+      console.info(
+        `[GenerationManager][SUMMARY] status=completed generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`
+      );
       await this.finishGeneration(ctx, "completed");
     } catch (error) {
       console.error("[GenerationManager] Error:", error);
       ctx.errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.info(
+        `[GenerationManager][SUMMARY] status=error generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} error=${JSON.stringify(ctx.errorMessage)}`
+      );
       await this.finishGeneration(ctx, "error");
     }
   }

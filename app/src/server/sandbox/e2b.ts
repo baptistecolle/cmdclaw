@@ -24,6 +24,10 @@ interface SandboxState {
 
 const activeSandboxes = new Map<string, SandboxState>();
 
+function logLifecycle(event: string, details: Record<string, unknown>): void {
+  console.info(`[E2B][LIFECYCLE] ${event} ${JSON.stringify(details)}`);
+}
+
 export interface SandboxConfig {
   conversationId: string;
   userId?: string;
@@ -59,7 +63,14 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
     // Verify sandbox and OpenCode server are alive
     try {
       const res = await fetch(`${state.serverUrl}/doc`, { method: "GET" });
-      if (res.ok) return state.sandbox;
+      if (res.ok) {
+        logLifecycle("VM_REUSED", {
+          conversationId: config.conversationId,
+          sandboxId: state.sandbox.sandboxId,
+          serverUrl: state.serverUrl,
+        });
+        return state.sandbox;
+      }
     } catch {
       // Sandbox or server is dead, remove from cache and create new one
       await state.sandbox.kill().catch(() => {});
@@ -69,8 +80,13 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
 
   // Create new sandbox
   const hasApiKey = !!config.anthropicApiKey;
-  console.log("[E2B] Creating sandbox from template:", TEMPLATE_NAME);
-  console.log("[E2B] API key:", hasApiKey ? "present" : "MISSING");
+  const vmCreateStart = Date.now();
+  logLifecycle("VM_START_REQUESTED", {
+    conversationId: config.conversationId,
+    template: TEMPLATE_NAME,
+    hasAnthropicApiKey: hasApiKey,
+    timeoutMs: SANDBOX_TIMEOUT_MS,
+  });
 
   const sandbox = await Sandbox.create(TEMPLATE_NAME, {
     envs: {
@@ -84,6 +100,12 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
     },
     timeoutMs: SANDBOX_TIMEOUT_MS,
   });
+  logLifecycle("VM_STARTED", {
+    conversationId: config.conversationId,
+    sandboxId: sandbox.sandboxId,
+    template: TEMPLATE_NAME,
+    durationMs: Date.now() - vmCreateStart,
+  });
 
   // Set SANDBOX_ID env var (needed by plugin)
   await sandbox.commands.run(
@@ -91,7 +113,11 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   );
 
   // Start OpenCode server in background
-  console.log("[E2B] Starting OpenCode server...");
+  logLifecycle("OPENCODE_SERVER_START_REQUESTED", {
+    conversationId: config.conversationId,
+    sandboxId: sandbox.sandboxId,
+    port: OPENCODE_PORT,
+  });
   sandbox.commands.run(
     `cd /app && opencode serve --port ${OPENCODE_PORT} --hostname 0.0.0.0`,
     {
@@ -102,6 +128,7 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
 
   // Get the public URL for the sandbox port
   const serverUrl = `https://${sandbox.getHost(OPENCODE_PORT)}`;
+  const serverReadyStart = Date.now();
   await waitForServer(serverUrl);
 
   // Create SDK client pointing to sandbox's OpenCode server
@@ -112,7 +139,12 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   state = { sandbox, client, sessionId: null, serverUrl };
   activeSandboxes.set(config.conversationId, state);
 
-  console.log("[E2B] OpenCode server ready at:", serverUrl);
+  logLifecycle("OPENCODE_SERVER_READY", {
+    conversationId: config.conversationId,
+    sandboxId: sandbox.sandboxId,
+    serverUrl,
+    durationMs: Date.now() - serverReadyStart,
+  });
   return sandbox;
 }
 
@@ -156,7 +188,11 @@ export async function getOrCreateSession(
 
   // Reuse existing session if one already exists for this conversation
   if (state.sessionId) {
-    console.log(`[E2B] Reusing existing session ${state.sessionId} for conversation ${config.conversationId}`);
+    logLifecycle("SESSION_REUSED", {
+      conversationId: config.conversationId,
+      sessionId: state.sessionId,
+      sandboxId: state.sandbox.sandboxId,
+    });
     return { client: state.client, sessionId: state.sessionId, sandbox: state.sandbox };
   }
 
@@ -171,6 +207,11 @@ export async function getOrCreateSession(
 
   const sessionId = sessionResult.data.id;
   state.sessionId = sessionId;
+  logLifecycle("SESSION_CREATED", {
+    conversationId: config.conversationId,
+    sessionId,
+    sandboxId: state.sandbox.sandboxId,
+  });
 
   // Inject subscription provider tokens if userId is available
   if (config.userId) {
@@ -317,6 +358,11 @@ export async function killSandbox(conversationId: string): Promise<void> {
   if (state) {
     try {
       await state.sandbox.kill();
+      logLifecycle("VM_TERMINATED", {
+        conversationId,
+        sandboxId: state.sandbox.sandboxId,
+        reason: "manual_kill",
+      });
     } catch (error) {
       console.error("[E2B] Failed to kill sandbox:", error);
     }
