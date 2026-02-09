@@ -41,6 +41,42 @@ const EXCLUDED_PATTERNS = [
   "bun.lockb",
 ];
 
+function shellEscape(value: string): string {
+  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+}
+
+function buildBase64ReadCommand(filePath: string): string {
+  const escapedPath = shellEscape(filePath);
+  return [
+    "if command -v python3 >/dev/null 2>&1; then",
+    `python3 -c "import base64,sys;print(base64.b64encode(open(sys.argv[1], 'rb').read()).decode('ascii'), end='')" ${escapedPath}`,
+    "else",
+    `base64 -w 0 ${escapedPath} 2>/dev/null || base64 ${escapedPath}`,
+    "fi",
+  ].join("\n");
+}
+
+export async function readSandboxFileAsBuffer(
+  sandbox: SandboxBackend,
+  filePath: string
+): Promise<Buffer> {
+  const result = await sandbox.execute(buildBase64ReadCommand(filePath), { timeout: 120_000 });
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Failed to read sandbox file: ${filePath}`);
+  }
+  const base64Content = result.stdout.replace(/\s+/g, "");
+  return Buffer.from(base64Content, "base64");
+}
+
+async function readE2BSandboxFileAsBuffer(sandbox: Sandbox, filePath: string): Promise<Buffer> {
+  const result = await sandbox.commands.run(buildBase64ReadCommand(filePath), { timeoutMs: 120_000 });
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Failed to read E2B file: ${filePath}`);
+  }
+  const base64Content = result.stdout.replace(/\s+/g, "");
+  return Buffer.from(base64Content, "base64");
+}
+
 /**
  * Upload a sandbox file to S3 and save record to database.
  */
@@ -118,11 +154,8 @@ export async function collectNewSandboxFiles(
 
   for (const filePath of paths) {
     try {
-      const content = await sandbox.readFile(filePath);
-      if (content) {
-        // sandbox.readFile returns a string, convert to Buffer
-        files.push({ path: filePath, content: Buffer.from(content) });
-      }
+      const content = await readSandboxFileAsBuffer(sandbox, filePath);
+      files.push({ path: filePath, content });
     } catch (err) {
       // Skip files we can't read
       console.warn(`[SandboxFileService] Could not read file ${filePath}:`, err);
@@ -176,11 +209,8 @@ export async function collectNewE2BFiles(
 
   for (const filePath of paths) {
     try {
-      const content = await sandbox.files.read(filePath);
-      if (content) {
-        // E2B files.read returns string, convert to Buffer
-        files.push({ path: filePath, content: Buffer.from(content) });
-      }
+      const content = await readE2BSandboxFileAsBuffer(sandbox, filePath);
+      files.push({ path: filePath, content });
     } catch (err) {
       // Skip files we can't read
       console.warn(`[SandboxFileService] Could not read E2B file ${filePath}:`, err);

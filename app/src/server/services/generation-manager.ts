@@ -49,6 +49,7 @@ import {
   uploadSandboxFile,
   collectNewSandboxFiles,
   collectNewE2BFiles,
+  readSandboxFileAsBuffer,
 } from "@/server/services/sandbox-file-service";
 import path from "path";
 
@@ -155,6 +156,8 @@ interface GenerationContext {
   attachments?: { name: string; mimeType: string; dataUrl: string }[];
   // Track assistant message IDs to filter out user message parts
   assistantMessageIds: Set<string>;
+  messageRoles: Map<string, string>;
+  pendingMessageParts: Map<string, Record<string, unknown>[]>;
   // BYOC fields
   backendType: BackendType;
   deviceId?: string;
@@ -175,6 +178,7 @@ interface GenerationContext {
   sandbox?: SandboxBackend;
   e2bSandbox?: import("e2b").Sandbox;
   sentFilePaths?: Set<string>;
+  uploadedSandboxFileIds?: Set<string>;
 }
 
 // Approval timeout: 5 minutes before pausing sandbox
@@ -375,9 +379,12 @@ class GenerationManager {
       model: model ?? conv.model ?? "claude-sonnet-4-20250514",
       userMessageContent: content,
       assistantMessageIds: new Set(),
+      messageRoles: new Map(),
+      pendingMessageParts: new Map(),
       backendType,
       deviceId: params.deviceId,
       attachments: params.attachments,
+      uploadedSandboxFileIds: new Set(),
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
@@ -466,6 +473,8 @@ class GenerationManager {
       model: model ?? "claude-sonnet-4-20250514",
       userMessageContent: content,
       assistantMessageIds: new Set(),
+      messageRoles: new Map(),
+      pendingMessageParts: new Map(),
       backendType: "opencode",
       workflowRunId: params.workflowRunId,
       allowedIntegrations: params.allowedIntegrations,
@@ -474,6 +483,7 @@ class GenerationManager {
       workflowPromptDo: params.workflowPromptDo ?? undefined,
       workflowPromptDont: params.workflowPromptDont ?? undefined,
       triggerPayload: params.triggerPayload,
+      uploadedSandboxFileIds: new Set(),
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
@@ -1302,6 +1312,7 @@ class GenerationManager {
                 content: file.content,
                 conversationId: ctx.conversationId,
               });
+              ctx.uploadedSandboxFileIds?.add(fileRecord.id);
 
               // Broadcast sandbox_file event so UI can update
               this.broadcast(ctx, {
@@ -1682,17 +1693,18 @@ class GenerationManager {
               let isError = false;
 
               try {
-                const content = await sandbox!.readFile(filePath);
-                if (!content) {
+                const content = await readSandboxFileAsBuffer(sandbox!, filePath);
+                if (content.length === 0) {
                   throw new Error("File not found or empty");
                 }
 
                 const fileRecord = await uploadSandboxFile({
                   path: filePath,
-                  content: Buffer.from(content),
+                  content,
                   conversationId: ctx.conversationId,
                   messageId: undefined, // Will be linked when message is saved
                 });
+                ctx.uploadedSandboxFileIds?.add(fileRecord.id);
 
                 resultContent = `File sent successfully: ${path.basename(filePath)}`;
 
@@ -2249,10 +2261,39 @@ class GenerationManager {
 
     switch (event.type) {
       case "message.updated": {
-        // Track assistant message IDs to filter out user message parts
         const info = props.info as Record<string, unknown>;
-        if (info?.role === "assistant" && info?.id) {
-          ctx.assistantMessageIds.add(info.id as string);
+        const messageId = typeof info?.id === "string" ? info.id : null;
+        const role = typeof info?.role === "string" ? info.role : null;
+
+        if (messageId && role) {
+          ctx.messageRoles.set(messageId, role);
+        }
+
+        if (messageId && role === "assistant") {
+          ctx.assistantMessageIds.add(messageId);
+          const pendingParts = ctx.pendingMessageParts.get(messageId);
+          if (pendingParts && pendingParts.length > 0) {
+            ctx.pendingMessageParts.delete(messageId);
+            let replayTextPart = currentTextPart;
+            let replayTextPartId = currentTextPartId;
+            const replaySetCurrentTextPart = (
+              part: { type: "text"; text: string } | null,
+              partId: string | null
+            ) => {
+              replayTextPart = part;
+              replayTextPartId = partId;
+              setCurrentTextPart(part, partId);
+            };
+            for (const pendingPart of pendingParts) {
+              await this.processOpencodeMessagePart(
+                ctx,
+                pendingPart,
+                replayTextPart,
+                replayTextPartId,
+                replaySetCurrentTextPart
+              );
+            }
+          }
         }
         break;
       }
@@ -2260,102 +2301,32 @@ class GenerationManager {
       case "message.part.updated": {
         const part = props.part as Record<string, unknown>;
         if (!part) return;
-
-        // Only process parts from assistant messages (filter out user message parts)
         const messageID = part.messageID as string;
-        if (messageID && !ctx.assistantMessageIds.has(messageID)) {
-          // This is a user message part, skip it
-          return;
-        }
 
-        const partId = part.id as string;
-
-        // Text content
-        // NOTE: OpenCode sends the FULL cumulative text with each update, not deltas
-        // We need to calculate the delta ourselves
-        if (part.type === "text") {
-          const fullText = part.text as string;
-          if (fullText) {
-            // Check if this is a new text part (different part ID)
-            const isNewPart = partId !== currentTextPartId;
-
-            // Calculate delta from the previous text
-            const previousLength = isNewPart ? 0 : (currentTextPart?.text.length ?? 0);
-            const delta = fullText.slice(previousLength);
-
-            // Only process if there's new content
-            if (delta) {
-              ctx.assistantContent += delta;
-              this.broadcast(ctx, { type: "text", content: delta });
-
-              if (currentTextPart && !isNewPart) {
-                // Update to the full cumulative text
-                currentTextPart.text = fullText;
-              } else {
-                // New text part - create a new entry
-                const newPart = { type: "text" as const, text: fullText };
-                ctx.contentParts.push(newPart);
-                setCurrentTextPart(newPart, partId);
-              }
-              this.scheduleSave(ctx);
+        if (messageID) {
+          const role = ctx.messageRoles.get(messageID);
+          if (role === "user") {
+            return;
+          }
+          if (role !== "assistant") {
+            // Preserve live streaming: process likely assistant parts immediately.
+            // Queue only parts that strongly look like user-echo updates.
+            if (!this.shouldProcessUnknownMessagePart(ctx, part)) {
+              const queued = ctx.pendingMessageParts.get(messageID) ?? [];
+              queued.push(part);
+              ctx.pendingMessageParts.set(messageID, queued);
+              return;
             }
           }
         }
 
-        // Tool call (OpenCode uses "tool" type with callID, tool, and state properties)
-        // See @opencode-ai/sdk ToolPart type: state contains input/output
-        // Status flow: pending (no input) -> running (has input) -> completed (has output)
-        if (part.type === "tool") {
-          setCurrentTextPart(null, null);
-          const toolUseId = part.callID as string;
-          const toolName = part.tool as string;
-          const state = part.state as Record<string, unknown> | undefined;
-
-          // Input is inside state.input
-          const toolInput = (state?.input || {}) as Record<string, unknown>;
-          const status = state?.status as string;
-          // Output is inside state.output when completed
-          const result = state?.output;
-
-          const existingToolUse = ctx.contentParts.find(
-            (p): p is ContentPart & { type: "tool_use" } =>
-              p.type === "tool_use" && p.id === toolUseId
-          );
-
-          if (status === "completed" && result !== undefined) {
-            // Tool completed - broadcast result
-            if (existingToolUse) {
-              this.broadcast(ctx, {
-                type: "tool_result",
-                toolName: existingToolUse.name,
-                result,
-              });
-              ctx.contentParts.push({
-                type: "tool_result",
-                tool_use_id: toolUseId,
-                content: result,
-              });
-              await this.saveProgress(ctx);
-            }
-          } else if (status === "running" && !existingToolUse) {
-            // Tool is running - now we have the actual input
-            // Only capture on "running" status, not "pending" (which has empty input)
-            this.broadcast(ctx, {
-              type: "tool_use",
-              toolName,
-              toolInput,
-              toolUseId,
-            });
-
-            ctx.contentParts.push({
-              type: "tool_use",
-              id: toolUseId || "",
-              name: toolName,
-              input: toolInput || {},
-            });
-            await this.saveProgress(ctx);
-          }
-        }
+        await this.processOpencodeMessagePart(
+          ctx,
+          part,
+          currentTextPart,
+          currentTextPartId,
+          setCurrentTextPart
+        );
         break;
       }
 
@@ -2371,6 +2342,133 @@ class GenerationManager {
       case "session.status": {
         // Can track status changes if needed
         break;
+      }
+    }
+  }
+
+  private shouldProcessUnknownMessagePart(
+    ctx: GenerationContext,
+    part: Record<string, unknown>
+  ): boolean {
+    if (part.type === "tool") {
+      return true;
+    }
+
+    if (part.type !== "text") {
+      return true;
+    }
+
+    const fullText = (part.text as string | undefined)?.trim();
+    const userText = ctx.userMessageContent.trim();
+    if (!fullText) {
+      return false;
+    }
+
+    // Guard against replaying user input text as assistant output.
+    if (
+      userText === fullText ||
+      userText.startsWith(fullText) ||
+      fullText.startsWith(userText)
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private async processOpencodeMessagePart(
+    ctx: GenerationContext,
+    part: Record<string, unknown>,
+    currentTextPart: { type: "text"; text: string } | null,
+    currentTextPartId: string | null,
+    setCurrentTextPart: (part: { type: "text"; text: string } | null, partId: string | null) => void
+  ): Promise<void> {
+    const partId = part.id as string;
+
+    // Text content
+    // NOTE: OpenCode sends the FULL cumulative text with each update, not deltas
+    // We need to calculate the delta ourselves
+    if (part.type === "text") {
+      const fullText = part.text as string;
+      if (fullText) {
+        // Check if this is a new text part (different part ID)
+        const isNewPart = partId !== currentTextPartId;
+
+        // Calculate delta from the previous text
+        const previousLength = isNewPart ? 0 : (currentTextPart?.text.length ?? 0);
+        const delta = fullText.slice(previousLength);
+
+        // Only process if there's new content
+        if (delta) {
+          ctx.assistantContent += delta;
+          this.broadcast(ctx, { type: "text", content: delta });
+
+          if (currentTextPart && !isNewPart) {
+            // Update to the full cumulative text
+            currentTextPart.text = fullText;
+          } else {
+            // New text part - create a new entry
+            const newPart = { type: "text" as const, text: fullText };
+            ctx.contentParts.push(newPart);
+            setCurrentTextPart(newPart, partId);
+          }
+          this.scheduleSave(ctx);
+        }
+      }
+    }
+
+    // Tool call (OpenCode uses "tool" type with callID, tool, and state properties)
+    // See @opencode-ai/sdk ToolPart type: state contains input/output
+    // Status flow: pending (no input) -> running (has input) -> completed (has output)
+    if (part.type === "tool") {
+      setCurrentTextPart(null, null);
+      const toolUseId = part.callID as string;
+      const toolName = part.tool as string;
+      const state = part.state as Record<string, unknown> | undefined;
+
+      // Input is inside state.input
+      const toolInput = (state?.input || {}) as Record<string, unknown>;
+      const status = state?.status as string;
+      // Output is inside state.output when completed
+      const result = state?.output;
+
+      const existingToolUse = ctx.contentParts.find(
+        (p): p is ContentPart & { type: "tool_use" } =>
+          p.type === "tool_use" && p.id === toolUseId
+      );
+
+      if (status === "completed" && result !== undefined) {
+        // Tool completed - broadcast result
+        if (existingToolUse) {
+          this.broadcast(ctx, {
+            type: "tool_result",
+            toolName: existingToolUse.name,
+            result,
+          });
+          ctx.contentParts.push({
+            type: "tool_result",
+            tool_use_id: toolUseId,
+            content: result,
+          });
+          await this.saveProgress(ctx);
+        }
+      } else if (status === "running" && !existingToolUse) {
+        // Tool is running - now we have the actual input
+        // Only capture on "running" status, not "pending" (which has empty input)
+        this.broadcast(ctx, {
+          type: "tool_use",
+          toolName,
+          toolInput,
+          toolUseId,
+        });
+
+        ctx.contentParts.push({
+          type: "tool_use",
+          id: toolUseId || "",
+          name: toolName,
+          input: toolInput || {},
+        });
+        await this.saveProgress(ctx);
       }
     }
   }
@@ -2693,7 +2791,6 @@ class GenerationManager {
       }
 
       // Auto-collect any new files created during generation (direct mode only)
-      const collectedFileIds: string[] = [];
       if (ctx.sandbox && ctx.generationMarkerTime) {
         try {
           const excludePaths = Array.from(ctx.sentFilePaths || []);
@@ -2707,8 +2804,7 @@ class GenerationManager {
                 conversationId: ctx.conversationId,
                 messageId: undefined, // Will be linked below
               });
-
-              collectedFileIds.push(fileRecord.id);
+              ctx.uploadedSandboxFileIds?.add(fileRecord.id);
 
               // Broadcast sandbox_file event
               this.broadcast(ctx, {
@@ -2743,14 +2839,15 @@ class GenerationManager {
 
       messageId = assistantMessage.id;
 
-      // Link collected sandbox files to the message
-      if (collectedFileIds.length > 0) {
+      // Link uploaded sandbox files to the final assistant message
+      const uploadedFileIds = Array.from(ctx.uploadedSandboxFileIds || []);
+      if (uploadedFileIds.length > 0) {
         const { sandboxFile } = await import("@/server/db/schema");
         const { inArray } = await import("drizzle-orm");
         await db
           .update(sandboxFile)
           .set({ messageId })
-          .where(inArray(sandboxFile.id, collectedFileIds));
+          .where(inArray(sandboxFile.id, uploadedFileIds));
       }
 
       // Generate title for new conversations

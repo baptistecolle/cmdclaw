@@ -6,6 +6,8 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { RouterClient } from "@orpc/server";
 import type { AppRouter } from "../src/server/orpc";
+import { createGenerationRuntime } from "../src/lib/generation-runtime";
+import { runGenerationStream } from "../src/lib/generation-stream";
 
 type ChatConfig = {
   serverUrl: string;
@@ -20,6 +22,7 @@ type Args = {
   files: string[];
   autoApprove: boolean;
   showThinking: boolean;
+  validatePersistence: boolean;
   authOnly: boolean;
   resetAuth: boolean;
 };
@@ -34,6 +37,7 @@ function parseArgs(argv: string[]): Args {
     files: [],
     autoApprove: false,
     showThinking: false,
+    validatePersistence: true,
     authOnly: false,
     resetAuth: false,
   };
@@ -61,6 +65,9 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--show-thinking":
         args.showThinking = true;
+        break;
+      case "--no-validate":
+        args.validatePersistence = false;
         break;
       case "--auth":
         args.authOnly = true;
@@ -101,6 +108,7 @@ function printHelp(): void {
   console.log("  -c, --conversation <id>   Continue an existing conversation");
   console.log("  --auto-approve            Auto-approve tool calls");
   console.log("  --show-thinking           Print thinking events");
+  console.log("  --no-validate             Skip persisted message validation");
   console.log("  --auth                    Run auth flow and exit");
   console.log("  --token <token>            Use provided auth token directly");
   console.log("  --reset-auth              Clear saved token and re-auth");
@@ -311,84 +319,112 @@ async function runGeneration(
   attachments?: { name: string; mimeType: string; dataUrl: string }[],
 ): Promise<{ generationId: string; conversationId: string } | null> {
   let outputStarted = false;
+  const runtime = createGenerationRuntime();
 
   try {
-    const { generationId, conversationId: convId } = await client.generation.startGeneration({
-      conversationId,
-      content,
-      autoApprove: options.autoApprove,
-      attachments: attachments?.length ? attachments : undefined,
-    });
-
-    const iterator = await client.generation.subscribeGeneration({ generationId });
-
-    for await (const event of iterator) {
-      switch (event.type) {
-        case "text":
-          process.stdout.write(event.content);
+    const result = await runGenerationStream({
+      client,
+      input: {
+        conversationId,
+        content,
+        autoApprove: options.autoApprove,
+        attachments: attachments?.length ? attachments : undefined,
+      },
+      callbacks: {
+        onText: (text) => {
+          process.stdout.write(text);
+          runtime.handleText(text);
           outputStarted = true;
-          break;
-        case "thinking":
+        },
+        onThinking: (thinking) => {
+          runtime.handleThinking(thinking);
           if (options.showThinking) {
-            process.stdout.write(`\n[thinking] ${event.content}\n`);
+            process.stdout.write(`\n[thinking] ${thinking.content}\n`);
           }
-          break;
-        case "tool_use":
-          process.stdout.write(`\n[tool_use] ${event.toolName}\n`);
-          break;
-        case "tool_result":
-          process.stdout.write(`\n[tool_result] ${event.toolName}\n`);
-          break;
-        case "pending_approval":
-          process.stdout.write(`\n[approval_needed] ${event.toolName}\n`);
+        },
+        onToolUse: (toolUse) => {
+          runtime.handleToolUse(toolUse);
+          process.stdout.write(`\n[tool_use] ${toolUse.toolName}\n`);
+        },
+        onToolResult: (toolName, result) => {
+          runtime.handleToolResult(toolName, result);
+          process.stdout.write(`\n[tool_result] ${toolName}\n`);
+        },
+        onPendingApproval: async (approval) => {
+          runtime.handlePendingApproval(approval);
+          process.stdout.write(`\n[approval_needed] ${approval.toolName}\n`);
           if (options.autoApprove || !rl) {
             const decision = options.autoApprove ? "approve" : "deny";
             process.stdout.write(` -> auto-${decision}\n`);
             await client.generation.submitApproval({
-              generationId: event.generationId,
-              toolUseId: event.toolUseId,
+              generationId: approval.generationId,
+              toolUseId: approval.toolUseId,
               decision,
             });
-          } else {
-            const decision = (await ask(rl, "Approve? (y/n) ")).trim().toLowerCase();
-            await client.generation.submitApproval({
-              generationId: event.generationId,
-              toolUseId: event.toolUseId,
-              decision: decision === "y" || decision === "yes" ? "approve" : "deny",
-            });
+            return;
           }
-          break;
-        case "approval_result":
-          process.stdout.write(`\n[approval_${event.decision}] ${event.toolUseId}\n`);
-          break;
-        case "auth_needed":
-          process.stdout.write(`\n[auth_needed] ${event.integrations.join(", ")}\n`);
-          break;
-        case "auth_progress":
-          process.stdout.write(`\n[auth_progress] connected=${event.connected} remaining=${event.remaining.join(", ")}\n`);
-          break;
-        case "auth_result":
-          process.stdout.write(`\n[auth_result] success=${event.success}\n`);
-          break;
-        case "done":
+
+          const decision = (await ask(rl, "Approve? (y/n) ")).trim().toLowerCase();
+          await client.generation.submitApproval({
+            generationId: approval.generationId,
+            toolUseId: approval.toolUseId,
+            decision: decision === "y" || decision === "yes" ? "approve" : "deny",
+          });
+        },
+        onApprovalResult: (toolUseId, decision) => {
+          runtime.handleApprovalResult(toolUseId, decision);
+          process.stdout.write(`\n[approval_${decision}] ${toolUseId}\n`);
+        },
+        onAuthNeeded: (auth) => {
+          runtime.handleAuthNeeded(auth);
+          process.stdout.write(`\n[auth_needed] ${auth.integrations.join(", ")}\n`);
+        },
+        onAuthProgress: (connected, remaining) => {
+          runtime.handleAuthProgress(connected, remaining);
+          process.stdout.write(`\n[auth_progress] connected=${connected} remaining=${remaining.join(", ")}\n`);
+        },
+        onAuthResult: (success) => {
+          runtime.handleAuthResult(success);
+          process.stdout.write(`\n[auth_result] success=${success}\n`);
+        },
+        onSandboxFile: (file) => {
+          process.stdout.write(`\n[file] ${file.filename} (${file.path})\n`);
+        },
+        onStatusChange: (status) => {
+          process.stdout.write(`\n[status] ${status}\n`);
+        },
+        onDone: async (doneGenerationId, doneConversationId, messageId) => {
+          runtime.handleDone({
+            generationId: doneGenerationId,
+            conversationId: doneConversationId,
+            messageId,
+          });
           if (outputStarted) process.stdout.write("\n");
-          return { generationId: event.generationId, conversationId: event.conversationId };
-        case "error":
-          process.stdout.write(`\n[error] ${event.message}\n`);
-          return { generationId, conversationId: convId };
-        case "cancelled":
+          if (options.validatePersistence) {
+            await validatePersistedAssistantMessage(
+              client,
+              doneConversationId,
+              messageId,
+              runtime.buildAssistantMessage()
+            );
+          }
+        },
+        onError: (message) => {
+          runtime.handleError();
+          process.stdout.write(`\n[error] ${message}\n`);
+        },
+        onCancelled: () => {
+          runtime.handleCancelled();
           process.stdout.write("\n[cancelled]\n");
-          return { generationId, conversationId: convId };
-        case "status_change":
-          process.stdout.write(`\n[status] ${event.status}\n`);
-          break;
-        case "sandbox_file":
-          process.stdout.write(`\n[file] ${event.filename} (${event.path})\n`);
-          break;
-        default:
-          break;
-      }
+        },
+      },
+    });
+
+    if (!result) {
+      throw new Error("Generation stream closed before a terminal event (done/error/cancelled)");
     }
+
+    return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\nRequest failed: ${message}\n`);
@@ -477,6 +513,42 @@ function fileToAttachment(filePath: string): { name: string; mimeType: string; d
     mimeType,
     dataUrl: `data:${mimeType};base64,${base64}`,
   };
+}
+
+function normalizeText(input: string): string {
+  return input.replace(/\s+/g, " ").trim();
+}
+
+async function validatePersistedAssistantMessage(
+  client: RouterClient<AppRouter>,
+  conversationId: string,
+  messageId: string,
+  expected: { content: string; parts: Array<{ type: string }> }
+): Promise<void> {
+  const conv = await client.conversation.get({ id: conversationId });
+  const savedMessage = conv.messages.find((m) => m.id === messageId);
+
+  if (!savedMessage) {
+    throw new Error(`Validation failed: assistant message ${messageId} was not saved in conversation ${conversationId}`);
+  }
+  if (savedMessage.role !== "assistant") {
+    throw new Error(`Validation failed: message ${messageId} saved with role ${savedMessage.role}, expected assistant`);
+  }
+
+  const persistedParts = Array.isArray(savedMessage.contentParts) ? savedMessage.contentParts : [];
+  if (expected.parts.length > 0 && persistedParts.length === 0) {
+    throw new Error("Validation failed: stream produced activity/text but saved message has no contentParts");
+  }
+
+  const normalizedStream = normalizeText(expected.content);
+  if (normalizedStream.length === 0) {
+    return;
+  }
+
+  const normalizedPersisted = normalizeText(savedMessage.content ?? "");
+  if (!normalizedPersisted.includes(normalizedStream)) {
+    throw new Error("Validation failed: streamed assistant text does not match saved message content");
+  }
 }
 
 void main();

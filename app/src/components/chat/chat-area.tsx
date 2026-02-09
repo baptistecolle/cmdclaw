@@ -20,8 +20,6 @@ import {
   useActiveGeneration,
   useCancelGeneration,
   useUpdateAutoApprove,
-  type GenerationPendingApprovalData,
-  type AuthNeededData,
   type SandboxFileData,
 } from "@/orpc/hooks";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
@@ -29,37 +27,15 @@ import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react"
 import { Switch } from "@/components/ui/switch";
 import { useHotkeys } from "react-hotkeys-hook";
 import type { IntegrationType } from "@/lib/integration-icons";
+import {
+  createGenerationRuntime,
+  type GenerationRuntime,
+  type RuntimeActivitySegment,
+  type RuntimeSnapshot,
+} from "@/lib/generation-runtime";
 
-// Trace state for tracking activity during a conversation turn
-type TraceStatus = "streaming" | "complete" | "error" | "waiting_approval" | "waiting_auth";
-
-// Segment approval data
-type SegmentApproval = {
-  toolUseId: string;
-  toolName: string;
-  toolInput: unknown;
-  integration: string;
-  operation: string;
-  command?: string;
-  status: "pending" | "approved" | "denied";
-};
-
-// Segment auth data
-type SegmentAuth = {
-  integrations: string[];
-  connectedIntegrations: string[];
-  reason?: string;
-  status: "pending" | "connecting" | "completed" | "cancelled";
-};
-
-// Activity segment - groups activities between approvals/auth
-type ActivitySegment = {
-  id: string;
-  items: ActivityItemData[];
-  approval?: SegmentApproval;
-  auth?: SegmentAuth;
-  isExpanded: boolean;
-};
+type TraceStatus = RuntimeSnapshot["traceStatus"];
+type ActivitySegment = Omit<RuntimeActivitySegment, "items"> & { items: ActivityItemData[] };
 
 type Props = {
   conversationId?: string;
@@ -79,6 +55,7 @@ export function ChatArea({ conversationId }: Props) {
 
   // Track current generation ID
   const currentGenerationIdRef = useRef<string | undefined>(undefined);
+  const runtimeRef = useRef<GenerationRuntime | null>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingParts, setStreamingParts] = useState<MessagePart[]>([]);
@@ -97,9 +74,6 @@ export function ChatArea({ conversationId }: Props) {
   // Sandbox files collected during streaming
   const [streamingSandboxFiles, setStreamingSandboxFiles] = useState<SandboxFileData[]>([]);
 
-  // Track tool call start times for duration display
-  const toolCallStartTimes = useRef<Map<string, number>>(new Map());
-
   // Current conversation ID (may be set during streaming for new conversations)
   const currentConversationIdRef = useRef<string | undefined>(conversationId);
 
@@ -108,6 +82,23 @@ export function ChatArea({ conversationId }: Props) {
   const isRecordingRef = useRef(false);
   const isNearBottomRef = useRef(true);
   const userScrolledUpRef = useRef(false);
+
+  const syncFromRuntime = useCallback((runtime: GenerationRuntime) => {
+    const snapshot = runtime.snapshot;
+    setStreamingParts(snapshot.parts as MessagePart[]);
+    setSegments(
+      snapshot.segments.map((seg) => ({
+        ...seg,
+        items: seg.items.map((item) => ({
+          ...item,
+          integration: item.integration as IntegrationType | undefined,
+        })),
+      }))
+    );
+    setIntegrationsUsed(new Set(snapshot.integrationsUsed as IntegrationType[]));
+    setStreamingSandboxFiles(snapshot.sandboxFiles as SandboxFileData[]);
+    setTraceStatus(snapshot.traceStatus);
+  }, []);
 
   // Auto-approve mutation
   const { mutateAsync: updateAutoApprove } = useUpdateAutoApprove();
@@ -221,6 +212,7 @@ export function ChatArea({ conversationId }: Props) {
     currentConversationIdRef.current = conversationId;
 
     if (!conversationId) {
+      runtimeRef.current = null;
       setMessages([]);
       setStreamingParts([]);
       setSegments([]);
@@ -237,6 +229,7 @@ export function ChatArea({ conversationId }: Props) {
   useEffect(() => {
     const handleNewChat = () => {
       abort();
+      runtimeRef.current = null;
       setMessages([]);
       setStreamingParts([]);
       setSegments([]);
@@ -266,224 +259,78 @@ export function ChatArea({ conversationId }: Props) {
         activeGeneration.status === "awaiting_auth" ? "waiting_auth" : "streaming"
       );
 
-      // Subscribe to the generation stream
-      const allParts: MessagePart[] = [];
-      const usedIntegrations = new Set<IntegrationType>();
-      let toolCallCounter = 0;
-      let activityCounter = 0;
-      let segmentCounter = 0;
-
-      const allSegments: ActivitySegment[] = [
-        { id: `seg-${segmentCounter++}`, items: [], isExpanded: true },
-      ];
-
-      const getCurrentSegment = () => allSegments[allSegments.length - 1];
-
-      const updateSegmentsState = () => {
-        const clonedSegments = allSegments.map((seg, idx) => ({
-          ...seg,
-          items: [...seg.items],
-          isExpanded: idx === allSegments.length - 1,
-        }));
-        setSegments(clonedSegments);
-      };
+      const runtime = createGenerationRuntime();
+      runtimeRef.current = runtime;
+      runtime.setStatus(
+        activeGeneration.status === "awaiting_approval"
+          ? "waiting_approval"
+          : activeGeneration.status === "awaiting_auth"
+            ? "waiting_auth"
+            : "streaming"
+      );
+      syncFromRuntime(runtime);
 
       subscribeToGeneration(activeGeneration.generationId, {
         onText: (text) => {
-          const lastPart = allParts[allParts.length - 1];
-          if (lastPart && lastPart.type === "text") {
-            lastPart.content += text;
-          } else {
-            allParts.push({ type: "text", content: text });
-          }
-          setStreamingParts([...allParts]);
-
-          const currentSeg = getCurrentSegment();
-          const lastTextActivity = currentSeg.items[currentSeg.items.length - 1];
-          if (lastTextActivity && lastTextActivity.type === "text") {
-            lastTextActivity.content += text;
-          } else {
-            currentSeg.items.push({
-              id: `activity-${activityCounter++}`,
-              timestamp: Date.now(),
-              type: "text",
-              content: text,
-            });
-          }
-          updateSegmentsState();
+          runtime.handleText(text);
+          syncFromRuntime(runtime);
         },
         onThinking: (data) => {
-          allParts.push({ type: "thinking", id: data.thinkingId, content: data.content });
-          setStreamingParts([...allParts]);
-          getCurrentSegment().items.push({
-            id: `activity-${activityCounter++}`,
-            timestamp: Date.now(),
-            type: "thinking",
-            content: data.content,
-          });
-          updateSegmentsState();
+          runtime.handleThinking(data);
+          syncFromRuntime(runtime);
         },
         onToolUse: (data) => {
-          const toolId = data.toolUseId || `tc-${toolCallCounter++}`;
-          allParts.push({
-            type: "tool_call",
-            id: toolId,
-            name: data.toolName,
-            input: data.toolInput,
-            integration: data.integration,
-            operation: data.operation,
-            isWrite: data.isWrite,
-          });
-          setStreamingParts([...allParts]);
-
-          if (data.integration) {
-            usedIntegrations.add(data.integration as IntegrationType);
-            setIntegrationsUsed(new Set(usedIntegrations));
-          }
-
-          getCurrentSegment().items.push({
-            id: `activity-${activityCounter++}`,
-            timestamp: Date.now(),
-            type: "tool_call",
-            content: data.toolName,
-            toolName: data.toolName,
-            integration: data.integration as IntegrationType | undefined,
-            operation: data.operation,
-            status: "running",
-            input: data.toolInput,
-          });
-          updateSegmentsState();
+          runtime.handleToolUse(data);
+          syncFromRuntime(runtime);
         },
         onToolResult: (toolName, result) => {
-          for (let i = allParts.length - 1; i >= 0; i--) {
-            const part = allParts[i];
-            if (part.type === "tool_call" && part.name === toolName && part.result === undefined) {
-              part.result = result;
-              break;
-            }
-          }
-          setStreamingParts([...allParts]);
-
-          for (let i = allSegments.length - 1; i >= 0; i--) {
-            const seg = allSegments[i];
-            const toolItem = [...seg.items].reverse().find(
-              (item) => item.type === "tool_call" && item.content === toolName && item.status === "running"
-            );
-            if (toolItem) {
-              toolItem.status = "complete";
-              toolItem.result = result;
-              break;
-            }
-          }
-          updateSegmentsState();
+          runtime.handleToolResult(toolName, result);
+          syncFromRuntime(runtime);
         },
         onPendingApproval: (data) => {
           console.log("[ApprovalCard] Showing approval card", { toolUseId: data.toolUseId, toolName: data.toolName, integration: data.integration, operation: data.operation, command: data.command });
           currentGenerationIdRef.current = data.generationId;
-
-          const currentSeg = getCurrentSegment();
-          currentSeg.approval = {
-            toolUseId: data.toolUseId,
-            toolName: data.toolName,
-            toolInput: data.toolInput,
-            integration: data.integration,
-            operation: data.operation,
-            command: data.command,
-            status: "pending",
-          };
-
-          currentSeg.isExpanded = false;
-          allSegments.push({
-            id: `seg-${segmentCounter++}`,
-            items: [],
-            isExpanded: true,
-          });
-
-          setTraceStatus("waiting_approval");
-          updateSegmentsState();
+          runtime.handlePendingApproval(data);
+          syncFromRuntime(runtime);
         },
         onApprovalResult: (toolUseId, decision) => {
-          for (const seg of allSegments) {
-            if (seg.approval && seg.approval.toolUseId === toolUseId) {
-              seg.approval.status = decision === "approved" ? "approved" : "denied";
-              const toolItem = seg.items.find(
-                (item) => item.type === "tool_call" && item.status === "running"
-              );
-              if (toolItem) {
-                toolItem.status = decision === "approved" ? "complete" : "error";
-              }
-              break;
-            }
-          }
-          setTraceStatus("streaming");
-          updateSegmentsState();
+          runtime.handleApprovalResult(toolUseId, decision);
+          syncFromRuntime(runtime);
         },
         onAuthNeeded: (data) => {
           currentGenerationIdRef.current = data.generationId;
           if (data.conversationId) {
             currentConversationIdRef.current = data.conversationId;
           }
-
-          const currentSeg = getCurrentSegment();
-          currentSeg.auth = {
-            integrations: data.integrations,
-            connectedIntegrations: [],
-            reason: data.reason,
-            status: "pending",
-          };
-
-          currentSeg.isExpanded = false;
-          allSegments.push({
-            id: `seg-${segmentCounter++}`,
-            items: [],
-            isExpanded: true,
-          });
-
-          setTraceStatus("waiting_auth");
-          updateSegmentsState();
+          runtime.handleAuthNeeded(data);
+          syncFromRuntime(runtime);
         },
         onAuthProgress: (connected, remaining) => {
-          for (const seg of allSegments) {
-            if (seg.auth && seg.auth.status === "pending") {
-              seg.auth.connectedIntegrations.push(connected);
-              if (remaining.length === 0) {
-                seg.auth.status = "completed";
-              }
-              break;
-            }
-          }
-          updateSegmentsState();
+          runtime.handleAuthProgress(connected, remaining);
+          syncFromRuntime(runtime);
         },
         onAuthResult: (success) => {
-          for (const seg of allSegments) {
-            if (seg.auth) {
-              seg.auth.status = success ? "completed" : "cancelled";
-              break;
-            }
-          }
-          if (success) {
-            setTraceStatus("streaming");
-          }
-          updateSegmentsState();
+          runtime.handleAuthResult(success);
+          syncFromRuntime(runtime);
         },
         onSandboxFile: (file) => {
-          setStreamingSandboxFiles((prev) => [...prev, file]);
+          runtime.handleSandboxFile(file);
+          syncFromRuntime(runtime);
         },
         onDone: (generationId, newConversationId, messageId, usage) => {
-          const fullContent = allParts
-            .filter((p): p is MessagePart & { type: "text" } => p.type === "text")
-            .map((p) => p.content)
-            .join("");
+          runtime.handleDone({ generationId, conversationId: newConversationId, messageId });
+          const assistant = runtime.buildAssistantMessage();
 
           setMessages((prev) => [
             ...prev,
             {
               id: messageId,
               role: "assistant",
-              content: fullContent,
-              parts: allParts.length > 0 ? allParts : undefined,
-              integrationsUsed: Array.from(usedIntegrations),
-            } as Message & { integrationsUsed?: IntegrationType[] },
+              content: assistant.content,
+              parts: assistant.parts as MessagePart[],
+              integrationsUsed: assistant.integrationsUsed,
+              sandboxFiles: assistant.sandboxFiles,
+            } as Message & { integrationsUsed?: IntegrationType[]; sandboxFiles?: SandboxFileData[] },
           ]);
           setStreamingParts([]);
           setStreamingSandboxFiles([]);
@@ -492,33 +339,27 @@ export function ChatArea({ conversationId }: Props) {
           setTraceStatus("complete");
           setStreamError(null);
           currentGenerationIdRef.current = undefined;
+          runtimeRef.current = null;
         },
         onError: (message) => {
+          runtime.handleError();
+          syncFromRuntime(runtime);
           console.error("Generation error:", message);
           setIsStreaming(false);
-          setTraceStatus("error");
           setStreamError(message || "Streaming failed. Please retry.");
           currentGenerationIdRef.current = undefined;
+          runtimeRef.current = null;
         },
         onCancelled: () => {
+          runtime.handleCancelled();
+          syncFromRuntime(runtime);
           setIsStreaming(false);
-          setTraceStatus("complete");
-          // Mark running items as interrupted instead of clearing
-          setSegments((prevSegments) =>
-            prevSegments.map((segment) => ({
-              ...segment,
-              items: segment.items.map((item) =>
-                item.status === "running"
-                  ? { ...item, status: "interrupted" as const }
-                  : item
-              ),
-            }))
-          );
           currentGenerationIdRef.current = undefined;
+          runtimeRef.current = null;
         },
       });
     }
-  }, [activeGeneration?.generationId, activeGeneration?.status, subscribeToGeneration]);
+  }, [activeGeneration?.generationId, activeGeneration?.status, subscribeToGeneration, syncFromRuntime]);
 
   // Track if user is near bottom of scroll
   const handleScroll = useCallback(() => {
@@ -603,6 +444,7 @@ export function ChatArea({ conversationId }: Props) {
     setStreamingParts([]);
     setTraceStatus("complete");
     currentGenerationIdRef.current = undefined;
+    runtimeRef.current = null;
   }, [abort, cancelGeneration]);
 
   // Helper to toggle segment expansion
@@ -633,33 +475,10 @@ export function ChatArea({ conversationId }: Props) {
     setSegments([]);
     setIntegrationsUsed(new Set());
     setTraceStatus("streaming");
-    toolCallStartTimes.current.clear();
 
-    const allParts: MessagePart[] = [];
-    const usedIntegrations = new Set<IntegrationType>();
-    const allSandboxFiles: SandboxFileData[] = [];
-    let toolCallCounter = 0;
-    let activityCounter = 0;
-    let segmentCounter = 0;
-
-    // Segment tracking - use mutable object for closure
-    const allSegments: ActivitySegment[] = [
-      { id: `seg-${segmentCounter++}`, items: [], isExpanded: true },
-    ];
-
-    // Helper to get current segment
-    const getCurrentSegment = () => allSegments[allSegments.length - 1];
-
-    // Helper to update segments state
-    const updateSegmentsState = () => {
-      // Clone segments for state update, ensuring only last segment is expanded
-      const clonedSegments = allSegments.map((seg, idx) => ({
-        ...seg,
-        items: [...seg.items],
-        isExpanded: idx === allSegments.length - 1,
-      }));
-      setSegments(clonedSegments);
-    };
+    const runtime = createGenerationRuntime();
+    runtimeRef.current = runtime;
+    syncFromRuntime(runtime);
 
     const effectiveConversationId = currentConversationIdRef.current ?? conversationId;
     const result = await startGeneration(
@@ -672,316 +491,66 @@ export function ChatArea({ conversationId }: Props) {
           }
         },
         onText: (text) => {
-          // Check if the last part is a text part - if so, append to it
-          const lastPart = allParts[allParts.length - 1];
-          if (lastPart && lastPart.type === "text") {
-            lastPart.content += text;
-          } else {
-            // Create a new text part
-            allParts.push({ type: "text", content: text });
-          }
-          setStreamingParts([...allParts]);
-
-          // Add to current segment - update existing text item or create new one
-          const currentSeg = getCurrentSegment();
-          const lastTextActivity = currentSeg.items[currentSeg.items.length - 1];
-          if (lastTextActivity && lastTextActivity.type === "text") {
-            lastTextActivity.content += text;
-          } else {
-            const activityItem: ActivityItemData = {
-              id: `activity-${activityCounter++}`,
-              timestamp: Date.now(),
-              type: "text",
-              content: text,
-            };
-            currentSeg.items.push(activityItem);
-          }
-          updateSegmentsState();
+          runtime.handleText(text);
+          syncFromRuntime(runtime);
         },
         onThinking: (data) => {
-          // Create a new thinking part
-          allParts.push({
-            type: "thinking",
-            id: data.thinkingId,
-            content: data.content,
-          });
-          setStreamingParts([...allParts]);
-
-          // Add to current segment
-          const activityItem: ActivityItemData = {
-            id: `activity-${activityCounter++}`,
-            timestamp: Date.now(),
-            type: "thinking",
-            content: data.content,
-          };
-          getCurrentSegment().items.push(activityItem);
-          updateSegmentsState();
+          runtime.handleThinking(data);
+          syncFromRuntime(runtime);
         },
         onToolUse: (data) => {
-          const toolId = data.toolUseId || `tc-${toolCallCounter++}`;
-          const now = Date.now();
-          toolCallStartTimes.current.set(toolId, now);
-
-          allParts.push({
-            type: "tool_call",
-            id: toolId,
-            name: data.toolName,
-            input: data.toolInput,
-            integration: data.integration,
-            operation: data.operation,
-            isWrite: data.isWrite,
-          });
-          setStreamingParts([...allParts]);
-
-          // Track integration used
-          if (data.integration) {
-            usedIntegrations.add(data.integration as IntegrationType);
-            setIntegrationsUsed(new Set(usedIntegrations));
-          }
-
-          // Add to current segment
-          const activityItem: ActivityItemData = {
-            id: `activity-${activityCounter++}`,
-            timestamp: now,
-            type: "tool_call",
-            content: data.toolName,
-            toolName: data.toolName,
-            integration: data.integration as IntegrationType | undefined,
-            operation: data.operation,
-            status: "running",
-            input: data.toolInput,
-          };
-          getCurrentSegment().items.push(activityItem);
-          updateSegmentsState();
+          runtime.handleToolUse(data);
+          syncFromRuntime(runtime);
         },
         onToolResult: (toolName, result) => {
-          // Find the last tool call with this name that doesn't have a result
-          for (let i = allParts.length - 1; i >= 0; i--) {
-            const part = allParts[i];
-            if (part.type === "tool_call" && part.name === toolName && part.result === undefined) {
-              part.result = result;
-              break;
-            }
-          }
-          setStreamingParts([...allParts]);
-
-          // Find and update the tool call in segments
-          for (let i = allSegments.length - 1; i >= 0; i--) {
-            const seg = allSegments[i];
-            const toolItem = [...seg.items].reverse().find(
-              (item) => item.type === "tool_call" && item.content === toolName && item.status === "running"
-            );
-            if (toolItem) {
-              toolItem.status = "complete";
-              toolItem.result = result;
-              break;
-            }
-          }
-          updateSegmentsState();
+          runtime.handleToolResult(toolName, result);
+          syncFromRuntime(runtime);
         },
         onPendingApproval: (data) => {
-          // Update the generation ID and conversation ID refs
           currentGenerationIdRef.current = data.generationId;
           if (data.conversationId) {
             currentConversationIdRef.current = data.conversationId;
           }
-
-          // Find the pending tool in current segment and mark it
-          const currentSeg = getCurrentSegment();
-          const pendingTool = [...currentSeg.items].reverse().find(
-            (item) => item.type === "tool_call" && item.status === "running"
-          );
-          if (pendingTool) {
-            pendingTool.status = "running"; // Keep as running but approval will show
-          }
-
-          // Attach approval to current segment
-          currentSeg.approval = {
-            toolUseId: data.toolUseId,
-            toolName: data.toolName,
-            toolInput: data.toolInput,
-            integration: data.integration,
-            operation: data.operation,
-            command: data.command,
-            status: "pending",
-          };
-
-          // Collapse current segment and create new one for subsequent activities
-          currentSeg.isExpanded = false;
-          allSegments.push({
-            id: `seg-${segmentCounter++}`,
-            items: [],
-            isExpanded: true,
-          });
-
-          setTraceStatus("waiting_approval");
-          updateSegmentsState();
+          runtime.handlePendingApproval(data);
+          syncFromRuntime(runtime);
         },
         onApprovalResult: (toolUseId, decision) => {
-          // Find and update the approval status in segments
-          for (const seg of allSegments) {
-            if (seg.approval && seg.approval.toolUseId === toolUseId) {
-              seg.approval.status = decision === "approved" ? "approved" : "denied";
-
-              // Also update the tool call status
-              const toolItem = seg.items.find(
-                (item) => item.type === "tool_call" && item.status === "running"
-              );
-              if (toolItem) {
-                toolItem.status = decision === "approved" ? "complete" : "error";
-              }
-              break;
-            }
-          }
-
-          setTraceStatus("streaming");
-          updateSegmentsState();
+          runtime.handleApprovalResult(toolUseId, decision);
+          syncFromRuntime(runtime);
         },
         onAuthNeeded: (data) => {
-          // Update the generation ID and conversation ID refs
           currentGenerationIdRef.current = data.generationId;
           if (data.conversationId) {
             currentConversationIdRef.current = data.conversationId;
           }
-
-          // Attach auth to current segment
-          const currentSeg = getCurrentSegment();
-          currentSeg.auth = {
-            integrations: data.integrations,
-            connectedIntegrations: [],
-            reason: data.reason,
-            status: "pending",
-          };
-
-          // Collapse current segment and create new one for subsequent activities
-          currentSeg.isExpanded = false;
-          allSegments.push({
-            id: `seg-${segmentCounter++}`,
-            items: [],
-            isExpanded: true,
-          });
-
-          setTraceStatus("waiting_auth");
-          updateSegmentsState();
+          runtime.handleAuthNeeded(data);
+          syncFromRuntime(runtime);
         },
         onAuthProgress: (connected, remaining) => {
-          // Find and update auth status in segments
-          for (const seg of allSegments) {
-            if (seg.auth && seg.auth.status === "pending") {
-              seg.auth.connectedIntegrations.push(connected);
-              if (remaining.length === 0) {
-                seg.auth.status = "completed";
-              }
-              break;
-            }
-          }
-          updateSegmentsState();
+          runtime.handleAuthProgress(connected, remaining);
+          syncFromRuntime(runtime);
         },
         onAuthResult: (success) => {
-          // Find and update auth status in segments
-          for (const seg of allSegments) {
-            if (seg.auth) {
-              seg.auth.status = success ? "completed" : "cancelled";
-              break;
-            }
-          }
-          if (success) {
-            setTraceStatus("streaming");
-          }
-          updateSegmentsState();
+          runtime.handleAuthResult(success);
+          syncFromRuntime(runtime);
         },
         onSandboxFile: (file) => {
-          allSandboxFiles.push(file);
-          setStreamingSandboxFiles([...allSandboxFiles]);
+          runtime.handleSandboxFile(file);
+          syncFromRuntime(runtime);
         },
         onDone: (generationId, newConversationId, messageId) => {
-          // Compute full content from text parts
-          const fullContent = allParts
-            .filter((p): p is MessagePart & { type: "text" } => p.type === "text")
-            .map((p) => p.content)
-            .join("");
+          runtime.handleDone({ generationId, conversationId: newConversationId, messageId });
+          const assistant = runtime.buildAssistantMessage();
 
-          // Build final parts array including approval parts
-          const finalParts: MessagePart[] = [];
-          for (const seg of allSegments) {
-            // Add all activity items as parts
-            for (const item of seg.items) {
-              if (item.type === "tool_call") {
-                // Find the corresponding part to get full info
-                const part = allParts.find(
-                  (p) => p.type === "tool_call" && p.name === item.toolName
-                );
-                if (part && part.type === "tool_call") {
-                  finalParts.push(part);
-                }
-              } else if (item.type === "thinking") {
-                const part = allParts.find(
-                  (p) => p.type === "thinking" && p.content === item.content
-                );
-                if (part) {
-                  finalParts.push(part);
-                }
-              } else if (item.type === "text") {
-                // Text parts are already tracked in allParts in order
-              }
-            }
-
-            // Add approval part if exists and resolved
-            if (seg.approval && seg.approval.status !== "pending") {
-              finalParts.push({
-                type: "approval",
-                toolUseId: seg.approval.toolUseId,
-                toolName: seg.approval.toolName,
-                toolInput: seg.approval.toolInput,
-                integration: seg.approval.integration,
-                operation: seg.approval.operation,
-                command: seg.approval.command,
-                status: seg.approval.status,
-              });
-            }
-          }
-
-          // Use allParts directly since it maintains correct order
-          // and add approval parts at correct positions
-          const partsWithApprovals: MessagePart[] = [];
-          let approvalIndex = 0;
-          const approvalParts: MessagePart[] = allSegments
-            .filter((seg): seg is ActivitySegment & { approval: SegmentApproval & { status: "approved" | "denied" } } =>
-              seg.approval !== undefined && seg.approval.status !== "pending")
-            .map((seg) => ({
-              type: "approval" as const,
-              toolUseId: seg.approval.toolUseId,
-              toolName: seg.approval.toolName,
-              toolInput: seg.approval.toolInput,
-              integration: seg.approval.integration,
-              operation: seg.approval.operation,
-              command: seg.approval.command,
-              status: seg.approval.status,
-            }));
-
-          // Insert approval parts after their corresponding tool calls
-          for (const part of allParts) {
-            partsWithApprovals.push(part);
-            // Check if this tool call has an approval
-            if (part.type === "tool_call" && approvalIndex < approvalParts.length) {
-              const approval = approvalParts[approvalIndex];
-              if (approval.type === "approval" && approval.toolUseId === part.id) {
-                partsWithApprovals.push(approval);
-                approvalIndex++;
-              }
-            }
-          }
-
-          // Add assistant message to list with integrations used and sandbox files
           setMessages((prev) => [
             ...prev,
             {
               id: messageId,
               role: "assistant",
-              content: fullContent,
-              parts: partsWithApprovals.length > 0 ? partsWithApprovals : allParts,
-              integrationsUsed: Array.from(usedIntegrations),
-              sandboxFiles: allSandboxFiles.length > 0 ? allSandboxFiles : undefined,
+              content: assistant.content,
+              parts: assistant.parts as MessagePart[],
+              integrationsUsed: assistant.integrationsUsed,
+              sandboxFiles: assistant.sandboxFiles as SandboxFileData[] | undefined,
             } as Message & { integrationsUsed?: IntegrationType[]; sandboxFiles?: SandboxFileData[] },
           ]);
           setStreamingParts([]);
@@ -991,6 +560,7 @@ export function ChatArea({ conversationId }: Props) {
           setTraceStatus("complete");
           setStreamError(null);
           currentGenerationIdRef.current = undefined;
+          runtimeRef.current = null;
 
           // Invalidate conversation queries to refresh sidebar
           queryClient.invalidateQueries({ queryKey: ["conversation"] });
@@ -1001,16 +571,13 @@ export function ChatArea({ conversationId }: Props) {
           }
         },
         onError: (message) => {
+          runtime.handleError();
+          syncFromRuntime(runtime);
           console.error("Generation error:", message);
           setIsStreaming(false);
-          setTraceStatus("error");
           setStreamError(message || "Streaming failed. Please retry.");
           currentGenerationIdRef.current = undefined;
-          // Keep last segment expanded on error
-          if (allSegments.length > 0) {
-            allSegments[allSegments.length - 1].isExpanded = true;
-            updateSegmentsState();
-          }
+          runtimeRef.current = null;
           // Add error message
           setMessages((prev) => [
             ...prev,
@@ -1022,25 +589,16 @@ export function ChatArea({ conversationId }: Props) {
           ]);
         },
         onCancelled: () => {
+          runtime.handleCancelled();
+          syncFromRuntime(runtime);
           setIsStreaming(false);
-          setTraceStatus("complete");
-          // Mark running items as interrupted instead of clearing
-          setSegments((prevSegments) =>
-            prevSegments.map((segment) => ({
-              ...segment,
-              items: segment.items.map((item) =>
-                item.status === "running"
-                  ? { ...item, status: "interrupted" as const }
-                  : item
-              ),
-            }))
-          );
           currentGenerationIdRef.current = undefined;
+          runtimeRef.current = null;
         },
       }
     );
 
-  }, [conversationId, startGeneration, queryClient]);
+  }, [conversationId, startGeneration, queryClient, selectedModel, localAutoApprove, selectedDeviceId, syncFromRuntime]);
 
   // Handle approval/denial of tool use
   const handleApprove = useCallback(
@@ -1054,19 +612,15 @@ export function ChatArea({ conversationId }: Props) {
           toolUseId,
           decision: "approve",
         });
-        // Update local segment state
-        setSegments((prev) =>
-          prev.map((seg) =>
-            seg.approval?.toolUseId === toolUseId
-              ? { ...seg, approval: { ...seg.approval, status: "approved" as const } }
-              : seg
-          )
-        );
+        if (runtimeRef.current) {
+          runtimeRef.current.setApprovalStatus(toolUseId, "approved");
+          syncFromRuntime(runtimeRef.current);
+        }
       } catch (err) {
         console.error("Failed to approve tool use:", err);
       }
     },
-    [submitApproval]
+    [submitApproval, syncFromRuntime]
   );
 
   const handleDeny = useCallback(
@@ -1080,19 +634,15 @@ export function ChatArea({ conversationId }: Props) {
           toolUseId,
           decision: "deny",
         });
-        // Update local segment state
-        setSegments((prev) =>
-          prev.map((seg) =>
-            seg.approval?.toolUseId === toolUseId
-              ? { ...seg, approval: { ...seg.approval, status: "denied" as const } }
-              : seg
-          )
-        );
+        if (runtimeRef.current) {
+          runtimeRef.current.setApprovalStatus(toolUseId, "denied");
+          syncFromRuntime(runtimeRef.current);
+        }
       } catch (err) {
         console.error("Failed to deny tool use:", err);
       }
     },
-    [submitApproval]
+    [submitApproval, syncFromRuntime]
   );
 
   // Handle auth connect - redirect to OAuth
@@ -1102,14 +652,10 @@ export function ChatArea({ conversationId }: Props) {
       const convId = currentConversationIdRef.current;
       if (!genId || !convId) return;
 
-      // Update status to connecting
-      setSegments((prev) =>
-        prev.map((seg) =>
-          seg.auth?.status === "pending"
-            ? { ...seg, auth: { ...seg.auth, status: "connecting" as const } }
-            : seg
-        )
-      );
+      if (runtimeRef.current) {
+        runtimeRef.current.setAuthConnecting();
+        syncFromRuntime(runtimeRef.current);
+      }
 
       try {
         // Get auth URL and redirect
@@ -1120,17 +666,13 @@ export function ChatArea({ conversationId }: Props) {
         window.location.href = result.authUrl;
       } catch (err) {
         console.error("Failed to get auth URL:", err);
-        // Reset status on error
-        setSegments((prev) =>
-          prev.map((seg) =>
-            seg.auth?.status === "connecting"
-              ? { ...seg, auth: { ...seg.auth, status: "pending" as const } }
-              : seg
-          )
-        );
+        if (runtimeRef.current) {
+          runtimeRef.current.setAuthPending();
+          syncFromRuntime(runtimeRef.current);
+        }
       }
     },
-    [getAuthUrl]
+    [getAuthUrl, syncFromRuntime]
   );
 
   // Handle auth cancel
@@ -1151,18 +693,15 @@ export function ChatArea({ conversationId }: Props) {
           success: false,
         });
 
-        setSegments((prev) =>
-          prev.map((s) =>
-            s.auth?.status === "pending"
-              ? { ...s, auth: { ...s.auth, status: "cancelled" as const } }
-              : s
-          )
-        );
+        if (runtimeRef.current) {
+          runtimeRef.current.setAuthCancelled();
+          syncFromRuntime(runtimeRef.current);
+        }
       } catch (err) {
         console.error("Failed to cancel auth:", err);
       }
     },
-    [submitAuthResult, segments]
+    [submitAuthResult, segments, syncFromRuntime]
   );
 
   // Voice recording: stop and transcribe
@@ -1268,9 +807,9 @@ export function ChatArea({ conversationId }: Props) {
             <>
               <MessageList messages={messages} />
 
-              {isStreaming && (
+              {(isStreaming || segments.length > 0) && (
                 <div className="py-4 space-y-4">
-                  {segments.length === 0 && (
+                  {isStreaming && segments.length === 0 && (
                     <div className="rounded-lg border border-border/50 bg-muted/30">
                       <div className="flex items-center gap-2 px-3 py-2">
                         <Activity className="h-4 w-4 text-muted-foreground" />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Paperclip, Download, FileIcon } from "lucide-react";
+import { Paperclip, Download, FileIcon, Eye } from "lucide-react";
 import { MessageBubble } from "./message-bubble";
 import { CollapsedTrace } from "./collapsed-trace";
 import { ToolApprovalCard } from "./tool-approval-card";
@@ -41,15 +41,32 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
   const { mutateAsync: downloadAttachment } = useDownloadAttachment();
   const { mutateAsync: downloadSandboxFile } = useDownloadSandboxFile();
 
-  const handleDownload = async (attachment: AttachmentData) => {
-    if (!attachment.id) return;
-    try {
+  const getAttachmentUrl = async (attachment: AttachmentData): Promise<string | null> => {
+    if (attachment.id) {
       const result = await downloadAttachment(attachment.id);
-      // Open presigned URL in new tab to trigger download
+      return result.url;
+    }
+    return attachment.dataUrl || null;
+  };
+
+  const handleViewAttachment = async (attachment: AttachmentData) => {
+    try {
+      const url = await getAttachmentUrl(attachment);
+      if (!url) return;
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error("Failed to open attachment:", err);
+    }
+  };
+
+  const handleDownload = async (attachment: AttachmentData) => {
+    try {
+      const url = await getAttachmentUrl(attachment);
+      if (!url) return;
+
       const link = document.createElement("a");
-      link.href = result.url;
+      link.href = url;
       link.download = attachment.name;
-      link.target = "_blank";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -88,25 +105,38 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
                     alt={a.name}
                     className="max-h-48 max-w-xs rounded-lg border object-cover"
                   />
-                  {a.id && (
-                    <button
-                      onClick={() => handleDownload(a)}
-                      className="absolute top-1 right-1 rounded-md bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </button>
+                  {(a.id || a.dataUrl) && (
+                    <div className="absolute top-1 right-1 flex items-center gap-1 rounded-md bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      <button type="button" onClick={() => handleViewAttachment(a)}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => handleDownload(a)}>
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (
-                <button
-                  key={i}
-                  onClick={a.id ? () => handleDownload(a) : undefined}
-                  className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs hover:bg-muted/80 transition-colors"
-                >
+                <div key={i} className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs">
                   <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="max-w-[200px] truncate">{a.name}</span>
-                  {a.id && <Download className="h-3 w-3 text-muted-foreground" />}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleViewAttachment(a)}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
+                  >
+                    <Eye className="h-3 w-3 text-muted-foreground" />
+                    <span>View</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(a)}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
+                  >
+                    <Download className="h-3 w-3 text-muted-foreground" />
+                    <span>Download</span>
+                  </button>
+                </div>
               )
             )}
           </div>

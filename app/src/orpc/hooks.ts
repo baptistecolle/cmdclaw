@@ -3,20 +3,23 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 import { client } from "./client";
+import {
+  runGenerationStream,
+  type ToolUseData,
+  type ThinkingData,
+  type GenerationPendingApprovalData,
+  type AuthNeededData,
+  type SandboxFileData,
+  type GenerationCallbacks,
+} from "@/lib/generation-stream";
 
-// Types for generation event callbacks
-export type ToolUseData = {
-  toolName: string;
-  toolInput: unknown;
-  toolUseId?: string;
-  integration?: string;
-  operation?: string;
-  isWrite?: boolean;
-};
-
-export type ThinkingData = {
-  content: string;
-  thinkingId: string;
+export type {
+  ToolUseData,
+  ThinkingData,
+  GenerationPendingApprovalData,
+  AuthNeededData,
+  SandboxFileData,
+  GenerationCallbacks,
 };
 
 // Hook for listing conversations
@@ -608,59 +611,6 @@ export function useDisconnectProvider() {
 
 // ========== GENERATION HOOKS ==========
 
-export type GenerationPendingApprovalData = {
-  generationId: string;
-  conversationId: string;
-  toolUseId: string;
-  toolName: string;
-  toolInput: unknown;
-  integration: string;
-  operation: string;
-  command?: string;
-};
-
-export type AuthNeededData = {
-  generationId: string;
-  conversationId: string;
-  integrations: string[];
-  reason?: string;
-};
-
-export type SandboxFileData = {
-  fileId: string;
-  path: string;
-  filename: string;
-  mimeType: string;
-  sizeBytes: number | null;
-};
-
-export type GenerationCallbacks = {
-  onText?: (content: string) => void;
-  onThinking?: (data: ThinkingData) => void;
-  onToolUse?: (data: ToolUseData) => void;
-  onToolResult?: (toolName: string, result: unknown) => void;
-  onPendingApproval?: (data: GenerationPendingApprovalData) => void;
-  onApprovalResult?: (toolUseId: string, decision: "approved" | "denied") => void;
-  onAuthNeeded?: (data: AuthNeededData) => void;
-  onAuthProgress?: (connected: string, remaining: string[]) => void;
-  onAuthResult?: (success: boolean, integrations?: string[]) => void;
-  onSandboxFile?: (data: SandboxFileData) => void;
-  onDone?: (
-    generationId: string,
-    conversationId: string,
-    messageId: string,
-    usage: {
-      inputTokens: number;
-      outputTokens: number;
-      totalCostUsd: number;
-    }
-  ) => void;
-  onStarted?: (generationId: string, conversationId: string) => void;
-  onError?: (message: string) => void;
-  onCancelled?: () => void;
-  onStatusChange?: (status: string) => void;
-};
-
 // Hook for generation-based streaming (new persistent generation system)
 export function useGeneration() {
   const queryClient = useQueryClient();
@@ -674,107 +624,23 @@ export function useGeneration() {
       const signal = abortControllerRef.current.signal;
 
       try {
-        // Start the generation
-        const { generationId, conversationId } = await client.generation.startGeneration(input);
-
-        // Notify caller and invalidate sidebar immediately
-        callbacks.onStarted?.(generationId, conversationId);
-        queryClient.invalidateQueries({ queryKey: ["conversation", "list"] });
-
-        // Subscribe to the generation stream
-        const iterator = await client.generation.subscribeGeneration(
-          { generationId },
-          { signal }
-        );
-
-        for await (const event of iterator) {
-          if (signal.aborted) {
-            break;
-          }
-
-          switch (event.type) {
-            case "text":
-              callbacks.onText?.(event.content);
-              break;
-            case "thinking":
-              callbacks.onThinking?.({
-                content: event.content,
-                thinkingId: event.thinkingId,
-              });
-              break;
-            case "tool_use":
-              callbacks.onToolUse?.({
-                toolName: event.toolName,
-                toolInput: event.toolInput,
-                toolUseId: event.toolUseId,
-                integration: event.integration,
-                operation: event.operation,
-                isWrite: event.isWrite,
-              });
-              break;
-            case "tool_result":
-              callbacks.onToolResult?.(event.toolName, event.result);
-              break;
-            case "pending_approval":
-              callbacks.onPendingApproval?.({
-                generationId: event.generationId,
-                conversationId: event.conversationId,
-                toolUseId: event.toolUseId,
-                toolName: event.toolName,
-                toolInput: event.toolInput,
-                integration: event.integration,
-                operation: event.operation,
-                command: event.command,
-              });
-              break;
-            case "approval_result":
-              callbacks.onApprovalResult?.(event.toolUseId, event.decision);
-              break;
-            case "auth_needed":
-              callbacks.onAuthNeeded?.({
-                generationId: event.generationId,
-                conversationId: event.conversationId,
-                integrations: event.integrations,
-                reason: event.reason,
-              });
-              break;
-            case "auth_progress":
-              callbacks.onAuthProgress?.(event.connected, event.remaining);
-              break;
-            case "auth_result":
-              callbacks.onAuthResult?.(event.success, event.integrations);
-              break;
-            case "sandbox_file":
-              callbacks.onSandboxFile?.({
-                fileId: event.fileId,
-                path: event.path,
-                filename: event.filename,
-                mimeType: event.mimeType,
-                sizeBytes: event.sizeBytes,
-              });
-              break;
-            case "done":
-              callbacks.onDone?.(
-                event.generationId,
-                event.conversationId,
-                event.messageId,
-                event.usage
-              );
+        const result = await runGenerationStream({
+          client,
+          input,
+          signal,
+          callbacks: {
+            ...callbacks,
+            onStarted: (generationId, conversationId) => {
+              callbacks.onStarted?.(generationId, conversationId);
+              queryClient.invalidateQueries({ queryKey: ["conversation", "list"] });
+            },
+            onDone: (generationId, conversationId, messageId, usage) => {
+              callbacks.onDone?.(generationId, conversationId, messageId, usage);
               queryClient.invalidateQueries({ queryKey: ["conversation"] });
-              break;
-            case "error":
-              callbacks.onError?.(event.message);
-              break;
-            case "cancelled":
-              callbacks.onCancelled?.();
-              break;
-            case "status_change":
-              callbacks.onStatusChange?.(event.status);
-              break;
-          }
-        }
-
-        return { generationId, conversationId };
+            },
+          },
+        });
+        return result;
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return null;
@@ -796,97 +662,18 @@ export function useGeneration() {
     const signal = abortControllerRef.current.signal;
 
     try {
-      const iterator = await client.generation.subscribeGeneration(
-        { generationId },
-        { signal }
-      );
-
-      for await (const event of iterator) {
-        if (signal.aborted) {
-          break;
-        }
-
-        switch (event.type) {
-          case "text":
-            callbacks.onText?.(event.content);
-            break;
-          case "thinking":
-            callbacks.onThinking?.({
-              content: event.content,
-              thinkingId: event.thinkingId,
-            });
-            break;
-          case "tool_use":
-            callbacks.onToolUse?.({
-              toolName: event.toolName,
-              toolInput: event.toolInput,
-              toolUseId: event.toolUseId,
-              integration: event.integration,
-              operation: event.operation,
-              isWrite: event.isWrite,
-            });
-            break;
-          case "tool_result":
-            callbacks.onToolResult?.(event.toolName, event.result);
-            break;
-          case "pending_approval":
-            callbacks.onPendingApproval?.({
-              generationId: event.generationId,
-              conversationId: event.conversationId,
-              toolUseId: event.toolUseId,
-              toolName: event.toolName,
-              toolInput: event.toolInput,
-              integration: event.integration,
-              operation: event.operation,
-              command: event.command,
-            });
-            break;
-          case "approval_result":
-            callbacks.onApprovalResult?.(event.toolUseId, event.decision);
-            break;
-          case "auth_needed":
-            callbacks.onAuthNeeded?.({
-              generationId: event.generationId,
-              conversationId: event.conversationId,
-              integrations: event.integrations,
-              reason: event.reason,
-            });
-            break;
-          case "auth_progress":
-            callbacks.onAuthProgress?.(event.connected, event.remaining);
-            break;
-          case "auth_result":
-            callbacks.onAuthResult?.(event.success, event.integrations);
-            break;
-          case "sandbox_file":
-            callbacks.onSandboxFile?.({
-              fileId: event.fileId,
-              path: event.path,
-              filename: event.filename,
-              mimeType: event.mimeType,
-              sizeBytes: event.sizeBytes,
-            });
-            break;
-          case "done":
-            callbacks.onDone?.(
-              event.generationId,
-              event.conversationId,
-              event.messageId,
-              event.usage
-            );
+      await runGenerationStream({
+        client,
+        generationId,
+        signal,
+        callbacks: {
+          ...callbacks,
+          onDone: (doneGenerationId, doneConversationId, messageId, usage) => {
+            callbacks.onDone?.(doneGenerationId, doneConversationId, messageId, usage);
             queryClient.invalidateQueries({ queryKey: ["conversation"] });
-            break;
-          case "error":
-            callbacks.onError?.(event.message);
-            break;
-          case "cancelled":
-            callbacks.onCancelled?.();
-            break;
-          case "status_change":
-            callbacks.onStatusChange?.(event.status);
-            break;
-        }
-      }
+          },
+        },
+      });
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         return;
