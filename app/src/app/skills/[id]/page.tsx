@@ -17,6 +17,8 @@ import {
 } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ChatArea } from "@/components/chat/chat-area";
+import { DualPanelWorkspace } from "@/components/ui/dual-panel-workspace";
 import {
   SkillEditor,
   parseSkillContent,
@@ -470,7 +472,14 @@ function SkillEditorPageContent() {
   const isSkillMd = selectedFile?.path === "SKILL.md";
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] max-w-4xl flex-col">
+    <DualPanelWorkspace
+      className="h-[calc(100vh-8rem)]"
+      leftTitle="Skill Copilot"
+      rightTitle="Skill Editor"
+      storageKey={`skill-editor-panel-${skillId}`}
+      left={<ChatArea />}
+      right={
+        <div className="flex h-full min-h-0 flex-col p-4 md:p-6">
       {/* Header with back button and delete */}
       <div className="mb-6 flex items-center justify-between shrink-0">
         <Button variant="ghost" size="icon" asChild>
@@ -909,7 +918,9 @@ Add your skill instructions here..."
           </div>
         </div>
       )}
-    </div>
+        </div>
+      }
+    />
   );
 }
 
