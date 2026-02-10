@@ -113,6 +113,8 @@ export default function ChatLayout({
   children: React.ReactNode;
 }) {
   const { isAdmin } = useIsAdmin();
+  const params = useParams();
+  const conversationId = params?.conversationId as string | undefined;
   const router = useRouter();
   const { data: user, isLoading: userLoading } = useCurrentUser();
 
@@ -139,6 +141,11 @@ export default function ChatLayout({
           <header className="flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <span className="text-sm font-medium">Chat</span>
+            {isAdmin && conversationId && (
+              <span className="text-xs text-muted-foreground font-mono">
+                ID: {conversationId}
+              </span>
+            )}
             {isAdmin && <CopyButton />}
           </header>
           <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">{children}</div>

@@ -5,6 +5,7 @@ import { generationManager, type GenerationEvent } from "@/server/services/gener
 import { db } from "@/server/db/client";
 import { generation, conversation } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
+import { logServerEvent } from "@/server/utils/observability";
 
 // Schema for generation events (same structure as GenerationEvent type)
 const generationEventSchema = z.discriminatedUnion("type", [
@@ -119,17 +120,48 @@ const startGeneration = protectedProcedure
     })
   )
   .handler(async ({ input, context }) => {
-    const result = await generationManager.startGeneration({
-      conversationId: input.conversationId,
-      content: input.content,
-      model: input.model,
+    const startedAt = Date.now();
+    const logContext = {
+      source: "rpc",
+      route: "/api/rpc/generation/startGeneration",
+      rpcProcedure: "generation.startGeneration",
       userId: context.user.id,
-      autoApprove: input.autoApprove,
-      deviceId: input.deviceId,
-      attachments: input.attachments,
-    });
+    };
 
-    return result;
+    try {
+      const result = await generationManager.startGeneration({
+        conversationId: input.conversationId,
+        content: input.content,
+        model: input.model,
+        userId: context.user.id,
+        autoApprove: input.autoApprove,
+        deviceId: input.deviceId,
+        attachments: input.attachments,
+      });
+
+      const successLogContext = {
+        ...logContext,
+        generationId: result.generationId,
+        conversationId: result.conversationId,
+      };
+      logServerEvent("info", "RPC_START_GENERATION_OK", {
+        elapsedMs: Date.now() - startedAt,
+      }, successLogContext);
+
+      return result;
+    } catch (error) {
+      logServerEvent(
+        "error",
+        "RPC_START_GENERATION_FAILED",
+        {
+          elapsedMs: Date.now() - startedAt,
+          conversationId: input.conversationId,
+          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+        },
+        logContext
+      );
+      throw error;
+    }
   });
 
 // Subscribe to generation stream (can be called multiple times, from multiple clients)
@@ -141,10 +173,23 @@ const subscribeGeneration = protectedProcedure
   )
   .output(eventIterator(generationEventSchema))
   .handler(async function* ({ input, context }) {
+    const logContext = {
+      source: "rpc",
+      route: "/api/rpc/generation/subscribeGeneration",
+      rpcProcedure: "generation.subscribeGeneration",
+      generationId: input.generationId,
+      userId: context.user.id,
+    };
+    logServerEvent("info", "RPC_SUBSCRIBE_GENERATION_OPENED", {}, logContext);
+
     const stream = generationManager.subscribeToGeneration(input.generationId, context.user.id);
 
-    for await (const event of stream) {
-      yield event;
+    try {
+      for await (const event of stream) {
+        yield event;
+      }
+    } finally {
+      logServerEvent("info", "RPC_SUBSCRIBE_GENERATION_CLOSED", {}, logContext);
     }
   });
 

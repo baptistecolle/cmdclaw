@@ -12,8 +12,6 @@ import {
 } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { ChatArea } from "@/components/chat/chat-area";
-import { DualPanelWorkspace } from "@/components/ui/dual-panel-workspace";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
@@ -209,14 +207,9 @@ export default function WorkflowEditorPage() {
         </div>
       )}
 
-      <DualPanelWorkspace
-        className="min-h-0 flex-1"
-        leftTitle="Workflow Copilot"
-        rightTitle="Workflow Builder"
-        storageKey={`workflow-builder-panel-${workflowId}`}
-        left={<ChatArea />}
-        right={
-          <div className="h-full space-y-6 overflow-y-auto p-4 md:p-6">
+      {/* Workflow copilot dual panel is disabled until it is ready. */}
+      <div className="min-h-0 flex-1">
+        <div className="h-full space-y-6 overflow-y-auto p-4 md:p-6">
             <div className="rounded-lg border p-6 space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
@@ -437,9 +430,8 @@ export default function WorkflowEditorPage() {
                 <p className="text-sm text-muted-foreground">No runs yet.</p>
               )}
             </div>
-          </div>
-        }
-      />
+        </div>
+      </div>
     </div>
   );
 }

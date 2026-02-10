@@ -7,6 +7,10 @@ import { COMPACTION_SUMMARY_PREFIX, SESSION_BOUNDARY_PREFIX } from "@/server/ser
 import { eq, and, asc } from "drizzle-orm";
 import { downloadFromS3 } from "@/server/storage/s3-client";
 import { decrypt } from "@/server/utils/encryption";
+import {
+  logServerEvent,
+  type ObservabilityContext,
+} from "@/server/utils/observability";
 import type { SandboxBackend, ExecuteResult } from "./types";
 
 // Use custom template with OpenCode pre-installed
@@ -24,8 +28,13 @@ interface SandboxState {
 
 const activeSandboxes = new Map<string, SandboxState>();
 
-function logLifecycle(event: string, details: Record<string, unknown>): void {
-  console.info(`[E2B][LIFECYCLE] ${event} ${JSON.stringify(details)}`);
+function logLifecycle(
+  event: string,
+  details: Record<string, unknown>,
+  context: ObservabilityContext = {}
+): void {
+  const enrichedContext: ObservabilityContext = { source: "e2b", ...context };
+  logServerEvent("info", event, details, enrichedContext);
 }
 
 export interface SandboxConfig {
@@ -35,27 +44,67 @@ export interface SandboxConfig {
   integrationEnvs?: Record<string, string>;
 }
 
+type SessionInitStage =
+  | "sandbox_checking_cache"
+  | "sandbox_reused"
+  | "sandbox_creating"
+  | "sandbox_created"
+  | "opencode_starting"
+  | "opencode_waiting_ready"
+  | "opencode_ready"
+  | "session_reused"
+  | "session_creating"
+  | "session_created"
+  | "session_replay_started"
+  | "session_replay_completed"
+  | "session_init_completed";
+
+type SessionInitLifecycleCallback = (stage: SessionInitStage, details?: Record<string, unknown>) => void;
+
+function formatErrorMessage(error: unknown): string {
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  return String(error);
+}
+
 /**
  * Wait for OpenCode server to be ready
  */
 async function waitForServer(url: string, maxWait = 30000): Promise<void> {
   const start = Date.now();
+  let attempts = 0;
+  let lastError: string | null = null;
   while (Date.now() - start < maxWait) {
+    attempts += 1;
     try {
       const res = await fetch(`${url}/doc`, { method: "GET" });
       if (res.ok) return;
+      lastError = `status_${res.status}`;
     } catch {
       // Server not ready yet
+      lastError = "network_error";
     }
     await new Promise((r) => setTimeout(r, 500));
   }
-  throw new Error("OpenCode server in sandbox failed to start");
+  throw new Error(
+    `OpenCode server in sandbox failed to start (url=${url}, attempts=${attempts}, waitedMs=${Date.now() - start}, lastError=${lastError || "unknown"})`
+  );
 }
 
 /**
  * Get or create a sandbox with OpenCode server running inside
  */
-export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox> {
+export async function getOrCreateSandbox(
+  config: SandboxConfig,
+  onLifecycle?: SessionInitLifecycleCallback,
+  telemetry?: ObservabilityContext
+): Promise<Sandbox> {
+  const telemetryContext: ObservabilityContext = {
+    ...telemetry,
+    source: "e2b",
+    conversationId: config.conversationId,
+    userId: config.userId,
+  };
+  onLifecycle?.("sandbox_checking_cache", { conversationId: config.conversationId });
   // Check if we have an active sandbox for this conversation
   let state = activeSandboxes.get(config.conversationId);
 
@@ -64,15 +113,30 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
     try {
       const res = await fetch(`${state.serverUrl}/doc`, { method: "GET" });
       if (res.ok) {
+        onLifecycle?.("sandbox_reused", {
+          conversationId: config.conversationId,
+          sandboxId: state.sandbox.sandboxId,
+        });
         logLifecycle("VM_REUSED", {
           conversationId: config.conversationId,
           sandboxId: state.sandbox.sandboxId,
           serverUrl: state.serverUrl,
-        });
+        }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId });
         return state.sandbox;
       }
+      logLifecycle("VM_CACHE_HEALTHCHECK_NOT_OK", {
+        conversationId: config.conversationId,
+        sandboxId: state.sandbox.sandboxId,
+        serverUrl: state.serverUrl,
+        status: res.status,
+      }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId });
     } catch {
       // Sandbox or server is dead, remove from cache and create new one
+      logLifecycle("VM_CACHE_HEALTHCHECK_FAILED", {
+        conversationId: config.conversationId,
+        sandboxId: state.sandbox.sandboxId,
+        serverUrl: state.serverUrl,
+      }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId });
       await state.sandbox.kill().catch(() => {});
       activeSandboxes.delete(config.conversationId);
     }
@@ -81,56 +145,129 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   // Create new sandbox
   const hasApiKey = !!config.anthropicApiKey;
   const vmCreateStart = Date.now();
+  onLifecycle?.("sandbox_creating", {
+    conversationId: config.conversationId,
+    template: TEMPLATE_NAME,
+  });
   logLifecycle("VM_START_REQUESTED", {
     conversationId: config.conversationId,
     template: TEMPLATE_NAME,
     hasAnthropicApiKey: hasApiKey,
     timeoutMs: SANDBOX_TIMEOUT_MS,
-  });
+  }, telemetryContext);
 
-  const sandbox = await Sandbox.create(TEMPLATE_NAME, {
-    envs: {
-      ANTHROPIC_API_KEY: config.anthropicApiKey,
-      ANVIL_API_KEY: env.ANVIL_API_KEY || "",
-      APP_URL: (env.APP_URL && new URL(env.APP_URL).hostname === "localhost"
-        ? "https://localcan.baptistecolle.com"
-        : env.APP_URL) || "",
-      BAP_SERVER_SECRET: env.BAP_SERVER_SECRET || "",
-      CONVERSATION_ID: config.conversationId,
-      ...config.integrationEnvs,
-    },
-    timeoutMs: SANDBOX_TIMEOUT_MS,
-  });
+  let sandbox: Sandbox;
+  try {
+    sandbox = await Sandbox.create(TEMPLATE_NAME, {
+      envs: {
+        ANTHROPIC_API_KEY: config.anthropicApiKey,
+        ANVIL_API_KEY: env.ANVIL_API_KEY || "",
+        APP_URL: (env.APP_URL && new URL(env.APP_URL).hostname === "localhost"
+          ? "https://localcan.baptistecolle.com"
+          : env.APP_URL) || "",
+        BAP_SERVER_SECRET: env.BAP_SERVER_SECRET || "",
+        CONVERSATION_ID: config.conversationId,
+        ...config.integrationEnvs,
+      },
+      timeoutMs: SANDBOX_TIMEOUT_MS,
+    });
+  } catch (error) {
+    logServerEvent("error", "VM_START_FAILED", {
+      conversationId: config.conversationId,
+      template: TEMPLATE_NAME,
+      durationMs: Date.now() - vmCreateStart,
+      error: formatErrorMessage(error),
+      hasAnthropicApiKey: hasApiKey,
+      hasE2BApiKey: Boolean(env.E2B_API_KEY),
+      integrationEnvCount: Object.keys(config.integrationEnvs || {}).length,
+    }, telemetryContext);
+    throw error;
+  }
   logLifecycle("VM_STARTED", {
     conversationId: config.conversationId,
     sandboxId: sandbox.sandboxId,
     template: TEMPLATE_NAME,
     durationMs: Date.now() - vmCreateStart,
+  }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+  onLifecycle?.("sandbox_created", {
+    conversationId: config.conversationId,
+    sandboxId: sandbox.sandboxId,
+    durationMs: Date.now() - vmCreateStart,
   });
 
   // Set SANDBOX_ID env var (needed by plugin)
-  await sandbox.commands.run(
-    `echo "export SANDBOX_ID=${sandbox.sandboxId}" >> ~/.bashrc`
-  );
+  try {
+    await sandbox.commands.run(
+      `echo "export SANDBOX_ID=${sandbox.sandboxId}" >> ~/.bashrc`
+    );
+  } catch (error) {
+    logServerEvent("warn", "VM_SET_SANDBOX_ID_FAILED", {
+      conversationId: config.conversationId,
+      sandboxId: sandbox.sandboxId,
+      error: formatErrorMessage(error),
+    }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+  }
 
   // Start OpenCode server in background
   logLifecycle("OPENCODE_SERVER_START_REQUESTED", {
     conversationId: config.conversationId,
     sandboxId: sandbox.sandboxId,
     port: OPENCODE_PORT,
+  }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+  onLifecycle?.("opencode_starting", {
+    conversationId: config.conversationId,
+    sandboxId: sandbox.sandboxId,
+    port: OPENCODE_PORT,
   });
-  sandbox.commands.run(
-    `cd /app && opencode serve --port ${OPENCODE_PORT} --hostname 0.0.0.0`,
-    {
-      background: true,
-      onStderr: (data) => console.error("[OpenCode stderr]", data),
-    }
-  );
+  const stderrBuffer: string[] = [];
+  try {
+    await sandbox.commands.run(
+      `cd /app && opencode serve --port ${OPENCODE_PORT} --hostname 0.0.0.0`,
+      {
+        background: true,
+        onStderr: (data) => {
+          const line = data.trim();
+          if (!line) return;
+          if (stderrBuffer.length >= 20) stderrBuffer.shift();
+          stderrBuffer.push(line);
+          logServerEvent("warn", "OPENCODE_SERVER_STDERR", {
+            conversationId: config.conversationId,
+            sandboxId: sandbox.sandboxId,
+            stderr: line,
+          }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+        },
+      }
+    );
+  } catch (error) {
+    logServerEvent("error", "OPENCODE_SERVER_START_FAILED", {
+      conversationId: config.conversationId,
+      sandboxId: sandbox.sandboxId,
+      error: formatErrorMessage(error),
+    }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+    throw error;
+  }
 
   // Get the public URL for the sandbox port
   const serverUrl = `https://${sandbox.getHost(OPENCODE_PORT)}`;
   const serverReadyStart = Date.now();
-  await waitForServer(serverUrl);
+  onLifecycle?.("opencode_waiting_ready", {
+    conversationId: config.conversationId,
+    sandboxId: sandbox.sandboxId,
+    serverUrl,
+  });
+  try {
+    await waitForServer(serverUrl);
+  } catch (error) {
+    logServerEvent("error", "OPENCODE_SERVER_READY_TIMEOUT", {
+      conversationId: config.conversationId,
+      sandboxId: sandbox.sandboxId,
+      serverUrl,
+      durationMs: Date.now() - serverReadyStart,
+      error: formatErrorMessage(error),
+      recentStderr: stderrBuffer.join(" | ").slice(0, 4000),
+    }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+    throw error;
+  }
 
   // Create SDK client pointing to sandbox's OpenCode server
   const client = createOpencodeClient({
@@ -141,6 +278,12 @@ export async function getOrCreateSandbox(config: SandboxConfig): Promise<Sandbox
   activeSandboxes.set(config.conversationId, state);
 
   logLifecycle("OPENCODE_SERVER_READY", {
+    conversationId: config.conversationId,
+    sandboxId: sandbox.sandboxId,
+    serverUrl,
+    durationMs: Date.now() - serverReadyStart,
+  }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+  onLifecycle?.("opencode_ready", {
     conversationId: config.conversationId,
     sandboxId: sandbox.sandboxId,
     serverUrl,
@@ -177,10 +320,27 @@ export function resetOpencodeSession(conversationId: string): void {
  */
 export async function getOrCreateSession(
   config: SandboxConfig,
-  options?: { title?: string; replayHistory?: boolean }
+  options?: {
+    title?: string;
+    replayHistory?: boolean;
+    onLifecycle?: SessionInitLifecycleCallback;
+    telemetry?: ObservabilityContext;
+  }
 ): Promise<{ client: OpencodeClient; sessionId: string; sandbox: Sandbox }> {
+  const telemetryContext: ObservabilityContext = {
+    ...options?.telemetry,
+    source: "e2b",
+    conversationId: config.conversationId,
+    userId: config.userId,
+  };
+  const sessionInitStartedAt = Date.now();
+  logLifecycle("SESSION_INIT_STARTED", {
+    conversationId: config.conversationId,
+    replayHistory: Boolean(options?.replayHistory),
+  }, telemetryContext);
+
   // Ensure sandbox exists
-  const sandbox = await getOrCreateSandbox(config);
+  const sandbox = await getOrCreateSandbox(config, options?.onLifecycle, telemetryContext);
   const state = activeSandboxes.get(config.conversationId);
 
   if (!state) {
@@ -189,15 +349,30 @@ export async function getOrCreateSession(
 
   // Reuse existing session if one already exists for this conversation
   if (state.sessionId) {
-    logLifecycle("SESSION_REUSED", {
+    options?.onLifecycle?.("session_reused", {
       conversationId: config.conversationId,
       sessionId: state.sessionId,
       sandboxId: state.sandbox.sandboxId,
     });
+    logLifecycle("SESSION_REUSED", {
+      conversationId: config.conversationId,
+      sessionId: state.sessionId,
+      sandboxId: state.sandbox.sandboxId,
+      durationMs: Date.now() - sessionInitStartedAt,
+    }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId, sessionId: state.sessionId });
     return { client: state.client, sessionId: state.sessionId, sandbox: state.sandbox };
   }
 
   // Create a new session
+  options?.onLifecycle?.("session_creating", {
+    conversationId: config.conversationId,
+    sandboxId: state.sandbox.sandboxId,
+  });
+  const sessionCreateStartedAt = Date.now();
+  logLifecycle("SESSION_CREATE_REQUESTED", {
+    conversationId: config.conversationId,
+    sandboxId: state.sandbox.sandboxId,
+  }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId });
   const sessionResult = await state.client.session.create({
     body: { title: options?.title || "Conversation" },
   });
@@ -212,6 +387,13 @@ export async function getOrCreateSession(
     conversationId: config.conversationId,
     sessionId,
     sandboxId: state.sandbox.sandboxId,
+    durationMs: Date.now() - sessionCreateStartedAt,
+  }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId, sessionId });
+  options?.onLifecycle?.("session_created", {
+    conversationId: config.conversationId,
+    sessionId,
+    sandboxId: state.sandbox.sandboxId,
+    durationMs: Date.now() - sessionCreateStartedAt,
   });
 
   // Inject subscription provider tokens if userId is available
@@ -221,13 +403,42 @@ export async function getOrCreateSession(
 
   // Replay conversation history if needed
   if (options?.replayHistory) {
+    options?.onLifecycle?.("session_replay_started", {
+      conversationId: config.conversationId,
+      sessionId,
+    });
+    const replayStartedAt = Date.now();
+    logLifecycle("SESSION_REPLAY_STARTED", {
+      conversationId: config.conversationId,
+      sessionId,
+    }, { ...telemetryContext, sessionId });
     await replayConversationHistory(
       state.client,
       sessionId,
       config.conversationId
     );
+    logLifecycle("SESSION_REPLAY_COMPLETED", {
+      conversationId: config.conversationId,
+      sessionId,
+      durationMs: Date.now() - replayStartedAt,
+    }, { ...telemetryContext, sessionId });
+    options?.onLifecycle?.("session_replay_completed", {
+      conversationId: config.conversationId,
+      sessionId,
+      durationMs: Date.now() - replayStartedAt,
+    });
   }
 
+  logLifecycle("SESSION_INIT_COMPLETED", {
+    conversationId: config.conversationId,
+    sessionId,
+    durationMs: Date.now() - sessionInitStartedAt,
+  }, { ...telemetryContext, sessionId, sandboxId: state.sandbox.sandboxId });
+  options?.onLifecycle?.("session_init_completed", {
+    conversationId: config.conversationId,
+    sessionId,
+    durationMs: Date.now() - sessionInitStartedAt,
+  });
   return { client: state.client, sessionId, sandbox: state.sandbox };
 }
 
@@ -363,7 +574,7 @@ export async function killSandbox(conversationId: string): Promise<void> {
         conversationId,
         sandboxId: state.sandbox.sandboxId,
         reason: "manual_kill",
-      });
+      }, { source: "e2b", conversationId, sandboxId: state.sandbox.sandboxId });
     } catch (error) {
       console.error("[E2B] Failed to kill sandbox:", error);
     }

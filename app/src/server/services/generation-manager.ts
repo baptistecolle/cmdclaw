@@ -51,6 +51,10 @@ import {
   collectNewE2BFiles,
   readSandboxFileAsBuffer,
 } from "@/server/services/sandbox-file-service";
+import {
+  createTraceId,
+  logServerEvent,
+} from "@/server/utils/observability";
 import path from "path";
 
 // Event types for generation stream
@@ -129,6 +133,7 @@ type BackendType = "opencode" | "direct";
 
 interface GenerationContext {
   id: string;
+  traceId: string;
   conversationId: string;
   userId: string;
   sandboxId?: string;
@@ -179,6 +184,9 @@ interface GenerationContext {
   e2bSandbox?: import("e2b").Sandbox;
   sentFilePaths?: Set<string>;
   uploadedSandboxFileIds?: Set<string>;
+  agentInitStartedAt?: number;
+  agentInitReadyAt?: number;
+  agentInitFailedAt?: number;
 }
 
 // Approval timeout: 5 minutes before pausing sandbox
@@ -268,6 +276,11 @@ function estimateTokensForMessageRow(m: MessageRow): number {
   return Math.max(contentTokens, partsTokens);
 }
 
+function formatErrorMessage(error: unknown): string {
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  return String(error);
+}
+
 class GenerationManager {
   private activeGenerations = new Map<string, GenerationContext>();
   private conversationToGeneration = new Map<string, string>();
@@ -285,6 +298,24 @@ class GenerationManager {
     attachments?: { name: string; mimeType: string; dataUrl: string }[];
   }): Promise<{ generationId: string; conversationId: string }> {
     const { content, userId, model, autoApprove } = params;
+    const traceId = createTraceId();
+    const startGenerationStartedAt = Date.now();
+    const logContext = {
+      source: "generation-manager",
+      traceId,
+      userId,
+      conversationId: params.conversationId,
+    };
+    logServerEvent(
+      "info",
+      "START_GENERATION_REQUESTED",
+      {
+        hasConversationId: Boolean(params.conversationId),
+        hasDeviceId: Boolean(params.deviceId),
+        attachmentsCount: params.attachments?.length ?? 0,
+      },
+      logContext
+    );
 
     // Check for existing active generation on this conversation
     if (params.conversationId) {
@@ -296,6 +327,12 @@ class GenerationManager {
         }
       }
     }
+    logServerEvent(
+      "info",
+      "START_GENERATION_PHASE_DONE",
+      { phase: "active_generation_check", elapsedMs: Date.now() - startGenerationStartedAt },
+      logContext
+    );
 
     // Get or create conversation
     let conv: typeof conversation.$inferSelect;
@@ -327,6 +364,17 @@ class GenerationManager {
         .returning();
       conv = newConv;
     }
+    logServerEvent(
+      "info",
+      "START_GENERATION_PHASE_DONE",
+      {
+        phase: "conversation_ready",
+        elapsedMs: Date.now() - startGenerationStartedAt,
+        resolvedConversationId: conv.id,
+        isNewConversation,
+      },
+      { ...logContext, conversationId: conv.id }
+    );
 
     // Save user message
     const [userMsg] = await db.insert(message).values({
@@ -334,6 +382,16 @@ class GenerationManager {
       role: "user",
       content,
     }).returning();
+    logServerEvent(
+      "info",
+      "START_GENERATION_PHASE_DONE",
+      {
+        phase: "message_saved",
+        elapsedMs: Date.now() - startGenerationStartedAt,
+        messageId: userMsg.id,
+      },
+      { ...logContext, conversationId: conv.id }
+    );
 
     // Upload attachments to S3 and save metadata
     if (params.attachments && params.attachments.length > 0) {
@@ -354,8 +412,26 @@ class GenerationManager {
             storageKey,
           });
         }
+        logServerEvent(
+          "info",
+          "START_GENERATION_PHASE_DONE",
+          {
+            phase: "attachments_uploaded",
+            elapsedMs: Date.now() - startGenerationStartedAt,
+            attachmentsCount: params.attachments.length,
+          },
+          { ...logContext, conversationId: conv.id }
+        );
       } catch (err) {
-        console.error("[GenerationManager] Failed to upload attachments:", err);
+        logServerEvent(
+          "error",
+          "START_GENERATION_ATTACHMENTS_UPLOAD_FAILED",
+          {
+            elapsedMs: Date.now() - startGenerationStartedAt,
+            error: formatErrorMessage(err),
+          },
+          { ...logContext, conversationId: conv.id }
+        );
       }
     }
 
@@ -370,6 +446,16 @@ class GenerationManager {
         outputTokens: 0,
       })
       .returning();
+    logServerEvent(
+      "info",
+      "START_GENERATION_PHASE_DONE",
+      {
+        phase: "generation_record_created",
+        elapsedMs: Date.now() - startGenerationStartedAt,
+        generationId: genRecord.id,
+      },
+      { ...logContext, conversationId: conv.id, generationId: genRecord.id }
+    );
 
     // Update conversation status
     await db
@@ -379,6 +465,15 @@ class GenerationManager {
         currentGenerationId: genRecord.id,
       })
       .where(eq(conversation.id, conv.id));
+    logServerEvent(
+      "info",
+      "START_GENERATION_PHASE_DONE",
+      {
+        phase: "conversation_status_updated",
+        elapsedMs: Date.now() - startGenerationStartedAt,
+      },
+      { ...logContext, conversationId: conv.id, generationId: genRecord.id }
+    );
 
     // Determine backend type: if deviceId is provided, use direct mode
     const backendType: BackendType = params.deviceId ? "direct" : "opencode";
@@ -386,6 +481,7 @@ class GenerationManager {
     // Create generation context
     const ctx: GenerationContext = {
       id: genRecord.id,
+      traceId,
       conversationId: conv.id,
       userId,
       status: "running",
@@ -408,10 +504,41 @@ class GenerationManager {
       deviceId: params.deviceId,
       attachments: params.attachments,
       uploadedSandboxFileIds: new Set(),
+      agentInitStartedAt: undefined,
+      agentInitReadyAt: undefined,
+      agentInitFailedAt: undefined,
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
     this.conversationToGeneration.set(conv.id, genRecord.id);
+
+    logServerEvent(
+      "info",
+      "GENERATION_ENQUEUED",
+      { backendType },
+      {
+        source: "generation-manager",
+        traceId: ctx.traceId,
+        generationId: ctx.id,
+        conversationId: ctx.conversationId,
+        userId: ctx.userId,
+      }
+    );
+    logServerEvent(
+      "info",
+      "START_GENERATION_RETURNING",
+      {
+        elapsedMs: Date.now() - startGenerationStartedAt,
+        generationId: ctx.id,
+      },
+      {
+        source: "generation-manager",
+        traceId: ctx.traceId,
+        generationId: ctx.id,
+        conversationId: ctx.conversationId,
+        userId: ctx.userId,
+      }
+    );
 
     // Start the generation in the background
     this.runGeneration(ctx).catch((err) => {
@@ -480,6 +607,7 @@ class GenerationManager {
 
     const ctx: GenerationContext = {
       id: genRecord.id,
+      traceId: createTraceId(),
       conversationId: newConv.id,
       userId,
       status: "running",
@@ -507,10 +635,26 @@ class GenerationManager {
       workflowPromptDont: params.workflowPromptDont ?? undefined,
       triggerPayload: params.triggerPayload,
       uploadedSandboxFileIds: new Set(),
+      agentInitStartedAt: undefined,
+      agentInitReadyAt: undefined,
+      agentInitFailedAt: undefined,
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
     this.conversationToGeneration.set(newConv.id, genRecord.id);
+
+    logServerEvent(
+      "info",
+      "WORKFLOW_GENERATION_ENQUEUED",
+      {},
+      {
+        source: "generation-manager",
+        traceId: ctx.traceId,
+        generationId: ctx.id,
+        conversationId: ctx.conversationId,
+        userId: ctx.userId,
+      }
+    );
 
     this.runGeneration(ctx).catch((err) => {
       console.error("[GenerationManager] runGeneration error:", err);
@@ -681,6 +825,17 @@ class GenerationManager {
       } else if (part.type === "thinking") {
         eventQueue.push({ type: "thinking", content: part.content, thinkingId: part.id });
       }
+    }
+
+    // If pending approval, send that event
+    if (ctx.agentInitStartedAt) {
+      eventQueue.push({ type: "status_change", status: "agent_init_started" });
+    }
+    if (ctx.agentInitReadyAt) {
+      eventQueue.push({ type: "status_change", status: "agent_init_ready" });
+    }
+    if (ctx.agentInitFailedAt) {
+      eventQueue.push({ type: "status_change", status: "agent_init_failed" });
     }
 
     // If pending approval, send that event
@@ -1011,18 +1166,123 @@ class GenerationManager {
       const hasExistingMessages = !!conv?.opencodeSessionId;
 
       // Get or create sandbox with OpenCode session
-      const { client, sessionId, sandbox } = await getOrCreateSession(
+      const agentInitStartedAt = Date.now();
+      const agentInitWarnAfterMs = 15_000;
+      ctx.agentInitStartedAt = agentInitStartedAt;
+      ctx.agentInitReadyAt = undefined;
+      ctx.agentInitFailedAt = undefined;
+      this.broadcast(ctx, { type: "status_change", status: "agent_init_started" });
+      logServerEvent(
+        "info",
+        "AGENT_INIT_STARTED",
+        {},
         {
+          source: "generation-manager",
+          traceId: ctx.traceId,
+          generationId: ctx.id,
           conversationId: ctx.conversationId,
           userId: ctx.userId,
-          anthropicApiKey: env.ANTHROPIC_API_KEY,
-          integrationEnvs: filteredCliEnv,
-        },
-        {
-          title: conv?.title || "Conversation",
-          replayHistory: hasExistingMessages,
         }
       );
+      const agentInitWarnTimer = setTimeout(() => {
+        const elapsedMs = Date.now() - agentInitStartedAt;
+        logServerEvent(
+          "warn",
+          "AGENT_INIT_SLOW",
+          { elapsedMs },
+          {
+            source: "generation-manager",
+            traceId: ctx.traceId,
+            generationId: ctx.id,
+            conversationId: ctx.conversationId,
+            userId: ctx.userId,
+          }
+        );
+      }, agentInitWarnAfterMs);
+
+      let client: Awaited<ReturnType<typeof getOrCreateSession>>["client"];
+      let sessionId: string;
+      let sandbox: import("e2b").Sandbox;
+      try {
+        const session = await getOrCreateSession(
+          {
+            conversationId: ctx.conversationId,
+            userId: ctx.userId,
+            anthropicApiKey: env.ANTHROPIC_API_KEY,
+            integrationEnvs: filteredCliEnv,
+          },
+          {
+            title: conv?.title || "Conversation",
+            replayHistory: hasExistingMessages,
+            telemetry: {
+              source: "generation-manager",
+              traceId: ctx.traceId,
+              generationId: ctx.id,
+              conversationId: ctx.conversationId,
+              userId: ctx.userId,
+            },
+            onLifecycle: (stage, details) => {
+              const status = `agent_init_${stage}`;
+              this.broadcast(ctx, { type: "status_change", status });
+              const lifecycleEvent = status.toUpperCase();
+              logServerEvent(
+                "info",
+                lifecycleEvent,
+                details ?? {},
+                {
+                  source: "generation-manager",
+                  traceId: ctx.traceId,
+                  generationId: ctx.id,
+                  conversationId: ctx.conversationId,
+                  userId: ctx.userId,
+                }
+              );
+            },
+          }
+        );
+        client = session.client;
+        sessionId = session.sessionId;
+        sandbox = session.sandbox;
+        ctx.agentInitReadyAt = Date.now();
+        this.broadcast(ctx, { type: "status_change", status: "agent_init_ready" });
+        const durationMs = ctx.agentInitReadyAt - agentInitStartedAt;
+        logServerEvent(
+          "info",
+          "AGENT_INIT_READY",
+          { durationMs },
+          {
+            source: "generation-manager",
+            traceId: ctx.traceId,
+            generationId: ctx.id,
+            conversationId: ctx.conversationId,
+            userId: ctx.userId,
+            sessionId,
+            sandboxId: sandbox.sandboxId,
+          }
+        );
+      } catch (error) {
+        ctx.agentInitFailedAt = Date.now();
+        this.broadcast(ctx, { type: "status_change", status: "agent_init_failed" });
+        const durationMs = ctx.agentInitFailedAt - agentInitStartedAt;
+        logServerEvent(
+          "error",
+          "AGENT_INIT_FAILED",
+          {
+            durationMs,
+            error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+          },
+          {
+            source: "generation-manager",
+            traceId: ctx.traceId,
+            generationId: ctx.id,
+            conversationId: ctx.conversationId,
+            userId: ctx.userId,
+          }
+        );
+        throw error;
+      } finally {
+        clearTimeout(agentInitWarnTimer);
+      }
 
       // Store session ID
       ctx.sessionId = sessionId;
@@ -1165,14 +1425,34 @@ class GenerationManager {
         }
       }
       if (stagedUploadCount > 0 || stagedUploadFailureCount > 0) {
-        console.info(
-          `[GenerationManager][LIFECYCLE] ATTACHMENTS_STAGED generationId=${ctx.id} conversationId=${ctx.conversationId} staged=${stagedUploadCount} failed=${stagedUploadFailureCount}`
-        );
+      logServerEvent(
+        "info",
+        "ATTACHMENTS_STAGED",
+        { stagedUploadCount, stagedUploadFailureCount },
+        {
+          source: "generation-manager",
+          traceId: ctx.traceId,
+          generationId: ctx.id,
+          conversationId: ctx.conversationId,
+          userId: ctx.userId,
+          sessionId,
+        }
+      );
       }
 
       // Send the prompt to OpenCode
-      console.info(
-        `[GenerationManager][LIFECYCLE] OPENCODE_PROMPT_SENT generationId=${ctx.id} conversationId=${ctx.conversationId} sessionId=${sessionId}`
+      logServerEvent(
+        "info",
+        "OPENCODE_PROMPT_SENT",
+        {},
+        {
+          source: "generation-manager",
+          traceId: ctx.traceId,
+          generationId: ctx.id,
+          conversationId: ctx.conversationId,
+          userId: ctx.userId,
+          sessionId,
+        }
       );
       const promptPromise = client.session.prompt({
         path: { id: sessionId },

@@ -26,6 +26,7 @@ import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useHotkeys } from "react-hotkeys-hook";
+import { usePostHog } from "posthog-js/react";
 import type { IntegrationType } from "@/lib/integration-icons";
 import {
   createGenerationRuntime,
@@ -41,8 +42,48 @@ type Props = {
   conversationId?: string;
 };
 
+function getAgentInitLabel(status: string | null): string {
+  switch (status) {
+    case "agent_init_started":
+      return "Preparing agent...";
+    case "agent_init_sandbox_checking_cache":
+      return "Checking sandbox...";
+    case "agent_init_sandbox_reused":
+      return "Reusing sandbox...";
+    case "agent_init_sandbox_creating":
+      return "Creating sandbox...";
+    case "agent_init_sandbox_created":
+      return "Sandbox created...";
+    case "agent_init_opencode_starting":
+      return "Starting agent server...";
+    case "agent_init_opencode_waiting_ready":
+      return "Waiting for agent server...";
+    case "agent_init_opencode_ready":
+      return "Agent server ready...";
+    case "agent_init_session_reused":
+      return "Reusing agent session...";
+    case "agent_init_session_creating":
+      return "Creating agent session...";
+    case "agent_init_session_created":
+      return "Agent session created...";
+    case "agent_init_session_replay_started":
+      return "Restoring previous context...";
+    case "agent_init_session_replay_completed":
+      return "Context restored...";
+    case "agent_init_session_init_completed":
+      return "Finalizing agent...";
+    case "agent_init_ready":
+      return "Agent ready...";
+    case "agent_init_failed":
+      return "Agent initialization failed...";
+    default:
+      return "Creating agent...";
+  }
+}
+
 export function ChatArea({ conversationId }: Props) {
   const queryClient = useQueryClient();
+  const posthog = usePostHog();
   const { data: existingConversation, isLoading } = useConversation(
     conversationId
   );
@@ -70,6 +111,7 @@ export function ChatArea({ conversationId }: Props) {
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
   const [integrationsUsed, setIntegrationsUsed] = useState<Set<IntegrationType>>(new Set());
   const [traceStatus, setTraceStatus] = useState<TraceStatus>("complete");
+  const [agentInitStatus, setAgentInitStatus] = useState<string | null>(null);
 
   // Sandbox files collected during streaming
   const [streamingSandboxFiles, setStreamingSandboxFiles] = useState<SandboxFileData[]>([]);
@@ -82,6 +124,127 @@ export function ChatArea({ conversationId }: Props) {
   const isRecordingRef = useRef(false);
   const isNearBottomRef = useRef(true);
   const userScrolledUpRef = useRef(false);
+  const initTrackingStartedAtRef = useRef<number | null>(null);
+  const initSignalReceivedAtRef = useRef<number | null>(null);
+  const initSignalEventTypeRef = useRef<string | null>(null);
+  const initTimeoutEventSentRef = useRef(false);
+  const initWatchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetInitTracking = useCallback(() => {
+    initTrackingStartedAtRef.current = null;
+    initSignalReceivedAtRef.current = null;
+    initSignalEventTypeRef.current = null;
+    initTimeoutEventSentRef.current = false;
+    if (initWatchdogTimerRef.current) {
+      clearTimeout(initWatchdogTimerRef.current);
+      initWatchdogTimerRef.current = null;
+    }
+    setAgentInitStatus(null);
+  }, []);
+
+  const beginInitTracking = useCallback((source: "new_generation" | "reconnect") => {
+    const startedAt = Date.now();
+    resetInitTracking();
+    initTrackingStartedAtRef.current = startedAt;
+    setAgentInitStatus("agent_init_started");
+    console.info(`[AgentInit][Client] started source=${source} conversationId=${currentConversationIdRef.current ?? "new"}`);
+    posthog?.capture("agent_creation_started", {
+      source,
+      startedAtMs: startedAt,
+      conversationId: currentConversationIdRef.current ?? null,
+      generationId: currentGenerationIdRef.current ?? null,
+      model: selectedModel,
+    });
+
+    initWatchdogTimerRef.current = setTimeout(() => {
+      if (!initTrackingStartedAtRef.current || initSignalReceivedAtRef.current) {
+        return;
+      }
+      initTimeoutEventSentRef.current = true;
+      const elapsedMs = Date.now() - initTrackingStartedAtRef.current;
+      console.warn(
+        `[AgentInit][Client] timeout_no_init elapsedMs=${elapsedMs} conversationId=${currentConversationIdRef.current ?? "new"} generationId=${currentGenerationIdRef.current ?? "unknown"}`
+      );
+      posthog?.capture("agent_init_timeout", {
+        elapsedMs,
+        conversationId: currentConversationIdRef.current ?? null,
+        generationId: currentGenerationIdRef.current ?? null,
+        model: selectedModel,
+      });
+    }, 20_000);
+  }, [posthog, resetInitTracking, selectedModel]);
+
+  const markInitSignal = useCallback((eventType: string, metadata?: Record<string, unknown>) => {
+    if (!initTrackingStartedAtRef.current || initSignalReceivedAtRef.current) {
+      return;
+    }
+    const now = Date.now();
+    const elapsedMs = now - initTrackingStartedAtRef.current;
+    initSignalReceivedAtRef.current = now;
+    initSignalEventTypeRef.current = eventType;
+    if (initWatchdogTimerRef.current) {
+      clearTimeout(initWatchdogTimerRef.current);
+      initWatchdogTimerRef.current = null;
+    }
+
+    console.info(
+      `[AgentInit][Client] init_signal_received event=${eventType} elapsedMs=${elapsedMs} conversationId=${currentConversationIdRef.current ?? "new"} generationId=${currentGenerationIdRef.current ?? "unknown"}`
+    );
+    posthog?.capture("agent_init_signal_received", {
+      eventType,
+      elapsedMs,
+      conversationId: currentConversationIdRef.current ?? null,
+      generationId: currentGenerationIdRef.current ?? null,
+      model: selectedModel,
+      ...metadata,
+    });
+  }, [posthog, selectedModel]);
+
+  const markInitMissingAtEnd = useCallback((endReason: string, metadata?: Record<string, unknown>) => {
+    if (!initTrackingStartedAtRef.current || initSignalReceivedAtRef.current) {
+      return;
+    }
+
+    const elapsedMs = Date.now() - initTrackingStartedAtRef.current;
+    if (initWatchdogTimerRef.current) {
+      clearTimeout(initWatchdogTimerRef.current);
+      initWatchdogTimerRef.current = null;
+    }
+
+    console.error(
+      `[AgentInit][Client] missing_init endReason=${endReason} elapsedMs=${elapsedMs} conversationId=${currentConversationIdRef.current ?? "new"} generationId=${currentGenerationIdRef.current ?? "unknown"}`
+    );
+    posthog?.capture("agent_init_missing", {
+      endReason,
+      elapsedMs,
+      didTimeout: initTimeoutEventSentRef.current,
+      conversationId: currentConversationIdRef.current ?? null,
+      generationId: currentGenerationIdRef.current ?? null,
+      model: selectedModel,
+      ...metadata,
+    });
+  }, [posthog, selectedModel]);
+
+  const handleInitStatusChange = useCallback((status: string) => {
+    console.info(`[AgentInit][Client] status_change status=${status} generationId=${currentGenerationIdRef.current ?? "unknown"}`);
+    if (!status.startsWith("agent_init_")) {
+      return;
+    }
+
+    setAgentInitStatus(status);
+    posthog?.capture("agent_init_status", {
+      status,
+      conversationId: currentConversationIdRef.current ?? null,
+      generationId: currentGenerationIdRef.current ?? null,
+      model: selectedModel,
+    });
+
+    if (status === "agent_init_ready") {
+      markInitSignal("agent_init_ready");
+    } else if (status === "agent_init_failed") {
+      markInitMissingAtEnd("agent_init_failed");
+    }
+  }, [markInitMissingAtEnd, markInitSignal, posthog, selectedModel]);
 
   const syncFromRuntime = useCallback((runtime: GenerationRuntime) => {
     const snapshot = runtime.snapshot;
@@ -206,6 +369,8 @@ export function ChatArea({ conversationId }: Props) {
     }
   }, [existingConversation, conversationId]);
 
+  useEffect(() => () => resetInitTracking(), [resetInitTracking]);
+
   // Reset when conversation changes
   useEffect(() => {
     // Always sync the ref with the prop
@@ -222,8 +387,9 @@ export function ChatArea({ conversationId }: Props) {
       setStreamError(null);
       setStreamingSandboxFiles([]);
       currentGenerationIdRef.current = undefined;
+      resetInitTracking();
     }
-  }, [conversationId]);
+  }, [conversationId, resetInitTracking]);
 
   // Listen for "new-chat" event to reset state when user clicks New Chat
   useEffect(() => {
@@ -240,10 +406,11 @@ export function ChatArea({ conversationId }: Props) {
       setStreamingSandboxFiles([]);
       currentGenerationIdRef.current = undefined;
       currentConversationIdRef.current = undefined;
+      resetInitTracking();
     };
     window.addEventListener("new-chat", handleNewChat);
     return () => window.removeEventListener("new-chat", handleNewChat);
-  }, [abort]);
+  }, [abort, resetInitTracking]);
 
   // Reconnect to active generation on mount
   useEffect(() => {
@@ -254,6 +421,7 @@ export function ChatArea({ conversationId }: Props) {
       // There's an active generation - reconnect to it
       currentGenerationIdRef.current = activeGeneration.generationId;
       setIsStreaming(true);
+      beginInitTracking("reconnect");
       setTraceStatus(
         activeGeneration.status === "awaiting_approval" ? "waiting_approval" :
         activeGeneration.status === "awaiting_auth" ? "waiting_auth" : "streaming"
@@ -272,22 +440,27 @@ export function ChatArea({ conversationId }: Props) {
 
       subscribeToGeneration(activeGeneration.generationId, {
         onText: (text) => {
+          markInitSignal("text");
           runtime.handleText(text);
           syncFromRuntime(runtime);
         },
         onThinking: (data) => {
+          markInitSignal("thinking");
           runtime.handleThinking(data);
           syncFromRuntime(runtime);
         },
         onToolUse: (data) => {
+          markInitSignal("tool_use", { toolName: data.toolName });
           runtime.handleToolUse(data);
           syncFromRuntime(runtime);
         },
         onToolResult: (toolName, result) => {
+          markInitSignal("tool_result", { toolName });
           runtime.handleToolResult(toolName, result);
           syncFromRuntime(runtime);
         },
         onPendingApproval: (data) => {
+          markInitSignal("pending_approval", { toolName: data.toolName });
           console.log("[ApprovalCard] Showing approval card", { toolUseId: data.toolUseId, toolName: data.toolName, integration: data.integration, operation: data.operation, command: data.command });
           currentGenerationIdRef.current = data.generationId;
           runtime.handlePendingApproval(data);
@@ -298,6 +471,7 @@ export function ChatArea({ conversationId }: Props) {
           syncFromRuntime(runtime);
         },
         onAuthNeeded: (data) => {
+          markInitSignal("auth_needed", { integrations: data.integrations });
           currentGenerationIdRef.current = data.generationId;
           if (data.conversationId) {
             currentConversationIdRef.current = data.conversationId;
@@ -314,10 +488,15 @@ export function ChatArea({ conversationId }: Props) {
           syncFromRuntime(runtime);
         },
         onSandboxFile: (file) => {
+          markInitSignal("sandbox_file", { filename: file.filename });
           runtime.handleSandboxFile(file);
           syncFromRuntime(runtime);
         },
+        onStatusChange: (status) => {
+          handleInitStatusChange(status);
+        },
         onDone: (generationId, newConversationId, messageId, usage) => {
+          markInitSignal("done");
           runtime.handleDone({ generationId, conversationId: newConversationId, messageId });
           const assistant = runtime.buildAssistantMessage();
 
@@ -340,26 +519,31 @@ export function ChatArea({ conversationId }: Props) {
           setStreamError(null);
           currentGenerationIdRef.current = undefined;
           runtimeRef.current = null;
+          resetInitTracking();
         },
         onError: (message) => {
           runtime.handleError();
           syncFromRuntime(runtime);
           console.error("Generation error:", message);
+          markInitMissingAtEnd("error", { message });
           setIsStreaming(false);
           setStreamError(message || "Streaming failed. Please retry.");
           currentGenerationIdRef.current = undefined;
           runtimeRef.current = null;
+          resetInitTracking();
         },
         onCancelled: () => {
           runtime.handleCancelled();
           syncFromRuntime(runtime);
+          markInitMissingAtEnd("cancelled");
           setIsStreaming(false);
           currentGenerationIdRef.current = undefined;
           runtimeRef.current = null;
+          resetInitTracking();
         },
       });
     }
-  }, [activeGeneration?.generationId, activeGeneration?.status, subscribeToGeneration, syncFromRuntime]);
+  }, [activeGeneration?.generationId, activeGeneration?.status, beginInitTracking, handleInitStatusChange, markInitMissingAtEnd, markInitSignal, resetInitTracking, subscribeToGeneration, syncFromRuntime]);
 
   // Track if user is near bottom of scroll
   const handleScroll = useCallback(() => {
@@ -443,9 +627,11 @@ export function ChatArea({ conversationId }: Props) {
     setIsStreaming(false);
     setStreamingParts([]);
     setTraceStatus("complete");
+    markInitMissingAtEnd("user_stopped");
+    resetInitTracking();
     currentGenerationIdRef.current = undefined;
     runtimeRef.current = null;
-  }, [abort, cancelGeneration]);
+  }, [abort, cancelGeneration, markInitMissingAtEnd, resetInitTracking]);
 
   // Helper to toggle segment expansion
   const toggleSegmentExpand = useCallback((segmentId: string) => {
@@ -475,6 +661,7 @@ export function ChatArea({ conversationId }: Props) {
     setSegments([]);
     setIntegrationsUsed(new Set());
     setTraceStatus("streaming");
+    beginInitTracking("new_generation");
 
     const runtime = createGenerationRuntime();
     runtimeRef.current = runtime;
@@ -486,27 +673,33 @@ export function ChatArea({ conversationId }: Props) {
       {
         onStarted: (generationId, newConversationId) => {
           currentGenerationIdRef.current = generationId;
+          console.info(`[AgentInit][Client] generation_started generationId=${generationId} conversationId=${newConversationId}`);
           if (!conversationId && newConversationId) {
             currentConversationIdRef.current = newConversationId;
           }
         },
         onText: (text) => {
+          markInitSignal("text");
           runtime.handleText(text);
           syncFromRuntime(runtime);
         },
         onThinking: (data) => {
+          markInitSignal("thinking");
           runtime.handleThinking(data);
           syncFromRuntime(runtime);
         },
         onToolUse: (data) => {
+          markInitSignal("tool_use", { toolName: data.toolName });
           runtime.handleToolUse(data);
           syncFromRuntime(runtime);
         },
         onToolResult: (toolName, result) => {
+          markInitSignal("tool_result", { toolName });
           runtime.handleToolResult(toolName, result);
           syncFromRuntime(runtime);
         },
         onPendingApproval: (data) => {
+          markInitSignal("pending_approval", { toolName: data.toolName });
           currentGenerationIdRef.current = data.generationId;
           if (data.conversationId) {
             currentConversationIdRef.current = data.conversationId;
@@ -519,6 +712,7 @@ export function ChatArea({ conversationId }: Props) {
           syncFromRuntime(runtime);
         },
         onAuthNeeded: (data) => {
+          markInitSignal("auth_needed", { integrations: data.integrations });
           currentGenerationIdRef.current = data.generationId;
           if (data.conversationId) {
             currentConversationIdRef.current = data.conversationId;
@@ -535,10 +729,15 @@ export function ChatArea({ conversationId }: Props) {
           syncFromRuntime(runtime);
         },
         onSandboxFile: (file) => {
+          markInitSignal("sandbox_file", { filename: file.filename });
           runtime.handleSandboxFile(file);
           syncFromRuntime(runtime);
         },
+        onStatusChange: (status) => {
+          handleInitStatusChange(status);
+        },
         onDone: (generationId, newConversationId, messageId) => {
+          markInitSignal("done");
           runtime.handleDone({ generationId, conversationId: newConversationId, messageId });
           const assistant = runtime.buildAssistantMessage();
 
@@ -561,6 +760,7 @@ export function ChatArea({ conversationId }: Props) {
           setStreamError(null);
           currentGenerationIdRef.current = undefined;
           runtimeRef.current = null;
+          resetInitTracking();
 
           // Invalidate conversation queries to refresh sidebar
           queryClient.invalidateQueries({ queryKey: ["conversation"] });
@@ -574,10 +774,12 @@ export function ChatArea({ conversationId }: Props) {
           runtime.handleError();
           syncFromRuntime(runtime);
           console.error("Generation error:", message);
+          markInitMissingAtEnd("error", { message });
           setIsStreaming(false);
           setStreamError(message || "Streaming failed. Please retry.");
           currentGenerationIdRef.current = undefined;
           runtimeRef.current = null;
+          resetInitTracking();
           // Add error message
           setMessages((prev) => [
             ...prev,
@@ -591,14 +793,16 @@ export function ChatArea({ conversationId }: Props) {
         onCancelled: () => {
           runtime.handleCancelled();
           syncFromRuntime(runtime);
+          markInitMissingAtEnd("cancelled");
           setIsStreaming(false);
           currentGenerationIdRef.current = undefined;
           runtimeRef.current = null;
+          resetInitTracking();
         },
       }
     );
 
-  }, [conversationId, startGeneration, queryClient, selectedModel, localAutoApprove, selectedDeviceId, syncFromRuntime]);
+  }, [beginInitTracking, conversationId, handleInitStatusChange, localAutoApprove, markInitMissingAtEnd, markInitSignal, queryClient, resetInitTracking, selectedDeviceId, selectedModel, startGeneration, syncFromRuntime]);
 
   // Handle approval/denial of tool use
   const handleApprove = useCallback(
@@ -813,7 +1017,7 @@ export function ChatArea({ conversationId }: Props) {
                     <div className="rounded-lg border border-border/50 bg-muted/30">
                       <div className="flex items-center gap-2 px-3 py-2">
                         <Activity className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Creating agent...</span>
+                        <span className="text-sm text-muted-foreground">{getAgentInitLabel(agentInitStatus)}</span>
                         <div className="flex gap-1 ml-auto">
                           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.3s]" />
                           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />
