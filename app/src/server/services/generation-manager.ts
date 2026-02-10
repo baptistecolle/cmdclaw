@@ -112,7 +112,7 @@ export type GenerationEvent =
       usage: { inputTokens: number; outputTokens: number; totalCostUsd: number };
     }
   | { type: "error"; message: string }
-  | { type: "cancelled" }
+  | { type: "cancelled"; generationId: string; conversationId: string; messageId?: string }
   | { type: "status_change"; status: string };
 
 type GenerationStatus =
@@ -743,38 +743,69 @@ class GenerationManager {
             },
           };
         } else if (genRecord.status === "cancelled") {
-          yield { type: "cancelled" };
+          yield {
+            type: "cancelled",
+            generationId: genRecord.id,
+            conversationId: genRecord.conversationId,
+            messageId: genRecord.messageId ?? undefined,
+          };
         } else if (genRecord.status === "error") {
           yield { type: "error", message: genRecord.errorMessage || "Unknown error" };
         }
         return;
       }
 
-      // If paused or awaiting approval/auth, we need to resume the context
-      // For now, just report the state
+      // Non-terminal generations without an active in-memory context cannot be resumed.
+      // This happens after process restarts and previously led to a stuck reconnect UI.
+      const orphanedStatuses = new Set<GenerationStatus>([
+        "running",
+        "awaiting_approval",
+        "awaiting_auth",
+        "paused",
+      ]);
+
+      if (orphanedStatuses.has(genRecord.status as GenerationStatus)) {
+        const errorMessage = "Generation context was lost. Please retry your prompt.";
+
+        logServerEvent(
+          "error",
+          "GENERATION_CONTEXT_LOST",
+          { previousStatus: genRecord.status },
+          {
+            source: "generation-manager",
+            generationId: genRecord.id,
+            conversationId: genRecord.conversationId,
+            userId,
+          }
+        );
+
+        await db
+          .update(generation)
+          .set({
+            status: "error",
+            errorMessage,
+            completedAt: new Date(),
+          })
+          .where(eq(generation.id, genRecord.id));
+
+        await db
+          .update(conversation)
+          .set({
+            generationStatus: "error",
+            currentGenerationId: null,
+          })
+          .where(
+            and(
+              eq(conversation.id, genRecord.conversationId),
+              eq(conversation.currentGenerationId, genRecord.id)
+            )
+          );
+
+        yield { type: "error", message: errorMessage };
+        return;
+      }
+
       yield { type: "status_change", status: genRecord.status };
-      if (genRecord.pendingApproval) {
-        yield {
-          type: "pending_approval",
-          generationId: genRecord.id,
-          conversationId: genRecord.conversationId,
-          toolUseId: genRecord.pendingApproval.toolUseId,
-          toolName: genRecord.pendingApproval.toolName,
-          toolInput: genRecord.pendingApproval.toolInput,
-          integration: genRecord.pendingApproval.integration ?? "",
-          operation: genRecord.pendingApproval.operation ?? "",
-          command: genRecord.pendingApproval.command,
-        };
-      }
-      if (genRecord.pendingAuth) {
-        yield {
-          type: "auth_needed",
-          generationId: genRecord.id,
-          conversationId: genRecord.conversationId,
-          integrations: genRecord.pendingAuth.integrations,
-          reason: genRecord.pendingAuth.reason,
-        };
-      }
       return;
     }
 
@@ -3082,9 +3113,9 @@ class GenerationManager {
 
     let messageId: string | undefined;
 
-    if (status === "completed") {
+    if (status === "completed" || status === "cancelled") {
       // Update session ID
-      if (ctx.sessionId) {
+      if (status === "completed" && ctx.sessionId) {
         await db
           .update(conversation)
           .set({ opencodeSessionId: ctx.sessionId })
@@ -3092,7 +3123,7 @@ class GenerationManager {
       }
 
       // Auto-collect any new files created during generation (direct mode only)
-      if (ctx.sandbox && ctx.generationMarkerTime) {
+      if (status === "completed" && ctx.sandbox && ctx.generationMarkerTime) {
         try {
           const excludePaths = Array.from(ctx.sentFilePaths || []);
           const newFiles = await collectNewSandboxFiles(ctx.sandbox, ctx.generationMarkerTime, excludePaths);
@@ -3125,14 +3156,38 @@ class GenerationManager {
         }
       }
 
-      // Save assistant message
+      const interruptionText = "Interrupted by user";
+      const cancelledParts =
+        status === "cancelled"
+          ? [
+              ...ctx.contentParts,
+              ...(
+                ctx.contentParts.some(
+                  (part): part is ContentPart & { type: "system" } =>
+                    part.type === "system" && part.content === interruptionText
+                )
+                  ? []
+                  : ([{ type: "system", content: interruptionText }] as ContentPart[])
+              ),
+            ]
+          : ctx.contentParts;
+
+      // Keep interruption marker in generation record snapshot too.
+      if (status === "cancelled") {
+        ctx.contentParts = cancelledParts;
+      }
+
+      // Save assistant message for completed and cancelled generations
       const [assistantMessage] = await db
         .insert(message)
         .values({
           conversationId: ctx.conversationId,
           role: "assistant",
-          content: ctx.assistantContent || "I apologize, but I couldn't generate a response.",
-          contentParts: ctx.contentParts.length > 0 ? ctx.contentParts : null,
+          content:
+            status === "cancelled"
+              ? ctx.assistantContent || interruptionText
+              : ctx.assistantContent || "I apologize, but I couldn't generate a response.",
+          contentParts: cancelledParts.length > 0 ? cancelledParts : null,
           inputTokens: ctx.usage.inputTokens,
           outputTokens: ctx.usage.outputTokens,
         })
@@ -3142,7 +3197,7 @@ class GenerationManager {
 
       // Link uploaded sandbox files to the final assistant message
       const uploadedFileIds = Array.from(ctx.uploadedSandboxFileIds || []);
-      if (uploadedFileIds.length > 0) {
+      if (status === "completed" && uploadedFileIds.length > 0) {
         const { sandboxFile } = await import("@/server/db/schema");
         const { inArray } = await import("drizzle-orm");
         await db
@@ -3152,7 +3207,7 @@ class GenerationManager {
       }
 
       // Generate title for new conversations
-      if (ctx.isNewConversation && ctx.assistantContent) {
+      if (status === "completed" && ctx.isNewConversation && ctx.assistantContent) {
         try {
           const title = await generateConversationTitle(
             ctx.userMessageContent,
@@ -3218,7 +3273,12 @@ class GenerationManager {
         usage: ctx.usage,
       });
     } else if (status === "cancelled") {
-      this.broadcast(ctx, { type: "cancelled" });
+      this.broadcast(ctx, {
+        type: "cancelled",
+        generationId: ctx.id,
+        conversationId: ctx.conversationId,
+        messageId,
+      });
     } else if (status === "error") {
       this.broadcast(ctx, { type: "error", message: ctx.errorMessage || "Unknown error" });
     }

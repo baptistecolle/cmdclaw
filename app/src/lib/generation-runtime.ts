@@ -13,6 +13,7 @@ export type RuntimeMessagePart =
       isWrite?: boolean;
     }
   | { type: "thinking"; id: string; content: string }
+  | { type: "system"; content: string }
   | {
       type: "approval";
       toolUseId: string;
@@ -145,7 +146,7 @@ export type RuntimeServerEvent =
   | { type: "sandbox_file"; fileId: string; path: string; filename: string; mimeType: string; sizeBytes: number | null }
   | { type: "done"; generationId: string; conversationId: string; messageId: string }
   | { type: "error"; message: string }
-  | { type: "cancelled" };
+  | { type: "cancelled"; generationId: string; conversationId: string; messageId?: string };
 
 export type RuntimeSnapshot = {
   parts: RuntimeMessagePart[];
@@ -420,7 +421,14 @@ export class GenerationRuntime {
     this.traceStatus = "error";
   }
 
-  handleCancelled(): void {
+  handleCancelled(data?: { generationId?: string; conversationId?: string }): void {
+    if (data?.generationId) {
+      this.currentGenerationId = data.generationId;
+    }
+    if (data?.conversationId) {
+      this.currentConversationId = data.conversationId;
+    }
+
     this.traceStatus = "complete";
     for (const segment of this.segments) {
       for (const item of segment.items) {
@@ -428,6 +436,28 @@ export class GenerationRuntime {
           item.status = "interrupted";
         }
       }
+    }
+
+    const interruptionText = "Interrupted by user";
+    const hasSystemPart = this.parts.some(
+      (part): part is RuntimeMessagePart & { type: "system" } =>
+        part.type === "system" && part.content === interruptionText
+    );
+    if (!hasSystemPart) {
+      this.parts.push({ type: "system", content: interruptionText });
+    }
+
+    const currentSegment = this.getCurrentSegment();
+    const hasSystemItem = currentSegment.items.some(
+      (item) => item.type === "system" && item.content === interruptionText
+    );
+    if (!hasSystemItem) {
+      currentSegment.items.push({
+        id: `activity-${this.activityCounter++}`,
+        timestamp: Date.now(),
+        type: "system",
+        content: interruptionText,
+      });
     }
   }
 
@@ -477,7 +507,7 @@ export class GenerationRuntime {
         this.handleError();
         return;
       case "cancelled":
-        this.handleCancelled();
+        this.handleCancelled(event);
         return;
       default:
         return;

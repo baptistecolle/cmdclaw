@@ -196,7 +196,8 @@ export type ContentPart =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown>; integration?: string; operation?: string }
   | { type: "tool_result"; tool_use_id: string; content: unknown }
-  | { type: "thinking"; id: string; content: string };
+  | { type: "thinking"; id: string; content: string }
+  | { type: "system"; content: string };
 
 export const message = pgTable(
   "message",

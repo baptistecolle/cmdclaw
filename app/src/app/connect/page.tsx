@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/app-shell";
 import { authClient } from "@/lib/auth-client";
 import { CheckCircle2, Loader2, Monitor, XCircle } from "lucide-react";
 
-export default function ConnectDevicePage() {
+function ConnectDevicePageContent() {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -122,5 +122,13 @@ export default function ConnectDevicePage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+export default function ConnectDevicePage() {
+  return (
+    <Suspense fallback={null}>
+      <ConnectDevicePageContent />
+    </Suspense>
   );
 }

@@ -146,6 +146,11 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
     );
   }
 
+  const hasInterruptedMarker = useMemo(
+    () => !!parts?.some((p) => p.type === "system" && p.content === "Interrupted by user"),
+    [parts]
+  );
+
   // Parse message parts into segments based on approval parts
   const segments = useMemo((): DisplaySegment[] => {
     if (!parts) return [];
@@ -182,7 +187,7 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
           toolName: part.name,
           integration: part.integration as IntegrationType | undefined,
           operation: part.operation,
-          status: part.result !== undefined ? "complete" : "running",
+          status: part.result !== undefined ? "complete" : hasInterruptedMarker ? "interrupted" : "running",
           input: part.input,
           result: part.result,
         });
@@ -192,6 +197,14 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
           id: `activity-${part.id}`,
           timestamp: Date.now() - (parts.length - i) * 1000,
           type: "thinking",
+          content: part.content,
+        });
+        activityIndex++;
+      } else if (part.type === "system") {
+        currentSegment.items.push({
+          id: `activity-system-${activityIndex}`,
+          timestamp: Date.now() - (parts.length - i) * 1000,
+          type: "system",
           content: part.content,
         });
         activityIndex++;
@@ -212,11 +225,11 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
     }
 
     return result;
-  }, [parts]);
+  }, [hasInterruptedMarker, parts]);
 
   // Check if there were any text, tool calls or thinking (need to show trace)
   const hasTrace = parts && parts.some(
-    (p) => p.type === "text" || p.type === "thinking" || p.type === "tool_call"
+    (p) => p.type === "text" || p.type === "thinking" || p.type === "tool_call" || p.type === "system"
   );
 
   // Check if there was an error

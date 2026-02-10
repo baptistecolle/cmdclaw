@@ -15,6 +15,7 @@ export type MessagePart =
       isWrite?: boolean;
     }
   | { type: "thinking"; id: string; content: string }
+  | { type: "system"; content: string }
   | {
       type: "approval";
       toolUseId: string;

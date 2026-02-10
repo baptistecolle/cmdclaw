@@ -263,6 +263,25 @@ export function ChatArea({ conversationId }: Props) {
     setTraceStatus(snapshot.traceStatus);
   }, []);
 
+  const persistInterruptedRuntimeMessage = useCallback(
+    (runtime: GenerationRuntime, messageId?: string) => {
+      runtime.handleCancelled();
+      const assistant = runtime.buildAssistantMessage();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: messageId ?? `cancelled-${Date.now()}`,
+          role: "assistant",
+          content: assistant.content || "Interrupted by user",
+          parts: assistant.parts as MessagePart[],
+          integrationsUsed: assistant.integrationsUsed,
+          sandboxFiles: assistant.sandboxFiles as SandboxFileData[] | undefined,
+        } as Message & { integrationsUsed?: IntegrationType[]; sandboxFiles?: SandboxFileData[] },
+      ]);
+    },
+    []
+  );
+
   // Auto-approve mutation
   const { mutateAsync: updateAutoApprove } = useUpdateAutoApprove();
 
@@ -288,6 +307,7 @@ export function ChatArea({ conversationId }: Props) {
           | { type: "tool_use"; id: string; name: string; input: Record<string, unknown>; integration?: string; operation?: string }
           | { type: "tool_result"; tool_use_id: string; content: unknown }
           | { type: "thinking"; id: string; content: string }
+          | { type: "system"; content: string }
         >;
       }>;
     } | null | undefined;
@@ -318,6 +338,8 @@ export function ChatArea({ conversationId }: Props) {
                   return { type: "text" as const, content: p.text };
                 } else if (p.type === "thinking") {
                   return { type: "thinking" as const, id: p.id, content: p.content };
+                } else if (p.type === "system") {
+                  return { type: "system" as const, content: p.content };
                 } else {
                   // tool_use -> tool_call with result merged
                   return {
@@ -532,9 +554,10 @@ export function ChatArea({ conversationId }: Props) {
           runtimeRef.current = null;
           resetInitTracking();
         },
-        onCancelled: () => {
-          runtime.handleCancelled();
-          syncFromRuntime(runtime);
+        onCancelled: (data) => {
+          if (runtimeRef.current === runtime) {
+            persistInterruptedRuntimeMessage(runtime, data.messageId);
+          }
           markInitMissingAtEnd("cancelled");
           setIsStreaming(false);
           currentGenerationIdRef.current = undefined;
@@ -543,7 +566,7 @@ export function ChatArea({ conversationId }: Props) {
         },
       });
     }
-  }, [activeGeneration?.generationId, activeGeneration?.status, beginInitTracking, handleInitStatusChange, markInitMissingAtEnd, markInitSignal, resetInitTracking, subscribeToGeneration, syncFromRuntime]);
+  }, [activeGeneration?.generationId, activeGeneration?.status, beginInitTracking, handleInitStatusChange, markInitMissingAtEnd, markInitSignal, persistInterruptedRuntimeMessage, resetInitTracking, subscribeToGeneration, syncFromRuntime]);
 
   // Track if user is near bottom of scroll
   const handleScroll = useCallback(() => {
@@ -590,48 +613,32 @@ export function ChatArea({ conversationId }: Props) {
   }, [messages, streamingParts]);
 
   const handleStop = useCallback(async () => {
+    const runtime = runtimeRef.current;
+    const generationId = currentGenerationIdRef.current;
+    if (runtime) {
+      persistInterruptedRuntimeMessage(runtime);
+    }
+    runtimeRef.current = null;
+    currentGenerationIdRef.current = undefined;
+
     abort();
     // Cancel the generation on the backend too
-    if (currentGenerationIdRef.current) {
+    if (generationId) {
       try {
-        await cancelGeneration(currentGenerationIdRef.current);
+        await cancelGeneration(generationId);
       } catch (err) {
         console.error("Failed to cancel generation:", err);
       }
     }
 
-    // Update segments: mark running items as interrupted, add system message
-    setSegments((prevSegments) => {
-      if (prevSegments.length === 0) return prevSegments;
-
-      return prevSegments.map((segment, index) => {
-        // Mark any running items as interrupted
-        const updatedItems = segment.items.map((item) =>
-          item.status === "running" ? { ...item, status: "interrupted" as const } : item
-        );
-
-        // Add interruption message to last segment
-        if (index === prevSegments.length - 1) {
-          updatedItems.push({
-            id: `interrupted-${Date.now()}`,
-            timestamp: Date.now(),
-            type: "system" as const,
-            content: "Interrupted by user",
-          });
-        }
-
-        return { ...segment, items: updatedItems, isExpanded: true };
-      });
-    });
-
     setIsStreaming(false);
     setStreamingParts([]);
+    setStreamingSandboxFiles([]);
+    setSegments([]);
     setTraceStatus("complete");
     markInitMissingAtEnd("user_stopped");
     resetInitTracking();
-    currentGenerationIdRef.current = undefined;
-    runtimeRef.current = null;
-  }, [abort, cancelGeneration, markInitMissingAtEnd, resetInitTracking]);
+  }, [abort, cancelGeneration, markInitMissingAtEnd, persistInterruptedRuntimeMessage, resetInitTracking]);
 
   // Helper to toggle segment expansion
   const toggleSegmentExpand = useCallback((segmentId: string) => {
@@ -790,9 +797,10 @@ export function ChatArea({ conversationId }: Props) {
             },
           ]);
         },
-        onCancelled: () => {
-          runtime.handleCancelled();
-          syncFromRuntime(runtime);
+        onCancelled: (data) => {
+          if (runtimeRef.current === runtime) {
+            persistInterruptedRuntimeMessage(runtime, data.messageId);
+          }
           markInitMissingAtEnd("cancelled");
           setIsStreaming(false);
           currentGenerationIdRef.current = undefined;
@@ -802,7 +810,7 @@ export function ChatArea({ conversationId }: Props) {
       }
     );
 
-  }, [beginInitTracking, conversationId, handleInitStatusChange, localAutoApprove, markInitMissingAtEnd, markInitSignal, queryClient, resetInitTracking, selectedDeviceId, selectedModel, startGeneration, syncFromRuntime]);
+  }, [beginInitTracking, conversationId, handleInitStatusChange, localAutoApprove, markInitMissingAtEnd, markInitSignal, persistInterruptedRuntimeMessage, queryClient, resetInitTracking, selectedDeviceId, selectedModel, startGeneration, syncFromRuntime]);
 
   // Handle approval/denial of tool use
   const handleApprove = useCallback(

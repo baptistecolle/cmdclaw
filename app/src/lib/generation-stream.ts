@@ -73,7 +73,7 @@ export type GenerationCallbacks = {
   ) => void | Promise<void>;
   onStarted?: (generationId: string, conversationId: string) => void | Promise<void>;
   onError?: (message: string) => void | Promise<void>;
-  onCancelled?: () => void | Promise<void>;
+  onCancelled?: (data: { generationId: string; conversationId: string; messageId?: string }) => void | Promise<void>;
   onStatusChange?: (status: string) => void | Promise<void>;
 };
 
@@ -188,7 +188,11 @@ export async function runGenerationStream(
         await callbacks.onError?.(event.message);
         break;
       case "cancelled":
-        await callbacks.onCancelled?.();
+        await callbacks.onCancelled?.({
+          generationId: event.generationId,
+          conversationId: event.conversationId,
+          messageId: event.messageId,
+        });
         break;
       case "status_change":
         await callbacks.onStatusChange?.(event.status);

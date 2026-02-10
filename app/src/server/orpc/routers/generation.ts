@@ -82,6 +82,9 @@ const generationEventSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("cancelled"),
+    generationId: z.string(),
+    conversationId: z.string(),
+    messageId: z.string().optional(),
   }),
   z.object({
     type: z.literal("status_change"),

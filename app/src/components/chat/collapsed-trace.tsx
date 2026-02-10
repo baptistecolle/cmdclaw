@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, AlertCircle, ChevronRight, Eye } from "lucide-react";
+import { Check, AlertCircle, ChevronRight, Eye, StopCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { IntegrationBadges } from "./integration-badges";
@@ -28,6 +28,11 @@ export function CollapsedTrace({
   onToggleExpand,
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const hasInterrupted = activityItems.some(
+    (item) =>
+      item.status === "interrupted" ||
+      (item.type === "system" && item.content === "Interrupted by user")
+  );
 
   // Handle toggle - use external handler if provided
   const handleToggle = () => {
@@ -51,7 +56,12 @@ export function CollapsedTrace({
           )}
         />
 
-        {hasError ? (
+        {hasInterrupted ? (
+          <>
+            <StopCircle className="h-4 w-4 text-orange-500" />
+            <span className="text-muted-foreground">Interrupted by user</span>
+          </>
+        ) : hasError ? (
           <>
             <AlertCircle className="h-4 w-4 text-amber-500" />
             <span className="text-muted-foreground">Completed with error</span>
