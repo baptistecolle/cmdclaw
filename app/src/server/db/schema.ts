@@ -324,7 +324,7 @@ export const workflow = pgTable(
     ownerId: text("owner_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    status: workflowStatusEnum("status").default("off").notNull(),
+    status: workflowStatusEnum("status").default("on").notNull(),
     triggerType: text("trigger_type").notNull(),
     prompt: text("prompt").notNull(),
     promptDo: text("prompt_do"),

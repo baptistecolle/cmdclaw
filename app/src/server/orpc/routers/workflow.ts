@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import { workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
+import { generation, user, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
@@ -58,10 +58,12 @@ const list = protectedProcedure.handler(async ({ context }) => {
 
   const items = await Promise.all(
     workflows.map(async (wf) => {
-      const lastRun = await context.db.query.workflowRun.findFirst({
+      const runs = await context.db.query.workflowRun.findMany({
         where: eq(workflowRun.workflowId, wf.id),
         orderBy: (run, { desc }) => [desc(run.startedAt)],
+        limit: 20,
       });
+      const lastRun = runs[0];
 
       return {
         id: wf.id,
@@ -74,6 +76,20 @@ const list = protectedProcedure.handler(async ({ context }) => {
         updatedAt: wf.updatedAt,
         lastRunStatus: lastRun?.status ?? null,
         lastRunAt: lastRun?.startedAt ?? null,
+        recentRuns: runs.map((run) => {
+          const payload =
+            run.triggerPayload && typeof run.triggerPayload === "object"
+              ? (run.triggerPayload as Record<string, unknown>)
+              : null;
+          const source = payload && Object.keys(payload).length > 0 ? "trigger" : "manual";
+
+          return {
+            id: run.id,
+            status: run.status,
+            startedAt: run.startedAt,
+            source,
+          };
+        }),
       };
     })
   );
@@ -140,7 +156,7 @@ const create = protectedProcedure
       .values({
         name: input.name,
         ownerId: context.user.id,
-        status: "off",
+        status: "on",
         triggerType: input.triggerType,
         prompt: input.prompt,
         promptDo: input.promptDo,
@@ -227,10 +243,16 @@ const trigger = protectedProcedure
     })
   )
   .handler(async ({ input, context }) => {
+    const dbUser = await context.db.query.user.findFirst({
+      where: eq(user.id, context.user.id),
+      columns: { role: true },
+    });
+
     return triggerWorkflowRun({
       workflowId: input.id,
       triggerPayload: input.payload ?? {},
       userId: context.user.id,
+      userRole: dbUser?.role ?? null,
     });
   });
 
@@ -257,6 +279,14 @@ const getRun = protectedProcedure
       where: eq(workflowRunEvent.workflowRunId, run.id),
       orderBy: (evt, { asc }) => [asc(evt.createdAt)],
     });
+    const gen = run.generationId
+      ? await context.db.query.generation.findFirst({
+          where: eq(generation.id, run.generationId),
+          columns: {
+            conversationId: true,
+          },
+        })
+      : null;
 
     return {
       id: run.id,
@@ -264,6 +294,7 @@ const getRun = protectedProcedure
       status: run.status,
       triggerPayload: run.triggerPayload,
       generationId: run.generationId,
+      conversationId: gen?.conversationId ?? null,
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
       errorMessage: run.errorMessage,

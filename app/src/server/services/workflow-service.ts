@@ -5,12 +5,13 @@ import { workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
 import type { IntegrationType } from "@/server/oauth/config";
 
-const ONE_HOUR_MS = 60 * 60 * 1000;
+const ONE_MINUTE_MS = 60 * 1000;
 
 export async function triggerWorkflowRun(params: {
   workflowId: string;
   triggerPayload: unknown;
   userId?: string;
+  userRole?: string | null;
 }): Promise<{
   workflowId: string;
   runId: string;
@@ -36,10 +37,10 @@ export async function triggerWorkflowRun(params: {
     orderBy: (run, { desc }) => [desc(run.startedAt)],
   });
 
-  if (lastRun && lastRun.startedAt) {
+  if (params.userRole !== "admin" && lastRun && lastRun.startedAt) {
     const now = Date.now();
-    if (now - new Date(lastRun.startedAt).getTime() < ONE_HOUR_MS) {
-      throw new ORPCError("BAD_REQUEST", { message: "Workflow is rate limited (1 run per hour)" });
+    if (now - new Date(lastRun.startedAt).getTime() < ONE_MINUTE_MS) {
+      throw new ORPCError("BAD_REQUEST", { message: "Workflow is rate limited (1 run per minute)" });
     }
   }
 

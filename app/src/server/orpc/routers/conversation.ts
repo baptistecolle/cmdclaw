@@ -51,8 +51,7 @@ const get = protectedProcedure
     const conv = await context.db.query.conversation.findFirst({
       where: and(
         eq(conversation.id, input.id),
-        eq(conversation.userId, context.user.id),
-        eq(conversation.type, "chat")
+        eq(conversation.userId, context.user.id)
       ),
       with: {
         messages: {

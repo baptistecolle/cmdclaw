@@ -3,77 +3,64 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWorkflowRun } from "@/orpc/hooks";
+import { ChatArea } from "@/components/chat/chat-area";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft } from "lucide-react";
-
-function formatDate(value?: Date | string | null) {
-  if (!value) return "—";
-  const date = typeof value === "string" ? new Date(value) : value;
-  return date.toLocaleString();
-}
 
 export default function WorkflowRunPage() {
   const params = useParams<{ id: string }>();
   const runId = params?.id;
   const { data: run, isLoading } = useWorkflowRun(runId);
 
-  if (isLoading || !run) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex h-full items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+  if (!run) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        Run not found.
+      </div>
+    );
+  }
+
+  if (!run.conversationId) {
+    return (
+      <div className="space-y-4 p-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
             <Link href={`/workflows/${run.workflowId}`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
-            <h2 className="text-xl font-semibold">Run {run.id.slice(0, 8)}</h2>
-            <p className="text-sm text-muted-foreground">
-              Status: {run.status} · Started {formatDate(run.startedAt)}
-            </p>
-          </div>
+          <h2 className="text-lg font-semibold">Run details unavailable in chat view</h2>
         </div>
-        <div className="text-sm text-muted-foreground">
-          Finished: {formatDate(run.finishedAt)}
+        <p className="text-sm text-muted-foreground">
+          This run does not have a linked conversation, so it cannot be opened in the chat interface.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center gap-3 border-b px-4 py-2">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href={`/workflows/${run.workflowId}`}>
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div>
+          <h2 className="text-sm font-medium">Workflow run</h2>
+          <p className="text-xs text-muted-foreground font-mono">ID: {run.id}</p>
         </div>
       </div>
-
-      <div className="rounded-lg border p-4">
-        <h3 className="text-sm font-semibold">Trigger payload</h3>
-        <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
-          {JSON.stringify(run.triggerPayload ?? {}, null, 2)}
-        </pre>
-      </div>
-
-      <div className="rounded-lg border p-4">
-        <h3 className="text-sm font-semibold">Timeline</h3>
-        <div className="mt-3 space-y-3">
-          {run.events.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No events recorded.</p>
-          ) : (
-            run.events.map((event) => (
-              <div key={event.id} className="rounded-md border p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{event.type}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDate(event.createdAt)}
-                  </span>
-                </div>
-                <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-muted p-2 text-xs">
-                  {JSON.stringify(event.payload ?? {}, null, 2)}
-                </pre>
-              </div>
-            ))
-          )}
-        </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
+        <ChatArea conversationId={run.conversationId} />
       </div>
     </div>
   );

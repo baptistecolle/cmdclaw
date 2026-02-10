@@ -32,6 +32,11 @@ export default function WorkflowsPage() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [workflowToDelete, setWorkflowToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [expandedRunsByWorkflow, setExpandedRunsByWorkflow] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!notification) return;
@@ -68,14 +73,15 @@ export default function WorkflowsPage() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete workflow "${name}"?`)) return;
+  const handleDelete = async () => {
+    if (!workflowToDelete) return;
     try {
-      await deleteWorkflow.mutateAsync(id);
+      await deleteWorkflow.mutateAsync(workflowToDelete.id);
       setNotification({
         type: "success",
-        message: `Workflow "${name}" deleted.`,
+        message: `Workflow "${workflowToDelete.name}" deleted.`,
       });
+      setWorkflowToDelete(null);
       refetch();
     } catch (error) {
       console.error("Failed to delete workflow:", error);
@@ -166,54 +172,160 @@ export default function WorkflowsPage() {
           {workflowList.map((wf) => (
             <div
               key={wf.id}
-              className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
+              className="rounded-lg border p-4"
             >
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium">{wf.name}</h3>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    {wf.triggerType}
-                  </span>
+              {(() => {
+                const recentRuns = Array.isArray(wf.recentRuns) ? wf.recentRuns : [];
+                const isExpanded = !!expandedRunsByWorkflow[wf.id];
+                const visibleRuns = isExpanded ? recentRuns : recentRuns.slice(0, 1);
+                const hiddenCount = Math.max(0, recentRuns.length - visibleRuns.length);
+
+                return (
+                  <>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium">{wf.name}</h3>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                      {wf.triggerType}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Last run: {wf.lastRunStatus ?? "—"} · {formatDate(wf.lastRunAt)}
+                  </div>
                 </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  Last run: {wf.lastRunStatus ?? "—"} · {formatDate(wf.lastRunAt)}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={wf.status === "on"}
+                      onCheckedChange={(checked) =>
+                        handleToggle(wf.id, checked ? "on" : "off")
+                      }
+                    />
+                    <span className="text-sm">{wf.status === "on" ? "On" : "Off"}</span>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleRun(wf.id)}
+                    disabled={wf.status !== "on"}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    Run
+                  </Button>
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link href={`/workflows/${wf.id}`}>
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setWorkflowToDelete({ id: wf.id, name: wf.name })}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={wf.status === "on"}
-                    onCheckedChange={(checked) =>
-                      handleToggle(wf.id, checked ? "on" : "off")
-                    }
-                  />
-                  <span className="text-sm">{wf.status === "on" ? "On" : "Off"}</span>
+              <div className="mt-4 border-t pt-3">
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Recent runs
                 </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleRun(wf.id)}
-                  disabled={wf.status !== "on"}
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Run
-                </Button>
-                <Button variant="ghost" size="icon" asChild>
-                  <Link href={`/workflows/${wf.id}`}>
-                    <Pencil className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(wf.id, wf.name)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {recentRuns.length > 0 ? (
+                  <div className="space-y-2">
+                    {visibleRuns.map((run) => (
+                      <Link
+                        key={run.id}
+                        href={`/workflows/runs/${run.id}`}
+                        className="flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
+                            {run.source}
+                          </span>
+                          <span className="capitalize">{run.status.replaceAll("_", " ")}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{formatDate(run.startedAt)}</span>
+                      </Link>
+                    ))}
+                    {hiddenCount > 0 ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() =>
+                          setExpandedRunsByWorkflow((prev) => ({
+                            ...prev,
+                            [wf.id]: true,
+                          }))
+                        }
+                      >
+                        Show {hiddenCount} more
+                      </Button>
+                    ) : null}
+                    {isExpanded && recentRuns.length > 1 ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() =>
+                          setExpandedRunsByWorkflow((prev) => ({
+                            ...prev,
+                            [wf.id]: false,
+                          }))
+                        }
+                      >
+                        Show less
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">No runs yet.</div>
+                )}
               </div>
+                  </>
+                );
+              })()}
             </div>
           ))}
+        </div>
+      )}
+
+      {workflowToDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setWorkflowToDelete(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border bg-background p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold">Delete workflow?</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This will permanently delete "{workflowToDelete.name}" and cannot be undone.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setWorkflowToDelete(null)}
+                disabled={deleteWorkflow.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleteWorkflow.isPending}
+              >
+                {deleteWorkflow.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Delete
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
