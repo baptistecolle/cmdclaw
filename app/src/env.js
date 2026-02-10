@@ -91,6 +91,7 @@ export const env = createEnv({
     SLACK_BOT_TOKEN: z.string().optional(),
     SLACK_SIGNING_SECRET: z.string().optional(),
     SLACK_BOT_OWNER_USER_ID: z.string().optional(),
+    REPORT_SLACK_CHANNEL_ID: z.string().optional(),
     // Community Integration Repo
     COMMUNITY_REPO_GITHUB_TOKEN: z.string().optional(),
     COMMUNITY_REPO_OWNER: z.string().default("bap-community"),
@@ -173,6 +174,7 @@ export const env = createEnv({
     SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,
     SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET,
     SLACK_BOT_OWNER_USER_ID: process.env.SLACK_BOT_OWNER_USER_ID,
+    REPORT_SLACK_CHANNEL_ID: process.env.REPORT_SLACK_CHANNEL_ID,
     COMMUNITY_REPO_GITHUB_TOKEN: process.env.COMMUNITY_REPO_GITHUB_TOKEN,
     COMMUNITY_REPO_OWNER: process.env.COMMUNITY_REPO_OWNER,
     COMMUNITY_REPO_NAME: process.env.COMMUNITY_REPO_NAME,
