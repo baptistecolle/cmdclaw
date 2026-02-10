@@ -7,6 +7,7 @@ import {
   Plug,
   Sparkles,
   Settings,
+  Shield,
   LogOut,
   Workflow,
   Flag,
@@ -39,14 +40,6 @@ import {
 } from "@/components/animate-ui/components/radix/sheet";
 
 type SessionData = Awaited<ReturnType<typeof authClient.getSession>>["data"];
-
-const navItems = [
-  { icon: MessageSquare, label: "Chat", href: "/chat" },
-  { icon: Workflow, label: "Workflows", href: "/workflows" },
-  { icon: Plug, label: "Integrations", href: "/integrations" },
-  { icon: Sparkles, label: "Skills", href: "/skills" },
-  { icon: Settings, label: "Settings", href: "/settings" },
-];
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -86,6 +79,15 @@ export function AppSidebar() {
 
   const userEmail = session?.user?.email ?? "";
   const avatarInitial = userEmail ? userEmail.charAt(0).toUpperCase() : "";
+  const isAdmin = session?.user?.role === "admin";
+  const navItems = [
+    { icon: MessageSquare, label: "Chat", href: "/chat" },
+    { icon: Workflow, label: "Workflows", href: "/workflows" },
+    { icon: Plug, label: "Integrations", href: "/integrations" },
+    ...(isAdmin ? [{ icon: Shield, label: "Admin", href: "/admin" }] : []),
+    { icon: Sparkles, label: "Skills", href: "/skills" },
+    { icon: Settings, label: "Settings", href: "/settings" },
+  ];
 
   const isActive = (href: string) => {
     if (href === "/chat") {

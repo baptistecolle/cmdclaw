@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { authClient } from "@/lib/auth-client";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,10 @@ type SessionData = Awaited<ReturnType<typeof authClient.getSession>>["data"];
 function getPhoneNumber(user: unknown): string {
   if (user && typeof user === "object" && "phoneNumber" in user) {
     const value = (user as { phoneNumber?: string | null }).phoneNumber;
-    return typeof value === "string" ? value : "";
+    if (typeof value !== "string" || value.length === 0) {
+      return "";
+    }
+    return value.startsWith("+") ? value : `+${value}`;
   }
   return "";
 }
@@ -64,10 +68,9 @@ export default function SettingsPage() {
 
     try {
       const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
-      const normalizedPhone = phoneNumber.replace(/\D/g, "");
       await authClient.updateUser({
         name: fullName,
-        phoneNumber: normalizedPhone || undefined,
+        phoneNumber: phoneNumber || undefined,
       });
       setNotification({ type: "success", message: "Settings saved" });
     } catch (error) {
@@ -177,14 +180,16 @@ export default function SettingsPage() {
 
           <div>
             <label className="mb-2 block text-sm font-medium">Phone number</label>
-            <Input
-              type="tel"
+            <PhoneInput
+              defaultCountry="US"
+              international
+              countryCallingCodeEditable={false}
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              onChange={(value) => setPhoneNumber(value ?? "")}
               placeholder="Enter your WhatsApp phone number"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Use your WhatsApp number with country code (digits only).
+              Use your WhatsApp number with country code.
             </p>
           </div>
         </div>

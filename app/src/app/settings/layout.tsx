@@ -21,9 +21,9 @@ export default function SettingsLayout({
 
   return (
     <AppShell>
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <main className="w-full max-w-4xl px-4">
-          <nav className="mb-6 flex gap-4 border-b">
+      <div className="min-h-full bg-background">
+        <main className="mx-auto w-full max-w-4xl px-4 pb-10 pt-8 md:px-6 md:pt-10">
+          <nav className="sticky top-0 z-10 mb-6 flex gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
             {settingsTabs.map((tab) => {
               const isActive =
                 tab.href === "/settings"

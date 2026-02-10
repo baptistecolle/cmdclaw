@@ -13,6 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   INTEGRATION_DISPLAY_NAMES,
@@ -20,6 +28,7 @@ import {
   type IntegrationType,
 } from "@/lib/integration-icons";
 import { Loader2, Play, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 
 const TRIGGERS = [
   { value: "schedule", label: "Run on a schedule" },
@@ -59,6 +68,10 @@ export default function WorkflowEditorPage() {
   const [scheduleTime, setScheduleTime] = useState("09:00");
   const [scheduleDaysOfWeek, setScheduleDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]); // Mon-Fri
   const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState(1);
+  const localTimezone = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    []
+  );
 
   useEffect(() => {
     if (!workflow) return;
@@ -73,14 +86,14 @@ export default function WorkflowEditorPage() {
     if (schedule) {
       setScheduleType(schedule.type);
       if (schedule.type === "interval") {
-        setIntervalMinutes(schedule.intervalMinutes);
+        setIntervalMinutes(Math.max(60, schedule.intervalMinutes));
       } else if (schedule.type === "daily") {
-        setScheduleTime(schedule.time);
+        setScheduleTime(schedule.time.slice(0, 5));
       } else if (schedule.type === "weekly") {
-        setScheduleTime(schedule.time);
+        setScheduleTime(schedule.time.slice(0, 5));
         setScheduleDaysOfWeek(schedule.daysOfWeek);
       } else if (schedule.type === "monthly") {
-        setScheduleTime(schedule.time);
+        setScheduleTime(schedule.time.slice(0, 5));
         setScheduleDayOfMonth(schedule.dayOfMonth);
       }
     }
@@ -113,13 +126,23 @@ export default function WorkflowEditorPage() {
 
     switch (scheduleType) {
       case "interval":
-        return { type: "interval", intervalMinutes };
+        return { type: "interval", intervalMinutes: Math.max(60, Math.round(intervalMinutes / 60) * 60) };
       case "daily":
-        return { type: "daily", time: scheduleTime, timezone: "UTC" };
+        return { type: "daily", time: scheduleTime.slice(0, 5), timezone: localTimezone };
       case "weekly":
-        return { type: "weekly", time: scheduleTime, daysOfWeek: scheduleDaysOfWeek, timezone: "UTC" };
+        return {
+          type: "weekly",
+          time: scheduleTime.slice(0, 5),
+          daysOfWeek: scheduleDaysOfWeek,
+          timezone: localTimezone,
+        };
       case "monthly":
-        return { type: "monthly", time: scheduleTime, dayOfMonth: scheduleDayOfMonth, timezone: "UTC" };
+        return {
+          type: "monthly",
+          time: scheduleTime.slice(0, 5),
+          dayOfMonth: scheduleDayOfMonth,
+          timezone: localTimezone,
+        };
       default:
         return null;
     }
@@ -167,8 +190,8 @@ export default function WorkflowEditorPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
-      <div className="flex items-center justify-between">
+    <div className="min-h-[calc(100vh-8rem)] space-y-5 pb-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/workflows">
@@ -182,7 +205,16 @@ export default function WorkflowEditorPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5">
+            <span className="text-sm text-muted-foreground">
+              {status === "on" ? "Workflow is on" : "Workflow is off"}
+            </span>
+            <Switch
+              checked={status === "on"}
+              onCheckedChange={(checked) => setStatus(checked ? "on" : "off")}
+            />
+          </div>
           <Button variant="secondary" onClick={handleRun} disabled={status !== "on"}>
             <Play className="mr-2 h-4 w-4" />
             Run now
@@ -207,155 +239,174 @@ export default function WorkflowEditorPage() {
         </div>
       )}
 
-      {/* Workflow copilot dual panel is disabled until it is ready. */}
-      <div className="min-h-0 flex-1">
-        <div className="h-full space-y-6 overflow-y-auto p-4 md:p-6">
-            <div className="rounded-lg border p-6 space-y-6">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="rounded-xl bg-card/20 p-5 md:p-6">
+          <div className="space-y-8">
+            <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Name</label>
                   <input
-                    className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                    className="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Trigger</label>
-                  <select
-                    className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                    value={triggerType}
-                    onChange={(e) => setTriggerType(e.target.value)}
+                  <Select value={triggerType} onValueChange={setTriggerType}>
+                    <SelectTrigger className="h-10 w-full bg-transparent">
+                      <SelectValue placeholder="Select a trigger" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRIGGERS.map((trigger) => (
+                        <SelectItem key={trigger.value} value={trigger.value}>
+                          {trigger.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <AnimatePresence initial={false} mode="wait">
+                {triggerType === "schedule" && (
+                  <motion.div
+                    key="schedule-settings"
+                    className="space-y-4"
+                    initial={{ opacity: 0, y: -8, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: "auto" }}
+                    exit={{ opacity: 0, y: -8, height: 0 }}
+                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    style={{ overflow: "hidden" }}
                   >
-                    {TRIGGERS.map((trigger) => (
-                      <option key={trigger.value} value={trigger.value}>
-                        {trigger.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {triggerType === "schedule" && (
-                <div className="rounded-md border p-4 space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Frequency</label>
-                    <select
-                      className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                      value={scheduleType}
-                      onChange={(e) => setScheduleType(e.target.value as typeof scheduleType)}
-                    >
-                      <option value="interval">Every X minutes/hours</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-
-                  {scheduleType === "interval" && (
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Run every</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={1}
-                          max={10080}
-                          className="h-9 w-24 rounded-md border bg-transparent px-3 text-sm"
-                          value={intervalMinutes}
-                          onChange={(e) => setIntervalMinutes(Math.max(1, parseInt(e.target.value) || 1))}
-                        />
-                        <select
-                          className="h-9 rounded-md border bg-transparent px-3 text-sm"
-                          value={intervalMinutes >= 60 && intervalMinutes % 60 === 0 ? "hours" : "minutes"}
-                          onChange={(e) => {
-                            if (e.target.value === "hours") {
-                              setIntervalMinutes(Math.max(1, Math.round(intervalMinutes / 60)) * 60);
-                            }
-                          }}
-                        >
-                          <option value="minutes">minutes</option>
-                          <option value="hours">hours</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {(scheduleType === "daily" || scheduleType === "weekly" || scheduleType === "monthly") && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Time (UTC)</label>
-                      <input
-                        type="time"
-                        className="h-9 w-32 rounded-md border bg-transparent px-3 text-sm"
-                        value={scheduleTime}
-                        onChange={(e) => setScheduleTime(e.target.value)}
-                      />
-                    </div>
-                  )}
-
-                  {scheduleType === "weekly" && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Days of the week</label>
-                      <div className="flex flex-wrap gap-2">
-                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => (
-                          <button
-                            key={day}
-                            type="button"
-                            className={cn(
-                              "h-9 w-12 rounded-md border text-sm font-medium transition-colors",
-                              scheduleDaysOfWeek.includes(index)
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-transparent hover:bg-muted"
-                            )}
-                            onClick={() => {
-                              setScheduleDaysOfWeek((prev) =>
-                                prev.includes(index)
-                                  ? prev.filter((d) => d !== index)
-                                  : [...prev, index].sort()
-                              );
-                            }}
-                          >
-                            {day}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {scheduleType === "monthly" && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Day of the month</label>
-                      <select
-                        className="h-9 w-24 rounded-md border bg-transparent px-3 text-sm"
-                        value={scheduleDayOfMonth}
-                        onChange={(e) => setScheduleDayOfMonth(parseInt(e.target.value))}
+                      <label className="text-sm font-medium">Frequency</label>
+                      <Select
+                        value={scheduleType}
+                        onValueChange={(value) => setScheduleType(value as typeof scheduleType)}
                       >
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                          <option key={day} value={day}>
-                            {day}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="h-10 w-full bg-background">
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="interval">Every X hours</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
-                </div>
-              )}
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Agent instructions</label>
-                <textarea
-                  className="min-h-[120px] w-full rounded-md border bg-transparent px-3 py-2 text-sm"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                />
-              </div>
+                    {scheduleType === "interval" && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Run every</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            max={168}
+                            className="h-10 w-24 rounded-md border bg-background px-3 text-sm"
+                            value={Math.max(1, Math.round(intervalMinutes / 60))}
+                            onChange={(e) => {
+                              const hours = Math.max(1, parseInt(e.target.value) || 1);
+                              setIntervalMinutes(hours * 60);
+                            }}
+                          />
+                          <span className="text-sm text-muted-foreground">hours</span>
+                        </div>
+                      </div>
+                    )}
 
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Allowed tools</label>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {(showAllIntegrations ? integrationEntries : integrationEntries.slice(0, 4)).map(({ key, name: label, logo }) => (
+                    {(scheduleType === "daily" || scheduleType === "weekly" || scheduleType === "monthly") && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Time ({localTimezone})</label>
+                        <Input
+                          type="time"
+                          step={60}
+                          value={scheduleTime}
+                          onChange={(e) => setScheduleTime(e.target.value.slice(0, 5))}
+                          className="h-10 w-36 bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                        />
+                      </div>
+                    )}
+
+                    {scheduleType === "weekly" && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Days of the week</label>
+                        <div className="flex flex-wrap gap-2">
+                          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => (
+                            <button
+                              key={day}
+                              type="button"
+                              className={cn(
+                                "h-9 w-12 rounded-md border text-sm font-medium transition-colors",
+                                scheduleDaysOfWeek.includes(index)
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "bg-background hover:bg-muted"
+                              )}
+                              onClick={() => {
+                                setScheduleDaysOfWeek((prev) =>
+                                  prev.includes(index)
+                                    ? prev.filter((d) => d !== index)
+                                    : [...prev, index].sort()
+                                );
+                              }}
+                            >
+                              {day}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {scheduleType === "monthly" && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Day of the month</label>
+                        <Select
+                          value={String(scheduleDayOfMonth)}
+                          onValueChange={(value) => setScheduleDayOfMonth(parseInt(value, 10))}
+                        >
+                          <SelectTrigger className="h-10 w-24 bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                              <SelectItem key={day} value={String(day)}>
+                                {day}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Agent instructions</label>
+              <textarea
+                className="min-h-[180px] w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Allowed tools</label>
+              <div className="grid gap-3 md:grid-cols-2">
+                {(showAllIntegrations ? integrationEntries : integrationEntries.slice(0, 4)).map(
+                  ({ key, name: label, logo }) => (
                     <label
                       key={key}
-                      className="flex items-center gap-3 rounded-md border p-3 text-sm"
+                      className={cn(
+                        "flex items-center gap-3 rounded-md p-3 text-sm transition-colors",
+                        allowedIntegrations.includes(key)
+                          ? "bg-primary/10"
+                          : "bg-muted/30 hover:bg-muted/50"
+                      )}
                     >
                       <Checkbox
                         checked={allowedIntegrations.includes(key)}
@@ -364,73 +415,62 @@ export default function WorkflowEditorPage() {
                       <img src={logo} alt={label} className="h-4 w-4" />
                       <span>{label}</span>
                     </label>
-                  ))}
-                </div>
-                {integrationEntries.length > 4 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAllIntegrations(!showAllIntegrations)}
-                    className="text-muted-foreground"
-                  >
-                    {showAllIntegrations ? (
-                      <>
-                        <ChevronUp className="mr-1 h-4 w-4" />
-                        Show less
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="mr-1 h-4 w-4" />
-                        Show more ({integrationEntries.length - 4} more)
-                      </>
-                    )}
-                  </Button>
+                  )
                 )}
               </div>
-
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={status === "on"}
-                  onCheckedChange={(checked) => setStatus(checked ? "on" : "off")}
-                />
-                <span className="text-sm">
-                  {status === "on" ? "Workflow is on" : "Workflow is off"}
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-lg border p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold">Recent runs</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Latest workflow runs and their status.
-                  </p>
-                </div>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/workflows/${workflowId}`}>Refresh</Link>
+              {integrationEntries.length > 4 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllIntegrations(!showAllIntegrations)}
+                  className="text-muted-foreground"
+                >
+                  {showAllIntegrations ? (
+                    <>
+                      <ChevronUp className="mr-1 h-4 w-4" />
+                      Show less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="mr-1 h-4 w-4" />
+                      Show more ({integrationEntries.length - 4} more)
+                    </>
+                  )}
                 </Button>
-              </div>
-              {runs && runs.length > 0 ? (
-                <div className="space-y-2">
-                  {runs.map((run) => (
-                    <Link
-                      key={run.id}
-                      href={`/workflows/runs/${run.id}`}
-                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted"
-                    >
-                      <span>{run.status}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(run.startedAt)}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No runs yet.</p>
               )}
             </div>
-        </div>
+
+          </div>
+        </section>
+
+        <aside className="rounded-xl bg-card/20 p-5 md:p-6 xl:sticky xl:top-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">Recent runs</h3>
+              <p className="text-xs text-muted-foreground">Latest workflow runs and their status.</p>
+            </div>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/workflows/${workflowId}`}>Refresh</Link>
+            </Button>
+          </div>
+
+          {runs && runs.length > 0 ? (
+            <div className="space-y-2">
+              {runs.map((run) => (
+                <Link
+                  key={run.id}
+                  href={`/workflows/runs/${run.id}`}
+                  className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+                >
+                  <span>{run.status}</span>
+                  <span className="text-xs text-muted-foreground">{formatDate(run.startedAt)}</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No runs yet.</p>
+          )}
+        </aside>
       </div>
     </div>
   );

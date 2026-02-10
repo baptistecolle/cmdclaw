@@ -29,7 +29,7 @@ const triggerTypeSchema = z.string().min(1).max(128);
 const scheduleSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("interval"),
-    intervalMinutes: z.number().min(1).max(10080), // max 1 week in minutes
+    intervalMinutes: z.number().min(60).max(10080), // min 1 hour, max 1 week in minutes
   }),
   z.object({
     type: z.literal("daily"),
