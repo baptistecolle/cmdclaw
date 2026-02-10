@@ -13,7 +13,7 @@ export default function AdminPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Use the tabs above to access admin-only settings.
         </p>
-      </p>
+      </div>
     </div>
   );
 }

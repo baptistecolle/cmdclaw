@@ -386,6 +386,7 @@ export function useCreateWorkflow() {
       prompt: string;
       promptDo?: string;
       promptDont?: string;
+      autoApprove?: boolean;
       allowedIntegrations: (
         "gmail"
         | "google_calendar"
@@ -428,6 +429,7 @@ export function useUpdateWorkflow() {
       prompt?: string;
       promptDo?: string | null;
       promptDont?: string | null;
+      autoApprove?: boolean;
       allowedIntegrations?: (
         "gmail"
         | "google_calendar"

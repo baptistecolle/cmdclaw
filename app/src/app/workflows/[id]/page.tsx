@@ -15,6 +15,16 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -22,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
 import {
   INTEGRATION_DISPLAY_NAMES,
   INTEGRATION_LOGOS,
@@ -55,6 +66,8 @@ export default function WorkflowEditorPage() {
   const [prompt, setPrompt] = useState("");
   const [allowedIntegrations, setAllowedIntegrations] = useState<IntegrationType[]>([]);
   const [status, setStatus] = useState<"on" | "off">("off");
+  const [autoApprove, setAutoApprove] = useState(true);
+  const [showDisableAutoApproveDialog, setShowDisableAutoApproveDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showAllIntegrations, setShowAllIntegrations] = useState(false);
   const [notification, setNotification] = useState<{
@@ -80,6 +93,7 @@ export default function WorkflowEditorPage() {
     setPrompt(workflow.prompt);
     setAllowedIntegrations((workflow.allowedIntegrations ?? []) as IntegrationType[]);
     setStatus(workflow.status);
+    setAutoApprove(workflow.autoApprove ?? true);
 
     // Initialize schedule state (when trigger is "schedule")
     const schedule = workflow.schedule as WorkflowSchedule | null;
@@ -158,6 +172,7 @@ export default function WorkflowEditorPage() {
         status,
         triggerType,
         prompt,
+        autoApprove,
         allowedIntegrations,
         schedule: buildSchedule(),
       });
@@ -205,14 +220,29 @@ export default function WorkflowEditorPage() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <div className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5">
             <span className="text-sm text-muted-foreground">
               {status === "on" ? "Workflow is on" : "Workflow is off"}
             </span>
             <Switch
               checked={status === "on"}
               onCheckedChange={(checked) => setStatus(checked ? "on" : "off")}
+            />
+          </div>
+          <div className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5">
+            <span className="text-sm text-muted-foreground">
+              {autoApprove ? "Auto-approve on" : "Auto-approve off"}
+            </span>
+            <Switch
+              checked={autoApprove}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  setAutoApprove(true);
+                  return;
+                }
+                setShowDisableAutoApproveDialog(true);
+              }}
             />
           </div>
           <Button variant="secondary" onClick={handleRun} disabled={status !== "on"}>
@@ -462,7 +492,7 @@ export default function WorkflowEditorPage() {
                   href={`/workflows/runs/${run.id}`}
                   className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 text-sm transition-colors hover:bg-muted/50"
                 >
-                  <span>{run.status}</span>
+                  <span>{getWorkflowRunStatusLabel(run.status)}</span>
                   <span className="text-xs text-muted-foreground">{formatDate(run.startedAt)}</span>
                 </Link>
               ))}
@@ -472,6 +502,31 @@ export default function WorkflowEditorPage() {
           )}
         </aside>
       </div>
+      <AlertDialog
+        open={showDisableAutoApproveDialog}
+        onOpenChange={setShowDisableAutoApproveDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Turn off auto-approve?</AlertDialogTitle>
+            <AlertDialogDescription>
+              If you turn this off, workflow runs can stop and wait for manual approval on write actions.
+              The agent might stay stuck until someone approves in the UI.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep on</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setAutoApprove(false);
+                setShowDisableAutoApproveDialog(false);
+              }}
+            >
+              Turn off
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

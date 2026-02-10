@@ -118,9 +118,16 @@ const integrationConfig = {
     icon: "/integrations/twitter.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
+  whatsapp: {
+    name: "WhatsApp",
+    description: "Link WhatsApp and pair the bridge with QR",
+    icon: "/integrations/whatsapp.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
 } as const;
 
 type IntegrationType = keyof typeof integrationConfig;
+type OAuthIntegrationType = Exclude<IntegrationType, "whatsapp">;
 
 function IntegrationsPageContent() {
   const searchParams = useSearchParams();
@@ -145,6 +152,7 @@ function IntegrationsPageContent() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const linkedInLinkingRef = useRef(false);
+  const [whatsAppBridgeStatus, setWhatsAppBridgeStatus] = useState<"disconnected" | "connecting" | "connected" | null>(null);
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [customForm, setCustomForm] = useState({
     slug: "",
@@ -216,7 +224,7 @@ function IntegrationsPageContent() {
     }
   }, [notification]);
 
-  const handleConnect = async (type: IntegrationType) => {
+  const handleConnect = async (type: OAuthIntegrationType) => {
     setConnectingType(type);
     try {
       const result = await getAuthUrl.mutateAsync({
@@ -252,8 +260,39 @@ function IntegrationsPageContent() {
     }
   };
 
+  useEffect(() => {
+    let active = true;
+
+    const loadWhatsAppStatus = async () => {
+      try {
+        const res = await fetch("/api/whatsapp/status");
+        if (!res.ok) {
+          if (res.status === 403 && active) {
+            setWhatsAppBridgeStatus(null);
+          }
+          return;
+        }
+        const data = (await res.json()) as { status: "disconnected" | "connecting" | "connected" };
+        if (active) {
+          setWhatsAppBridgeStatus(data.status);
+        }
+      } catch {
+        if (active) {
+          setWhatsAppBridgeStatus(null);
+        }
+      }
+    };
+
+    loadWhatsAppStatus();
+    const interval = setInterval(loadWhatsAppStatus, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   const integrationsList = Array.isArray(integrations) ? integrations : [];
-  const connectedIntegrations = new Map(
+  const connectedIntegrations = new Map<string, (typeof integrationsList)[number]>(
     integrationsList.map((i) => [i.type, i])
   );
 
@@ -261,21 +300,24 @@ function IntegrationsPageContent() {
   const filteredIntegrations = (Object.entries(integrationConfig) as [IntegrationType, (typeof integrationConfig)[IntegrationType]][]).filter(
     ([type, config]) => {
       const integration = connectedIntegrations.get(type);
+      const isWhatsAppConnected = type === "whatsapp" && whatsAppBridgeStatus === "connected";
       const matchesSearch = config.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         config.description.toLowerCase().includes(searchQuery.toLowerCase());
 
       if (!matchesSearch) return false;
 
-      if (activeTab === "connected") return !!integration;
-      if (activeTab === "not_connected") return !integration;
+      if (activeTab === "connected") return !!integration || isWhatsAppConnected;
+      if (activeTab === "not_connected") return !integration && !isWhatsAppConnected;
       return true;
     }
   );
 
+  const connectedCount = connectedIntegrations.size + (whatsAppBridgeStatus === "connected" ? 1 : 0);
+
   const tabs: { id: FilterTab; label: string; count: number }[] = [
     { id: "all", label: "All", count: Object.keys(integrationConfig).length },
-    { id: "connected", label: "Connected", count: connectedIntegrations.size },
-    { id: "not_connected", label: "Not Connected", count: Object.keys(integrationConfig).length - connectedIntegrations.size },
+    { id: "connected", label: "Connected", count: connectedCount },
+    { id: "not_connected", label: "Not Connected", count: Object.keys(integrationConfig).length - connectedCount },
   ];
 
   return (
@@ -360,7 +402,9 @@ function IntegrationsPageContent() {
             const integration = connectedIntegrations.get(type);
             const isConnecting = connectingType === type;
             const isExpanded = expandedCard === type;
-            const actions = getIntegrationActions(type);
+            const isWhatsApp = type === "whatsapp";
+            const isWhatsAppConnected = isWhatsApp && whatsAppBridgeStatus === "connected";
+            const actions = isWhatsApp ? [] : getIntegrationActions(type);
 
             return (
               <div
@@ -393,6 +437,10 @@ function IntegrationsPageContent() {
                             {integration.displayName}
                           </span>
                         </p>
+                      ) : isWhatsAppConnected ? (
+                        <p className="text-sm text-muted-foreground">
+                          Bridge is connected. Open to manage QR/linking.
+                        </p>
                       ) : (
                         <p className="text-sm text-muted-foreground">
                           {config.description}
@@ -420,7 +468,17 @@ function IntegrationsPageContent() {
                         />
                       </Button>
                     )}
-                    {integration ? (
+                    {isWhatsApp ? (
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.location.href = "/integrations/whatsapp";
+                        }}
+                      >
+                        {isWhatsAppConnected ? "Manage" : "Connect"}
+                        <ExternalLink className="ml-2 h-4 w-4" />
+                      </Button>
+                    ) : integration ? (
                       <>
                         <label
                           className="flex cursor-pointer items-center gap-2"
@@ -449,7 +507,7 @@ function IntegrationsPageContent() {
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleConnect(type);
+                          handleConnect(type as OAuthIntegrationType);
                         }}
                         disabled={isConnecting}
                       >

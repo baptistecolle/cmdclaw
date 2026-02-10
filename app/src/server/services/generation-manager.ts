@@ -169,6 +169,7 @@ interface GenerationContext {
   // Workflow fields
   workflowRunId?: string;
   allowedIntegrations?: IntegrationType[];
+  autoApprove: boolean;
   // OpenCode permission request fields (for forwarding approval to OpenCode SDK)
   opencodePermissionId?: string;
   opencodeClient?: any;
@@ -502,6 +503,7 @@ class GenerationManager {
       pendingMessageParts: new Map(),
       backendType,
       deviceId: params.deviceId,
+      autoApprove: conv.autoApprove,
       attachments: params.attachments,
       uploadedSandboxFileIds: new Set(),
       agentInitStartedAt: undefined,
@@ -559,6 +561,7 @@ class GenerationManager {
     content: string;
     model?: string;
     userId: string;
+    autoApprove: boolean;
     allowedIntegrations: IntegrationType[];
     allowedCustomIntegrations?: string[];
     workflowPrompt: string;
@@ -576,7 +579,7 @@ class GenerationManager {
         title: title || "Workflow run",
         type: "workflow",
         model: model ?? "claude-sonnet-4-20250514",
-        autoApprove: false,
+        autoApprove: params.autoApprove,
       })
       .returning();
 
@@ -629,6 +632,7 @@ class GenerationManager {
       backendType: "opencode",
       workflowRunId: params.workflowRunId,
       allowedIntegrations: params.allowedIntegrations,
+      autoApprove: params.autoApprove,
       allowedCustomIntegrations: params.allowedCustomIntegrations,
       workflowPrompt: params.workflowPrompt,
       workflowPromptDo: params.workflowPromptDo ?? undefined,
@@ -2960,6 +2964,10 @@ class GenerationManager {
       return "deny";
     }
 
+    if (ctx.autoApprove) {
+      return "allow";
+    }
+
     // Create a promise that resolves when user approves/denies
     return new Promise((resolve) => {
       const toolUseId = `plugin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -3390,5 +3398,14 @@ function resolveProviderID(modelID: string): string {
   return "anthropic"; // default
 }
 
-// Singleton instance
-export const generationManager = new GenerationManager();
+// Stable singleton across dev hot-reloads/module re-evaluation.
+const globalForGenerationManager = globalThis as typeof globalThis & {
+  __bapGenerationManager?: GenerationManager;
+};
+
+export const generationManager =
+  globalForGenerationManager.__bapGenerationManager ?? new GenerationManager();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForGenerationManager.__bapGenerationManager = generationManager;
+}

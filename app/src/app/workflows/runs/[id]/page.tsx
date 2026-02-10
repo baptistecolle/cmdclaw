@@ -14,8 +14,17 @@ export default function WorkflowRunPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin" />
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex items-center gap-3 border-b px-4 py-2">
+          <div className="h-9 w-9" />
+          <div>
+            <h2 className="text-sm font-medium">Workflow run</h2>
+            <p className="font-mono text-xs text-muted-foreground">ID: {runId}</p>
+          </div>
+        </div>
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
       </div>
     );
   }

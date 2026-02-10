@@ -69,6 +69,7 @@ const list = protectedProcedure.handler(async ({ context }) => {
         id: wf.id,
         name: wf.name,
         status: wf.status,
+        autoApprove: wf.autoApprove,
         triggerType: wf.triggerType,
         allowedIntegrations: wf.allowedIntegrations,
         allowedCustomIntegrations: wf.allowedCustomIntegrations,
@@ -118,6 +119,7 @@ const get = protectedProcedure
       id: wf.id,
       name: wf.name,
       status: wf.status,
+      autoApprove: wf.autoApprove,
       triggerType: wf.triggerType,
       prompt: wf.prompt,
       promptDo: wf.promptDo,
@@ -145,6 +147,7 @@ const create = protectedProcedure
       prompt: z.string().min(1).max(20000),
       promptDo: z.string().max(2000).optional(),
       promptDont: z.string().max(2000).optional(),
+      autoApprove: z.boolean().optional(),
       allowedIntegrations: z.array(integrationTypeSchema).default([]),
       allowedCustomIntegrations: z.array(z.string()).default([]),
       schedule: scheduleSchema.nullish(),
@@ -161,6 +164,7 @@ const create = protectedProcedure
         prompt: input.prompt,
         promptDo: input.promptDo,
         promptDont: input.promptDont,
+        autoApprove: input.autoApprove ?? true,
         allowedIntegrations: input.allowedIntegrations,
         allowedCustomIntegrations: input.allowedCustomIntegrations,
         schedule: input.schedule ?? null,
@@ -184,6 +188,7 @@ const update = protectedProcedure
       prompt: z.string().min(1).max(20000).optional(),
       promptDo: z.string().max(2000).nullish(),
       promptDont: z.string().max(2000).nullish(),
+      autoApprove: z.boolean().optional(),
       allowedIntegrations: z.array(integrationTypeSchema).optional(),
       allowedCustomIntegrations: z.array(z.string()).optional(),
       schedule: scheduleSchema.nullish(),
@@ -197,6 +202,7 @@ const update = protectedProcedure
     if (input.prompt !== undefined) updates.prompt = input.prompt;
     if (input.promptDo !== undefined) updates.promptDo = input.promptDo ?? null;
     if (input.promptDont !== undefined) updates.promptDont = input.promptDont ?? null;
+    if (input.autoApprove !== undefined) updates.autoApprove = input.autoApprove;
     if (input.allowedIntegrations !== undefined) {
       updates.allowedIntegrations = input.allowedIntegrations;
     }

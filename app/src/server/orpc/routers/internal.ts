@@ -12,6 +12,10 @@ import { env } from "@/env";
 // Verify the plugin auth secret
 function verifyPluginSecret(authHeader: string | undefined): boolean {
   if (!env.BAP_SERVER_SECRET) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Internal] BAP_SERVER_SECRET not configured, allowing internal plugin request in development");
+      return true;
+    }
     console.warn("[Internal] BAP_SERVER_SECRET not configured");
     return false;
   }

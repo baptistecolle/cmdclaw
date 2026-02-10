@@ -84,9 +84,9 @@ export function AppSidebar() {
     { icon: MessageSquare, label: "Chat", href: "/chat" },
     { icon: Workflow, label: "Workflows", href: "/workflows" },
     { icon: Plug, label: "Integrations", href: "/integrations" },
-    ...(isAdmin ? [{ icon: Shield, label: "Admin", href: "/admin" }] : []),
     { icon: Sparkles, label: "Skills", href: "/skills" },
     { icon: Settings, label: "Settings", href: "/settings" },
+    ...(isAdmin ? [{ icon: Shield, label: "Admin", href: "/admin" }] : []),
   ];
 
   const isActive = (href: string) => {

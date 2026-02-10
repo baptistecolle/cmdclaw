@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
 import { Loader2, Plus, Pencil, Trash2, Play, CheckCircle2, XCircle } from "lucide-react";
 
 function formatDate(value?: Date | string | null) {
@@ -191,7 +192,7 @@ export default function WorkflowsPage() {
                     </span>
                   </div>
                   <div className="mt-2 text-xs text-muted-foreground">
-                    Last run: {wf.lastRunStatus ?? "—"} · {formatDate(wf.lastRunAt)}
+                    Last run: {wf.lastRunStatus ? getWorkflowRunStatusLabel(wf.lastRunStatus) : "—"} · {formatDate(wf.lastRunAt)}
                   </div>
                 </div>
 
@@ -245,7 +246,7 @@ export default function WorkflowsPage() {
                           <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
                             {run.source}
                           </span>
-                          <span className="capitalize">{run.status.replaceAll("_", " ")}</span>
+                          <span>{getWorkflowRunStatusLabel(run.status)}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">{formatDate(run.startedAt)}</span>
                       </Link>

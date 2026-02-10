@@ -4,12 +4,19 @@ import { getTokensForIntegrations } from "@/server/integrations/cli-env";
 
 export const runtime = "nodejs";
 
-function verifyPluginSecret(authHeader: string | undefined): boolean {
+function verifyPluginSecret(authHeader: string | undefined, requestAuthHeader: string | null): boolean {
+  const providedAuth = authHeader ?? requestAuthHeader ?? undefined;
+
   if (!env.BAP_SERVER_SECRET) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Internal] BAP_SERVER_SECRET not configured, allowing internal auth request in development");
+      return true;
+    }
     console.warn("[Internal] BAP_SERVER_SECRET not configured");
     return false;
   }
-  return authHeader === `Bearer ${env.BAP_SERVER_SECRET}`;
+
+  return providedAuth === `Bearer ${env.BAP_SERVER_SECRET}`;
 }
 
 export async function POST(request: Request) {
@@ -22,7 +29,7 @@ export async function POST(request: Request) {
       reason: input.reason,
     });
 
-    if (!verifyPluginSecret(input.authHeader)) {
+    if (!verifyPluginSecret(input.authHeader, request.headers.get("authorization"))) {
       console.error("[Internal] Invalid plugin auth for auth request");
       return Response.json({ success: false });
     }

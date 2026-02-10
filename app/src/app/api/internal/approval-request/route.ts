@@ -3,12 +3,19 @@ import { generationManager } from "@/server/services/generation-manager";
 
 export const runtime = "nodejs";
 
-function verifyPluginSecret(authHeader: string | undefined): boolean {
+function verifyPluginSecret(authHeader: string | undefined, requestAuthHeader: string | null): boolean {
+  const providedAuth = authHeader ?? requestAuthHeader ?? undefined;
+
   if (!env.BAP_SERVER_SECRET) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Internal] BAP_SERVER_SECRET not configured, allowing internal approval request in development");
+      return true;
+    }
     console.warn("[Internal] BAP_SERVER_SECRET not configured");
     return false;
   }
-  return authHeader === `Bearer ${env.BAP_SERVER_SECRET}`;
+
+  return providedAuth === `Bearer ${env.BAP_SERVER_SECRET}`;
 }
 
 export async function POST(request: Request) {
@@ -22,7 +29,7 @@ export async function POST(request: Request) {
       hasAuthHeader: !!input.authHeader,
     });
 
-    if (!verifyPluginSecret(input.authHeader)) {
+    if (!verifyPluginSecret(input.authHeader, request.headers.get("authorization"))) {
       console.error("[Internal] Invalid plugin auth for approval request");
       return Response.json({ decision: "deny" });
     }

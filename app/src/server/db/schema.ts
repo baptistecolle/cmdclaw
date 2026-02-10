@@ -329,6 +329,7 @@ export const workflow = pgTable(
     prompt: text("prompt").notNull(),
     promptDo: text("prompt_do"),
     promptDont: text("prompt_dont"),
+    autoApprove: boolean("auto_approve").default(true).notNull(),
     allowedIntegrations: integrationTypeEnum("allowed_integrations").array().notNull(),
     allowedCustomIntegrations: text("allowed_custom_integrations").array().notNull().default([]),
     // Schedule configuration for time-based triggers (JSON object)

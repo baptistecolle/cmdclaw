@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const [linkCode, setLinkCode] = useState<string | null>(null);
   const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [removingPhone, setRemovingPhone] = useState(false);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
@@ -97,6 +98,34 @@ export default function SettingsPage() {
       setNotification({ type: "error", message: "Failed to generate link code" });
     } finally {
       setLinkLoading(false);
+    }
+  };
+
+  const handleRemovePhoneNumber = async () => {
+    setRemovingPhone(true);
+    try {
+      const res = await fetch("/api/settings/phone-number", { method: "DELETE" });
+      if (!res.ok) {
+        throw new Error("Failed to remove phone number");
+      }
+      setPhoneNumber("");
+      setSessionData((prev: SessionData | null) =>
+        prev
+          ? {
+              ...prev,
+              user: {
+                ...prev.user,
+                phoneNumber: null,
+              },
+            }
+          : prev,
+      );
+      setNotification({ type: "success", message: "Phone number removed" });
+    } catch (error) {
+      console.error("Failed to remove phone number:", error);
+      setNotification({ type: "error", message: "Failed to remove phone number" });
+    } finally {
+      setRemovingPhone(false);
     }
   };
 
@@ -186,11 +215,30 @@ export default function SettingsPage() {
               countryCallingCodeEditable={false}
               value={phoneNumber}
               onChange={(value) => setPhoneNumber(value ?? "")}
-              placeholder="Enter your WhatsApp phone number"
+              placeholder="Enter your phone number"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Use your WhatsApp number with country code.
+              will be used for whatsapp
             </p>
+            {phoneNumber ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={handleRemovePhoneNumber}
+                disabled={removingPhone}
+              >
+                {removingPhone ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Removing...
+                  </>
+                ) : (
+                  "Remove phone number"
+                )}
+              </Button>
+            ) : null}
           </div>
         </div>
 

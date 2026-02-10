@@ -14,7 +14,7 @@ export default function WorkflowsLayout({
   return (
     <AppShell>
       {isRunsRoute ? (
-        <div className="h-full bg-background">{children}</div>
+        <div className="flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background">{children}</div>
       ) : (
         <div className="min-h-screen bg-background">
           <div className="container px-4 py-6">
