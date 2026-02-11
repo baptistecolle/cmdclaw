@@ -7,6 +7,7 @@ import { COMPACTION_SUMMARY_PREFIX, SESSION_BOUNDARY_PREFIX } from "@/server/ser
 import { eq, and, asc } from "drizzle-orm";
 import { downloadFromS3 } from "@/server/storage/s3-client";
 import { decrypt } from "@/server/utils/encryption";
+import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integration-skill-service";
 import {
   logServerEvent,
   type ObservabilityContext,
@@ -697,6 +698,60 @@ Available skills:
 ${skillNames.map((name) => `- ${name}`).join("\n")}
 
 Read the SKILL.md file in each skill directory when relevant to the user's request.
+`;
+}
+
+/**
+ * Write resolved community integration skills selected by the user to sandbox.
+ */
+export async function writeResolvedIntegrationSkillsToSandbox(
+  sandbox: Sandbox,
+  userId: string,
+  allowedSlugs?: string[]
+): Promise<string[]> {
+  const resolved = await resolvePreferredCommunitySkillsForUser(userId, allowedSlugs);
+  if (resolved.length === 0) {
+    return [];
+  }
+
+  await sandbox.commands.run("mkdir -p /app/.opencode/integration-skills");
+  const written: string[] = [];
+
+  for (const skill of resolved) {
+    const skillDir = `/app/.opencode/integration-skills/${skill.slug}`;
+    await sandbox.commands.run(`mkdir -p "${skillDir}"`);
+
+    for (const file of skill.files) {
+      const filePath = `${skillDir}/${file.path}`;
+      const lastSlash = filePath.lastIndexOf("/");
+      const parentDir = filePath.substring(0, lastSlash);
+      if (parentDir !== skillDir) {
+        await sandbox.commands.run(`mkdir -p "${parentDir}"`);
+      }
+      await sandbox.files.write(filePath, file.content);
+    }
+
+    written.push(skill.slug);
+  }
+
+  return written;
+}
+
+export function getIntegrationSkillsSystemPrompt(skillSlugs: string[]): string {
+  if (skillSlugs.length === 0) {
+    return "";
+  }
+
+  return `
+# Community Integration Skills
+
+Use community integration skills for these slugs (preferred over official skill variants):
+${skillSlugs.map((slug) => `- ${slug}`).join("\n")}
+
+Community files are available in:
+/app/.opencode/integration-skills/<slug>/
+
+When a slug is listed above, prioritize that community skill's SKILL.md and resources for that integration.
 `;
 }
 

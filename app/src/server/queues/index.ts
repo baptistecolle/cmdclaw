@@ -4,7 +4,7 @@ import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
 const rawQueueName = process.env.BULLMQ_QUEUE_NAME ?? "bap-default";
 export const queueName = rawQueueName.replaceAll(":", "-");
-export const redisUrl = process.env.BULLMQ_REDIS_URL ?? process.env.REDIS_URL ?? "redis://localhost:6379";
+export const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 const redisOptions = { maxRetriesPerRequest: null, enableReadyCheck: false } as const;
 
 export const SCHEDULED_WORKFLOW_JOB_NAME = "workflow:scheduled-trigger";

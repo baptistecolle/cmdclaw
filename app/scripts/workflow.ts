@@ -396,7 +396,7 @@ Commands:
 
 Create flags:
   -n, --name <name>               Workflow name (required)
-  -t, --trigger <type>            Trigger type (required): gmail.new_email, hubspot.new_contact, schedule
+  -t, --trigger <type>            Trigger type (required): gmail.new_email, schedule
   -p, --prompt <instructions>     Agent instructions (required)
   -i, --integrations <list>       Comma-separated integrations: gmail,github,slack,...
   --schedule-type <type>          Schedule type: interval, daily, weekly, monthly

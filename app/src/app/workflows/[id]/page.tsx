@@ -44,7 +44,6 @@ import { AnimatePresence, motion } from "motion/react";
 const TRIGGERS = [
   { value: "schedule", label: "Run on a schedule" },
   { value: "gmail.new_email", label: "New Gmail email" },
-  { value: "hubspot.new_contact", label: "New HubSpot contact" },
 ];
 
 function formatDate(value?: Date | string | null) {

@@ -3,6 +3,7 @@ import { conversationRouter } from "./routers/conversation";
 import { deviceRouter } from "./routers/device";
 import { generationRouter } from "./routers/generation";
 import { integrationRouter } from "./routers/integration";
+import { integrationSkillRouter } from "./routers/integration-skill";
 import { internalRouter } from "./routers/internal";
 import { providerAuthRouter } from "./routers/provider-auth";
 import { skillRouter } from "./routers/skill";
@@ -20,6 +21,7 @@ export const appRouter = {
   device: deviceRouter,
   generation: generationRouter,
   integration: integrationRouter,
+  integrationSkill: integrationSkillRouter,
   internal: internalRouter,
   providerAuth: providerAuthRouter,
   skill: skillRouter,

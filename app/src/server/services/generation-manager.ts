@@ -15,6 +15,8 @@ import {
   getOrCreateSession,
   writeSkillsToSandbox,
   getSkillsSystemPrompt,
+  writeResolvedIntegrationSkillsToSandbox,
+  getIntegrationSkillsSystemPrompt,
   resetOpencodeSession,
 } from "@/server/sandbox/e2b";
 import {
@@ -52,10 +54,15 @@ import {
   readSandboxFileAsBuffer,
 } from "@/server/services/sandbox-file-service";
 import {
+  createCommunityIntegrationSkill,
+  resolvePreferredCommunitySkillsForUser,
+} from "@/server/services/integration-skill-service";
+import {
   createTraceId,
   logServerEvent,
 } from "@/server/utils/observability";
 import path from "path";
+import type { Sandbox } from "e2b";
 
 // Event types for generation stream
 export type GenerationEvent =
@@ -679,6 +686,64 @@ class GenerationManager {
   ): AsyncGenerator<GenerationEvent, void, unknown> {
     const ctx = this.activeGenerations.get(generationId);
 
+    const buildTerminalEvents = (genRecord: typeof generation.$inferSelect): GenerationEvent[] => {
+      const events: GenerationEvent[] = [];
+
+      if (genRecord.contentParts) {
+        for (const part of genRecord.contentParts) {
+          if (part.type === "text") {
+            events.push({ type: "text", content: part.text });
+          } else if (part.type === "tool_use") {
+            events.push({
+              type: "tool_use",
+              toolName: part.name,
+              toolInput: part.input,
+              toolUseId: part.id,
+              integration: part.integration,
+              operation: part.operation,
+            });
+          } else if (part.type === "tool_result") {
+            const toolUse = genRecord.contentParts?.find(
+              (p): p is ContentPart & { type: "tool_use" } =>
+                p.type === "tool_use" && p.id === part.tool_use_id
+            );
+            events.push({
+              type: "tool_result",
+              toolName: toolUse?.name ?? "unknown",
+              result: part.content,
+            });
+          } else if (part.type === "thinking") {
+            events.push({ type: "thinking", content: part.content, thinkingId: part.id });
+          }
+        }
+      }
+
+      if (genRecord.status === "completed" && genRecord.messageId) {
+        events.push({
+          type: "done",
+          generationId: genRecord.id,
+          conversationId: genRecord.conversationId,
+          messageId: genRecord.messageId,
+          usage: {
+            inputTokens: genRecord.inputTokens,
+            outputTokens: genRecord.outputTokens,
+            totalCostUsd: 0,
+          },
+        });
+      } else if (genRecord.status === "cancelled") {
+        events.push({
+          type: "cancelled",
+          generationId: genRecord.id,
+          conversationId: genRecord.conversationId,
+          messageId: genRecord.messageId ?? undefined,
+        });
+      } else if (genRecord.status === "error") {
+        events.push({ type: "error", message: genRecord.errorMessage || "Unknown error" });
+      }
+
+      return events;
+    };
+
     // If no active context, check database for completed/partial generation
     if (!ctx) {
       const genRecord = await db.query.generation.findFirst({
@@ -703,64 +768,15 @@ class GenerationManager {
         genRecord.status === "cancelled" ||
         genRecord.status === "error"
       ) {
-        // Replay content parts as events
-        if (genRecord.contentParts) {
-          for (const part of genRecord.contentParts) {
-            if (part.type === "text") {
-              yield { type: "text", content: part.text };
-            } else if (part.type === "tool_use") {
-              yield {
-                type: "tool_use",
-                toolName: part.name,
-                toolInput: part.input,
-                toolUseId: part.id,
-                integration: part.integration,
-                operation: part.operation,
-              };
-            } else if (part.type === "tool_result") {
-              // Find tool name from previous tool_use
-              const toolUse = genRecord.contentParts?.find(
-                (p): p is ContentPart & { type: "tool_use" } =>
-                  p.type === "tool_use" && p.id === part.tool_use_id
-              );
-              yield {
-                type: "tool_result",
-                toolName: toolUse?.name ?? "unknown",
-                result: part.content,
-              };
-            } else if (part.type === "thinking") {
-              yield { type: "thinking", content: part.content, thinkingId: part.id };
-            }
-          }
-        }
-
-        if (genRecord.status === "completed" && genRecord.messageId) {
-          yield {
-            type: "done",
-            generationId: genRecord.id,
-            conversationId: genRecord.conversationId,
-            messageId: genRecord.messageId,
-            usage: {
-              inputTokens: genRecord.inputTokens,
-              outputTokens: genRecord.outputTokens,
-              totalCostUsd: 0,
-            },
-          };
-        } else if (genRecord.status === "cancelled") {
-          yield {
-            type: "cancelled",
-            generationId: genRecord.id,
-            conversationId: genRecord.conversationId,
-            messageId: genRecord.messageId ?? undefined,
-          };
-        } else if (genRecord.status === "error") {
-          yield { type: "error", message: genRecord.errorMessage || "Unknown error" };
+        for (const event of buildTerminalEvents(genRecord)) {
+          yield event;
         }
         return;
       }
 
-      // Non-terminal generations without an active in-memory context cannot be resumed.
-      // This happens after process restarts and previously led to a stuck reconnect UI.
+      // Non-terminal generation exists in DB but this process has no in-memory context.
+      // This can happen in multi-process deployments (e.g. workflow worker + web server).
+      // Poll DB for terminal state instead of immediately marking it as error.
       const orphanedStatuses = new Set<GenerationStatus>([
         "running",
         "awaiting_approval",
@@ -769,12 +785,13 @@ class GenerationManager {
       ]);
 
       if (orphanedStatuses.has(genRecord.status as GenerationStatus)) {
-        const errorMessage = "Generation context was lost. Please retry your prompt.";
-
         logServerEvent(
-          "error",
-          "GENERATION_CONTEXT_LOST",
-          { previousStatus: genRecord.status },
+          "warn",
+          "GENERATION_CONTEXT_MISSING_IN_MEMORY",
+          {
+            previousStatus: genRecord.status,
+            conversationType: genRecord.conversation.type,
+          },
           {
             source: "generation-manager",
             generationId: genRecord.id,
@@ -783,27 +800,64 @@ class GenerationManager {
           }
         );
 
-        await db
-          .update(generation)
-          .set({
-            status: "error",
-            errorMessage,
-            completedAt: new Date(),
-          })
-          .where(eq(generation.id, genRecord.id));
+        const pollIntervalMs = 500;
+        const heartbeatIntervalMs = 10_000;
+        const maxWaitMs = genRecord.conversation.type === "workflow" ? 10 * 60 * 1000 : 30_000;
+        const startedAt = Date.now();
+        let lastHeartbeatAt = 0;
+        let lastStatus: typeof generation.$inferSelect.status = genRecord.status;
 
-        await db
-          .update(conversation)
-          .set({
-            generationStatus: "error",
-            currentGenerationId: null,
-          })
-          .where(
-            and(
-              eq(conversation.id, genRecord.conversationId),
-              eq(conversation.currentGenerationId, genRecord.id)
-            )
-          );
+        yield { type: "status_change", status: genRecord.status };
+
+        while (Date.now() - startedAt < maxWaitMs) {
+          await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
+
+          const latest = await db.query.generation.findFirst({
+            where: eq(generation.id, generationId),
+          });
+
+          if (!latest) {
+            yield { type: "error", message: "Generation not found" };
+            return;
+          }
+
+          if (latest.status !== lastStatus) {
+            lastStatus = latest.status;
+            yield { type: "status_change", status: latest.status };
+          } else if (Date.now() - lastHeartbeatAt >= heartbeatIntervalMs) {
+            lastHeartbeatAt = Date.now();
+            yield { type: "status_change", status: latest.status };
+          }
+
+          if (
+            latest.status === "completed" ||
+            latest.status === "cancelled" ||
+            latest.status === "error"
+          ) {
+            for (const event of buildTerminalEvents(latest)) {
+              yield event;
+            }
+            return;
+          }
+        }
+
+        const errorMessage =
+          "Generation is still processing but cannot be streamed from this server yet. Please refresh shortly.";
+        logServerEvent(
+          "warn",
+          "GENERATION_STREAM_POLL_TIMEOUT",
+          {
+            status: lastStatus,
+            maxWaitMs,
+            conversationType: genRecord.conversation.type,
+          },
+          {
+            source: "generation-manager",
+            generationId: genRecord.id,
+            conversationId: genRecord.conversationId,
+            userId,
+          }
+        );
 
         yield { type: "error", message: errorMessage };
         return;
@@ -1330,6 +1384,7 @@ class GenerationManager {
       // Write skills to sandbox
       const writtenSkills = await writeSkillsToSandbox(sandbox, ctx.userId);
       const skillsInstructions = getSkillsSystemPrompt(writtenSkills);
+      let integrationSkillsInstructions = "";
 
       // Write memory files to sandbox
       let memoryInstructions = buildMemorySystemPrompt();
@@ -1382,6 +1437,22 @@ class GenerationManager {
             `echo 'export CUSTOM_INTEGRATION_PERMISSIONS=${JSON.stringify(JSON.stringify(customPerms)).slice(1, -1)}' >> ~/.bashrc`
           );
         }
+
+        const allowedSkillSlugs = new Set<string>(allowedIntegrations);
+        for (const cred of customCreds) {
+          const slug = cred.customIntegration.slug;
+          if (ctx.allowedCustomIntegrations && !ctx.allowedCustomIntegrations.includes(slug)) {
+            continue;
+          }
+          allowedSkillSlugs.add(slug);
+        }
+
+        const writtenIntegrationSkills = await writeResolvedIntegrationSkillsToSandbox(
+          sandbox,
+          ctx.userId,
+          Array.from(allowedSkillSlugs)
+        );
+        integrationSkillsInstructions = getIntegrationSkillsSystemPrompt(writtenIntegrationSkills);
       } catch (e) {
         console.error("[Generation] Failed to write custom integration CLI code:", e);
       }
@@ -1395,11 +1466,14 @@ class GenerationManager {
         "be made available for download in the chat interface.",
       ].join("");
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
+      const integrationSkillDraftInstructions = this.getIntegrationSkillDraftInstructions();
       const systemPromptParts = [
         baseSystemPrompt,
         fileShareInstructions,
         cliInstructions,
         skillsInstructions,
+        integrationSkillsInstructions,
+        integrationSkillDraftInstructions,
         memoryInstructions,
         workflowPrompt,
       ].filter(
@@ -1629,6 +1703,14 @@ class GenerationManager {
       // Wait for prompt to complete
       await promptPromise;
 
+      if (ctx.e2bSandbox) {
+        try {
+          await this.importIntegrationSkillDraftsFromE2B(ctx, ctx.e2bSandbox);
+        } catch (error) {
+          console.error("[GenerationManager] Failed to import integration skill drafts from E2B:", error);
+        }
+      }
+
       // Collect new files created in the sandbox during generation
       let uploadedSandboxFileCount = 0;
       if (ctx.e2bSandbox && ctx.generationMarkerTime) {
@@ -1740,11 +1822,41 @@ class GenerationManager {
       const enabledIntegrations = await getEnabledIntegrationTypes(ctx.userId);
       const allowedIntegrations = ctx.allowedIntegrations ?? enabledIntegrations;
       const cliInstructions = getCliInstructions(allowedIntegrations);
+      const resolvedCommunityIntegrationSkills = await resolvePreferredCommunitySkillsForUser(
+        ctx.userId,
+        allowedIntegrations
+      );
+      if (resolvedCommunityIntegrationSkills.length > 0) {
+        await sandbox.execute('mkdir -p "/app/.opencode/integration-skills"');
+        for (const skill of resolvedCommunityIntegrationSkills) {
+          const skillDir = `/app/.opencode/integration-skills/${skill.slug}`;
+          await sandbox.execute(`mkdir -p "${skillDir}"`);
+          for (const file of skill.files) {
+            const filePath = `${skillDir}/${file.path}`;
+            const idx = filePath.lastIndexOf("/");
+            if (idx > 0) {
+              await sandbox.execute(`mkdir -p "${filePath.slice(0, idx)}"`);
+            }
+            await sandbox.writeFile(filePath, file.content);
+          }
+        }
+      }
+      const integrationSkillsPrompt = getIntegrationSkillsSystemPrompt(
+        resolvedCommunityIntegrationSkills.map((skill) => skill.slug)
+      );
 
       const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
       const memoryPrompt = buildMemorySystemPrompt();
-      const systemPromptParts = [baseSystemPrompt, cliInstructions, memoryPrompt, workflowPrompt].filter(Boolean);
+      const integrationSkillDraftInstructions = this.getIntegrationSkillDraftInstructions();
+      const systemPromptParts = [
+        baseSystemPrompt,
+        cliInstructions,
+        integrationSkillsPrompt,
+        integrationSkillDraftInstructions,
+        memoryPrompt,
+        workflowPrompt,
+      ].filter(Boolean);
       const systemPrompt = systemPromptParts.join("\n\n");
 
       // 4. Build message history from DB
@@ -2146,6 +2258,14 @@ class GenerationManager {
 
       if (iterationCount >= MAX_ITERATIONS) {
         console.warn("[GenerationManager] Hit max iterations in tool loop");
+      }
+
+      if (sandbox) {
+        try {
+          await this.importIntegrationSkillDraftsFromSandbox(ctx, sandbox);
+        } catch (error) {
+          console.error("[GenerationManager] Failed to import integration skill drafts:", error);
+        }
       }
 
       // Complete the generation
@@ -2807,6 +2927,126 @@ class GenerationManager {
         await this.saveProgress(ctx);
       }
     }
+  }
+
+  private getIntegrationSkillDraftInstructions(): string {
+    return [
+      "## Creating Integration Skills",
+      "To create a new integration skill via chat, write a JSON draft file in:",
+      "/app/.opencode/integration-skill-drafts/<slug>.json",
+      "The server imports drafts automatically when generation completes.",
+      "Draft schema:",
+      "{",
+      '  "slug": "integration-slug",',
+      '  "title": "Skill title",',
+      '  "description": "When and why to use this skill",',
+      '  "setAsPreferred": true,',
+      '  "files": [{"path":"SKILL.md","content":"..."}]',
+      "}",
+    ].join("\n");
+  }
+
+  private async importIntegrationSkillDraftsFromE2B(ctx: GenerationContext, sandbox: Sandbox): Promise<void> {
+    const findResult = await sandbox.commands.run(
+      `find /app/.opencode/integration-skill-drafts -maxdepth 1 -type f -name '*.json' 2>/dev/null | head -20`
+    );
+    const paths = findResult.stdout
+      .trim()
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (const filePath of paths) {
+      try {
+        const content = await sandbox.files.read(filePath);
+        const created = await this.importIntegrationSkillDraftContent(ctx, String(content));
+        if (created > 0) {
+          await sandbox.commands.run(`rm -f "${filePath}"`);
+        }
+      } catch (error) {
+        console.error(`[GenerationManager] Failed to import integration skill draft ${filePath}:`, error);
+      }
+    }
+  }
+
+  private async importIntegrationSkillDraftsFromSandbox(
+    ctx: GenerationContext,
+    sandbox: SandboxBackend
+  ): Promise<void> {
+    const findResult = await sandbox.execute(
+      `find /app/.opencode/integration-skill-drafts -maxdepth 1 -type f -name '*.json' 2>/dev/null | head -20`
+    );
+    const paths = findResult.stdout
+      .trim()
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (const filePath of paths) {
+      try {
+        const content = await sandbox.readFile(filePath);
+        const created = await this.importIntegrationSkillDraftContent(ctx, content);
+        if (created > 0) {
+          await sandbox.execute(`rm -f "${filePath}"`);
+        }
+      } catch (error) {
+        console.error(`[GenerationManager] Failed to import integration skill draft ${filePath}:`, error);
+      }
+    }
+  }
+
+  private async importIntegrationSkillDraftContent(
+    ctx: GenerationContext,
+    rawContent: string
+  ): Promise<number> {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawContent);
+    } catch {
+      return 0;
+    }
+
+    const drafts = Array.isArray(parsed) ? parsed : [parsed];
+    let createdCount = 0;
+
+    for (const draft of drafts) {
+      if (!draft || typeof draft !== "object") continue;
+      const rec = draft as Record<string, unknown>;
+      const slug = typeof rec.slug === "string" ? rec.slug : "";
+      const title = typeof rec.title === "string" ? rec.title : "";
+      const description = typeof rec.description === "string" ? rec.description : "";
+      if (!slug || !title || !description) continue;
+
+      const files =
+        Array.isArray(rec.files)
+          ? rec.files
+              .map((entry) => {
+                if (!entry || typeof entry !== "object") return null;
+                const e = entry as Record<string, unknown>;
+                if (typeof e.path !== "string" || typeof e.content !== "string") return null;
+                return { path: e.path, content: e.content };
+              })
+              .filter((entry): entry is { path: string; content: string } => !!entry)
+          : [];
+
+      try {
+        await createCommunityIntegrationSkill(ctx.userId, {
+          slug,
+          title,
+          description,
+          files,
+          setAsPreferred: rec.setAsPreferred === true,
+        });
+        createdCount += 1;
+      } catch (error) {
+        console.warn(
+          `[GenerationManager] Skipped integration skill draft for slug '${slug}':`,
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
+    return createdCount;
   }
 
   private async handleApprovalTimeout(ctx: GenerationContext): Promise<void> {

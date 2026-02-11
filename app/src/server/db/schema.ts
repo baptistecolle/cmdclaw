@@ -108,6 +108,8 @@ export const userRelations = relations(user, ({ many }) => ({
   devices: many(device),
   customIntegrations: many(customIntegration),
   customIntegrationCredentials: many(customIntegrationCredential),
+  integrationSkillsCreated: many(integrationSkill),
+  integrationSkillPreferences: many(integrationSkillPreference),
   whatsappLinks: many(whatsappUserLink),
   whatsappConversations: many(whatsappConversation),
   whatsappLinkCodes: many(whatsappLinkCode),
@@ -1081,6 +1083,116 @@ export const customIntegrationCredentialRelations = relations(customIntegrationC
   customIntegration: one(customIntegration, {
     fields: [customIntegrationCredential.customIntegrationId],
     references: [customIntegration.id],
+  }),
+}));
+
+export const integrationSkillSourceEnum = pgEnum("integration_skill_source", [
+  "official",
+  "community",
+]);
+
+export const integrationSkillVisibilityEnum = pgEnum("integration_skill_visibility", [
+  "public",
+]);
+
+export const integrationSkill = pgTable(
+  "integration_skill",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    source: integrationSkillSourceEnum("source").notNull(),
+    visibility: integrationSkillVisibilityEnum("visibility").default("public").notNull(),
+    createdByUserId: text("created_by_user_id")
+      .references(() => user.id, { onDelete: "set null" }),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("integration_skill_slug_idx").on(table.slug),
+    index("integration_skill_created_by_idx").on(table.createdByUserId),
+    index("integration_skill_source_idx").on(table.source),
+  ]
+);
+
+export const integrationSkillFile = pgTable(
+  "integration_skill_file",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    integrationSkillId: text("integration_skill_id")
+      .notNull()
+      .references(() => integrationSkill.id, { onDelete: "cascade" }),
+    path: text("path").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("integration_skill_file_skill_id_idx").on(table.integrationSkillId),
+  ]
+);
+
+export const integrationSkillPreference = pgTable(
+  "integration_skill_preference",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    preferredSource: integrationSkillSourceEnum("preferred_source").notNull(),
+    preferredSkillId: text("preferred_skill_id")
+      .references(() => integrationSkill.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("integration_skill_pref_user_id_idx").on(table.userId),
+    index("integration_skill_pref_slug_idx").on(table.slug),
+    unique("integration_skill_pref_user_slug_idx").on(table.userId, table.slug),
+  ]
+);
+
+export const integrationSkillRelations = relations(integrationSkill, ({ one, many }) => ({
+  createdBy: one(user, {
+    fields: [integrationSkill.createdByUserId],
+    references: [user.id],
+  }),
+  files: many(integrationSkillFile),
+}));
+
+export const integrationSkillFileRelations = relations(integrationSkillFile, ({ one }) => ({
+  integrationSkill: one(integrationSkill, {
+    fields: [integrationSkillFile.integrationSkillId],
+    references: [integrationSkill.id],
+  }),
+}));
+
+export const integrationSkillPreferenceRelations = relations(integrationSkillPreference, ({ one }) => ({
+  user: one(user, {
+    fields: [integrationSkillPreference.userId],
+    references: [user.id],
+  }),
+  preferredSkill: one(integrationSkill, {
+    fields: [integrationSkillPreference.preferredSkillId],
+    references: [integrationSkill.id],
   }),
 }));
 

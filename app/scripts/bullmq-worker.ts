@@ -1,10 +1,13 @@
 import { startQueues, stopQueues } from "../src/server/queues";
 import { reconcileScheduledWorkflowJobs } from "../src/server/services/workflow-scheduler";
+import { startGmailWorkflowWatcher } from "../src/server/services/workflow-gmail-watcher";
 
 const { worker, queueEvents, queueName, redisUrl } = startQueues();
+const stopGmailWatcher = startGmailWorkflowWatcher();
 
 const shutdown = async () => {
   console.log("[worker] shutting down...");
+  stopGmailWatcher();
   await stopQueues(worker, queueEvents);
 };
 

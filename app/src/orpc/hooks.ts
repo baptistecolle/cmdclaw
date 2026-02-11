@@ -248,6 +248,54 @@ export function useGetCustomAuthUrl() {
   });
 }
 
+// ========== INTEGRATION SKILL HOOKS ==========
+
+export function useIntegrationSkillListBySlug(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["integrationSkill", "listBySlug", slug],
+    queryFn: () => client.integrationSkill.listBySlug({ slug: slug! }),
+    enabled: !!slug,
+  });
+}
+
+export function useResolvedIntegrationSkill(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["integrationSkill", "resolved", slug],
+    queryFn: () => client.integrationSkill.getResolvedForUser({ slug: slug! }),
+    enabled: !!slug,
+  });
+}
+
+export function useCreateIntegrationSkillFromChat() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      slug: string;
+      title: string;
+      description: string;
+      files?: Array<{ path: string; content: string }>;
+      setAsPreferred?: boolean;
+    }) => client.integrationSkill.createFromChat(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["integrationSkill"] });
+    },
+  });
+}
+
+export function useSetIntegrationSkillPreference() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      slug: string;
+      preferredSource: "official" | "community";
+      preferredSkillId?: string;
+    }) => client.integrationSkill.setPreference(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["integrationSkill"] });
+    },
+  });
+}
+
 // Hook for voice transcription
 export function useTranscribe() {
   return useMutation({

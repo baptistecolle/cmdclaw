@@ -50,7 +50,7 @@ export default function WorkflowsPage() {
     try {
       const result = await createWorkflow.mutateAsync({
         name: "New Workflow",
-        triggerType: "gmail.new_email",
+        triggerType: "schedule",
         prompt: "Describe what the agent should do when this trigger fires.",
         allowedIntegrations: [],
       });
