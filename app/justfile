@@ -1,0 +1,12 @@
+set dotenv-load := true
+
+app_image := "bap-app"
+worker_image := "bap-worker"
+
+docker-run-app:
+  docker build -f Dockerfile.app -t {{app_image}} .
+  docker run --rm --env-file .env -p 3000:3000 {{app_image}}
+
+docker-run-worker:
+  docker build -f Dockerfile.worker -t {{worker_image}} .
+  docker run --rm --env-file .env {{worker_image}}
