@@ -8,6 +8,9 @@ export const template = Template()
   .aptInstall(['python3', 'python3-venv', 'python3-pip', 'python-is-python3'])
   // Install Node.js 22.x LTS (needed for packages with node shebang)
   .runCmd('curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs')
+  // Install agent-browser and preload Chromium
+  .npmInstall(['agent-browser'], { g: true })
+  .runCmd('agent-browser install --with-deps')
   // Install bun and create symlinks in /usr/local/bin for PATH availability
   .runCmd('curl -fsSL https://bun.sh/install | bash')
   .runCmd('sudo ln -s $HOME/.bun/bin/bun /usr/local/bin/bun')

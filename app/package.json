@@ -21,7 +21,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "worker": "tsx --require dotenv/config scripts/bullmq-worker.ts",
+    "worker": "bun --env-file=.env scripts/bullmq-worker.ts",
     "auth:generate": "bun x @better-auth/cli@latest generate --output src/server/db/auth-schema.ts -y",
     "docker-up:local": "docker compose up",
     "e2b:build:dev": "tsx src/e2b-template/build.dev.ts",

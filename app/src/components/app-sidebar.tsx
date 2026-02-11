@@ -86,7 +86,6 @@ export function AppSidebar() {
     { icon: Plug, label: "Integrations", href: "/integrations" },
     { icon: Sparkles, label: "Skills", href: "/skills" },
     { icon: Settings, label: "Settings", href: "/settings" },
-    ...(isAdmin ? [{ icon: Shield, label: "Admin", href: "/admin" }] : []),
   ];
 
   const isActive = (href: string) => {
@@ -270,6 +269,26 @@ export function AppSidebar() {
             </TooltipTrigger>
             <TooltipContent side="right">Report</TooltipContent>
           </Tooltip>
+
+          {isAdmin && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href="/admin"
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
+                    isActive("/admin")
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  <Shield className="h-4 w-4" />
+                  <span className="sr-only">Admin</span>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">Admin</TooltipContent>
+            </Tooltip>
+          )}
         </nav>
 
         {/* Footer: user avatar with dropdown */}

@@ -4,6 +4,7 @@ import { protectedProcedure } from "../middleware";
 import { generation, user, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
+import { removeWorkflowScheduleJob, syncWorkflowScheduleJob } from "@/server/services/workflow-scheduler";
 
 const integrationTypeSchema = z.enum([
   "gmail",
@@ -171,6 +172,17 @@ const create = protectedProcedure
       })
       .returning();
 
+    if (created.triggerType === "schedule") {
+      try {
+        await syncWorkflowScheduleJob(created);
+      } catch (error) {
+        console.error(`[workflow] failed to sync scheduler after create (${created.id})`, error);
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Workflow created but failed to sync schedule job",
+        });
+      }
+    }
+
     return {
       id: created.id,
       name: created.name,
@@ -217,10 +229,29 @@ const update = protectedProcedure
       .update(workflow)
       .set(updates)
       .where(and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)))
-      .returning({ id: workflow.id });
+      .returning({
+        id: workflow.id,
+        status: workflow.status,
+        triggerType: workflow.triggerType,
+        schedule: workflow.schedule,
+      });
 
     if (result.length === 0) {
       throw new ORPCError("NOT_FOUND", { message: "Workflow not found" });
+    }
+
+    const shouldSyncSchedule =
+      input.status !== undefined || input.triggerType !== undefined || input.schedule !== undefined;
+
+    if (shouldSyncSchedule) {
+      try {
+        await syncWorkflowScheduleJob(result[0]!);
+      } catch (error) {
+        console.error(`[workflow] failed to sync scheduler after update (${input.id})`, error);
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Workflow updated but failed to sync schedule job",
+        });
+      }
     }
 
     return { success: true };
@@ -236,6 +267,15 @@ const del = protectedProcedure
 
     if (result.length === 0) {
       throw new ORPCError("NOT_FOUND", { message: "Workflow not found" });
+    }
+
+    try {
+      await removeWorkflowScheduleJob(input.id);
+    } catch (error) {
+      console.error(`[workflow] failed to remove scheduler after delete (${input.id})`, error);
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Workflow deleted but failed to remove schedule job",
+      });
     }
 
     return { success: true };

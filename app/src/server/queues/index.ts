@@ -1,18 +1,36 @@
-import { QueueEvents, Worker, type Processor } from "bullmq";
+import { Queue, QueueEvents, Worker, type Processor } from "bullmq";
 import IORedis from "ioredis";
+import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
-const queueName = process.env.BULLMQ_QUEUE_NAME ?? "bap:default";
-const redisUrl = process.env.BULLMQ_REDIS_URL ?? process.env.REDIS_URL ?? "redis://localhost:6379";
-const redisOptions = { maxRetriesPerRequest: null, enableReadyCheck: false };
+const rawQueueName = process.env.BULLMQ_QUEUE_NAME ?? "bap-default";
+export const queueName = rawQueueName.replaceAll(":", "-");
+export const redisUrl = process.env.BULLMQ_REDIS_URL ?? process.env.REDIS_URL ?? "redis://localhost:6379";
+const redisOptions = { maxRetriesPerRequest: null, enableReadyCheck: false } as const;
 
-type JobPayload = Record<string, unknown>;
+export const SCHEDULED_WORKFLOW_JOB_NAME = "workflow:scheduled-trigger";
+
+type JobPayload = Record<string, unknown> & { workflowId?: string };
 type JobHandler = Processor<JobPayload, unknown, string>;
 
 const handlers: Record<string, JobHandler> = {
-  "example:log": async (job) => {
-    const payload = JSON.stringify(job.data ?? {});
-    console.log(`[worker] received example:log job ${job.id} with payload ${payload}`);
-    return { receivedAt: new Date().toISOString() };
+  [SCHEDULED_WORKFLOW_JOB_NAME]: async (job) => {
+    const workflowId = job.data?.workflowId;
+    if (!workflowId || typeof workflowId !== "string") {
+      throw new Error(`Missing workflowId in scheduled job "${job.id}"`);
+    }
+
+    const scheduleType =
+      typeof job.data?.scheduleType === "string" ? job.data.scheduleType : "unknown";
+
+    return triggerWorkflowRun({
+      workflowId,
+      triggerPayload: {
+        source: "schedule",
+        workflowId,
+        scheduleType,
+        scheduledFor: new Date().toISOString(),
+      },
+    });
   },
 };
 
@@ -26,9 +44,25 @@ const processor: Processor<JobPayload, unknown, string> = async (job) => {
   return handler(job);
 };
 
-export const startQueues = () => {
+let queue: Queue<JobPayload, unknown, string> | null = null;
+
+function createRedisConnection(): IORedis {
   // Cast to any due to ioredis version mismatch with bullmq's bundled version
-  const connection = new IORedis(redisUrl, redisOptions) as any;
+  return new IORedis(redisUrl, redisOptions) as any;
+}
+
+export const getQueue = (): Queue<JobPayload, unknown, string> => {
+  if (!queue) {
+    queue = new Queue<JobPayload, unknown, string>(queueName, {
+      connection: createRedisConnection() as any,
+    });
+  }
+
+  return queue;
+};
+
+export const startQueues = () => {
+  const connection = createRedisConnection() as any;
 
   const worker = new Worker(queueName, processor, {
     connection,
@@ -36,7 +70,7 @@ export const startQueues = () => {
   });
 
   const queueEvents = new QueueEvents(queueName, {
-    connection: new IORedis(redisUrl, redisOptions) as any,
+    connection: createRedisConnection() as any,
   });
 
   queueEvents.on("completed", ({ jobId }) => {
@@ -64,5 +98,10 @@ export const startQueues = () => {
 };
 
 export const stopQueues = async (worker: Worker, queueEvents: QueueEvents) => {
-  await Promise.allSettled([worker.close(), queueEvents.close()]);
+  const closers: Promise<unknown>[] = [worker.close(), queueEvents.close()];
+  if (queue) {
+    closers.push(queue.close());
+    queue = null;
+  }
+  await Promise.allSettled(closers);
 };
