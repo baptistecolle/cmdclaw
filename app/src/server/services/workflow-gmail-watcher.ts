@@ -1,0 +1,299 @@
+import { and, eq, sql } from "drizzle-orm";
+import { db } from "@/server/db/client";
+import { integration, integrationToken, workflow, workflowRun } from "@/server/db/schema";
+import { getValidAccessToken } from "@/server/integrations/token-refresh";
+import { triggerWorkflowRun } from "@/server/services/workflow-service";
+
+const GMAIL_TRIGGER_TYPE = "gmail.new_email";
+const DEFAULT_POLL_INTERVAL_MS = 2 * 60 * 1000;
+const DEFAULT_LOOKBACK_SECONDS = 120;
+const GMAIL_LIST_LIMIT = 10;
+
+type WatchableWorkflow = {
+  workflowId: string;
+  integrationId: string;
+  accessToken: string;
+  refreshToken: string | null;
+  expiresAt: Date | null;
+};
+
+type GmailListResponse = {
+  messages?: Array<{ id: string; threadId?: string }>;
+};
+
+type GmailMessageResponse = {
+  id: string;
+  threadId?: string;
+  internalDate?: string;
+  snippet?: string;
+  payload?: {
+    headers?: Array<{ name?: string; value?: string }>;
+  };
+};
+
+type GmailMessageSummary = {
+  id: string;
+  threadId: string | null;
+  internalDateMs: number;
+  snippet: string;
+  subject: string | null;
+  from: string | null;
+  date: string | null;
+};
+
+function getPollIntervalMs(): number {
+  const raw = Number(process.env.GMAIL_WATCHER_INTERVAL_SECONDS ?? "");
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return DEFAULT_POLL_INTERVAL_MS;
+  }
+  return Math.floor(raw * 1000);
+}
+
+function getHeaderValue(
+  headers: Array<{ name?: string; value?: string }> | undefined,
+  headerName: string
+): string | null {
+  const item = headers?.find((header) => header.name?.toLowerCase() === headerName.toLowerCase());
+  return item?.value ?? null;
+}
+
+async function listWatchableWorkflows(): Promise<WatchableWorkflow[]> {
+  const rows = await db
+    .select({
+      workflowId: workflow.id,
+      integrationId: integration.id,
+      accessToken: integrationToken.accessToken,
+      refreshToken: integrationToken.refreshToken,
+      expiresAt: integrationToken.expiresAt,
+    })
+    .from(workflow)
+    .innerJoin(
+      integration,
+      and(
+        eq(integration.userId, workflow.ownerId),
+        eq(integration.type, "gmail"),
+        eq(integration.enabled, true)
+      )
+    )
+    .innerJoin(integrationToken, eq(integrationToken.integrationId, integration.id))
+    .where(and(eq(workflow.status, "on"), eq(workflow.triggerType, GMAIL_TRIGGER_TYPE)));
+
+  return rows;
+}
+
+async function getWorkflowLastProcessedInternalDate(workflowId: string): Promise<number | null> {
+  const result = await db
+    .select({
+      maxInternalDate: sql<string | null>`max(((${workflowRun.triggerPayload} ->> 'gmailInternalDate')::bigint)::text)`,
+    })
+    .from(workflowRun)
+    .where(
+      and(
+        eq(workflowRun.workflowId, workflowId),
+        sql`${workflowRun.triggerPayload} ->> 'source' = ${GMAIL_TRIGGER_TYPE}`
+      )
+    );
+
+  const value = result[0]?.maxInternalDate;
+  if (!value) return null;
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function hasRunForGmailMessage(workflowId: string, gmailMessageId: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: workflowRun.id })
+    .from(workflowRun)
+    .where(
+      and(
+        eq(workflowRun.workflowId, workflowId),
+        sql`${workflowRun.triggerPayload} ->> 'gmailMessageId' = ${gmailMessageId}`
+      )
+    )
+    .limit(1);
+
+  return rows.length > 0;
+}
+
+async function listRecentGmailMessages(accessToken: string, afterSeconds: number): Promise<string[]> {
+  const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
+  url.searchParams.set("maxResults", String(GMAIL_LIST_LIMIT));
+  url.searchParams.set("q", `after:${afterSeconds}`);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gmail list request failed (${response.status}): ${errorText}`);
+  }
+
+  const data = (await response.json()) as GmailListResponse;
+  return (data.messages ?? []).map((message) => message.id);
+}
+
+async function getGmailMessageSummary(
+  accessToken: string,
+  messageId: string
+): Promise<GmailMessageSummary | null> {
+  const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`);
+  url.searchParams.set("format", "metadata");
+  url.searchParams.set("metadataHeaders", "Subject");
+  url.searchParams.set("metadataHeaders", "From");
+  url.searchParams.set("metadataHeaders", "Date");
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gmail get request failed (${response.status}): ${errorText}`);
+  }
+
+  const data = (await response.json()) as GmailMessageResponse;
+  const internalDateMs = Number.parseInt(data.internalDate ?? "", 10);
+  if (!Number.isFinite(internalDateMs)) return null;
+
+  return {
+    id: data.id,
+    threadId: data.threadId ?? null,
+    internalDateMs,
+    snippet: data.snippet ?? "",
+    subject: getHeaderValue(data.payload?.headers, "Subject"),
+    from: getHeaderValue(data.payload?.headers, "From"),
+    date: getHeaderValue(data.payload?.headers, "Date"),
+  };
+}
+
+async function triggerWorkflowFromGmailMessage(
+  workflowId: string,
+  message: GmailMessageSummary
+): Promise<void> {
+  await triggerWorkflowRun({
+    workflowId,
+    triggerPayload: {
+      source: GMAIL_TRIGGER_TYPE,
+      workflowId,
+      gmailMessageId: message.id,
+      gmailThreadId: message.threadId,
+      gmailInternalDate: message.internalDateMs,
+      from: message.from,
+      subject: message.subject,
+      date: message.date,
+      snippet: message.snippet,
+      watchedAt: new Date().toISOString(),
+    },
+  });
+}
+
+export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; triggered: number }> {
+  const watchable = await listWatchableWorkflows();
+  if (watchable.length === 0) return { checked: 0, triggered: 0 };
+
+  const tokenCache = new Map<string, string>();
+  let checked = 0;
+  let triggered = 0;
+
+  for (const item of watchable) {
+    checked += 1;
+
+    try {
+      let accessToken = tokenCache.get(item.integrationId);
+      if (!accessToken) {
+        accessToken = await getValidAccessToken({
+          accessToken: item.accessToken,
+          refreshToken: item.refreshToken,
+          expiresAt: item.expiresAt,
+          integrationId: item.integrationId,
+          type: "gmail",
+        });
+        tokenCache.set(item.integrationId, accessToken);
+      }
+
+      const lastProcessed = await getWorkflowLastProcessedInternalDate(item.workflowId);
+      const fallbackStart = Math.floor(Date.now() / 1000) - DEFAULT_LOOKBACK_SECONDS;
+      const afterSeconds = Math.max(
+        0,
+        Math.floor(((lastProcessed ?? fallbackStart * 1000) - 60 * 1000) / 1000)
+      );
+
+      const messageIds = await listRecentGmailMessages(accessToken, afterSeconds);
+      if (messageIds.length === 0) continue;
+
+      const messages: GmailMessageSummary[] = [];
+      for (const messageId of messageIds) {
+        try {
+          const summary = await getGmailMessageSummary(accessToken, messageId);
+          if (summary) messages.push(summary);
+        } catch (error) {
+          console.error(
+            `[workflow-gmail-watcher] failed to fetch message ${messageId} for workflow ${item.workflowId}`,
+            error
+          );
+        }
+      }
+
+      messages.sort((a, b) => a.internalDateMs - b.internalDateMs);
+
+      for (const message of messages) {
+        if (lastProcessed !== null && message.internalDateMs <= lastProcessed) {
+          continue;
+        }
+
+        const alreadyHandled = await hasRunForGmailMessage(item.workflowId, message.id);
+        if (alreadyHandled) continue;
+
+        try {
+          await triggerWorkflowFromGmailMessage(item.workflowId, message);
+          triggered += 1;
+        } catch (error) {
+          console.error(
+            `[workflow-gmail-watcher] failed to trigger workflow ${item.workflowId} for message ${message.id}`,
+            error
+          );
+        }
+      }
+    } catch (error) {
+      console.error(`[workflow-gmail-watcher] failed for workflow ${item.workflowId}`, error);
+    }
+  }
+
+  return { checked, triggered };
+}
+
+export function startGmailWorkflowWatcher(): () => void {
+  const intervalMs = getPollIntervalMs();
+  let isRunning = false;
+
+  const run = async () => {
+    if (isRunning) return;
+    isRunning = true;
+
+    try {
+      const { checked, triggered } = await pollGmailWorkflowTriggers();
+      if (checked > 0) {
+        console.log(
+          `[workflow-gmail-watcher] checked ${checked} workflow(s), triggered ${triggered} run(s)`
+        );
+      }
+    } catch (error) {
+      console.error("[workflow-gmail-watcher] poll failed", error);
+    } finally {
+      isRunning = false;
+    }
+  };
+
+  void run();
+  const interval = setInterval(() => {
+    void run();
+  }, intervalMs);
+
+  return () => clearInterval(interval);
+}
