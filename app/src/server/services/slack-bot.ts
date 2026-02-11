@@ -60,6 +60,27 @@ async function postMessage(channel: string, text: string, threadTs?: string) {
   });
 }
 
+function formatSlackErrorMessage(err: unknown): string {
+  const raw =
+    err instanceof Error
+      ? err.stack || err.message
+      : typeof err === "string"
+        ? err
+        : JSON.stringify(err);
+
+  const compact = raw.replace(/\s+/g, " ").trim();
+  const clipped =
+    compact.length > 500 ? `${compact.slice(0, 497)}...` : compact;
+
+  return [
+    "There was an issue processing your message. Please contact heybap with this error so we can solve it.",
+    "",
+    "```",
+    clipped || "Unknown error",
+    "```",
+  ].join("\n");
+}
+
 async function getSlackUserInfo(
   userId: string,
   fallbackName?: string | null
@@ -143,24 +164,24 @@ export async function handleSlackEvent(payload: SlackEvent) {
 
   if (!messageText) return;
 
-  // Look up linked Bap user
-  const link = await resolveUser(team_id, slackUserId);
-
-  if (!link) {
-    const appUrl = env.NEXT_PUBLIC_APP_URL ?? "https://heybap.com";
-    const linkUrl = `${appUrl}/api/slack/link?slackUserId=${slackUserId}&slackTeamId=${team_id}`;
-    await postMessage(
-      channel,
-      `To use @bap, connect your account first: ${linkUrl}`,
-      isDirectMessage ? undefined : threadTs
-    );
-    return;
-  }
-
-  // Add typing indicator
-  await addReaction(channel, event.ts, "hourglass_flowing_sand");
-
   try {
+    // Look up linked Bap user
+    const link = await resolveUser(team_id, slackUserId);
+
+    if (!link) {
+      const appUrl = env.NEXT_PUBLIC_APP_URL ?? "https://heybap.com";
+      const linkUrl = `${appUrl}/api/slack/link?slackUserId=${slackUserId}&slackTeamId=${team_id}`;
+      await postMessage(
+        channel,
+        `To use @bap, connect your account first: ${linkUrl}`,
+        isDirectMessage ? undefined : threadTs
+      );
+      return;
+    }
+
+    // Add typing indicator
+    await addReaction(channel, event.ts, "hourglass_flowing_sand");
+
     // Get or create Bap conversation for this Slack thread
     const convId = await getOrCreateConversation(
       team_id,
@@ -207,7 +228,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
     console.error("[slack-bot] Error handling event:", err);
     await postMessage(
       channel,
-      "Sorry, something went wrong processing your message.",
+      formatSlackErrorMessage(err),
       isDirectMessage ? undefined : threadTs
     );
   } finally {

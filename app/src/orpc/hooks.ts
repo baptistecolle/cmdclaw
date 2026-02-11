@@ -13,6 +13,33 @@ import {
   type GenerationCallbacks,
 } from "@/lib/generation-stream";
 
+const STREAM_NOT_READY_ERROR =
+  "Generation is still processing but cannot be streamed from this server yet. Please refresh shortly.";
+const STREAM_RETRY_DELAY_MS = 1500;
+const STREAM_MAX_RETRIES = 80;
+
+function isStreamNotReadyError(message: string | undefined): boolean {
+  return (message ?? "").trim() === STREAM_NOT_READY_ERROR;
+}
+
+async function waitForRetry(signal: AbortSignal, delayMs: number): Promise<boolean> {
+  if (signal.aborted) return false;
+  return await new Promise<boolean>((resolve) => {
+    const timeout = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, delayMs);
+
+    const onAbort = () => {
+      clearTimeout(timeout);
+      signal.removeEventListener("abort", onAbort);
+      resolve(false);
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export type {
   ToolUseData,
   ThinkingData,
@@ -672,25 +699,70 @@ export function useGeneration() {
     ): Promise<{ generationId: string; conversationId: string } | null> => {
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
+      let currentGenerationId: string | undefined;
+      let currentConversationId: string | undefined;
+      let retries = 0;
 
       try {
-        const result = await runGenerationStream({
-          client,
-          input,
-          signal,
-          callbacks: {
-            ...callbacks,
-            onStarted: (generationId, conversationId) => {
-              callbacks.onStarted?.(generationId, conversationId);
-              queryClient.invalidateQueries({ queryKey: ["conversation", "list"] });
+        while (!signal.aborted) {
+          let streamNotReady = false;
+          const result = await runGenerationStream({
+            client,
+            input: currentGenerationId ? undefined : input,
+            generationId: currentGenerationId,
+            signal,
+            callbacks: {
+              ...callbacks,
+              onStarted: (generationId, conversationId) => {
+                currentGenerationId = generationId;
+                currentConversationId = conversationId;
+                callbacks.onStarted?.(generationId, conversationId);
+                queryClient.invalidateQueries({ queryKey: ["conversation", "list"] });
+              },
+              onDone: (generationId, conversationId, messageId, usage) => {
+                callbacks.onDone?.(generationId, conversationId, messageId, usage);
+                queryClient.invalidateQueries({ queryKey: ["conversation"] });
+              },
+              onError: (message) => {
+                if (isStreamNotReadyError(message)) {
+                  streamNotReady = true;
+                  return;
+                }
+                callbacks.onError?.(message);
+              },
             },
-            onDone: (generationId, conversationId, messageId, usage) => {
-              callbacks.onDone?.(generationId, conversationId, messageId, usage);
-              queryClient.invalidateQueries({ queryKey: ["conversation"] });
-            },
-          },
-        });
-        return result;
+          });
+
+          if (result) {
+            currentGenerationId = result.generationId;
+            currentConversationId = result.conversationId;
+          }
+
+          if (!streamNotReady) {
+            return result ?? (currentGenerationId && currentConversationId
+              ? { generationId: currentGenerationId, conversationId: currentConversationId }
+              : null);
+          }
+
+          if (retries >= STREAM_MAX_RETRIES) {
+            callbacks.onError?.(STREAM_NOT_READY_ERROR);
+            return currentGenerationId && currentConversationId
+              ? { generationId: currentGenerationId, conversationId: currentConversationId }
+              : null;
+          }
+
+          retries += 1;
+          const shouldContinue = await waitForRetry(signal, STREAM_RETRY_DELAY_MS);
+          if (!shouldContinue) {
+            return currentGenerationId && currentConversationId
+              ? { generationId: currentGenerationId, conversationId: currentConversationId }
+              : null;
+          }
+        }
+
+        return currentGenerationId && currentConversationId
+          ? { generationId: currentGenerationId, conversationId: currentConversationId }
+          : null;
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return null;
@@ -710,20 +782,47 @@ export function useGeneration() {
   ) => {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
+    let currentGenerationId: string | undefined = generationId;
+    let retries = 0;
 
     try {
-      await runGenerationStream({
-        client,
-        generationId,
-        signal,
-        callbacks: {
-          ...callbacks,
-          onDone: (doneGenerationId, doneConversationId, messageId, usage) => {
-            callbacks.onDone?.(doneGenerationId, doneConversationId, messageId, usage);
-            queryClient.invalidateQueries({ queryKey: ["conversation"] });
+      while (!signal.aborted && currentGenerationId) {
+        let streamNotReady = false;
+        await runGenerationStream({
+          client,
+          generationId: currentGenerationId,
+          signal,
+          callbacks: {
+            ...callbacks,
+            onDone: (doneGenerationId, doneConversationId, messageId, usage) => {
+              callbacks.onDone?.(doneGenerationId, doneConversationId, messageId, usage);
+              queryClient.invalidateQueries({ queryKey: ["conversation"] });
+            },
+            onError: (message) => {
+              if (isStreamNotReadyError(message)) {
+                streamNotReady = true;
+                return;
+              }
+              callbacks.onError?.(message);
+            },
           },
-        },
-      });
+        });
+
+        if (!streamNotReady) {
+          return;
+        }
+
+        if (retries >= STREAM_MAX_RETRIES) {
+          callbacks.onError?.(STREAM_NOT_READY_ERROR);
+          return;
+        }
+
+        retries += 1;
+        const shouldContinue = await waitForRetry(signal, STREAM_RETRY_DELAY_MS);
+        if (!shouldContinue) {
+          return;
+        }
+      }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         return;

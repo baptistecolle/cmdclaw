@@ -174,11 +174,11 @@ export default function WorkflowsPage() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-7">
           {workflowList.map((wf) => (
             <div
               key={wf.id}
-              className="rounded-lg border p-4"
+              className="rounded-md border border-border/30 bg-background/70 px-5 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-muted/20"
             >
               {(() => {
                 const recentRuns = Array.isArray(wf.recentRuns) ? wf.recentRuns : [];
@@ -188,109 +188,109 @@ export default function WorkflowsPage() {
 
                 return (
                   <>
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium">{getWorkflowDisplayName(wf.name)}</h3>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      {wf.triggerType}
-                    </span>
-                  </div>
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Last run: {wf.lastRunStatus ? getWorkflowRunStatusLabel(wf.lastRunStatus) : "—"} · {formatDate(wf.lastRunAt)}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={wf.status === "on"}
-                      onCheckedChange={(checked) =>
-                        handleToggle(wf.id, checked ? "on" : "off")
-                      }
-                    />
-                    <span className="text-sm">{wf.status === "on" ? "On" : "Off"}</span>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleRun(wf.id)}
-                    disabled={wf.status !== "on"}
-                  >
-                    <Play className="mr-2 h-4 w-4" />
-                    Run
-                  </Button>
-                  <Button variant="ghost" size="icon" asChild>
-                    <Link href={`/workflows/${wf.id}`}>
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setWorkflowToDelete({ id: wf.id, name: getWorkflowDisplayName(wf.name) })}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="mt-4 border-t pt-3">
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Recent runs
-                </div>
-                {recentRuns.length > 0 ? (
-                  <div className="space-y-2">
-                    {visibleRuns.map((run) => (
-                      <Link
-                        key={run.id}
-                        href={`/workflows/runs/${run.id}`}
-                        className="flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
-                            {run.source}
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-medium">{getWorkflowDisplayName(wf.name)}</h3>
+                          <span className="rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
+                            {wf.triggerType}
                           </span>
-                          <span>{getWorkflowRunStatusLabel(run.status)}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{formatDate(run.startedAt)}</span>
-                      </Link>
-                    ))}
-                    {hiddenCount > 0 ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-xs"
-                        onClick={() =>
-                          setExpandedRunsByWorkflow((prev) => ({
-                            ...prev,
-                            [wf.id]: true,
-                          }))
-                        }
-                      >
-                        Show {hiddenCount} more
-                      </Button>
-                    ) : null}
-                    {isExpanded && recentRuns.length > 1 ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-xs"
-                        onClick={() =>
-                          setExpandedRunsByWorkflow((prev) => ({
-                            ...prev,
-                            [wf.id]: false,
-                          }))
-                        }
-                      >
-                        Show less
-                      </Button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">No runs yet.</div>
-                )}
-              </div>
+                        <div className="mt-1.5 text-xs text-muted-foreground">
+                          Last run: {wf.lastRunStatus ? getWorkflowRunStatusLabel(wf.lastRunStatus) : "—"} · {formatDate(wf.lastRunAt)}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2 rounded-full bg-muted/50 px-2.5 py-1">
+                          <Switch
+                            checked={wf.status === "on"}
+                            onCheckedChange={(checked) =>
+                              handleToggle(wf.id, checked ? "on" : "off")
+                            }
+                          />
+                          <span className="text-sm">{wf.status === "on" ? "On" : "Off"}</span>
+                        </div>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleRun(wf.id)}
+                          disabled={wf.status !== "on"}
+                        >
+                          <Play className="mr-2 h-4 w-4" />
+                          Run
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/workflows/${wf.id}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setWorkflowToDelete({ id: wf.id, name: getWorkflowDisplayName(wf.name) })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
+                        Recent runs
+                      </div>
+                      {recentRuns.length > 0 ? (
+                        <div className="space-y-2">
+                          {visibleRuns.map((run) => (
+                            <Link
+                              key={run.id}
+                              href={`/workflows/runs/${run.id}`}
+                              className="flex items-center justify-between rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted/45 hover:text-foreground"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs capitalize text-muted-foreground">
+                                  {run.source}
+                                </span>
+                                <span>{getWorkflowRunStatusLabel(run.status)}</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">{formatDate(run.startedAt)}</span>
+                            </Link>
+                          ))}
+                          {hiddenCount > 0 ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-xs"
+                              onClick={() =>
+                                setExpandedRunsByWorkflow((prev) => ({
+                                  ...prev,
+                                  [wf.id]: true,
+                                }))
+                              }
+                            >
+                              Show {hiddenCount} more
+                            </Button>
+                          ) : null}
+                          {isExpanded && recentRuns.length > 1 ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-xs"
+                              onClick={() =>
+                                setExpandedRunsByWorkflow((prev) => ({
+                                  ...prev,
+                                  [wf.id]: false,
+                                }))
+                              }
+                            >
+                              Show less
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">No runs yet.</div>
+                      )}
+                    </div>
                   </>
                 );
               })()}
