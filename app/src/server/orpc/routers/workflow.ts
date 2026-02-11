@@ -5,6 +5,7 @@ import { generation, user, workflow, workflowRun, workflowRunEvent } from "@/ser
 import { and, asc, desc, eq } from "drizzle-orm";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
 import { removeWorkflowScheduleJob, syncWorkflowScheduleJob } from "@/server/services/workflow-scheduler";
+import { generateWorkflowName } from "@/server/utils/generate-workflow-name";
 
 const integrationTypeSchema = z.enum([
   "gmail",
@@ -23,8 +24,22 @@ const integrationTypeSchema = z.enum([
   "reddit",
   "twitter",
 ]);
+const ALL_INTEGRATION_TYPES = [...integrationTypeSchema.options];
 
 const triggerTypeSchema = z.string().min(1).max(128);
+
+function buildFallbackWorkflowName(agentDescription: string, triggerType: string): string {
+  const firstSentence = agentDescription
+    .split(/[\n.!?]/)[0]
+    ?.replace(/\s+/g, " ")
+    .trim();
+
+  if (firstSentence) {
+    return firstSentence.slice(0, 128);
+  }
+
+  return "New Workflow";
+}
 
 // Schedule configuration schema
 const scheduleSchema = z.discriminatedUnion("type", [
@@ -143,22 +158,44 @@ const get = protectedProcedure
 const create = protectedProcedure
   .input(
     z.object({
-      name: z.string().min(1).max(128),
+      name: z.string().max(128).optional(),
       triggerType: triggerTypeSchema,
-      prompt: z.string().min(1).max(20000),
+      prompt: z.string().max(20000),
       promptDo: z.string().max(2000).optional(),
       promptDont: z.string().max(2000).optional(),
       autoApprove: z.boolean().optional(),
-      allowedIntegrations: z.array(integrationTypeSchema).default([]),
+      allowedIntegrations: z.array(integrationTypeSchema).default(ALL_INTEGRATION_TYPES),
       allowedCustomIntegrations: z.array(z.string()).default([]),
       schedule: scheduleSchema.nullish(),
     })
   )
   .handler(async ({ input, context }) => {
+    const providedName = input.name?.trim();
+    const hasAgentDescription = input.prompt.trim().length > 0;
+    const generatedName =
+      (!providedName || providedName.length === 0) && hasAgentDescription
+        ? await generateWorkflowName({
+            agentDescription: input.prompt,
+            triggerType: input.triggerType,
+            allowedIntegrations: input.allowedIntegrations,
+            allowedCustomIntegrations: input.allowedCustomIntegrations,
+            schedule: input.schedule ?? null,
+            autoApprove: input.autoApprove ?? true,
+            promptDo: input.promptDo ?? null,
+            promptDont: input.promptDont ?? null,
+          })
+        : null;
+    const nameToSave =
+      providedName && providedName.length > 0
+        ? providedName
+        : hasAgentDescription
+          ? generatedName ?? buildFallbackWorkflowName(input.prompt, input.triggerType)
+          : "";
+
     const [created] = await context.db
       .insert(workflow)
       .values({
-        name: input.name,
+        name: nameToSave,
         ownerId: context.user.id,
         status: "on",
         triggerType: input.triggerType,
@@ -194,10 +231,10 @@ const update = protectedProcedure
   .input(
     z.object({
       id: z.string(),
-      name: z.string().min(1).max(128).optional(),
+      name: z.string().max(128).optional(),
       status: z.enum(["on", "off"]).optional(),
       triggerType: triggerTypeSchema.optional(),
-      prompt: z.string().min(1).max(20000).optional(),
+      prompt: z.string().max(20000).optional(),
       promptDo: z.string().max(2000).nullish(),
       promptDont: z.string().max(2000).nullish(),
       autoApprove: z.boolean().optional(),
@@ -207,8 +244,40 @@ const update = protectedProcedure
     })
   )
   .handler(async ({ input, context }) => {
+    const existing = await context.db.query.workflow.findFirst({
+      where: and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)),
+    });
+
+    if (!existing) {
+      throw new ORPCError("NOT_FOUND", { message: "Workflow not found" });
+    }
+
     const updates: Partial<typeof workflow.$inferInsert> = {};
-    if (input.name !== undefined) updates.name = input.name;
+    if (input.name !== undefined) {
+      const providedName = input.name.trim();
+      if (providedName.length > 0) {
+        updates.name = providedName;
+      } else {
+        const nextPrompt = input.prompt ?? existing.prompt;
+        const hasAgentDescription = nextPrompt.trim().length > 0;
+        if (!hasAgentDescription) {
+          updates.name = "";
+        } else {
+          const generatedName = await generateWorkflowName({
+            agentDescription: nextPrompt,
+            triggerType: input.triggerType ?? existing.triggerType,
+            allowedIntegrations: input.allowedIntegrations ?? existing.allowedIntegrations,
+            allowedCustomIntegrations: input.allowedCustomIntegrations ?? existing.allowedCustomIntegrations,
+            schedule: input.schedule === undefined ? existing.schedule : input.schedule ?? null,
+            autoApprove: input.autoApprove ?? existing.autoApprove,
+            promptDo: input.promptDo === undefined ? existing.promptDo : input.promptDo ?? null,
+            promptDont: input.promptDont === undefined ? existing.promptDont : input.promptDont ?? null,
+          });
+          updates.name =
+            generatedName ?? buildFallbackWorkflowName(nextPrompt, input.triggerType ?? existing.triggerType);
+        }
+      }
+    }
     if (input.status !== undefined) updates.status = input.status;
     if (input.triggerType !== undefined) updates.triggerType = input.triggerType;
     if (input.prompt !== undefined) updates.prompt = input.prompt;

@@ -1,18 +1,36 @@
 import { startQueues, stopQueues } from "../src/server/queues";
+import { closePool } from "../src/server/db/client";
 import { reconcileScheduledWorkflowJobs } from "../src/server/services/workflow-scheduler";
 import { startGmailWorkflowWatcher } from "../src/server/services/workflow-gmail-watcher";
 
-const { worker, queueEvents, queueName, redisUrl } = startQueues();
+const { worker, queueEvents, workerConnection, queueEventsConnection, queueName, redisUrl } =
+  startQueues();
 const stopGmailWatcher = startGmailWorkflowWatcher();
+let shutdownPromise: Promise<void> | null = null;
 
 const shutdown = async () => {
-  console.log("[worker] shutting down...");
-  stopGmailWatcher();
-  await stopQueues(worker, queueEvents);
+  if (shutdownPromise) return shutdownPromise;
+
+  shutdownPromise = (async () => {
+    console.log("[worker] shutting down...");
+
+    stopGmailWatcher();
+    await Promise.allSettled([
+      stopQueues(worker, queueEvents, workerConnection, queueEventsConnection),
+      closePool(),
+    ]);
+  })();
+
+  return shutdownPromise;
 };
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.once("SIGINT", () => {
+  void shutdown().finally(() => process.exit(0));
+});
+
+process.once("SIGTERM", () => {
+  void shutdown().finally(() => process.exit(0));
+});
 
 console.log(`[worker] listening on "${queueName}" with redis "${redisUrl}"`);
 

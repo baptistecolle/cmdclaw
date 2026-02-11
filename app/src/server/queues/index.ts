@@ -8,6 +8,7 @@ export const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 const redisOptions = { maxRetriesPerRequest: null, enableReadyCheck: false } as const;
 
 export const SCHEDULED_WORKFLOW_JOB_NAME = "workflow:scheduled-trigger";
+export const GMAIL_WORKFLOW_JOB_NAME = "workflow:gmail-trigger";
 
 type JobPayload = Record<string, unknown> & { workflowId?: string };
 type JobHandler = Processor<JobPayload, unknown, string>;
@@ -32,6 +33,17 @@ const handlers: Record<string, JobHandler> = {
       },
     });
   },
+  [GMAIL_WORKFLOW_JOB_NAME]: async (job) => {
+    const workflowId = job.data?.workflowId;
+    if (!workflowId || typeof workflowId !== "string") {
+      throw new Error(`Missing workflowId in gmail job "${job.id}"`);
+    }
+
+    return triggerWorkflowRun({
+      workflowId,
+      triggerPayload: job.data?.triggerPayload ?? {},
+    });
+  },
 };
 
 const processor: Processor<JobPayload, unknown, string> = async (job) => {
@@ -45,6 +57,7 @@ const processor: Processor<JobPayload, unknown, string> = async (job) => {
 };
 
 let queue: Queue<JobPayload, unknown, string> | null = null;
+let queueConnection: IORedis | null = null;
 
 function createRedisConnection(): IORedis {
   // Cast to any due to ioredis version mismatch with bullmq's bundled version
@@ -53,8 +66,9 @@ function createRedisConnection(): IORedis {
 
 export const getQueue = (): Queue<JobPayload, unknown, string> => {
   if (!queue) {
+    queueConnection = createRedisConnection();
     queue = new Queue<JobPayload, unknown, string>(queueName, {
-      connection: createRedisConnection() as any,
+      connection: queueConnection as any,
     });
   }
 
@@ -62,15 +76,16 @@ export const getQueue = (): Queue<JobPayload, unknown, string> => {
 };
 
 export const startQueues = () => {
-  const connection = createRedisConnection() as any;
+  const workerConnection = createRedisConnection();
+  const queueEventsConnection = createRedisConnection();
 
   const worker = new Worker(queueName, processor, {
-    connection,
+    connection: workerConnection as any,
     concurrency: Number(process.env.BULLMQ_CONCURRENCY ?? "5"),
   });
 
   const queueEvents = new QueueEvents(queueName, {
-    connection: createRedisConnection() as any,
+    connection: queueEventsConnection as any,
   });
 
   queueEvents.on("completed", ({ jobId }) => {
@@ -94,14 +109,33 @@ export const startQueues = () => {
     console.error("[worker] queue events error", error);
   });
 
-  return { worker, queueEvents, queueName, redisUrl };
+  return { worker, queueEvents, workerConnection, queueEventsConnection, queueName, redisUrl };
 };
 
-export const stopQueues = async (worker: Worker, queueEvents: QueueEvents) => {
+async function closeRedisConnection(connection: IORedis): Promise<void> {
+  try {
+    await connection.quit();
+  } catch {
+    connection.disconnect();
+  }
+}
+
+export const stopQueues = async (
+  worker: Worker,
+  queueEvents: QueueEvents,
+  workerConnection: IORedis,
+  queueEventsConnection: IORedis
+) => {
   const closers: Promise<unknown>[] = [worker.close(), queueEvents.close()];
   if (queue) {
     closers.push(queue.close());
+    if (queueConnection) {
+      closers.push(closeRedisConnection(queueConnection));
+      queueConnection = null;
+    }
     queue = null;
   }
+  closers.push(closeRedisConnection(workerConnection));
+  closers.push(closeRedisConnection(queueEventsConnection));
   await Promise.allSettled(closers);
 };

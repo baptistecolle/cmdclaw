@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
+import { INTEGRATION_DISPLAY_NAMES, type IntegrationType } from "@/lib/integration-icons";
 import { Loader2, Plus, Pencil, Trash2, Play, CheckCircle2, XCircle } from "lucide-react";
 
 function formatDate(value?: Date | string | null) {
@@ -49,10 +50,10 @@ export default function WorkflowsPage() {
     setIsCreating(true);
     try {
       const result = await createWorkflow.mutateAsync({
-        name: "New Workflow",
+        name: "",
         triggerType: "schedule",
-        prompt: "Describe what the agent should do when this trigger fires.",
-        allowedIntegrations: [],
+        prompt: "",
+        allowedIntegrations: Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[],
       });
       window.location.href = `/workflows/${result.id}`;
     } catch (error) {
@@ -111,6 +112,10 @@ export default function WorkflowsPage() {
   };
 
   const workflowList = Array.isArray(workflows) ? workflows : [];
+  const getWorkflowDisplayName = (name?: string | null) => {
+    const trimmed = name?.trim();
+    return trimmed && trimmed.length > 0 ? trimmed : "New Workflow";
+  };
 
   return (
     <div>
@@ -186,7 +191,7 @@ export default function WorkflowsPage() {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-medium">{wf.name}</h3>
+                    <h3 className="font-medium">{getWorkflowDisplayName(wf.name)}</h3>
                     <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                       {wf.triggerType}
                     </span>
@@ -223,7 +228,7 @@ export default function WorkflowsPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setWorkflowToDelete({ id: wf.id, name: wf.name })}
+                    onClick={() => setWorkflowToDelete({ id: wf.id, name: getWorkflowDisplayName(wf.name) })}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

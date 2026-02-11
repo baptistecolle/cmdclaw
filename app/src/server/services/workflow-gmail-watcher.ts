@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { integration, integrationToken, workflow, workflowRun } from "@/server/db/schema";
 import { getValidAccessToken } from "@/server/integrations/token-refresh";
-import { triggerWorkflowRun } from "@/server/services/workflow-service";
+import { GMAIL_WORKFLOW_JOB_NAME, getQueue } from "@/server/queues";
 
 const GMAIL_TRIGGER_TYPE = "gmail.new_email";
 const DEFAULT_POLL_INTERVAL_MS = 2 * 60 * 1000;
@@ -176,7 +176,8 @@ async function triggerWorkflowFromGmailMessage(
   workflowId: string,
   message: GmailMessageSummary
 ): Promise<void> {
-  await triggerWorkflowRun({
+  const queue = getQueue();
+  await queue.add(GMAIL_WORKFLOW_JOB_NAME, {
     workflowId,
     triggerPayload: {
       source: GMAIL_TRIGGER_TYPE,
@@ -190,16 +191,24 @@ async function triggerWorkflowFromGmailMessage(
       snippet: message.snippet,
       watchedAt: new Date().toISOString(),
     },
+  }, {
+    jobId: `workflow-gmail-${workflowId}-${message.id}`,
+    attempts: 20,
+    backoff: {
+      type: "exponential",
+      delay: 10_000,
+    },
+    removeOnComplete: true,
   });
 }
 
-export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; triggered: number }> {
+export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; enqueued: number }> {
   const watchable = await listWatchableWorkflows();
-  if (watchable.length === 0) return { checked: 0, triggered: 0 };
+  if (watchable.length === 0) return { checked: 0, enqueued: 0 };
 
   const tokenCache = new Map<string, string>();
   let checked = 0;
-  let triggered = 0;
+  let enqueued = 0;
 
   for (const item of watchable) {
     checked += 1;
@@ -252,7 +261,7 @@ export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; tr
 
         try {
           await triggerWorkflowFromGmailMessage(item.workflowId, message);
-          triggered += 1;
+          enqueued += 1;
         } catch (error) {
           console.error(
             `[workflow-gmail-watcher] failed to trigger workflow ${item.workflowId} for message ${message.id}`,
@@ -265,7 +274,7 @@ export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; tr
     }
   }
 
-  return { checked, triggered };
+  return { checked, enqueued };
 }
 
 export function startGmailWorkflowWatcher(): () => void {
@@ -277,10 +286,10 @@ export function startGmailWorkflowWatcher(): () => void {
     isRunning = true;
 
     try {
-      const { checked, triggered } = await pollGmailWorkflowTriggers();
+      const { checked, enqueued } = await pollGmailWorkflowTriggers();
       if (checked > 0) {
         console.log(
-          `[workflow-gmail-watcher] checked ${checked} workflow(s), triggered ${triggered} run(s)`
+          `[workflow-gmail-watcher] checked ${checked} workflow(s), enqueued ${enqueued} run(s)`
         );
       }
     } catch (error) {

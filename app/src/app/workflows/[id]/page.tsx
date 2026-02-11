@@ -64,6 +64,7 @@ export default function WorkflowEditorPage() {
   const [triggerType, setTriggerType] = useState(TRIGGERS[0].value);
   const [prompt, setPrompt] = useState("");
   const [allowedIntegrations, setAllowedIntegrations] = useState<IntegrationType[]>([]);
+  const [restrictTools, setRestrictTools] = useState(false);
   const [status, setStatus] = useState<"on" | "off">("off");
   const [autoApprove, setAutoApprove] = useState(true);
   const [showDisableAutoApproveDialog, setShowDisableAutoApproveDialog] = useState(false);
@@ -87,10 +88,21 @@ export default function WorkflowEditorPage() {
 
   useEffect(() => {
     if (!workflow) return;
+    const availableIntegrationTypes = Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[];
+    const workflowAllowedIntegrations = (workflow.allowedIntegrations ?? []) as IntegrationType[];
+    const hasRestriction =
+      workflowAllowedIntegrations.length > 0 &&
+      workflowAllowedIntegrations.length < availableIntegrationTypes.length;
+
     setName(workflow.name);
     setTriggerType(workflow.triggerType);
     setPrompt(workflow.prompt);
-    setAllowedIntegrations((workflow.allowedIntegrations ?? []) as IntegrationType[]);
+    setAllowedIntegrations(
+      hasRestriction || workflowAllowedIntegrations.length === 0
+        ? workflowAllowedIntegrations
+        : availableIntegrationTypes
+    );
+    setRestrictTools(hasRestriction || workflowAllowedIntegrations.length === 0);
     setStatus(workflow.status);
     setAutoApprove(workflow.autoApprove ?? true);
 
@@ -126,6 +138,10 @@ export default function WorkflowEditorPage() {
         logo: INTEGRATION_LOGOS[key],
       })),
     []
+  );
+  const allIntegrationTypes = useMemo(
+    () => integrationEntries.map((entry) => entry.key),
+    [integrationEntries]
   );
 
   const toggleIntegration = (type: IntegrationType) => {
@@ -172,7 +188,7 @@ export default function WorkflowEditorPage() {
         triggerType,
         prompt,
         autoApprove,
-        allowedIntegrations,
+        allowedIntegrations: restrictTools ? allowedIntegrations : allIntegrationTypes,
         schedule: buildSchedule(),
       });
       setNotification({ type: "success", message: "Workflow saved." });
@@ -203,6 +219,8 @@ export default function WorkflowEditorPage() {
     );
   }
 
+  const workflowDisplayName = workflow.name.trim().length > 0 ? workflow.name : "New Workflow";
+
   return (
     <div className="min-h-[calc(100vh-8rem)] space-y-5 pb-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -213,7 +231,7 @@ export default function WorkflowEditorPage() {
             </Link>
           </Button>
           <div>
-            <h2 className="text-xl font-semibold">{workflow.name}</h2>
+            <h2 className="text-xl font-semibold">{workflowDisplayName}</h2>
             <p className="text-sm text-muted-foreground">
               Configure trigger, agent instructions, and allowed tools.
             </p>
@@ -279,6 +297,7 @@ export default function WorkflowEditorPage() {
                     className="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    placeholder="Leave blank to auto generate"
                   />
                 </div>
                 <div className="space-y-2">
@@ -424,48 +443,92 @@ export default function WorkflowEditorPage() {
             </div>
 
             <div className="space-y-3">
-              <label className="text-sm font-medium">Allowed tools</label>
-              <div className="grid gap-3 md:grid-cols-2">
-                {(showAllIntegrations ? integrationEntries : integrationEntries.slice(0, 4)).map(
-                  ({ key, name: label, logo }) => (
-                    <label
-                      key={key}
-                      className={cn(
-                        "flex items-center gap-3 rounded-md p-3 text-sm transition-colors",
-                        allowedIntegrations.includes(key)
-                          ? "bg-primary/10"
-                          : "bg-muted/30 hover:bg-muted/50"
-                      )}
-                    >
-                      <Checkbox
-                        checked={allowedIntegrations.includes(key)}
-                        onCheckedChange={() => toggleIntegration(key)}
-                      />
-                      <img src={logo} alt={label} className="h-4 w-4" />
-                      <span>{label}</span>
-                    </label>
-                  )
-                )}
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-sm font-medium">Allowed tools</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">All tools allowed</span>
+                  <Switch
+                    checked={!restrictTools}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setRestrictTools(false);
+                        setAllowedIntegrations(allIntegrationTypes);
+                        return;
+                      }
+                      setRestrictTools(true);
+                    }}
+                  />
+                </div>
               </div>
-              {integrationEntries.length > 4 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAllIntegrations(!showAllIntegrations)}
-                  className="text-muted-foreground"
-                >
-                  {showAllIntegrations ? (
-                    <>
-                      <ChevronUp className="mr-1 h-4 w-4" />
-                      Show less
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="mr-1 h-4 w-4" />
-                      Show more ({integrationEntries.length - 4} more)
-                    </>
+              {!restrictTools ? (
+                <p className="text-sm text-muted-foreground">All tools are allowed.</p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">
+                      {allowedIntegrations.length}/{allIntegrationTypes.length} selected
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        disabled={allowedIntegrations.length === allIntegrationTypes.length}
+                        onClick={() => setAllowedIntegrations(allIntegrationTypes)}
+                      >
+                        Select all
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        disabled={allowedIntegrations.length === 0}
+                        onClick={() => setAllowedIntegrations([])}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {(showAllIntegrations ? integrationEntries : integrationEntries.slice(0, 4)).map(
+                      ({ key, name: label, logo }) => (
+                        <label
+                          key={key}
+                          className={cn(
+                            "flex items-center gap-3 rounded-md bg-muted/30 p-3 text-sm transition-colors hover:bg-muted/50"
+                          )}
+                        >
+                          <Checkbox
+                            checked={allowedIntegrations.includes(key)}
+                            onCheckedChange={() => toggleIntegration(key)}
+                          />
+                          <img src={logo} alt={label} className="h-4 w-4" />
+                          <span>{label}</span>
+                        </label>
+                      )
+                    )}
+                  </div>
+                  {integrationEntries.length > 4 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllIntegrations(!showAllIntegrations)}
+                      className="text-muted-foreground"
+                    >
+                      {showAllIntegrations ? (
+                        <>
+                          <ChevronUp className="mr-1 h-4 w-4" />
+                          Show less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="mr-1 h-4 w-4" />
+                          Show more ({integrationEntries.length - 4} more)
+                        </>
+                      )}
+                    </Button>
                   )}
-                </Button>
+                </>
               )}
             </div>
 

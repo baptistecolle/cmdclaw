@@ -1,11 +1,62 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
+import { generation, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
 import type { IntegrationType } from "@/server/oauth/config";
 
-const ONE_MINUTE_MS = 60 * 1000;
+const ACTIVE_WORKFLOW_RUN_STATUSES = ["running", "awaiting_approval", "awaiting_auth"] as const;
+const TERMINAL_GENERATION_STATUSES = ["completed", "cancelled", "error"] as const;
+
+function mapGenerationStatusToWorkflowRunStatus(
+  status: (typeof TERMINAL_GENERATION_STATUSES)[number]
+): "completed" | "cancelled" | "error" {
+  if (status === "completed") return "completed";
+  if (status === "cancelled") return "cancelled";
+  return "error";
+}
+
+async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promise<void> {
+  const candidateRuns = await db.query.workflowRun.findMany({
+    where: and(
+      eq(workflowRun.workflowId, workflowId),
+      inArray(workflowRun.status, [...ACTIVE_WORKFLOW_RUN_STATUSES])
+    ),
+    with: {
+      generation: {
+        columns: {
+          id: true,
+          status: true,
+          completedAt: true,
+          errorMessage: true,
+        },
+      },
+    },
+    limit: 20,
+  });
+
+  for (const run of candidateRuns) {
+    const gen = run.generation;
+    if (!gen) continue;
+
+    if (!TERMINAL_GENERATION_STATUSES.includes(gen.status as (typeof TERMINAL_GENERATION_STATUSES)[number])) {
+      continue;
+    }
+
+    const mappedStatus = mapGenerationStatusToWorkflowRunStatus(
+      gen.status as (typeof TERMINAL_GENERATION_STATUSES)[number]
+    );
+
+    await db
+      .update(workflowRun)
+      .set({
+        status: mappedStatus,
+        finishedAt: run.finishedAt ?? gen.completedAt ?? new Date(),
+        errorMessage: run.errorMessage ?? gen.errorMessage ?? null,
+      })
+      .where(eq(workflowRun.id, run.id));
+  }
+}
 
 export async function triggerWorkflowRun(params: {
   workflowId: string;
@@ -32,16 +83,22 @@ export async function triggerWorkflowRun(params: {
     throw new ORPCError("BAD_REQUEST", { message: "Workflow is turned off" });
   }
 
-  const lastRun = await db.query.workflowRun.findFirst({
-    where: eq(workflowRun.workflowId, wf.id),
+  // Defensive reconciliation for runs that were left active while their generation already ended.
+  // This avoids permanently blocking future triggers for the workflow.
+  await reconcileStaleWorkflowRunsForWorkflow(wf.id);
+
+  const activeRun = await db.query.workflowRun.findFirst({
+    where: and(
+      eq(workflowRun.workflowId, wf.id),
+      inArray(workflowRun.status, [...ACTIVE_WORKFLOW_RUN_STATUSES])
+    ),
     orderBy: (run, { desc }) => [desc(run.startedAt)],
   });
 
-  if (params.userRole !== "admin" && lastRun && lastRun.startedAt) {
-    const now = Date.now();
-    if (now - new Date(lastRun.startedAt).getTime() < ONE_MINUTE_MS) {
-      throw new ORPCError("BAD_REQUEST", { message: "Workflow is rate limited (1 run per minute)" });
-    }
+  if (params.userRole !== "admin" && activeRun) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "Workflow already has an active run",
+    });
   }
 
   const [run] = await db

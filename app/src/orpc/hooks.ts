@@ -429,7 +429,7 @@ export function useCreateWorkflow() {
 
   return useMutation({
     mutationFn: (input: {
-      name: string;
+      name?: string;
       triggerType: string;
       prompt: string;
       promptDo?: string;

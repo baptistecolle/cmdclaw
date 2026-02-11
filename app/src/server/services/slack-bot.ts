@@ -52,24 +52,39 @@ async function removeReaction(
   );
 }
 
-async function postMessage(channel: string, threadTs: string, text: string) {
+async function postMessage(channel: string, text: string, threadTs?: string) {
   await slackApi("chat.postMessage", {
     channel,
-    thread_ts: threadTs,
+    ...(threadTs ? { thread_ts: threadTs } : {}),
     text,
   });
 }
 
 async function getSlackUserInfo(
-  userId: string
+  userId: string,
+  fallbackName?: string | null
 ): Promise<{ displayName: string }> {
   const res = await slackApi("users.info", { user: userId });
   const user = res.user as
-    | { profile?: { display_name?: string; real_name?: string } }
+    | { name?: string; profile?: { display_name?: string; real_name?: string } }
     | undefined;
+
+  if (res.ok) {
+    const displayName =
+      user?.profile?.display_name || user?.profile?.real_name || user?.name;
+    if (displayName) {
+      return { displayName };
+    }
+  }
+
+  if (!res.ok) {
+    console.warn(
+      `[slack-bot] users.info failed for ${userId}: ${String(res.error ?? "unknown error")}`
+    );
+  }
+
   return {
-    displayName:
-      user?.profile?.display_name || user?.profile?.real_name || "Unknown User",
+    displayName: fallbackName || `Slack user <@${userId}>`,
   };
 }
 
@@ -119,6 +134,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
 
   const slackUserId = event.user;
   const channel = event.channel;
+  const isDirectMessage = channel.startsWith("D");
   const threadTs = event.thread_ts ?? event.ts;
   const messageText = event.text
     // Strip bot mention from text
@@ -135,8 +151,8 @@ export async function handleSlackEvent(payload: SlackEvent) {
     const linkUrl = `${appUrl}/api/slack/link?slackUserId=${slackUserId}&slackTeamId=${team_id}`;
     await postMessage(
       channel,
-      threadTs,
-      `To use @bap, connect your account first: ${linkUrl}`
+      `To use @bap, connect your account first: ${linkUrl}`,
+      isDirectMessage ? undefined : threadTs
     );
     return;
   }
@@ -154,12 +170,20 @@ export async function handleSlackEvent(payload: SlackEvent) {
     );
 
     // Get Slack user display name for context
-    const { displayName } = await getSlackUserInfo(slackUserId);
+    const { displayName } = await getSlackUserInfo(slackUserId, link.user?.name);
 
     // Start generation via generation manager
     const { generationId } = await generationManager.startGeneration({
       conversationId: convId,
-      content: `[Slack message from ${displayName}]: ${messageText}`,
+      content: [
+        `[Slack message from ${displayName}]`,
+        `channel_id: ${channel}`,
+        `thread_ts: ${threadTs}`,
+        `message_ts: ${event.ts}`,
+        `context: You are already replying in this same Slack conversation via the bot bridge. Do not ask for channel ID or thread timestamp. Reply normally to the user's message.`,
+        "",
+        messageText,
+      ].join("\n"),
       userId: link.userId,
       autoApprove: true,
     });
@@ -176,15 +200,15 @@ export async function handleSlackEvent(payload: SlackEvent) {
       // Split long messages (Slack limit ~4000 chars)
       const chunks = splitMessage(slackText, 3900);
       for (const chunk of chunks) {
-        await postMessage(channel, threadTs, chunk);
+        await postMessage(channel, chunk, isDirectMessage ? undefined : threadTs);
       }
     }
   } catch (err) {
     console.error("[slack-bot] Error handling event:", err);
     await postMessage(
       channel,
-      threadTs,
-      "Sorry, something went wrong processing your message."
+      "Sorry, something went wrong processing your message.",
+      isDirectMessage ? undefined : threadTs
     );
   } finally {
     // Remove typing indicator
@@ -200,6 +224,9 @@ async function resolveUser(slackTeamId: string, slackUserId: string) {
       eq(slackUserLink.slackTeamId, slackTeamId),
       eq(slackUserLink.slackUserId, slackUserId)
     ),
+    with: {
+      user: true,
+    },
   });
 }
 
