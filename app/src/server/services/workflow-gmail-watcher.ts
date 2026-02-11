@@ -57,6 +57,35 @@ function getHeaderValue(
   return item?.value ?? null;
 }
 
+function isGmailAuthError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(error);
+
+  return (
+    message.includes("invalid_grant") ||
+    message.includes("UNAUTHENTICATED") ||
+    message.includes("Invalid Credentials") ||
+    message.includes("401")
+  );
+}
+
+async function disableBrokenGmailIntegration(
+  integrationId: string,
+  reason: string
+): Promise<void> {
+  await db
+    .update(integration)
+    .set({
+      enabled: false,
+      updatedAt: new Date(),
+    })
+    .where(eq(integration.id, integrationId));
+
+  console.warn(
+    `[workflow-gmail-watcher] disabled gmail integration ${integrationId} due to auth failure (${reason}); reconnect required`
+  );
+}
+
 async function listWatchableWorkflows(): Promise<WatchableWorkflow[]> {
   const rows = await db
     .select({
@@ -270,6 +299,19 @@ export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; en
         }
       }
     } catch (error) {
+      if (isGmailAuthError(error)) {
+        try {
+          await disableBrokenGmailIntegration(
+            item.integrationId,
+            error instanceof Error ? error.message : "auth_error"
+          );
+        } catch (disableError) {
+          console.error(
+            `[workflow-gmail-watcher] failed to disable broken gmail integration ${item.integrationId}`,
+            disableError
+          );
+        }
+      }
       console.error(`[workflow-gmail-watcher] failed for workflow ${item.workflowId}`, error);
     }
   }

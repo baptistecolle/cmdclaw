@@ -13,6 +13,23 @@ export const GMAIL_WORKFLOW_JOB_NAME = "workflow:gmail-trigger";
 type JobPayload = Record<string, unknown> & { workflowId?: string };
 type JobHandler = Processor<JobPayload, unknown, string>;
 
+function isActiveWorkflowRunConflict(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as {
+    code?: unknown;
+    status?: unknown;
+    message?: unknown;
+  };
+
+  return (
+    maybeError.code === "BAD_REQUEST" &&
+    maybeError.status === 400 &&
+    typeof maybeError.message === "string" &&
+    maybeError.message.includes("Workflow already has an active run")
+  );
+}
+
 const handlers: Record<string, JobHandler> = {
   [SCHEDULED_WORKFLOW_JOB_NAME]: async (job) => {
     const workflowId = job.data?.workflowId;
@@ -39,10 +56,20 @@ const handlers: Record<string, JobHandler> = {
       throw new Error(`Missing workflowId in gmail job "${job.id}"`);
     }
 
-    return triggerWorkflowRun({
-      workflowId,
-      triggerPayload: job.data?.triggerPayload ?? {},
-    });
+    try {
+      return await triggerWorkflowRun({
+        workflowId,
+        triggerPayload: job.data?.triggerPayload ?? {},
+      });
+    } catch (error) {
+      if (isActiveWorkflowRunConflict(error)) {
+        console.warn(
+          `[worker] skipped gmail workflow trigger because run is already active for workflow ${workflowId}`
+        );
+        return;
+      }
+      throw error;
+    }
   },
 };
 

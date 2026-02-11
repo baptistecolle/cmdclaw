@@ -1,12 +1,18 @@
 import { ORPCError } from "@orpc/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { generation, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
+import { conversation, generation, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
 import type { IntegrationType } from "@/server/oauth/config";
 
 const ACTIVE_WORKFLOW_RUN_STATUSES = ["running", "awaiting_approval", "awaiting_auth"] as const;
 const TERMINAL_GENERATION_STATUSES = ["completed", "cancelled", "error"] as const;
+const ORPHAN_RUN_GRACE_MS = 2 * 60 * 1000;
+const WORKFLOW_PREPARING_TIMEOUT_MS = (() => {
+  const seconds = Number(process.env.WORKFLOW_PREPARING_TIMEOUT_SECONDS ?? "300");
+  if (!Number.isFinite(seconds) || seconds <= 0) return 5 * 60 * 1000;
+  return Math.floor(seconds * 1000);
+})();
 
 function mapGenerationStatusToWorkflowRunStatus(
   status: (typeof TERMINAL_GENERATION_STATUSES)[number]
@@ -26,8 +32,13 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
       generation: {
         columns: {
           id: true,
+          conversationId: true,
           status: true,
+          startedAt: true,
           completedAt: true,
+          contentParts: true,
+          pendingApproval: true,
+          pendingAuth: true,
           errorMessage: true,
         },
       },
@@ -37,9 +48,60 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
 
   for (const run of candidateRuns) {
     const gen = run.generation;
-    if (!gen) continue;
+    if (!gen) {
+      const isLikelyOrphan = run.status === "running" && Date.now() - run.startedAt.getTime() > ORPHAN_RUN_GRACE_MS;
+      if (!isLikelyOrphan) continue;
+
+      await db
+        .update(workflowRun)
+        .set({
+          status: "error",
+          finishedAt: run.finishedAt ?? new Date(),
+          errorMessage: run.errorMessage ?? "Workflow run failed before generation could start.",
+        })
+        .where(eq(workflowRun.id, run.id));
+
+      continue;
+    }
 
     if (!TERMINAL_GENERATION_STATUSES.includes(gen.status as (typeof TERMINAL_GENERATION_STATUSES)[number])) {
+      const isPreparingTimeout =
+        run.status === "running" &&
+        gen.status === "running" &&
+        Date.now() - gen.startedAt.getTime() > WORKFLOW_PREPARING_TIMEOUT_MS &&
+        (gen.contentParts?.length ?? 0) === 0 &&
+        !gen.pendingApproval &&
+        !gen.pendingAuth;
+
+      if (isPreparingTimeout) {
+        const errorMessage = "Workflow run timed out while preparing agent.";
+
+        await db
+          .update(generation)
+          .set({
+            status: "error",
+            completedAt: new Date(),
+            errorMessage,
+          })
+          .where(eq(generation.id, gen.id));
+
+        await db
+          .update(conversation)
+          .set({ generationStatus: "error" })
+          .where(eq(conversation.id, gen.conversationId));
+
+        await db
+          .update(workflowRun)
+          .set({
+            status: "error",
+            finishedAt: run.finishedAt ?? new Date(),
+            errorMessage,
+          })
+          .where(eq(workflowRun.id, run.id));
+
+        continue;
+      }
+
       continue;
     }
 
@@ -121,28 +183,54 @@ export async function triggerWorkflowRun(params: {
 
   const allowedIntegrations = (wf.allowedIntegrations ?? []) as IntegrationType[];
 
-  const { generationId, conversationId } = await generationManager.startWorkflowGeneration({
-    workflowRunId: run.id,
-    content: userContent,
-    userId: wf.ownerId,
-    autoApprove: wf.autoApprove,
-    allowedIntegrations,
-    allowedCustomIntegrations: (wf as any).allowedCustomIntegrations ?? [],
-    workflowPrompt: wf.prompt,
-    workflowPromptDo: wf.promptDo,
-    workflowPromptDont: wf.promptDont,
-    triggerPayload: params.triggerPayload,
-  });
+  let generationId: string;
+  let conversationId: string;
+  try {
+    const startResult = await generationManager.startWorkflowGeneration({
+      workflowRunId: run.id,
+      content: userContent,
+      userId: wf.ownerId,
+      autoApprove: wf.autoApprove,
+      allowedIntegrations,
+      allowedCustomIntegrations: (wf as any).allowedCustomIntegrations ?? [],
+      workflowPrompt: wf.prompt,
+      workflowPromptDo: wf.promptDo,
+      workflowPromptDont: wf.promptDont,
+      triggerPayload: params.triggerPayload,
+    });
 
-  await db
-    .update(workflowRun)
-    .set({ generationId })
-    .where(eq(workflowRun.id, run.id));
+    generationId = startResult.generationId;
+    conversationId = startResult.conversationId;
+
+    await db
+      .update(workflowRun)
+      .set({ generationId })
+      .where(eq(workflowRun.id, run.id));
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to start workflow generation";
+
+    await db
+      .update(workflowRun)
+      .set({
+        status: "error",
+        finishedAt: new Date(),
+        errorMessage,
+      })
+      .where(eq(workflowRun.id, run.id));
+
+    await db.insert(workflowRunEvent).values({
+      workflowRunId: run.id,
+      type: "error",
+      payload: { message: errorMessage, stage: "start_generation" },
+    });
+
+    throw error;
+  }
 
   return {
     workflowId: wf.id,
     runId: run.id,
-    generationId,
-    conversationId,
+    generationId: generationId!,
+    conversationId: conversationId!,
   };
 }

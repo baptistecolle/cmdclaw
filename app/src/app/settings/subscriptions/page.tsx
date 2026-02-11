@@ -18,18 +18,26 @@ const PROVIDERS: {
   id: ProviderID;
   name: string;
   description: string;
+  logoUrl: string;
+  logoAlt: string;
+  logoClassName?: string;
   models: string[];
 }[] = [
   {
     id: "openai",
     name: "ChatGPT",
     description: "Use your ChatGPT Plus/Pro/Max subscription",
+    logoUrl: "/integrations/openai.svg",
+    logoAlt: "OpenAI logo",
+    logoClassName: "dark:invert",
     models: ["GPT-5.1 Codex Max", "GPT-5.1 Codex Mini", "GPT-5.2", "GPT-5.2 Codex", "GPT-5.1 Codex"],
   },
   {
     id: "google",
     name: "Gemini",
     description: "Use your Google AI Pro/Ultra subscription",
+    logoUrl: "/integrations/gemini.svg",
+    logoAlt: "Google Gemini logo",
     models: ["Gemini 2.5 Pro", "Gemini 2.5 Flash"],
   },
 ];
@@ -176,6 +184,13 @@ export default function SubscriptionsPage() {
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
+                    <img
+                      src={provider.logoUrl}
+                      alt={provider.logoAlt}
+                      className={cn("h-5 w-auto shrink-0", provider.logoClassName)}
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <h3 className="font-medium">{provider.name}</h3>
                     {isConnected && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
@@ -187,21 +202,6 @@ export default function SubscriptionsPage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {provider.description}
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {provider.models.map((model) => (
-                      <span
-                        key={model}
-                        className={cn(
-                          "rounded-md px-2 py-0.5 text-xs",
-                          isConnected
-                            ? "bg-foreground/10 text-foreground"
-                            : "bg-muted text-muted-foreground"
-                        )}
-                      >
-                        {model}
-                      </span>
-                    ))}
-                  </div>
                 </div>
 
                 <div className="shrink-0">
@@ -239,11 +239,20 @@ export default function SubscriptionsPage() {
       </div>
 
       <div className="mt-6 rounded-lg border border-muted bg-muted/30 p-4">
-        <p className="text-xs text-muted-foreground">
-          Anthropic models (Claude) are always available through Bap&apos;s platform.
-          Connecting a subscription gives you access to additional models from
-          that provider. Your tokens are encrypted and stored securely.
-        </p>
+        <div className="flex items-start gap-2">
+          <img
+            src="/integrations/anthropic.svg"
+            alt="Anthropic logo"
+            className="mt-0.5 h-4 w-auto shrink-0 dark:invert"
+            loading="lazy"
+            decoding="async"
+          />
+          <p className="text-xs text-muted-foreground">
+            Anthropic models (Claude) are always available through Bap&apos;s platform.
+            Connecting a subscription gives you access to additional models from
+            that provider.
+          </p>
+        </div>
       </div>
     </div>
   );

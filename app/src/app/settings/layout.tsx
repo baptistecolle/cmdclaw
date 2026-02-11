@@ -33,6 +33,7 @@ export default function SettingsLayout({
                 <Link
                   key={tab.href}
                   href={tab.href}
+                  prefetch={false}
                   className={cn(
                     "border-b-2 px-1 pb-2 text-sm font-medium transition-colors",
                     isActive

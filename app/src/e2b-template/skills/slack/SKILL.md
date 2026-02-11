@@ -9,7 +9,9 @@ Read and write messages, search, manage threads, add reactions, and upload files
 
 ## Environment Variables
 
-- `SLACK_ACCESS_TOKEN` - Slack Bot or User OAuth token
+- `SLACK_ACCESS_TOKEN` - Slack user OAuth token (required for `--as user` and read operations)
+- `SLACK_BOT_RELAY_URL` - Optional relay endpoint for posting as bot
+- `SLACK_BOT_RELAY_SECRET` - Secret for relay auth (required with `--as bot`)
 
 ## Commands
 
@@ -23,8 +25,8 @@ slack history -c <channelId> [-l limit]
 # Get recent messages across all channels
 slack recent [-l limit] [-q "filter query"]
 
-# Send a message (optionally in a thread)
-slack send -c <channelId> -t "Hello team" [--thread <ts>]
+# Send a message (optionally in a thread, actor required)
+slack send -c <channelId> -t "Hello team" --as <user|bot> [--thread <ts>]
 
 # Search messages
 slack search -q "deployment failed" [-l limit]

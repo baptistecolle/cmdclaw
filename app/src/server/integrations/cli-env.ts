@@ -74,6 +74,19 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
     cliEnv.DISCORD_BOT_TOKEN = env.DISCORD_BOT_TOKEN;
   }
 
+  // Slack bot relay config (keeps SLACK_BOT_TOKEN server-side only)
+  const slackRelaySecret = env.SLACK_BOT_RELAY_SECRET ?? env.BAP_SERVER_SECRET;
+  if (slackRelaySecret) {
+    cliEnv.SLACK_BOT_RELAY_SECRET = slackRelaySecret;
+  }
+  if (env.APP_URL) {
+    const relayBaseUrl =
+      new URL(env.APP_URL).hostname === "localhost"
+        ? "https://localcan.baptistecolle.com"
+        : env.APP_URL;
+    cliEnv.SLACK_BOT_RELAY_URL = `${relayBaseUrl}/api/internal/slack/post-as-bot`;
+  }
+
   // Custom integrations
   try {
     const customCreds = await db.query.customIntegrationCredential.findMany({
@@ -246,7 +259,7 @@ export function getCliInstructions(connectedIntegrations: IntegrationType[]): st
 ## Slack CLI [${statusTag("slack")}]
 - slack channels - List channels
 - slack history -c <channelId> - Get channel messages
-- slack send -c <channelId> -t <text> [--thread <ts>] - Send message
+- slack send -c <channelId> -t <text> --as <user|bot> [--thread <ts>] - Send message (explicit actor required)
 - slack search -q <query> - Search messages
 - slack users - List users
 - slack user -u <userId> - Get user info

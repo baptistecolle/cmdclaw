@@ -201,6 +201,11 @@ interface GenerationContext {
 const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 // Auth timeout: 10 minutes for OAuth flow
 const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
+const AGENT_PREPARING_TIMEOUT_MS = (() => {
+  const seconds = Number(process.env.AGENT_PREPARING_TIMEOUT_SECONDS ?? "300");
+  if (!Number.isFinite(seconds) || seconds <= 0) return 5 * 60 * 1000;
+  return Math.floor(seconds * 1000);
+})();
 // Save debounce interval for text chunks
 const SAVE_DEBOUNCE_MS = 2000;
 // Compaction + memory flush defaults
@@ -252,6 +257,24 @@ type MessageRow = typeof message.$inferSelect;
 
 function estimateTokensFromText(text: string): number {
   return Math.ceil(text.length / 4);
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 function estimateTokensFromContentParts(parts: ContentPart[] | null | undefined): number {
@@ -1293,41 +1316,45 @@ class GenerationManager {
       let sessionId: string;
       let sandbox: import("e2b").Sandbox;
       try {
-        const session = await getOrCreateSession(
-          {
-            conversationId: ctx.conversationId,
-            userId: ctx.userId,
-            anthropicApiKey: env.ANTHROPIC_API_KEY,
-            integrationEnvs: filteredCliEnv,
-          },
-          {
-            title: conv?.title || "Conversation",
-            replayHistory: hasExistingMessages,
-            telemetry: {
-              source: "generation-manager",
-              traceId: ctx.traceId,
-              generationId: ctx.id,
+        const session = await withTimeout(
+          getOrCreateSession(
+            {
               conversationId: ctx.conversationId,
               userId: ctx.userId,
+              anthropicApiKey: env.ANTHROPIC_API_KEY,
+              integrationEnvs: filteredCliEnv,
             },
-            onLifecycle: (stage, details) => {
-              const status = `agent_init_${stage}`;
-              this.broadcast(ctx, { type: "status_change", status });
-              const lifecycleEvent = status.toUpperCase();
-              logServerEvent(
-                "info",
-                lifecycleEvent,
-                details ?? {},
-                {
-                  source: "generation-manager",
-                  traceId: ctx.traceId,
-                  generationId: ctx.id,
-                  conversationId: ctx.conversationId,
-                  userId: ctx.userId,
-                }
-              );
-            },
-          }
+            {
+              title: conv?.title || "Conversation",
+              replayHistory: hasExistingMessages,
+              telemetry: {
+                source: "generation-manager",
+                traceId: ctx.traceId,
+                generationId: ctx.id,
+                conversationId: ctx.conversationId,
+                userId: ctx.userId,
+              },
+              onLifecycle: (stage, details) => {
+                const status = `agent_init_${stage}`;
+                this.broadcast(ctx, { type: "status_change", status });
+                const lifecycleEvent = status.toUpperCase();
+                logServerEvent(
+                  "info",
+                  lifecycleEvent,
+                  details ?? {},
+                  {
+                    source: "generation-manager",
+                    traceId: ctx.traceId,
+                    generationId: ctx.id,
+                    conversationId: ctx.conversationId,
+                    userId: ctx.userId,
+                  }
+                );
+              },
+            }
+          ),
+          AGENT_PREPARING_TIMEOUT_MS,
+          `Agent preparation timed out after ${Math.round(AGENT_PREPARING_TIMEOUT_MS / 1000)} seconds.`
         );
         client = session.client;
         sessionId = session.sessionId;

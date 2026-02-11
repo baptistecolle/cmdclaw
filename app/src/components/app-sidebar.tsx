@@ -220,6 +220,7 @@ export function AppSidebar() {
         {/* Logo */}
         <Link
           href="/chat"
+          prefetch={false}
           className="mb-4 flex h-9 w-9 items-center justify-center"
         >
           <Image
@@ -240,6 +241,7 @@ export function AppSidebar() {
                 <TooltipTrigger asChild>
                   <Link
                     href={item.href}
+                    prefetch={false}
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
                       active
@@ -275,6 +277,7 @@ export function AppSidebar() {
               <TooltipTrigger asChild>
                 <Link
                   href="/admin"
+                  prefetch={false}
                   className={cn(
                     "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
                     isActive("/admin")
@@ -313,7 +316,7 @@ export function AppSidebar() {
               </>
             )}
             <DropdownMenuItem asChild>
-              <Link href="/settings" className="flex items-center gap-2">
+              <Link href="/settings" prefetch={false} className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>
               </Link>
@@ -328,7 +331,7 @@ export function AppSidebar() {
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem asChild>
-                <Link href="/login" className="flex items-center gap-2">
+                <Link href="/login" prefetch={false} className="flex items-center gap-2">
                   <LogOut className="h-4 w-4" />
                   <span>Log in</span>
                 </Link>

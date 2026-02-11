@@ -2,32 +2,113 @@ import { parseArgs } from "util";
 import { readFile, access } from "fs/promises";
 import { constants } from "fs";
 
-const TOKEN = process.env.SLACK_ACCESS_TOKEN;
-if (!TOKEN) {
-  console.error("Error: SLACK_ACCESS_TOKEN environment variable required");
-  process.exit(1);
+const RELAY_URL =
+  process.env.SLACK_BOT_RELAY_URL ||
+  (process.env.APP_URL
+    ? `${process.env.APP_URL.replace(/\/$/, "")}/api/internal/slack/post-as-bot`
+    : undefined);
+const RELAY_SECRET = process.env.SLACK_BOT_RELAY_SECRET;
+
+function getUserToken(): string {
+  const token = process.env.SLACK_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error(
+      "SLACK_ACCESS_TOKEN environment variable required for this command"
+    );
+  }
+  return token;
 }
 
-const headers = { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" };
-
 async function api(method: string, body?: Record<string, unknown>) {
+  const token = getUserToken();
   const res = await fetch(`https://slack.com/api/${method}`, {
-    method: "POST", headers, body: body ? JSON.stringify(body) : undefined,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json();
   if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
   return data;
 }
 
+async function getTokenIdentity(): Promise<{
+  userId?: string;
+  botId?: string;
+  team?: string;
+  isBotToken: boolean;
+}> {
+  const token = getUserToken();
+  const res = await fetch("https://slack.com/api/auth.test", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
+  }
+  return {
+    userId: typeof data.user_id === "string" ? data.user_id : undefined,
+    botId: typeof data.bot_id === "string" ? data.bot_id : undefined,
+    team: typeof data.team === "string" ? data.team : undefined,
+    isBotToken: typeof data.bot_id === "string",
+  };
+}
+
 async function apiFormData(method: string, formData: FormData) {
+  const token = getUserToken();
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${TOKEN}` },
+    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
   const data = await res.json();
   if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
   return data;
+}
+
+async function postAsBot(
+  channel: string,
+  text: string,
+  threadTs?: string
+): Promise<{ channel?: string; ts?: string }> {
+  if (!RELAY_URL) {
+    throw new Error("SLACK_BOT_RELAY_URL or APP_URL is required for --as bot");
+  }
+  if (!RELAY_SECRET) {
+    throw new Error("SLACK_BOT_RELAY_SECRET is required for --as bot");
+  }
+
+  const res = await fetch(RELAY_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RELAY_SECRET}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      channel,
+      text,
+      threadTs,
+      conversationId: process.env.CONVERSATION_ID,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({} as Record<string, unknown>));
+  if (!res.ok || !data.ok) {
+    throw new Error(
+      `Slack relay error: ${String(data.error ?? `HTTP ${res.status}`)}`
+    );
+  }
+
+  return {
+    channel: typeof data.channel === "string" ? data.channel : undefined,
+    ts: typeof data.ts === "string" ? data.ts : undefined,
+  };
 }
 
 const { positionals, values } = parseArgs({
@@ -50,6 +131,7 @@ const { positionals, values } = parseArgs({
     file: { type: "string", short: "f" },
     filename: { type: "string" },
     title: { type: "string" },
+    as: { type: "string" },
   },
 });
 
@@ -87,16 +169,60 @@ async function getHistory() {
 }
 
 async function sendMessage() {
-  if (!values.channel || !values.text) {
-    console.error("Required: --channel <channelId> --text <message> [--thread <ts>]");
+  const actor = values.as;
+  if (!values.channel || !values.text || !actor) {
+    console.error(
+      "Required: --channel <channelId> --text <message> --as <user|bot> [--thread <ts>]"
+    );
+    process.exit(1);
+  }
+
+  if (actor !== "user" && actor !== "bot") {
+    console.error("Invalid --as value. Use --as user or --as bot");
     process.exit(1);
   }
 
   const body: Record<string, unknown> = { channel: values.channel, text: values.text };
   if (values.thread) body.thread_ts = values.thread;
 
-  const data = await api("chat.postMessage", body);
-  console.log(`Message sent to ${data.channel} at ${data.ts}`);
+  if (actor === "bot") {
+    try {
+      const data = await postAsBot(
+        values.channel,
+        values.text,
+        values.thread
+      );
+      console.log(`Bot message sent to ${data.channel || values.channel} at ${data.ts || "unknown ts"}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("not_in_channel")) {
+        throw new Error(
+          "Bot is not in that channel. Invite the Slack app to the channel, or send with --as user."
+        );
+      }
+      throw error;
+    }
+    return;
+  }
+
+  try {
+    const data = await api("chat.postMessage", body);
+    console.log(`User message sent to ${data.channel} at ${data.ts}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("not_in_channel")) {
+      const identity = await getTokenIdentity().catch(() => null);
+      if (identity?.isBotToken) {
+        throw new Error(
+          `--as user was selected, but SLACK_ACCESS_TOKEN is a bot token (bot_id=${identity.botId ?? "unknown"}). Reconnect Slack integration to refresh a user token, or use --as bot.`
+        );
+      }
+      throw new Error(
+        "Slack returned not_in_channel for your user token. Join the target channel with that Slack user and retry."
+      );
+    }
+    throw error;
+  }
 }
 
 async function searchMessages() {
@@ -261,7 +387,7 @@ function showHelp() {
   channels [-l limit]                                   List channels
   history -c <channelId> [-l limit]                     Get channel messages
   recent [-l limit] [-q filter]                         Get latest messages across all channels
-  send -c <channelId> -t <text> [--thread <ts>]         Send message
+  send -c <channelId> -t <text> --as <user|bot> [--thread <ts>]  Send message
   search -q <query> [-l limit]                          Search messages
   users [-l limit]                                      List users
   user -u <userId>                                      Get user info
@@ -270,6 +396,7 @@ function showHelp() {
   upload -c <channelId> -f <path> [--filename] [--title] [--text] [--thread]  Upload file
 
 Options:
+  --as <user|bot>                                      Required for send command
   -h, --help                                            Show this help message`);
 }
 

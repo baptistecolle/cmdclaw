@@ -238,6 +238,13 @@ function parseBashCommand(
   return { integration, operation };
 }
 
+function commandUsesSlackBotRelay(command: string): boolean {
+  const trimmed = command.trim();
+  if (!trimmed.startsWith("slack ")) return false;
+  if (!/\bsend\b/.test(trimmed)) return false;
+  return /\s--as\s+bot(?:\s|$)/.test(trimmed);
+}
+
 /**
  * Check if an operation requires approval (is a write operation)
  */
@@ -391,6 +398,19 @@ export const IntegrationPermissionsPlugin = async () => {
       if (!hasToken && integration.startsWith("custom-")) {
         const slug = integration.replace("custom-", "").toUpperCase().replace(/-/g, "_");
         hasToken = !!(process.env[`${slug}_ACCESS_TOKEN`] || process.env[`${slug}_API_KEY`]);
+      }
+
+      // slack send --as bot can use relay without a Slack user token
+      if (
+        !hasToken &&
+        integration === "slack" &&
+        operation === "send" &&
+        commandUsesSlackBotRelay(command) &&
+        !!process.env.SLACK_BOT_RELAY_SECRET &&
+        !!(process.env.SLACK_BOT_RELAY_URL || process.env.APP_URL)
+      ) {
+        hasToken = true;
+        console.log("[Plugin] Slack bot relay mode detected, skipping Slack user auth");
       }
 
       if (!hasToken) {
