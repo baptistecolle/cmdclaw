@@ -1,5 +1,6 @@
-// @ts-nocheck
 import { parseArgs } from "util";
+
+type JsonValue = ReturnType<typeof JSON.parse>;
 
 const TOKEN = process.env.NOTION_ACCESS_TOKEN;
 if (!TOKEN) {
@@ -30,7 +31,7 @@ const { positionals, values } = parseArgs({
 const [command, ...args] = positionals;
 
 async function search() {
-  const body: Record<string, unknown> = {
+  const body: Record<string, JsonValue> = {
     query: values.query || "",
     page_size: parseInt(values.limit || "10"),
   };
@@ -45,8 +46,8 @@ async function search() {
   });
   if (!res.ok) throw new Error(await res.text());
 
-  const { results } = await res.json();
-  const items = results.map((item: Record<string, unknown>) => ({
+  const { results = [] } = (await res.json()) as { results?: Record<string, JsonValue>[] };
+  const items = results.map((item: Record<string, JsonValue>) => ({
     id: item.id,
     type: item.object,
     title:
@@ -70,12 +71,14 @@ async function getPage(pageId: string) {
   ]);
 
   if (!pageRes.ok) throw new Error(await pageRes.text());
-  const page = await pageRes.json();
-  const blocks = blocksRes.ok ? (await blocksRes.json()).results : [];
+  const page = (await pageRes.json()) as Record<string, JsonValue>;
+  const blocks = blocksRes.ok
+    ? (((await blocksRes.json()) as { results?: Record<string, JsonValue>[] }).results ?? [])
+    : [];
 
-  const content = blocks.map((b: Record<string, unknown>) => ({
+  const content = blocks.map((b: Record<string, JsonValue>) => ({
     type: b.type,
-    text: b[b.type]?.rich_text?.map((t: Record<string, unknown>) => t.plain_text).join("") || "",
+    text: b[b.type]?.rich_text?.map((t: Record<string, JsonValue>) => t.plain_text).join("") || "",
   }));
 
   console.log(
@@ -116,7 +119,7 @@ async function createPage() {
   });
 
   if (!res.ok) throw new Error(await res.text());
-  const page = await res.json();
+  const page = (await res.json()) as { url?: string };
   console.log(`Page created: ${page.url}`);
 }
 
@@ -153,9 +156,9 @@ async function listDatabases() {
   });
 
   if (!res.ok) throw new Error(await res.text());
-  const { results } = await res.json();
+  const { results = [] } = (await res.json()) as { results?: Record<string, JsonValue>[] };
 
-  const dbs = results.map((db: Record<string, unknown>) => ({
+  const dbs = results.map((db: Record<string, JsonValue>) => ({
     id: db.id,
     title: db.title?.[0]?.plain_text || "Untitled",
     url: db.url,
@@ -173,12 +176,14 @@ async function queryDatabase(databaseId: string) {
   });
 
   if (!res.ok) throw new Error(await res.text());
-  const { results } = await res.json();
+  const { results = [] } = (await res.json()) as { results?: Record<string, JsonValue>[] };
 
-  const entries = results.map((page: Record<string, unknown>) => {
-    const props: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(page.properties)) {
-      const p = value as unknown;
+  const entries = results.map((page: Record<string, JsonValue>) => {
+    const props: Record<string, JsonValue> = {};
+    for (const [key, value] of Object.entries(
+      (page.properties ?? {}) as Record<string, JsonValue>,
+    )) {
+      const p = value as Record<string, JsonValue>;
       if (p.title) props[key] = p.title?.[0]?.plain_text || "";
       else if (p.rich_text) props[key] = p.rich_text?.[0]?.plain_text || "";
       else if (p.number !== undefined) props[key] = p.number;

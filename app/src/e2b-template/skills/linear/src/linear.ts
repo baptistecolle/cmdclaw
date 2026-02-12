@@ -1,5 +1,6 @@
-// @ts-nocheck
 import { parseArgs } from "util";
+
+type JsonValue = ReturnType<typeof JSON.parse>;
 
 const TOKEN = process.env.LINEAR_ACCESS_TOKEN;
 if (!TOKEN) {
@@ -9,7 +10,7 @@ if (!TOKEN) {
 
 const headers = { Authorization: TOKEN, "Content-Type": "application/json" };
 
-async function graphql<T>(query: string, variables?: Record<string, unknown>) {
+async function graphql<T = JsonValue>(query: string, variables?: Record<string, JsonValue>) {
   const res = await fetch("https://api.linear.app/graphql", {
     method: "POST",
     headers,
@@ -103,7 +104,7 @@ async function createIssue() {
   );
   if (!teamData.teams.nodes.length) throw new Error(`Team ${values.team} not found`);
 
-  const input: Record<string, unknown> = {
+  const input: Record<string, JsonValue> = {
     teamId: teamData.teams.nodes[0].id,
     title: values.title,
   };
@@ -145,7 +146,7 @@ async function updateIssue(identifier: string) {
   }`);
   if (!issueData.issues.nodes.length) throw new Error(`Issue ${identifier} not found`);
 
-  const input: Record<string, unknown> = {};
+  const input: Record<string, JsonValue> = {};
   if (values.title) input.title = values.title;
   if (values.description) input.description = values.description;
   if (values.priority) input.priority = parseInt(values.priority);

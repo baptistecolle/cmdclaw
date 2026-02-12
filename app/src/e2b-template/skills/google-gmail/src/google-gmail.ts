@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { parseArgs } from "util";
 
 const TOKEN = process.env.GMAIL_ACCESS_TOKEN;
@@ -107,7 +106,7 @@ async function getEmail(messageId: string) {
         from: getHeader("From"),
         to: getHeader("To"),
         date: getHeader("Date"),
-        body: extractBody(email.payload).slice(0, 10000),
+        body: extractBody(email.payload ?? {}).slice(0, 10000),
       },
       null,
       2,

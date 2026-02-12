@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { parseArgs } from "util";
 import { writeFile, mkdir, readFile, access } from "fs/promises";
 import { dirname } from "path";
@@ -119,10 +118,13 @@ async function downloadFile(fileId: string) {
   const metaRes = await fetch(`${DRIVE_URL}/files/${fileId}?fields=name,mimeType`, { headers });
   if (!metaRes.ok) throw new Error(await metaRes.text());
   const meta = (await metaRes.json()) as { name?: string; mimeType?: string };
+  if (!meta.mimeType) {
+    throw new Error("File metadata response missing mimeType");
+  }
 
   const isGoogleType = meta.mimeType.startsWith("application/vnd.google-apps.");
   let downloadUrl: string;
-  let fileName = values.output || meta.name;
+  let fileName = values.output || meta.name || fileId;
 
   if (isGoogleType) {
     const exportConfig = EXPORT_MIMES[meta.mimeType];
@@ -164,8 +166,8 @@ async function searchFiles() {
   const res = await fetch(`${DRIVE_URL}/files?${params}`, { headers });
   if (!res.ok) throw new Error(await res.text());
 
-  const { files = [] } = await res.json();
-  const items = files.map((f: Record<string, unknown>) => ({
+  const { files = [] } = (await res.json()) as { files?: DriveFile[] };
+  const items = files.map((f) => ({
     id: f.id,
     name: f.name,
     mimeType: f.mimeType,

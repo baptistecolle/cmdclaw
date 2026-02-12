@@ -1,5 +1,6 @@
-// @ts-nocheck
 import { parseArgs } from "util";
+
+type JsonValue = ReturnType<typeof JSON.parse>;
 
 const TOKEN = process.env.REDDIT_ACCESS_TOKEN;
 if (!TOKEN) {
@@ -14,13 +15,13 @@ const headers = {
   "User-Agent": USER_AGENT,
 };
 
-async function api(path: string, options?: RequestInit) {
+async function api<T = JsonValue>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`https://oauth.reddit.com${path}`, {
     ...options,
     headers: { ...headers, ...options?.headers },
   });
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  return res.json();
+  return (await res.json()) as T;
 }
 
 const { positionals, values } = parseArgs({
@@ -43,7 +44,7 @@ const { positionals, values } = parseArgs({
 const [command, ...args] = positionals;
 
 // Helper to format post data
-function formatPost(post: Record<string, unknown>) {
+function formatPost(post: Record<string, JsonValue>) {
   const data = post.data || post;
   return {
     id: data.name || `t3_${data.id}`,
@@ -63,7 +64,7 @@ function formatPost(post: Record<string, unknown>) {
 }
 
 // Helper to format comment data
-function formatComment(comment: Record<string, unknown>): unknown {
+function formatComment(comment: Record<string, JsonValue>): unknown {
   const data = comment.data || comment;
   if (data.kind === "more" || !data.body) return null;
   return {
@@ -132,7 +133,7 @@ async function getUser(username: string) {
         },
         created: new Date(userData.created_utc * 1000).toISOString(),
         recentPosts: posts.data.children.map(formatPost),
-        recentComments: comments.data.children.map((c: Record<string, unknown>) => ({
+        recentComments: comments.data.children.map((c: Record<string, JsonValue>) => ({
           id: c.data.name,
           body: c.data.body?.substring(0, 200),
           subreddit: c.data.subreddit,
@@ -366,7 +367,7 @@ async function inbox() {
   const limit = values.limit || "25";
   const data = await api(`/message/inbox?limit=${limit}`);
 
-  const messages = data.data.children.map((m: Record<string, unknown>) => ({
+  const messages = data.data.children.map((m: Record<string, JsonValue>) => ({
     id: m.data.name,
     author: m.data.author,
     subject: m.data.subject,
@@ -413,7 +414,7 @@ async function subscriptions() {
   const limit = values.limit || "100";
   const data = await api(`/subreddits/mine/subscriber?limit=${limit}`);
 
-  const subs = data.data.children.map((s: Record<string, unknown>) => ({
+  const subs = data.data.children.map((s: Record<string, JsonValue>) => ({
     name: s.data.display_name,
     title: s.data.title,
     subscribers: s.data.subscribers,

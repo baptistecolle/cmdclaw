@@ -14,7 +14,8 @@
   "rules": {
     "jest/no-conditional-expect": "off",
     "no-empty-pattern": "off",
-    "no-useless-escape": "off"
+    "no-useless-escape": "off",
+    "typescript/no-explicit-any": "error"
   },
   "ignorePatterns": [
     ".next/**",

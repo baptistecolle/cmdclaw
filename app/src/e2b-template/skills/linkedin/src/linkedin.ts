@@ -1,5 +1,6 @@
-// @ts-nocheck
 import { parseArgs } from "util";
+
+type JsonValue = ReturnType<typeof JSON.parse>;
 
 const UNIPILE_API_KEY = process.env.UNIPILE_API_KEY;
 const UNIPILE_DSN = process.env.UNIPILE_DSN;
@@ -17,7 +18,7 @@ const headers = {
   Accept: "application/json",
 };
 
-async function api(endpoint: string, options?: RequestInit) {
+async function api<T = JsonValue>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = endpoint.startsWith("http") ? endpoint : `${BASE_URL}${endpoint}`;
   const res = await fetch(url, {
     ...options,
@@ -29,7 +30,7 @@ async function api(endpoint: string, options?: RequestInit) {
     throw new Error(`Unipile API Error (${res.status}): ${error}`);
   }
 
-  return res.json();
+  return (await res.json()) as T;
 }
 
 const { positionals, values } = parseArgs({
@@ -62,9 +63,9 @@ async function listChats() {
 
   const data = await api(`/chats?${params}`);
   const chats =
-    data.items?.map((c: Record<string, unknown>) => ({
+    data.items?.map((c: Record<string, JsonValue>) => ({
       id: c.id,
-      attendees: c.attendees?.map((a: Record<string, unknown>) => ({
+      attendees: c.attendees?.map((a: Record<string, JsonValue>) => ({
         id: a.provider_id,
         name: a.display_name,
       })),
@@ -82,7 +83,7 @@ async function getChat(chatId: string) {
     JSON.stringify(
       {
         id: data.id,
-        attendees: data.attendees?.map((a: Record<string, unknown>) => ({
+        attendees: data.attendees?.map((a: Record<string, JsonValue>) => ({
           id: a.provider_id,
           name: a.display_name,
           headline: a.headline,
@@ -107,7 +108,7 @@ async function listMessages(chatId: string) {
 
   const data = await api(`/chats/${chatId}/messages?${params}`);
   const messages =
-    data.items?.map((m: Record<string, unknown>) => ({
+    data.items?.map((m: Record<string, JsonValue>) => ({
       id: m.id,
       text: m.text,
       sender: m.sender?.display_name,
@@ -217,7 +218,7 @@ async function searchUsers(query: string) {
   });
 
   const users =
-    data.items?.map((u: Record<string, unknown>) => ({
+    data.items?.map((u: Record<string, JsonValue>) => ({
       id: u.provider_id,
       name: u.display_name,
       headline: u.headline,
@@ -231,7 +232,7 @@ async function searchUsers(query: string) {
 // ========== INVITATIONS & CONNECTIONS ==========
 
 async function sendInvitation(profileId: string, message?: string) {
-  const body: Record<string, unknown> = {
+  const body: Record<string, JsonValue> = {
     account_id: LINKEDIN_ACCOUNT_ID,
     provider_id: profileId,
   };
@@ -251,7 +252,7 @@ async function listPendingInvitations() {
   const data = await api(`/users/invitations?account_id=${LINKEDIN_ACCOUNT_ID}&limit=${limit}`);
 
   const invitations =
-    data.items?.map((i: Record<string, unknown>) => ({
+    data.items?.map((i: Record<string, JsonValue>) => ({
       id: i.provider_id,
       name: i.display_name,
       headline: i.headline,
@@ -273,7 +274,7 @@ async function listConnections() {
   const data = await api(`/users/relations?${params}`);
 
   const connections =
-    data.items?.map((c: Record<string, unknown>) => ({
+    data.items?.map((c: Record<string, JsonValue>) => ({
       id: c.provider_id,
       name: c.display_name,
       headline: c.headline,
@@ -340,7 +341,7 @@ async function listPosts(profileId?: string) {
   const data = await api(`/posts?${params}`);
 
   const posts =
-    data.items?.map((p: Record<string, unknown>) => ({
+    data.items?.map((p: Record<string, JsonValue>) => ({
       id: p.id,
       text: p.text?.substring(0, 200),
       author: p.author?.display_name,
@@ -387,7 +388,7 @@ async function listCompanyPosts(companyId: string) {
   const data = await api(`/companies/${companyId}/posts?${params}`);
 
   const posts =
-    data.items?.map((p: Record<string, unknown>) => ({
+    data.items?.map((p: Record<string, JsonValue>) => ({
       id: p.id,
       text: p.text?.substring(0, 200),
       likesCount: p.likes_count,

@@ -1,7 +1,8 @@
-// @ts-nocheck
 import { parseArgs } from "util";
 import { readFile, access } from "fs/promises";
 import { constants } from "fs";
+
+type JsonValue = ReturnType<typeof JSON.parse>;
 
 const RELAY_URL =
   process.env.SLACK_BOT_RELAY_URL ||
@@ -18,7 +19,7 @@ function getUserToken(): string {
   return token;
 }
 
-async function api(method: string, body?: Record<string, unknown>) {
+async function api<T = JsonValue>(method: string, body?: Record<string, JsonValue>): Promise<T> {
   const token = getUserToken();
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: "POST",
@@ -28,9 +29,9 @@ async function api(method: string, body?: Record<string, unknown>) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const data = await res.json();
+  const data = (await res.json()) as Record<string, JsonValue>;
   if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
-  return data;
+  return data as T;
 }
 
 async function getTokenIdentity(): Promise<{
@@ -47,7 +48,7 @@ async function getTokenIdentity(): Promise<{
       "Content-Type": "application/json",
     },
   });
-  const data = await res.json();
+  const data = (await res.json()) as Record<string, JsonValue>;
   if (!data.ok) {
     throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
   }
@@ -59,16 +60,16 @@ async function getTokenIdentity(): Promise<{
   };
 }
 
-async function apiFormData(method: string, formData: FormData) {
+async function apiFormData<T = JsonValue>(method: string, formData: FormData): Promise<T> {
   const token = getUserToken();
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
-  const data = await res.json();
+  const data = (await res.json()) as Record<string, JsonValue>;
   if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
-  return data;
+  return data as T;
 }
 
 async function postAsBot(
@@ -97,7 +98,7 @@ async function postAsBot(
     }),
   });
 
-  const data = await res.json().catch(() => ({}) as Record<string, unknown>);
+  const data = await res.json().catch(() => ({}) as Record<string, JsonValue>);
   if (!res.ok || !data.ok) {
     throw new Error(`Slack relay error: ${String(data.error ?? `HTTP ${res.status}`)}`);
   }
@@ -141,7 +142,7 @@ async function listChannels() {
     exclude_archived: true,
   });
 
-  const channels = data.channels.map((ch: Record<string, unknown>) => ({
+  const channels = data.channels.map((ch: Record<string, JsonValue>) => ({
     id: ch.id,
     name: ch.name,
     private: ch.is_private,
@@ -163,7 +164,7 @@ async function getHistory() {
     limit: parseInt(values.limit || "20"),
   });
 
-  const messages = data.messages.map((m: Record<string, unknown>) => ({
+  const messages = data.messages.map((m: Record<string, JsonValue>) => ({
     ts: m.ts,
     user: m.user,
     text: m.text,
@@ -188,7 +189,7 @@ async function sendMessage() {
     process.exit(1);
   }
 
-  const body: Record<string, unknown> = {
+  const body: Record<string, JsonValue> = {
     channel: values.channel,
     text: values.text,
   };
@@ -245,7 +246,7 @@ async function searchMessages() {
     sort_dir: "desc",
   });
 
-  const messages = data.messages.matches.map((m: Record<string, unknown>) => ({
+  const messages = data.messages.matches.map((m: Record<string, JsonValue>) => ({
     text: m.text,
     user: m.user,
     channel: m.channel?.name,
@@ -270,7 +271,7 @@ async function getRecentMessages() {
     sort_dir: "desc",
   });
 
-  const messages = data.messages.matches.map((m: Record<string, unknown>) => ({
+  const messages = data.messages.matches.map((m: Record<string, JsonValue>) => ({
     ts: m.ts,
     user: m.user,
     username: m.username,
@@ -291,8 +292,8 @@ async function listUsers() {
   });
 
   const users = data.members
-    .filter((u: Record<string, unknown>) => !u.deleted && !u.is_bot)
-    .map((u: Record<string, unknown>) => ({
+    .filter((u: Record<string, JsonValue>) => !u.deleted && !u.is_bot)
+    .map((u: Record<string, JsonValue>) => ({
       id: u.id,
       name: u.name,
       realName: u.real_name,
@@ -339,7 +340,7 @@ async function getThread() {
     ts: values.thread,
   });
 
-  const messages = data.messages.map((m: Record<string, unknown>) => ({
+  const messages = data.messages.map((m: Record<string, JsonValue>) => ({
     ts: m.ts,
     user: m.user,
     text: m.text,

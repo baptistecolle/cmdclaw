@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_DOCS_ACCESS_TOKEN;
