@@ -1,0 +1,25 @@
+{
+  "plugins": [
+    "typescript",
+    "oxc",
+    "unicorn",
+    "react",
+    "import",
+    "vitest",
+    "nextjs"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "jest/no-conditional-expect": "off",
+    "no-empty-pattern": "off",
+    "no-useless-escape": "off"
+  },
+  "ignorePatterns": [
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts"
+  ]
+}
