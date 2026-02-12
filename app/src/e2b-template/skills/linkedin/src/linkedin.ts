@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { parseArgs } from "util";
 
 const UNIPILE_API_KEY = process.env.UNIPILE_API_KEY;

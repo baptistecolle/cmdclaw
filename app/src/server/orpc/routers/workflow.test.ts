@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 function createProcedureStub() {
-  const stub: unknown = {
-    input: vi.fn(() => stub),
-    output: vi.fn(() => stub),
+  const stub = {
+    input: vi.fn(),
+    output: vi.fn(),
     handler: vi.fn((fn: unknown) => fn),
   };
+  stub.input.mockReturnValue(stub);
+  stub.output.mockReturnValue(stub);
   return stub;
 }
 
@@ -39,7 +41,10 @@ vi.mock("@/server/utils/generate-workflow-name", () => ({
 }));
 
 import { workflowRouter } from "./workflow";
-const workflowRouterAny = workflowRouter as unknown;
+const workflowRouterAny = workflowRouter as unknown as Record<
+  string,
+  (args: unknown) => Promise<unknown>
+>;
 
 function createContext() {
   const insertReturningMock = vi.fn();
@@ -55,7 +60,7 @@ function createContext() {
   const deleteWhereMock = vi.fn(() => ({ returning: deleteReturningMock }));
   const deleteMock = vi.fn(() => ({ where: deleteWhereMock }));
 
-  const context: unknown = {
+  const context = {
     user: { id: "user-1" },
     db: {
       query: {
@@ -357,7 +362,7 @@ describe("workflowRouter", () => {
       },
     ]);
 
-    const result = await workflowRouterAny.create({
+    const result = (await workflowRouterAny.create({
       input: {
         triggerType: "manual",
         prompt: "First sentence for fallback. second sentence",
@@ -366,7 +371,7 @@ describe("workflowRouter", () => {
         allowedCustomIntegrations: [],
       },
       context,
-    });
+    })) as { name: string };
 
     expect(result.name).toBe("First sentence for fallback");
     expect(context.mocks.insertValuesMock).toHaveBeenCalledWith(
@@ -925,10 +930,10 @@ describe("workflowRouter", () => {
     });
     context.db.query.workflowRunEvent.findMany.mockResolvedValue([]);
 
-    const result = await workflowRouterAny.getRun({
+    const result = (await workflowRouterAny.getRun({
       input: { id: "run-2" },
       context,
-    });
+    })) as { conversationId: string | null };
 
     expect(result.conversationId).toBeNull();
     expect(context.db.query.generation.findFirst).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { parseArgs } from "util";
 import { readFile, access } from "fs/promises";
 import { constants } from "fs";

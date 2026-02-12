@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 function createProcedureStub() {
-  const stub: unknown = {
-    input: vi.fn(() => stub),
-    output: vi.fn(() => stub),
+  const stub = {
+    input: vi.fn(),
+    output: vi.fn(),
     handler: vi.fn((fn: unknown) => fn),
   };
+  stub.input.mockReturnValue(stub);
+  stub.output.mockReturnValue(stub);
   return stub;
 }
 
@@ -45,7 +47,10 @@ vi.mock("@/server/lib/encryption", () => ({
 }));
 
 import { integrationRouter } from "./integration";
-const integrationRouterAny = integrationRouter as unknown;
+const integrationRouterAny = integrationRouter as unknown as Record<
+  string,
+  (args: unknown) => Promise<unknown>
+>;
 
 function encodeState(state: Record<string, unknown>) {
   return Buffer.from(JSON.stringify(state)).toString("base64url");
@@ -99,7 +104,7 @@ function createContext() {
       deleteWhereMock,
       deleteReturningMock,
     },
-  } as unknown;
+  };
 }
 
 describe("integrationRouter", () => {
@@ -163,34 +168,34 @@ describe("integrationRouter", () => {
   it("builds provider-specific auth URL params (slack user_scope, reddit duration, PKCE)", async () => {
     const context = createContext();
 
-    const slack = await integrationRouterAny.getAuthUrl({
+    const slack = (await integrationRouterAny.getAuthUrl({
       input: {
         type: "slack",
         redirectUrl: "https://app.example.com/integrations",
       },
       context,
-    });
+    })) as { authUrl: string };
     const slackUrl = new URL(slack.authUrl);
     expect(slackUrl.searchParams.get("user_scope")).toBe("scope:read scope:write");
     expect(slackUrl.searchParams.get("scope")).toBeNull();
 
-    const reddit = await integrationRouterAny.getAuthUrl({
+    const reddit = (await integrationRouterAny.getAuthUrl({
       input: {
         type: "reddit",
         redirectUrl: "https://app.example.com/integrations",
       },
       context,
-    });
+    })) as { authUrl: string };
     const redditUrl = new URL(reddit.authUrl);
     expect(redditUrl.searchParams.get("duration")).toBe("permanent");
 
-    const airtable = await integrationRouterAny.getAuthUrl({
+    const airtable = (await integrationRouterAny.getAuthUrl({
       input: {
         type: "airtable",
         redirectUrl: "https://app.example.com/integrations",
       },
       context,
-    });
+    })) as { authUrl: string };
     const airtableUrl = new URL(airtable.authUrl);
     expect(airtableUrl.searchParams.get("code_challenge")).toBeTruthy();
     expect(airtableUrl.searchParams.get("code_challenge_method")).toBe("S256");
@@ -217,24 +222,24 @@ describe("integrationRouter", () => {
   it("adds google and notion-specific auth params", async () => {
     const context = createContext();
 
-    const google = await integrationRouterAny.getAuthUrl({
+    const google = (await integrationRouterAny.getAuthUrl({
       input: {
         type: "gmail",
         redirectUrl: "https://app.example.com/integrations",
       },
       context,
-    });
+    })) as { authUrl: string };
     const googleUrl = new URL(google.authUrl);
     expect(googleUrl.searchParams.get("access_type")).toBe("offline");
     expect(googleUrl.searchParams.get("prompt")).toBe("consent");
 
-    const notion = await integrationRouterAny.getAuthUrl({
+    const notion = (await integrationRouterAny.getAuthUrl({
       input: {
         type: "notion",
         redirectUrl: "https://app.example.com/integrations",
       },
       context,
-    });
+    })) as { authUrl: string };
     const notionUrl = new URL(notion.authUrl);
     expect(notionUrl.searchParams.get("owner")).toBe("user");
   });
@@ -844,13 +849,13 @@ describe("integrationRouter", () => {
         clientSecret: "enc:my-client-secret",
       });
 
-    const authUrlResult = await integrationRouterAny.getCustomAuthUrl({
+    const authUrlResult = (await integrationRouterAny.getCustomAuthUrl({
       input: {
         slug: "my-custom",
         redirectUrl: "https://app.example.com/integrations/custom",
       },
       context,
-    });
+    })) as { authUrl: string };
 
     const customAuthUrl = new URL(authUrlResult.authUrl);
     expect(customAuthUrl.searchParams.get("client_id")).toBe("my-client-id");
@@ -1026,13 +1031,13 @@ describe("integrationRouter", () => {
       clientId: "enc:client-id",
     });
 
-    const result = await integrationRouterAny.getCustomAuthUrl({
+    const result = (await integrationRouterAny.getCustomAuthUrl({
       input: {
         slug: "my-custom",
         redirectUrl: "https://app.example.com/custom",
       },
       context,
-    });
+    })) as { authUrl: string };
 
     const authUrl = new URL(result.authUrl);
     expect(authUrl.searchParams.get("audience")).toBe("users");

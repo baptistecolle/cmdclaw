@@ -160,7 +160,12 @@ type GenerationCtx = {
   subscribers: Map<string, { id: string; callback: (event: unknown) => void }>;
   abortController: AbortController;
   pendingApproval: unknown;
-  pendingAuth: unknown;
+  pendingAuth: {
+    integrations?: string[];
+    connectedIntegrations?: string[];
+    requestedAt?: string;
+    [key: string]: unknown;
+  } | null;
   usage: { inputTokens: number; outputTokens: number; totalCostUsd: number };
   startedAt: Date;
   lastSaveAt: Date;
@@ -172,6 +177,7 @@ type GenerationCtx = {
   pendingMessageParts: Map<string, unknown>;
   backendType: string;
   autoApprove: boolean;
+  uploadedSandboxFileIds?: Set<string>;
   [key: string]: unknown;
 };
 
@@ -179,7 +185,20 @@ type GenerationManagerTestHarness = {
   activeGenerations: Map<string, GenerationCtx>;
   conversationToGeneration: Map<string, string>;
   finishGeneration: (ctx: GenerationCtx, status: string) => Promise<void>;
-  runGeneration: (...args: unknown[]) => Promise<void>;
+  runGeneration: (ctx: GenerationCtx) => Promise<void>;
+  handleSessionReset: (ctx: GenerationCtx) => Promise<void>;
+  runDirectGeneration: (ctx: GenerationCtx) => Promise<void>;
+  runOpenCodeGeneration: (ctx: GenerationCtx) => Promise<void>;
+  buildWorkflowPrompt: (ctx: GenerationCtx) => string | null;
+  getLLMBackend: (...args: unknown[]) => Promise<unknown>;
+  buildMessageHistory: (...args: unknown[]) => Promise<unknown[]>;
+  executeMemoryTool: (...args: unknown[]) => Promise<{ content: string; isError: boolean }>;
+  importIntegrationSkillDraftsFromE2B: (...args: unknown[]) => Promise<void>;
+  processOpencodeEvent: (...args: unknown[]) => Promise<void>;
+  handleOpenCodeActionableEvent: (...args: unknown[]) => Promise<unknown>;
+  importIntegrationSkillDraftsFromSandbox: (...args: unknown[]) => Promise<void>;
+  waitForAuth: (...args: unknown[]) => Promise<{ success: boolean }>;
+  waitForApproval: (...args: unknown[]) => Promise<string>;
 };
 
 function asTestManager(): GenerationManagerTestHarness {
@@ -926,7 +945,11 @@ describe("generationManager transitions", () => {
     expect(ctx.status).toBe("cancelled");
     expect(
       ctx.contentParts.some(
-        (p: unknown) => p.type === "system" && p.content === "Interrupted by user",
+        (p: unknown) =>
+          !!p &&
+          typeof p === "object" &&
+          (p as { type?: unknown }).type === "system" &&
+          (p as { content?: unknown }).content === "Interrupted by user",
       ),
     ).toBe(true);
     expect(callback).toHaveBeenCalledWith({
@@ -1077,13 +1100,13 @@ describe("generationManager transitions", () => {
   });
 
   it("runs OpenCode generation happy path and completes", async () => {
-    (env as unknown).ANTHROPIC_API_KEY = "test-key";
+    Object.defineProperty(env, "ANTHROPIC_API_KEY", { value: "test-key", configurable: true });
 
     vi.mocked(getCliEnvForUser).mockResolvedValue({
       GITHUB_ACCESS_TOKEN: "gh-token",
       SLACK_ACCESS_TOKEN: "slack-token",
-    } as unknown);
-    vi.mocked(getEnabledIntegrationTypes).mockResolvedValue(["github", "slack"] as unknown);
+    });
+    vi.mocked(getEnabledIntegrationTypes).mockResolvedValue(["github", "slack"]);
     vi.mocked(getCliInstructionsWithCustom).mockResolvedValue("cli instructions");
     vi.mocked(writeSkillsToSandbox).mockResolvedValue(["base-skill"]);
     vi.mocked(getSkillsSystemPrompt).mockReturnValue("skills prompt");
@@ -1093,13 +1116,15 @@ describe("generationManager transitions", () => {
     vi.mocked(buildMemorySystemPrompt).mockReturnValue("memory prompt");
     vi.mocked(collectNewE2BFiles).mockResolvedValue([
       { path: "/app/out/report.txt", content: Buffer.from("report") },
-    ] as unknown);
+    ]);
     vi.mocked(uploadSandboxFile).mockResolvedValue({
       id: "sandbox-file-1",
       filename: "report.txt",
       mimeType: "text/plain",
       sizeBytes: 6,
-    } as unknown);
+      path: "/app/out/report.txt",
+      storageKey: "k/report.txt",
+    });
 
     conversationFindFirstMock.mockResolvedValue({
       id: "conv-opencode",
@@ -1112,7 +1137,7 @@ describe("generationManager transitions", () => {
       stream: asAsyncIterable([
         { type: "server.connected", properties: {} },
         { type: "session.idle", properties: {} },
-      ] as unknown[]),
+      ]),
     });
     vi.mocked(getOrCreateSession).mockResolvedValue({
       client: {
@@ -1129,7 +1154,7 @@ describe("generationManager transitions", () => {
           run: vi.fn().mockResolvedValue({}),
         },
       },
-    } as unknown);
+    } as unknown as Awaited<ReturnType<typeof getOrCreateSession>>);
 
     const mgr = asTestManager();
     const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
@@ -1166,26 +1191,34 @@ describe("generationManager transitions", () => {
     expect(promptMock).toHaveBeenCalledTimes(1);
     expect(vi.mocked(uploadSandboxFile)).toHaveBeenCalled();
     expect(finishSpy).toHaveBeenCalledWith(ctx, "completed");
-    expect(ctx.uploadedSandboxFileIds.has("sandbox-file-1")).toBe(true);
+    expect(ctx.uploadedSandboxFileIds?.has("sandbox-file-1")).toBe(true);
   });
 
   it("runs direct generation through multi-tool paths and completes", async () => {
-    vi.mocked(getEnabledIntegrationTypes).mockResolvedValue(["github"] as unknown);
+    vi.mocked(getEnabledIntegrationTypes).mockResolvedValue(["github"]);
     vi.mocked(resolvePreferredCommunitySkillsForUser).mockResolvedValue([
       {
+        source: "community",
         slug: "skill-one",
+        id: "is-1",
+        title: "Skill One",
+        description: "desc",
         files: [
           { path: "README.md", content: "hi" },
           { path: "nested/file.txt", content: "content" },
         ],
+        createdByUserId: "user-1",
       },
-    ] as unknown);
+    ]);
     vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("integration skills prompt");
     vi.mocked(buildMemorySystemPrompt).mockReturnValue("memory prompt");
-    vi.mocked(getDirectModeTools).mockReturnValue([{ name: "bash" }] as unknown);
+    vi.mocked(getDirectModeTools).mockReturnValue([{ name: "bash" }] as ReturnType<
+      typeof getDirectModeTools
+    >);
     vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
     vi.mocked(parseBashCommand).mockImplementation((command) => {
-      if (command === "slack forbidden") return { integration: "slack" } as unknown;
+      if (command === "slack forbidden")
+        return { integration: "slack" } as ReturnType<typeof parseBashCommand>;
       return null;
     });
     vi.mocked(checkToolPermissions).mockImplementation((toolName) => {
@@ -1197,7 +1230,7 @@ describe("generationManager transitions", () => {
           integration: "slack",
           integrationName: "Slack",
           reason: "auth needed",
-        } as unknown;
+        };
       }
       if (toolName === "approve_tool") {
         return {
@@ -1205,13 +1238,13 @@ describe("generationManager transitions", () => {
           needsApproval: true,
           needsAuth: false,
           integration: "github",
-        } as unknown;
+        };
       }
       return {
         allowed: true,
         needsApproval: false,
         needsAuth: false,
-      } as unknown;
+      };
     });
     vi.mocked(readSandboxFileAsBuffer).mockResolvedValue(Buffer.from("file-content"));
     vi.mocked(uploadSandboxFile).mockResolvedValue({
@@ -1219,11 +1252,13 @@ describe("generationManager transitions", () => {
       filename: "report.txt",
       mimeType: "text/plain",
       sizeBytes: 12,
-    } as unknown);
+      path: "/tmp/report.txt",
+      storageKey: "k/report.txt",
+    });
     vi.mocked(toolCallToCommand).mockImplementation((toolName) => {
-      if (toolName === "bash_exec") return { command: "run-ok" } as unknown;
-      if (toolName === "bash_fail") return { command: "run-fail" } as unknown;
-      return null as unknown;
+      if (toolName === "bash_exec") return { command: "run-ok", isWrite: false };
+      if (toolName === "bash_fail") return { command: "run-fail", isWrite: false };
+      return null;
     });
 
     const sandbox = {
@@ -1240,7 +1275,9 @@ describe("generationManager transitions", () => {
       }),
       teardown: vi.fn().mockResolvedValue(undefined),
     };
-    vi.mocked(getSandboxBackend).mockReturnValue(sandbox as unknown);
+    vi.mocked(getSandboxBackend).mockReturnValue(
+      sandbox as unknown as ReturnType<typeof getSandboxBackend>,
+    );
 
     const firstStream = asAsyncIterable([
       { type: "text_delta", text: "Hello " },
@@ -1269,21 +1306,18 @@ describe("generationManager transitions", () => {
       { type: "tool_use_delta", jsonDelta: "{}" },
       { type: "tool_use_end" },
       { type: "usage", inputTokens: 2, outputTokens: 3 },
-    ] as unknown[]);
+    ]);
     const secondStream = asAsyncIterable([
       { type: "text_delta", text: "done" },
       { type: "usage", inputTokens: 1, outputTokens: 1 },
-    ] as unknown[]);
+    ]);
     const llm = {
-      chat: vi
-        .fn()
-        .mockReturnValueOnce(firstStream as unknown)
-        .mockReturnValueOnce(secondStream as unknown),
+      chat: vi.fn().mockReturnValueOnce(firstStream).mockReturnValueOnce(secondStream),
     };
 
     const mgr = asTestManager();
     const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
-    vi.spyOn(mgr, "getLLMBackend").mockResolvedValue(llm as unknown);
+    vi.spyOn(mgr, "getLLMBackend").mockResolvedValue(llm);
     vi.spyOn(mgr, "buildMessageHistory").mockResolvedValue([]);
     vi.spyOn(mgr, "executeMemoryTool").mockResolvedValue({
       content: "memory ok",
@@ -1306,7 +1340,7 @@ describe("generationManager transitions", () => {
 
     expect(finishSpy).toHaveBeenCalledWith(ctx, "completed");
     expect(vi.mocked(uploadSandboxFile)).toHaveBeenCalled();
-    expect(ctx.uploadedSandboxFileIds.has("uploaded-send-file-1")).toBe(true);
+    expect(ctx.uploadedSandboxFileIds?.has("uploaded-send-file-1")).toBe(true);
     expect(ctx.assistantContent).toContain("Hello done");
   });
 });

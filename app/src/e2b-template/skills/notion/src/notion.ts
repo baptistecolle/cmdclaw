@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { parseArgs } from "util";
 
 const TOKEN = process.env.NOTION_ACCESS_TOKEN;

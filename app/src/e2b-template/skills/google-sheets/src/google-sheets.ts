@@ -25,6 +25,14 @@ const { positionals, values } = parseArgs({
 
 const [command, ...args] = positionals;
 
+type SheetInfo = {
+  properties?: {
+    sheetId?: number;
+    title?: string;
+    gridProperties?: { rowCount?: number; columnCount?: number };
+  };
+};
+
 async function getSpreadsheet(spreadsheetId: string) {
   const url = values.range
     ? `${SHEETS_URL}/${spreadsheetId}/values/${encodeURIComponent(values.range)}`
@@ -33,7 +41,14 @@ async function getSpreadsheet(spreadsheetId: string) {
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(await res.text());
 
-  const data = await res.json();
+  const data = (await res.json()) as {
+    spreadsheetId?: string;
+    spreadsheetUrl?: string;
+    range?: string;
+    values?: unknown[][];
+    properties?: { title?: string };
+    sheets?: SheetInfo[];
+  };
 
   if (values.range) {
     console.log(
@@ -53,7 +68,7 @@ async function getSpreadsheet(spreadsheetId: string) {
         {
           spreadsheetId: data.spreadsheetId,
           title: data.properties?.title,
-          sheets: data.sheets?.map((s: Record<string, unknown>) => ({
+          sheets: data.sheets?.map((s) => ({
             sheetId: s.properties?.sheetId,
             title: s.properties?.title,
             rowCount: s.properties?.gridProperties?.rowCount,
@@ -83,7 +98,7 @@ async function createSpreadsheet() {
   });
 
   if (!res.ok) throw new Error(await res.text());
-  const sheet = await res.json();
+  const sheet = (await res.json()) as { spreadsheetUrl?: string };
   console.log(`Spreadsheet created: ${sheet.spreadsheetUrl}`);
 }
 
@@ -111,7 +126,9 @@ async function appendRows(spreadsheetId: string) {
   );
 
   if (!res.ok) throw new Error(await res.text());
-  const result = await res.json();
+  const result = (await res.json()) as {
+    updates?: { updatedRows?: number; updatedRange?: string };
+  };
   console.log(
     `Appended ${result.updates?.updatedRows || 0} rows to ${result.updates?.updatedRange}`,
   );
@@ -141,7 +158,7 @@ async function updateCells(spreadsheetId: string) {
   );
 
   if (!res.ok) throw new Error(await res.text());
-  const result = await res.json();
+  const result = (await res.json()) as { updatedCells?: number; updatedRange?: string };
   console.log(`Updated ${result.updatedCells || 0} cells in ${result.updatedRange}`);
 }
 
@@ -184,7 +201,9 @@ async function addSheet(spreadsheetId: string) {
   });
 
   if (!res.ok) throw new Error(await res.text());
-  const result = await res.json();
+  const result = (await res.json()) as {
+    replies?: Array<{ addSheet?: { properties?: { title?: string; sheetId?: number } } }>;
+  };
   const newSheet = result.replies?.[0]?.addSheet?.properties;
   console.log(`Sheet "${newSheet?.title}" added with ID: ${newSheet?.sheetId}`);
 }
@@ -200,8 +219,10 @@ async function listSpreadsheets() {
   const res = await fetch(`${DRIVE_URL}/files?${params}`, { headers });
   if (!res.ok) throw new Error(await res.text());
 
-  const { files = [] } = await res.json();
-  const sheets = files.map((f: Record<string, unknown>) => ({
+  const { files = [] } = (await res.json()) as {
+    files?: Array<{ id?: string; name?: string; modifiedTime?: string; webViewLink?: string }>;
+  };
+  const sheets = files.map((f) => ({
     id: f.id,
     name: f.name,
     modifiedTime: f.modifiedTime,

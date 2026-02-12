@@ -184,14 +184,15 @@ describe("writeSessionTranscriptFromConversation", () => {
     generateConversationTitleMock.mockResolvedValue("Session Summary");
 
     insertValuesFn = vi.fn((values: unknown) => {
-      if (Array.isArray(values)) {
+      if (Array.isArray(values) || !values || typeof values !== "object") {
         return Promise.resolve(undefined);
       }
+      const valueRecord = values as Record<string, unknown>;
       return {
         returning: vi.fn().mockResolvedValue([
           {
             id: "transcript-1",
-            ...values,
+            ...valueRecord,
           },
         ]),
       };

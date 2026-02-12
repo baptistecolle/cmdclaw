@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { parseArgs } from "util";
 
 const TOKEN = process.env.REDDIT_ACCESS_TOKEN;

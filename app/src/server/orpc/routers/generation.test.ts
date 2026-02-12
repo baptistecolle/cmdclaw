@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 function createProcedureStub() {
-  const stub: unknown = {
-    input: vi.fn(() => stub),
-    output: vi.fn(() => stub),
+  const stub = {
+    input: vi.fn(),
+    output: vi.fn(),
     handler: vi.fn((fn: unknown) => fn),
   };
+  stub.input.mockReturnValue(stub);
+  stub.output.mockReturnValue(stub);
   return stub;
 }
 
@@ -61,8 +63,11 @@ vi.mock("@/server/utils/observability", () => ({
 
 import { generationRouter } from "./generation";
 
-const context = { user: { id: "user-1" } } as unknown;
-const generationRouterAny = generationRouter as unknown;
+const context = { user: { id: "user-1" } };
+const generationRouterAny = generationRouter as unknown as Record<
+  string,
+  (args: unknown) => Promise<unknown>
+>;
 
 describe("generationRouter", () => {
   beforeEach(() => {

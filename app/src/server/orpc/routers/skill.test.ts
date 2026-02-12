@@ -2,11 +2,13 @@ import { ORPCError } from "@orpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 function createProcedureStub() {
-  const stub: unknown = {
-    input: vi.fn(() => stub),
-    output: vi.fn(() => stub),
+  const stub = {
+    input: vi.fn(),
+    output: vi.fn(),
     handler: vi.fn((fn: unknown) => fn),
   };
+  stub.input.mockReturnValue(stub);
+  stub.output.mockReturnValue(stub);
   return stub;
 }
 
@@ -44,7 +46,10 @@ vi.mock("@/server/storage/validation", () => ({
 
 import { skillRouter } from "./skill";
 
-const skillRouterAny = skillRouter as unknown;
+const skillRouterAny = skillRouter as unknown as Record<
+  string,
+  (args: unknown) => Promise<unknown>
+>;
 
 function createContext() {
   const insertReturningMock = vi.fn();
@@ -64,7 +69,7 @@ function createContext() {
   const selectFromMock = vi.fn(() => ({ where: selectWhereMock }));
   const selectMock = vi.fn(() => ({ from: selectFromMock }));
 
-  const context: unknown = {
+  const context = {
     user: { id: "user-1" },
     db: {
       query: {
@@ -171,10 +176,14 @@ describe("skillRouter", () => {
       updatedAt: now,
     });
 
-    const result = await skillRouterAny.get({
+    const result = (await skillRouterAny.get({
       input: { id: "skill-1" },
       context,
-    });
+    })) as {
+      id: string;
+      files: unknown[];
+      documents: unknown[];
+    };
 
     expect(result.id).toBe("skill-1");
     expect(result.files).toEqual([
@@ -240,18 +249,25 @@ describe("skillRouter", () => {
     });
 
     expect(context.mocks.insertValuesMock).toHaveBeenCalledTimes(2);
-    expect(context.mocks.insertValuesMock.mock.calls[0][0]).toMatchObject({
+    const firstInsertArg = (
+      context.mocks.insertValuesMock.mock.calls[0] as unknown as [Record<string, unknown>]
+    )[0];
+    const secondInsertArg = (
+      context.mocks.insertValuesMock.mock.calls[1] as unknown as [Record<string, unknown>]
+    )[0];
+
+    expect(firstInsertArg).toMatchObject({
       userId: "user-1",
       name: "my-skill",
       displayName: "My Skill",
       description: "A test skill",
     });
-    expect(context.mocks.insertValuesMock.mock.calls[1][0]).toMatchObject({
+    expect(secondInsertArg).toMatchObject({
       skillId: "skill-1",
       path: "SKILL.md",
     });
-    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain("name: my-skill");
-    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain("# My Skill");
+    expect(secondInsertArg.content).toContain("name: my-skill");
+    expect(secondInsertArg.content).toContain("# My Skill");
   });
 
   it("returns BAD_REQUEST when create receives a name that cannot produce a slug", async () => {

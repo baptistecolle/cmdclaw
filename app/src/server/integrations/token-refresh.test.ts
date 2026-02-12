@@ -1,39 +1,49 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { updateWhereMock, selectWhereMock, findManyMock, dbMock, getOAuthConfigMock, decryptMock } =
-  vi.hoisted(() => {
-    const updateWhereMock = vi.fn();
-    const updateSetMock = vi.fn(() => ({ where: updateWhereMock }));
-    const updateMock = vi.fn(() => ({ set: updateSetMock }));
+const {
+  updateMock,
+  updateSetMock,
+  updateWhereMock,
+  selectWhereMock,
+  findManyMock,
+  dbMock,
+  getOAuthConfigMock,
+  decryptMock,
+} = vi.hoisted(() => {
+  const updateWhereMock = vi.fn();
+  const updateSetMock = vi.fn(() => ({ where: updateWhereMock }));
+  const updateMock = vi.fn(() => ({ set: updateSetMock }));
 
-    const selectWhereMock = vi.fn();
-    const selectInnerJoinMock = vi.fn(() => ({ where: selectWhereMock }));
-    const selectFromMock = vi.fn(() => ({ innerJoin: selectInnerJoinMock }));
-    const selectMock = vi.fn(() => ({ from: selectFromMock }));
-    const findManyMock = vi.fn();
-    const decryptMock = vi.fn((value: string) => value);
+  const selectWhereMock = vi.fn();
+  const selectInnerJoinMock = vi.fn(() => ({ where: selectWhereMock }));
+  const selectFromMock = vi.fn(() => ({ innerJoin: selectInnerJoinMock }));
+  const selectMock = vi.fn(() => ({ from: selectFromMock }));
+  const findManyMock = vi.fn();
+  const decryptMock = vi.fn((value: string) => value);
 
-    const dbMock = {
-      update: updateMock,
-      select: selectMock,
-      query: {
-        customIntegrationCredential: {
-          findMany: findManyMock,
-        },
+  const dbMock = {
+    update: updateMock,
+    select: selectMock,
+    query: {
+      customIntegrationCredential: {
+        findMany: findManyMock,
       },
-    };
+    },
+  };
 
-    const getOAuthConfigMock = vi.fn();
+  const getOAuthConfigMock = vi.fn();
 
-    return {
-      updateWhereMock,
-      selectWhereMock,
-      findManyMock,
-      dbMock,
-      getOAuthConfigMock,
-      decryptMock,
-    };
-  });
+  return {
+    updateMock,
+    updateSetMock,
+    updateWhereMock,
+    selectWhereMock,
+    findManyMock,
+    dbMock,
+    getOAuthConfigMock,
+    decryptMock,
+  };
+});
 
 vi.mock("@/server/db/client", () => ({
   db: dbMock,

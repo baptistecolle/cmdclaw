@@ -215,9 +215,9 @@ describe("GET /api/oauth/callback", () => {
       "https://app.example.com/settings/integrations?success=true",
     );
 
-    const tokenInsertCall = (insertValuesMock.mock.calls as unknown[]).find(
-      (call) => call[0] && typeof call[0] === "object" && "accessToken" in call[0],
-    );
+    const tokenInsertCall = (
+      insertValuesMock.mock.calls as unknown as Array<[Record<string, unknown>]>
+    ).find((call) => call[0] && typeof call[0] === "object" && "accessToken" in call[0]);
     expect(tokenInsertCall?.[0]).toEqual(
       expect.objectContaining({
         accessToken: "xoxp-user-token",
@@ -274,9 +274,9 @@ describe("GET /api/oauth/callback", () => {
 
     expect(getLocation(response)).toBe("https://app.example.com/integrations?success=true");
 
-    const integrationInsertCall = (insertValuesMock.mock.calls as unknown[]).find(
-      (call) => call[0] && typeof call[0] === "object" && "providerAccountId" in call[0],
-    );
+    const integrationInsertCall = (
+      insertValuesMock.mock.calls as unknown as Array<[Record<string, unknown>]>
+    ).find((call) => call[0] && typeof call[0] === "object" && "providerAccountId" in call[0]);
 
     expect(integrationInsertCall?.[0]).toEqual(
       expect.objectContaining({

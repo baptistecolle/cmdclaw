@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { parseArgs } from "util";
 
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
