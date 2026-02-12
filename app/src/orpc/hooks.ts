@@ -668,6 +668,15 @@ export function useProviderAuthStatus() {
   });
 }
 
+// Hook for fetching free models available on OpenCode Zen
+export function useOpencodeFreeModels() {
+  return useQuery({
+    queryKey: ["providerAuth", "freeModels"],
+    queryFn: () => client.providerAuth.freeModels(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 // Hook for initiating subscription provider OAuth connection
 export function useConnectProvider() {
   return useMutation({

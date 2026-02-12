@@ -61,6 +61,7 @@ import {
   createTraceId,
   logServerEvent,
 } from "@/server/utils/observability";
+import { isOpencodeFreeModel } from "@/server/ai/opencode-models";
 import path from "path";
 import type { Sandbox } from "e2b";
 import type {
@@ -1614,7 +1615,7 @@ class GenerationManager {
 
       // Resolve provider from model ID
       const modelConfig = {
-        providerID: resolveProviderID(ctx.model),
+        providerID: await resolveProviderID(ctx.model),
         modelID: ctx.model,
       };
 
@@ -2410,7 +2411,7 @@ class GenerationManager {
    * Get the appropriate LLM backend for a generation context.
    */
   private async getLLMBackend(ctx: GenerationContext): Promise<LLMBackend> {
-    const providerID = resolveProviderID(ctx.model);
+    const providerID = await resolveProviderID(ctx.model);
 
     switch (providerID) {
       case "anthropic":
@@ -3911,7 +3912,8 @@ class GenerationManager {
 /**
  * Map a model ID to its provider ID.
  */
-function resolveProviderID(modelID: string): string {
+async function resolveProviderID(modelID: string): Promise<string> {
+  if (await isOpencodeFreeModel(modelID)) return "opencode";
   if (modelID.startsWith("claude")) return "anthropic";
   if (
     modelID.startsWith("gpt") ||

@@ -7,6 +7,7 @@ import {
   isOAuthProviderConfig,
   type SubscriptionProviderID,
 } from "@/server/ai/subscription-providers";
+import { listOpencodeFreeModels } from "@/server/ai/opencode-models";
 import { encrypt } from "@/server/utils/encryption";
 import { storePending } from "@/server/ai/pending-oauth";
 import { ensureOAuthCallbackServer } from "@/server/ai/oauth-callback-server";
@@ -178,6 +179,15 @@ const setApiKey = protectedProcedure
   });
 
 /**
+ * GET /provider-auth/free-models
+ * Return free models available from OpenCode Zen.
+ */
+const freeModels = protectedProcedure.handler(async () => {
+  const models = await listOpencodeFreeModels();
+  return { models };
+});
+
+/**
  * Internal: Store tokens after OAuth callback.
  * Called from the API callback route, not directly from the client.
  */
@@ -226,4 +236,5 @@ export const providerAuthRouter = {
   status,
   disconnect,
   setApiKey,
+  freeModels,
 };

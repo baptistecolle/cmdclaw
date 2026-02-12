@@ -35,6 +35,7 @@
     "e2b:build:dev": "tsx src/e2b-template/build.dev.ts",
     "e2b:build:prod": "tsx src/e2b-template/build.prod.ts",
     "e2b:sandbox": "bun scripts/test-sandbox.ts",
+    "models:opencode:free": "bun scripts/list-opencode-free-models.ts",
     "ws:dev": "bun scripts/start-ws.ts",
     "chat": "bun scripts/chat.ts",
     "workflow": "bun scripts/workflow.ts"

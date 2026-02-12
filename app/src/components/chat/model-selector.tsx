@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { useProviderAuthStatus } from "@/orpc/hooks";
+import { useOpencodeFreeModels, useProviderAuthStatus } from "@/orpc/hooks";
 import { cn } from "@/lib/utils";
 
 type ModelOption = {
@@ -42,8 +42,6 @@ const KIMI_MODELS: ModelOption[] = [
   { id: "kimi-k2-thinking", name: "Kimi K2 Thinking", provider: "kimi-for-coding", providerLabel: "Kimi" },
 ];
 
-const ALL_MODELS = [...ANTHROPIC_MODELS, ...OPENAI_MODELS, ...GOOGLE_MODELS, ...KIMI_MODELS];
-
 type Props = {
   selectedModel: string;
   onModelChange: (modelId: string) => void;
@@ -52,13 +50,23 @@ type Props = {
 
 export function ModelSelector({ selectedModel, onModelChange, disabled }: Props) {
   const { data: authStatus } = useProviderAuthStatus();
+  const { data: freeModelsData } = useOpencodeFreeModels();
   const connected = authStatus?.connected ?? {};
 
   const isOpenAIConnected = "openai" in connected;
   const isGoogleConnected = "google" in connected;
   const isKimiConnected = "kimi" in connected;
 
-  const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
+  const zenModels: ModelOption[] = (freeModelsData?.models ?? []).map((model) => ({
+    id: model.id,
+    name: model.name,
+    provider: "opencode",
+    providerLabel: "OpenCode Zen",
+  }));
+
+  const allModels = [...ANTHROPIC_MODELS, ...OPENAI_MODELS, ...GOOGLE_MODELS, ...KIMI_MODELS, ...zenModels];
+
+  const currentModel = allModels.find((m) => m.id === selectedModel);
   const displayName = currentModel?.name ?? selectedModel;
 
   return (
@@ -89,6 +97,25 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
             )}
           </DropdownMenuItem>
         ))}
+
+        {zenModels.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>OpenCode Zen</DropdownMenuLabel>
+            {zenModels.map((model) => (
+              <DropdownMenuItem
+                key={model.id}
+                data-testid={`chat-model-option-${model.id}`}
+                onClick={() => onModelChange(model.id)}
+              >
+                <span className="flex-1">{model.name}</span>
+                {selectedModel === model.id && (
+                  <Check className="h-3.5 w-3.5 text-foreground" />
+                )}
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
 
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="flex items-center gap-1.5">
