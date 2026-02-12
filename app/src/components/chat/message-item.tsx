@@ -94,7 +94,7 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
   // For user messages, show simple bubble + attachments
   if (role === "user") {
     return (
-      <div className="py-4 space-y-2">
+      <div data-testid="chat-message-user" className="py-4 space-y-2">
         {attachments && attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 justify-end">
             {attachments.map((a, i) =>
@@ -269,7 +269,10 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
   const hasApprovals = segments.some((seg) => seg.approval !== null);
 
   return (
-    <div className="py-4 space-y-3">
+    <div
+      data-testid={role === "assistant" ? "chat-message-assistant" : undefined}
+      className="py-4 space-y-3"
+    >
       {/* Show segmented trace if there are approvals, otherwise show collapsed trace */}
       {hasTrace && segments.length > 0 && (
         hasApprovals ? (

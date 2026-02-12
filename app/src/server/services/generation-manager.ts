@@ -63,6 +63,14 @@ import {
 } from "@/server/utils/observability";
 import path from "path";
 import type { Sandbox } from "e2b";
+import type {
+  Event as OpencodeEvent,
+  OpencodeClient,
+  Part as OpencodePart,
+  PermissionRequest,
+  QuestionRequest,
+  ToolPart,
+} from "@opencode-ai/sdk/v2/client";
 
 // Event types for generation stream
 export type GenerationEvent =
@@ -137,6 +145,17 @@ interface Subscriber {
 }
 
 type BackendType = "opencode" | "direct";
+type OpenCodeTrackedEvent = Extract<
+  OpencodeEvent,
+  { type: "message.updated" | "message.part.updated" | "session.updated" | "session.status" }
+>;
+type OpenCodeActionableEvent = Extract<
+  OpencodeEvent,
+  { type: "message.part.updated" | "permission.asked" | "question.asked" }
+>;
+type PendingOpenCodeApprovalRequest =
+  | { kind: "permission"; request: PermissionRequest }
+  | { kind: "question"; request: QuestionRequest; defaultAnswers: string[][] };
 
 interface GenerationContext {
   id: string;
@@ -169,7 +188,7 @@ interface GenerationContext {
   // Track assistant message IDs to filter out user message parts
   assistantMessageIds: Set<string>;
   messageRoles: Map<string, string>;
-  pendingMessageParts: Map<string, Record<string, unknown>[]>;
+  pendingMessageParts: Map<string, OpencodePart[]>;
   // BYOC fields
   backendType: BackendType;
   deviceId?: string;
@@ -177,10 +196,9 @@ interface GenerationContext {
   workflowRunId?: string;
   allowedIntegrations?: IntegrationType[];
   autoApprove: boolean;
-  // OpenCode permission request fields (for forwarding approval to OpenCode SDK)
-  opencodePermissionId?: string;
-  opencodeClient?: any;
-  opencodeSessionId?: string;
+  // OpenCode approval request fields (for forwarding user decisions to OpenCode SDK)
+  opencodePendingApprovalRequest?: PendingOpenCodeApprovalRequest;
+  opencodeClient?: OpencodeClient;
   allowedCustomIntegrations?: string[];
   workflowPrompt?: string;
   workflowPromptDo?: string;
@@ -251,6 +269,50 @@ function shouldAutoApproveOpenCodePermission(
 
     return false;
   });
+}
+
+function assertNever(x: never): never {
+  throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
+}
+
+function isOpenCodeTrackedEvent(event: OpencodeEvent): event is OpenCodeTrackedEvent {
+  return (
+    event.type === "message.updated" ||
+    event.type === "message.part.updated" ||
+    event.type === "session.updated" ||
+    event.type === "session.status"
+  );
+}
+
+function isOpenCodeActionableEvent(event: OpencodeEvent): event is OpenCodeActionableEvent {
+  return (
+    event.type === "message.part.updated" ||
+    event.type === "permission.asked" ||
+    event.type === "question.asked"
+  );
+}
+
+function buildDefaultQuestionAnswers(request: QuestionRequest): string[][] {
+  return request.questions.map((question) => {
+    const firstOptionLabel = question.options[0]?.label;
+    if (firstOptionLabel) {
+      return [firstOptionLabel];
+    }
+    if (question.custom === false) {
+      return [];
+    }
+    return ["default answer"];
+  });
+}
+
+function buildQuestionCommand(request: QuestionRequest): string {
+  return request.questions
+    .map((question) => {
+      const options = question.options.map((option) => option.label).filter(Boolean);
+      const optionsText = options.length > 0 ? ` [${options.join(" | ")}]` : "";
+      return `${question.header}: ${question.question}${optionsText}`;
+    })
+    .join(" || ");
 }
 
 type MessageRow = typeof message.$inferSelect;
@@ -1066,20 +1128,48 @@ class GenerationManager {
       ctx.approvalResolver = undefined;
     }
 
-    // Forward decision to OpenCode SDK if this was an OpenCode permission request
-    if (ctx.opencodePermissionId && ctx.opencodeClient && ctx.opencodeSessionId) {
+    // Forward decision to OpenCode SDK if this was an OpenCode permission/question request
+    if (ctx.opencodePendingApprovalRequest && ctx.opencodeClient) {
       try {
-        await ctx.opencodeClient.postSessionIdPermissionsPermissionId({
-          path: { id: ctx.opencodeSessionId, permissionID: ctx.opencodePermissionId },
-          body: { response: decision === "approve" ? "always" : "reject" },
-        });
-        console.log("[GenerationManager] OpenCode permission", decision === "approve" ? "approved" : "denied", ctx.opencodePermissionId);
+        switch (ctx.opencodePendingApprovalRequest.kind) {
+          case "permission": {
+            await ctx.opencodeClient.permission.reply({
+              requestID: ctx.opencodePendingApprovalRequest.request.id,
+              reply: decision === "approve" ? "always" : "reject",
+            });
+            console.log(
+              "[GenerationManager] OpenCode permission",
+              decision === "approve" ? "approved" : "denied",
+              ctx.opencodePendingApprovalRequest.request.id
+            );
+            break;
+          }
+          case "question": {
+            if (decision === "approve") {
+              await ctx.opencodeClient.question.reply({
+                requestID: ctx.opencodePendingApprovalRequest.request.id,
+                answers: ctx.opencodePendingApprovalRequest.defaultAnswers,
+              });
+            } else {
+              await ctx.opencodeClient.question.reject({
+                requestID: ctx.opencodePendingApprovalRequest.request.id,
+              });
+            }
+            console.log(
+              "[GenerationManager] OpenCode question",
+              decision === "approve" ? "answered" : "rejected",
+              ctx.opencodePendingApprovalRequest.request.id
+            );
+            break;
+          }
+          default:
+            assertNever(ctx.opencodePendingApprovalRequest);
+        }
       } catch (err) {
-        console.error("[GenerationManager] Failed to submit OpenCode permission:", err);
+        console.error("[GenerationManager] Failed to submit OpenCode approval:", err);
       }
-      ctx.opencodePermissionId = undefined;
+      ctx.opencodePendingApprovalRequest = undefined;
       ctx.opencodeClient = undefined;
-      ctx.opencodeSessionId = undefined;
     }
 
     // Clear pending approval
@@ -1514,6 +1604,7 @@ class GenerationManager {
       let opencodeEventCount = 0;
       let opencodeToolCallCount = 0;
       let opencodePermissionCount = 0;
+      let opencodeQuestionCount = 0;
       let stagedUploadCount = 0;
       let stagedUploadFailureCount = 0;
 
@@ -1591,16 +1682,15 @@ class GenerationManager {
         }
       );
       const promptPromise = client.session.prompt({
-        path: { id: sessionId },
-        body: {
-          parts: promptParts as any,
-          system: systemPrompt,
-          model: modelConfig,
-        },
+        sessionID: sessionId,
+        parts: promptParts as any,
+        system: systemPrompt,
+        model: modelConfig,
       });
 
       // Process SSE events
-      for await (const event of eventStream) {
+      for await (const rawEvent of eventStream) {
+        const event = rawEvent as OpencodeEvent;
         if (ctx.abortController.signal.aborted) {
           break;
         }
@@ -1608,8 +1698,8 @@ class GenerationManager {
         opencodeEventCount += 1;
 
         if (event.type === "message.part.updated") {
-          const part = (event.properties as any)?.part;
-          if (part?.type === "tool" && part?.state?.status === "pending") {
+          const part = event.properties.part;
+          if (part.type === "tool" && part.state.status === "pending") {
             opencodeToolCallCount += 1;
           }
         }
@@ -1627,89 +1717,20 @@ class GenerationManager {
           );
         }
 
-        // Transform OpenCode events to GenerationEvents
-        await this.processOpencodeEvent(ctx, event, currentTextPart, currentTextPartId, (part, partId) => {
-          currentTextPart = part;
-          currentTextPartId = partId;
-        });
+        // Transform tracked OpenCode events to GenerationEvents
+        if (isOpenCodeTrackedEvent(event)) {
+          await this.processOpencodeEvent(ctx, event, currentTextPart, currentTextPartId, (part, partId) => {
+            currentTextPart = part;
+            currentTextPartId = partId;
+          });
+        }
 
-        // Auto-approve permission requests only for uploaded files directory
-        if ((event.type as string) === "permission.asked") {
-          opencodePermissionCount += 1;
-          const permProps = (event as any).properties as Record<string, unknown>;
-          const permissionID = permProps.id as string;
-          const permissionType = (permProps.permission as string) || "file access";
-          const patterns = permProps.patterns as string[] | undefined;
-          const allPatternsAllowed = shouldAutoApproveOpenCodePermission(permissionType, patterns);
-          if (permissionID && allPatternsAllowed) {
-            console.log("[GenerationManager] Auto-approving sandbox permission:", permissionID, permissionType, patterns);
-            try {
-              await client.postSessionIdPermissionsPermissionId({
-                path: { id: sessionId, permissionID },
-                body: { response: "always" },
-              });
-            } catch (err) {
-              console.error("[GenerationManager] Failed to approve permission:", err);
-            }
-          } else {
-            console.log("[GenerationManager] Surfacing permission request to UI:", permissionID, permProps.permission, patterns);
-            const toolUseId = `opencode-perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            const command = patterns?.length
-              ? `${permissionType}: ${patterns.join(", ")}`
-              : permissionType;
-
-            ctx.status = "awaiting_approval";
-            ctx.pendingApproval = {
-              toolUseId,
-              toolName: "Permission",
-              toolInput: permProps as Record<string, unknown>,
-              requestedAt: new Date().toISOString(),
-              integration: "Bap",
-              operation: permissionType,
-              command,
-            };
-            ctx.opencodePermissionId = permissionID;
-            ctx.opencodeClient = client;
-            ctx.opencodeSessionId = sessionId;
-
-            // Update database
-            db.update(generation)
-              .set({ status: "awaiting_approval", pendingApproval: ctx.pendingApproval })
-              .where(eq(generation.id, ctx.id))
-              .then(() => db.update(conversation).set({ generationStatus: "awaiting_approval" }).where(eq(conversation.id, ctx.conversationId)))
-              .then(() => {
-                if (!ctx.workflowRunId) return;
-                return db.update(workflowRun).set({ status: "awaiting_approval" }).where(eq(workflowRun.id, ctx.workflowRunId));
-              })
-              .catch((err) => console.error("[GenerationManager] DB update error:", err));
-
-            // Notify frontend
-            this.broadcast(ctx, {
-              type: "pending_approval",
-              generationId: ctx.id,
-              conversationId: ctx.conversationId,
-              toolUseId,
-              toolName: "Permission",
-              toolInput: permProps as Record<string, unknown>,
-              integration: "Bap",
-              operation: permissionType,
-              command,
-            });
-
-            // Start approval timeout
-            ctx.approvalTimeoutId = setTimeout(() => {
-              // Auto-deny on timeout
-              if (ctx.opencodePermissionId && ctx.opencodeClient && ctx.opencodeSessionId) {
-                client.postSessionIdPermissionsPermissionId({
-                  path: { id: ctx.opencodeSessionId, permissionID: ctx.opencodePermissionId },
-                  body: { response: "reject" },
-                }).catch((err: any) => console.error("[GenerationManager] Failed to reject permission on timeout:", err));
-                ctx.opencodePermissionId = undefined;
-                ctx.opencodeClient = undefined;
-                ctx.opencodeSessionId = undefined;
-              }
-              this.handleApprovalTimeout(ctx);
-            }, APPROVAL_TIMEOUT_MS);
+        if (isOpenCodeActionableEvent(event)) {
+          const actionableResult = await this.handleOpenCodeActionableEvent(ctx, client, event);
+          if (actionableResult.type === "permission") {
+            opencodePermissionCount += 1;
+          } else if (actionableResult.type === "question") {
+            opencodeQuestionCount += 1;
           }
         }
 
@@ -1782,7 +1803,7 @@ class GenerationManager {
       // Check if aborted
       if (ctx.abortController.signal.aborted) {
         console.info(
-          `[GenerationManager][SUMMARY] status=cancelled generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`
+          `[GenerationManager][SUMMARY] status=cancelled generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} questions=${opencodeQuestionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`
         );
         await this.finishGeneration(ctx, "cancelled");
         return;
@@ -1790,7 +1811,7 @@ class GenerationManager {
 
       // Complete the generation
       console.info(
-        `[GenerationManager][SUMMARY] status=completed generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`
+        `[GenerationManager][SUMMARY] status=completed generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} questions=${opencodeQuestionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`
       );
       await this.finishGeneration(ctx, "completed");
     } catch (error) {
@@ -2731,22 +2752,224 @@ class GenerationManager {
   }
 
   /**
-   * Process an OpenCode SSE event and transform it to GenerationEvent
+   * Handle actionable OpenCode events that require explicit responses.
+   */
+  private async handleOpenCodeActionableEvent(
+    ctx: GenerationContext,
+    client: OpencodeClient,
+    event: OpenCodeActionableEvent
+  ): Promise<{ type: "none" | "permission" | "question" }> {
+    switch (event.type) {
+      case "message.part.updated": {
+        if (event.properties.part.type === "tool") {
+          this.handleOpenCodeToolStateCoverage(event.properties.part);
+        }
+        return { type: "none" };
+      }
+      case "permission.asked": {
+        await this.handleOpenCodePermissionAsked(ctx, client, event.properties);
+        return { type: "permission" };
+      }
+      case "question.asked": {
+        await this.handleOpenCodeQuestionAsked(ctx, client, event.properties);
+        return { type: "question" };
+      }
+      default:
+        return assertNever(event);
+    }
+  }
+
+  private handleOpenCodeToolStateCoverage(part: ToolPart): void {
+    switch (part.state.status) {
+      case "pending":
+        return;
+      case "running":
+        return;
+      case "completed":
+        return;
+      case "error":
+        return;
+      default:
+        return assertNever(part.state);
+    }
+  }
+
+  private async handleOpenCodePermissionAsked(
+    ctx: GenerationContext,
+    client: OpencodeClient,
+    request: PermissionRequest
+  ): Promise<void> {
+    const permissionType = request.permission || "file access";
+    const patterns = request.patterns;
+    const allPatternsAllowed = shouldAutoApproveOpenCodePermission(permissionType, patterns);
+
+    if (allPatternsAllowed) {
+      console.log("[GenerationManager] Auto-approving sandbox permission:", request.id, permissionType, patterns);
+      try {
+        await client.permission.reply({
+          requestID: request.id,
+          reply: "always",
+        });
+      } catch (err) {
+        console.error("[GenerationManager] Failed to approve permission:", err);
+      }
+      return;
+    }
+
+    console.log(
+      "[GenerationManager] Surfacing permission request to UI:",
+      request.id,
+      request.permission,
+      patterns
+    );
+
+    const toolUseId = `opencode-perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const command = patterns?.length ? `${permissionType}: ${patterns.join(", ")}` : permissionType;
+
+    await this.queueOpenCodeApprovalRequest(
+      ctx,
+      client,
+      {
+        kind: "permission",
+        request,
+      },
+      {
+        toolUseId,
+        toolName: "Permission",
+        toolInput: request as Record<string, unknown>,
+        requestedAt: new Date().toISOString(),
+        integration: "Bap",
+        operation: permissionType,
+        command,
+      }
+    );
+  }
+
+  private async handleOpenCodeQuestionAsked(
+    ctx: GenerationContext,
+    client: OpencodeClient,
+    request: QuestionRequest
+  ): Promise<void> {
+    const defaultAnswers = buildDefaultQuestionAnswers(request);
+
+    if (ctx.autoApprove) {
+      try {
+        await client.question.reply({
+          requestID: request.id,
+          answers: defaultAnswers,
+        });
+      } catch (err) {
+        console.error("[GenerationManager] Failed to auto-answer question:", err);
+      }
+      return;
+    }
+
+    const toolUseId = `opencode-question-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const command = buildQuestionCommand(request);
+
+    await this.queueOpenCodeApprovalRequest(
+      ctx,
+      client,
+      {
+        kind: "question",
+        request,
+        defaultAnswers,
+      },
+      {
+        toolUseId,
+        toolName: "Question",
+        toolInput: request as unknown as Record<string, unknown>,
+        requestedAt: new Date().toISOString(),
+        integration: "Bap",
+        operation: "question",
+        command,
+      }
+    );
+  }
+
+  private async queueOpenCodeApprovalRequest(
+    ctx: GenerationContext,
+    client: OpencodeClient,
+    openCodeRequest: PendingOpenCodeApprovalRequest,
+    pendingApproval: PendingApproval
+  ): Promise<void> {
+    ctx.status = "awaiting_approval";
+    ctx.pendingApproval = pendingApproval;
+    ctx.opencodePendingApprovalRequest = openCodeRequest;
+    ctx.opencodeClient = client;
+
+    db.update(generation)
+      .set({ status: "awaiting_approval", pendingApproval: ctx.pendingApproval })
+      .where(eq(generation.id, ctx.id))
+      .then(() => db.update(conversation).set({ generationStatus: "awaiting_approval" }).where(eq(conversation.id, ctx.conversationId)))
+      .then(() => {
+        if (!ctx.workflowRunId) return;
+        return db.update(workflowRun).set({ status: "awaiting_approval" }).where(eq(workflowRun.id, ctx.workflowRunId));
+      })
+      .catch((err) => console.error("[GenerationManager] DB update error:", err));
+
+    this.broadcast(ctx, {
+      type: "pending_approval",
+      generationId: ctx.id,
+      conversationId: ctx.conversationId,
+      toolUseId: pendingApproval.toolUseId,
+      toolName: pendingApproval.toolName,
+      toolInput: pendingApproval.toolInput,
+      integration: pendingApproval.integration,
+      operation: pendingApproval.operation,
+      command: pendingApproval.command,
+    });
+
+    ctx.approvalTimeoutId = setTimeout(() => {
+      this.rejectOpenCodePendingApprovalRequest(ctx)
+        .catch((err) => console.error("[GenerationManager] Failed to reject OpenCode request on timeout:", err))
+        .finally(() => {
+          this.handleApprovalTimeout(ctx);
+        });
+    }, APPROVAL_TIMEOUT_MS);
+  }
+
+  private async rejectOpenCodePendingApprovalRequest(ctx: GenerationContext): Promise<void> {
+    if (!ctx.opencodePendingApprovalRequest || !ctx.opencodeClient) {
+      return;
+    }
+
+    try {
+      switch (ctx.opencodePendingApprovalRequest.kind) {
+        case "permission":
+          await ctx.opencodeClient.permission.reply({
+            requestID: ctx.opencodePendingApprovalRequest.request.id,
+            reply: "reject",
+          });
+          break;
+        case "question":
+          await ctx.opencodeClient.question.reject({
+            requestID: ctx.opencodePendingApprovalRequest.request.id,
+          });
+          break;
+        default:
+          assertNever(ctx.opencodePendingApprovalRequest);
+      }
+    } finally {
+      ctx.opencodePendingApprovalRequest = undefined;
+      ctx.opencodeClient = undefined;
+    }
+  }
+
+  /**
+   * Process tracked OpenCode SSE events and transform them to GenerationEvent
    */
   private async processOpencodeEvent(
     ctx: GenerationContext,
-    event: { type: string; properties?: unknown },
+    event: OpenCodeTrackedEvent,
     currentTextPart: { type: "text"; text: string } | null,
     currentTextPartId: string | null,
     setCurrentTextPart: (part: { type: "text"; text: string } | null, partId: string | null) => void
   ): Promise<void> {
-    const props = event.properties as Record<string, unknown>;
-
     switch (event.type) {
       case "message.updated": {
-        const info = props.info as Record<string, unknown>;
-        const messageId = typeof info?.id === "string" ? info.id : null;
-        const role = typeof info?.role === "string" ? info.role : null;
+        const messageId = event.properties.info.id;
+        const role = event.properties.info.role;
 
         if (messageId && role) {
           ctx.messageRoles.set(messageId, role);
@@ -2782,9 +3005,8 @@ class GenerationManager {
       }
 
       case "message.part.updated": {
-        const part = props.part as Record<string, unknown>;
-        if (!part) return;
-        const messageID = part.messageID as string;
+        const part = event.properties.part;
+        const messageID = part.messageID;
 
         if (messageID) {
           const role = ctx.messageRoles.get(messageID);
@@ -2815,10 +3037,7 @@ class GenerationManager {
 
       case "session.updated": {
         // Track session metadata if needed
-        const info = props.info as Record<string, unknown>;
-        if (info?.id) {
-          ctx.sessionId = info.id as string;
-        }
+        ctx.sessionId = event.properties.info.id;
         break;
       }
 
@@ -2826,12 +3045,14 @@ class GenerationManager {
         // Can track status changes if needed
         break;
       }
+      default:
+        return assertNever(event);
     }
   }
 
   private shouldProcessUnknownMessagePart(
     ctx: GenerationContext,
-    part: Record<string, unknown>
+    part: OpencodePart
   ): boolean {
     if (part.type === "tool") {
       return true;
@@ -2841,7 +3062,7 @@ class GenerationManager {
       return true;
     }
 
-    const fullText = (part.text as string | undefined)?.trim();
+    const fullText = part.text.trim();
     const userText = ctx.userMessageContent.trim();
     if (!fullText) {
       return false;
@@ -2861,18 +3082,18 @@ class GenerationManager {
 
   private async processOpencodeMessagePart(
     ctx: GenerationContext,
-    part: Record<string, unknown>,
+    part: OpencodePart,
     currentTextPart: { type: "text"; text: string } | null,
     currentTextPartId: string | null,
     setCurrentTextPart: (part: { type: "text"; text: string } | null, partId: string | null) => void
   ): Promise<void> {
-    const partId = part.id as string;
+    const partId = part.id;
 
     // Text content
     // NOTE: OpenCode sends the FULL cumulative text with each update, not deltas
     // We need to calculate the delta ourselves
     if (part.type === "text") {
-      const fullText = part.text as string;
+      const fullText = part.text;
       if (fullText) {
         // Check if this is a new text part (different part ID)
         const isNewPart = partId !== currentTextPartId;
@@ -2905,24 +3126,40 @@ class GenerationManager {
     // Status flow: pending (no input) -> running (has input) -> completed (has output)
     if (part.type === "tool") {
       setCurrentTextPart(null, null);
-      const toolUseId = part.callID as string;
-      const toolName = part.tool as string;
-      const state = part.state as Record<string, unknown> | undefined;
-
-      // Input is inside state.input
-      const toolInput = (state?.input || {}) as Record<string, unknown>;
-      const status = state?.status as string;
-      // Output is inside state.output when completed
-      const result = state?.output;
+      const toolUseId = part.callID;
+      const toolName = part.tool;
+      const toolInput = "input" in part.state ? part.state.input : {};
 
       const existingToolUse = ctx.contentParts.find(
         (p): p is ContentPart & { type: "tool_use" } =>
           p.type === "tool_use" && p.id === toolUseId
       );
 
-      if (status === "completed" && result !== undefined) {
-        // Tool completed - broadcast result
-        if (existingToolUse) {
+      switch (part.state.status) {
+        case "pending":
+          return;
+        case "running": {
+          if (existingToolUse) return;
+
+          this.broadcast(ctx, {
+            type: "tool_use",
+            toolName,
+            toolInput,
+            toolUseId,
+          });
+
+          ctx.contentParts.push({
+            type: "tool_use",
+            id: toolUseId,
+            name: toolName,
+            input: toolInput,
+          });
+          await this.saveProgress(ctx);
+          return;
+        }
+        case "completed": {
+          if (!existingToolUse) return;
+          const result = part.state.output;
           this.broadcast(ctx, {
             type: "tool_result",
             toolName: existingToolUse.name,
@@ -2934,24 +3171,26 @@ class GenerationManager {
             content: result,
           });
           await this.saveProgress(ctx);
+          return;
         }
-      } else if (status === "running" && !existingToolUse) {
-        // Tool is running - now we have the actual input
-        // Only capture on "running" status, not "pending" (which has empty input)
-        this.broadcast(ctx, {
-          type: "tool_use",
-          toolName,
-          toolInput,
-          toolUseId,
-        });
-
-        ctx.contentParts.push({
-          type: "tool_use",
-          id: toolUseId || "",
-          name: toolName,
-          input: toolInput || {},
-        });
-        await this.saveProgress(ctx);
+        case "error": {
+          if (!existingToolUse) return;
+          const result = { error: part.state.error };
+          this.broadcast(ctx, {
+            type: "tool_result",
+            toolName: existingToolUse.name,
+            result,
+          });
+          ctx.contentParts.push({
+            type: "tool_result",
+            tool_use_id: toolUseId,
+            content: result,
+          });
+          await this.saveProgress(ctx);
+          return;
+        }
+        default:
+          return assertNever(part.state);
       }
     }
   }

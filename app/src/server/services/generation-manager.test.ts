@@ -197,6 +197,134 @@ describe("generationManager transitions", () => {
     });
   });
 
+  it("submits question approval and replies to OpenCode with default answers", async () => {
+    const callback = vi.fn();
+    const questionReplyMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+    const questionRejectMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+
+    const ctx = createCtx({
+      status: "awaiting_approval",
+      pendingApproval: {
+        toolUseId: "question-1",
+        toolName: "Question",
+        toolInput: { id: "question-request-1" },
+        requestedAt: new Date().toISOString(),
+        integration: "Bap",
+        operation: "question",
+        command: "Choose one",
+      },
+      opencodeClient: {
+        question: {
+          reply: questionReplyMock,
+          reject: questionRejectMock,
+        },
+        permission: {
+          reply: vi.fn(),
+        },
+      },
+      opencodePendingApprovalRequest: {
+        kind: "question",
+        request: {
+          id: "question-request-1",
+          sessionID: "session-1",
+          questions: [
+            {
+              header: "Choice",
+              question: "Pick one option",
+              options: [
+                { label: "A", description: "Option A" },
+                { label: "B", description: "Option B" },
+              ],
+            },
+          ],
+        },
+        defaultAnswers: [["A"]],
+      },
+    });
+    ctx.subscribers.set("sub-1", { id: "sub-1", callback });
+
+    const mgr = generationManager as any;
+    mgr.activeGenerations.set(ctx.id, ctx);
+
+    const result = await generationManager.submitApproval(ctx.id, "question-1", "approve", ctx.userId);
+
+    expect(result).toBe(true);
+    expect(questionReplyMock).toHaveBeenCalledWith({
+      requestID: "question-request-1",
+      answers: [["A"]],
+    });
+    expect(questionRejectMock).not.toHaveBeenCalled();
+    expect(ctx.pendingApproval).toBeNull();
+    expect(ctx.status).toBe("running");
+    expect(callback).toHaveBeenCalledWith({
+      type: "approval_result",
+      toolUseId: "question-1",
+      decision: "approved",
+    });
+  });
+
+  it("submits denied question approval and rejects OpenCode question", async () => {
+    const callback = vi.fn();
+    const questionReplyMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+    const questionRejectMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+
+    const ctx = createCtx({
+      status: "awaiting_approval",
+      pendingApproval: {
+        toolUseId: "question-2",
+        toolName: "Question",
+        toolInput: { id: "question-request-2" },
+        requestedAt: new Date().toISOString(),
+        integration: "Bap",
+        operation: "question",
+        command: "Choose one",
+      },
+      opencodeClient: {
+        question: {
+          reply: questionReplyMock,
+          reject: questionRejectMock,
+        },
+        permission: {
+          reply: vi.fn(),
+        },
+      },
+      opencodePendingApprovalRequest: {
+        kind: "question",
+        request: {
+          id: "question-request-2",
+          sessionID: "session-2",
+          questions: [
+            {
+              header: "Choice",
+              question: "Pick one option",
+              options: [{ label: "A", description: "Option A" }],
+            },
+          ],
+        },
+        defaultAnswers: [["A"]],
+      },
+    });
+    ctx.subscribers.set("sub-1", { id: "sub-1", callback });
+
+    const mgr = generationManager as any;
+    mgr.activeGenerations.set(ctx.id, ctx);
+
+    const result = await generationManager.submitApproval(ctx.id, "question-2", "deny", ctx.userId);
+
+    expect(result).toBe(true);
+    expect(questionReplyMock).not.toHaveBeenCalled();
+    expect(questionRejectMock).toHaveBeenCalledWith({
+      requestID: "question-request-2",
+    });
+    expect(ctx.pendingApproval).toBeNull();
+    expect(ctx.status).toBe("running");
+    expect(callback).toHaveBeenCalledWith({
+      type: "approval_result",
+      toolUseId: "question-2",
+      decision: "denied",
+    });
+  });
+
   it("times out approval into paused status and emits status_change", async () => {
     const callback = vi.fn();
     const ctx = createCtx();

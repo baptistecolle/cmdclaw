@@ -21,7 +21,7 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
 
   if (isUser) {
     return (
-      <div className={cn("flex justify-end", className)}>
+      <div data-testid="chat-bubble-user" className={cn("flex justify-end", className)}>
         <div className="max-w-[80%] rounded-lg bg-primary px-4 py-2 text-primary-foreground">
           <p className="whitespace-pre-wrap text-sm">{content}</p>
         </div>
@@ -83,7 +83,7 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
   };
 
   return (
-    <div className={className}>
+    <div data-testid="chat-bubble-assistant" className={className}>
       <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 max-w-none">
         <ReactMarkdown
           components={{

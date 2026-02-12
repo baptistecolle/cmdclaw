@@ -1,5 +1,5 @@
 import { Sandbox } from "e2b";
-import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
+import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk/v2/client";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
 import { skill, message, conversation, providerAuth } from "@/server/db/schema";
@@ -375,7 +375,7 @@ export async function getOrCreateSession(
     sandboxId: state.sandbox.sandboxId,
   }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId });
   const sessionResult = await state.client.session.create({
-    body: { title: options?.title || "Conversation" },
+    title: options?.title || "Conversation",
   });
 
   if (sessionResult.error || !sessionResult.data) {
@@ -515,16 +515,14 @@ async function replayConversationHistory(
 
   // Inject history as context using noReply: true
   await client.session.prompt({
-    path: { id: sessionId },
-    body: {
-      parts: [
-        {
-          type: "text",
-          text: `<conversation_history>\n${summaryBlock}${historyContext}\n</conversation_history>\n\nContinue this conversation. The user's next message follows.`,
-        },
-      ],
-      noReply: true,
-    },
+    sessionID: sessionId,
+    parts: [
+      {
+        type: "text",
+        text: `<conversation_history>\n${summaryBlock}${historyContext}\n</conversation_history>\n\nContinue this conversation. The user's next message follows.`,
+      },
+    ],
+    noReply: true,
   });
 }
 
@@ -545,8 +543,8 @@ export async function injectProviderAuth(
     for (const auth of auths) {
       try {
         await client.auth.set({
-          path: { id: auth.provider },
-          body: {
+          providerID: auth.provider,
+          auth: {
             type: "oauth",
             access: decrypt(auth.accessToken),
             refresh: decrypt(auth.refreshToken),

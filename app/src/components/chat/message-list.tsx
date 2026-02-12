@@ -63,7 +63,7 @@ export function MessageList({ messages }: Props) {
   }
 
   return (
-    <div className="space-y-2">
+    <div data-testid="chat-message-list" className="space-y-2">
       {messages.map((message) => (
         <MessageItem
           key={message.id}

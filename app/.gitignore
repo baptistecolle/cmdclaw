@@ -35,5 +35,6 @@ pnpm-debug.log*
 certificates
 
 test-results/
+playwright/.auth/
 
 src/daemon/dist

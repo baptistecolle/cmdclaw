@@ -62,6 +62,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
           variant="ghost"
           size="sm"
           disabled={disabled}
+          data-testid="chat-model-selector"
           className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
         >
           {displayName}
@@ -73,6 +74,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         {ANTHROPIC_MODELS.map((model) => (
           <DropdownMenuItem
             key={model.id}
+            data-testid={`chat-model-option-${model.id}`}
             onClick={() => onModelChange(model.id)}
           >
             <span className="flex-1">{model.name}</span>
@@ -93,6 +95,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
           OPENAI_MODELS.map((model) => (
             <DropdownMenuItem
               key={model.id}
+              data-testid={`chat-model-option-${model.id}`}
               onClick={() => onModelChange(model.id)}
             >
               <span className="flex-1">{model.name}</span>
@@ -123,6 +126,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
           GOOGLE_MODELS.map((model) => (
             <DropdownMenuItem
               key={model.id}
+              data-testid={`chat-model-option-${model.id}`}
               onClick={() => onModelChange(model.id)}
             >
               <span className="flex-1">{model.name}</span>
