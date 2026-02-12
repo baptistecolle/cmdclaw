@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { PostHogClientProvider } from "@/components/posthog-provider";
 import { env } from "@/env";
 import { ORPCProvider } from "@/orpc/provider";
+// oxlint-disable-next-line import/no-unassigned-import
 import "./globals.css";
 
 const geistSans = Geist({
