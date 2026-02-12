@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
@@ -116,9 +117,12 @@ export default function AdminWhatsAppPage() {
           )}
           {waQrDataUrl ? (
             <div className="mt-4 flex flex-col items-start gap-2">
-              <img
+              <Image
                 src={waQrDataUrl}
                 alt="WhatsApp QR code"
+                width={224}
+                height={224}
+                unoptimized
                 className="h-56 w-56"
               />
               <p className="text-xs text-muted-foreground">

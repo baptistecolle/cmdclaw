@@ -55,7 +55,7 @@ async function getSpreadsheet(spreadsheetId: string) {
         {
           spreadsheetId: data.spreadsheetId,
           title: data.properties?.title,
-          sheets: data.sheets?.map((s: unknown) => ({
+          sheets: data.sheets?.map((s: Record<string, unknown>) => ({
             sheetId: s.properties?.sheetId,
             title: s.properties?.title,
             rowCount: s.properties?.gridProperties?.rowCount,
@@ -211,7 +211,7 @@ async function listSpreadsheets() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const sheets = files.map((f: unknown) => ({
+  const sheets = files.map((f: Record<string, unknown>) => ({
     id: f.id,
     name: f.name,
     modifiedTime: f.modifiedTime,

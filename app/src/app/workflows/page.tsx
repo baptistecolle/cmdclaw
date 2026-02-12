@@ -351,8 +351,8 @@ export default function WorkflowsPage() {
           >
             <h3 className="text-lg font-semibold">Delete workflow?</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              This will permanently delete "{workflowToDelete.name}" and cannot
-              be undone.
+              This will permanently delete &quot;{workflowToDelete.name}&quot;
+              and cannot be undone.
             </p>
             <div className="mt-6 flex items-center justify-end gap-2">
               <Button

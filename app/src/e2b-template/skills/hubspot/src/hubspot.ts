@@ -59,7 +59,7 @@ async function listContacts() {
   const data = await api(
     `/crm/v3/objects/contacts?limit=${limit}&properties=firstname,lastname,email,phone,company`,
   );
-  const contacts = data.results.map((c: unknown) => ({
+  const contacts = data.results.map((c: Record<string, unknown>) => ({
     id: c.id,
     email: c.properties.email,
     firstname: c.properties.firstname,
@@ -132,7 +132,7 @@ async function searchContacts() {
       properties: ["firstname", "lastname", "email", "phone", "company"],
     }),
   });
-  const contacts = data.results.map((c: unknown) => ({
+  const contacts = data.results.map((c: Record<string, unknown>) => ({
     id: c.id,
     email: c.properties.email,
     firstname: c.properties.firstname,
@@ -148,7 +148,7 @@ async function listCompanies() {
   const data = await api(
     `/crm/v3/objects/companies?limit=${limit}&properties=name,domain,industry,numberofemployees`,
   );
-  const companies = data.results.map((c: unknown) => ({
+  const companies = data.results.map((c: Record<string, unknown>) => ({
     id: c.id,
     name: c.properties.name,
     domain: c.properties.domain,
@@ -211,7 +211,7 @@ async function listDeals() {
   const data = await api(
     `/crm/v3/objects/deals?limit=${limit}&properties=dealname,amount,dealstage,pipeline,closedate`,
   );
-  const deals = data.results.map((d: unknown) => ({
+  const deals = data.results.map((d: Record<string, unknown>) => ({
     id: d.id,
     name: d.properties.dealname,
     amount: d.properties.amount,
@@ -280,7 +280,7 @@ async function listTickets() {
   const data = await api(
     `/crm/v3/objects/tickets?limit=${limit}&properties=subject,content,hs_pipeline,hs_pipeline_stage,hs_ticket_priority`,
   );
-  const tickets = data.results.map((t: unknown) => ({
+  const tickets = data.results.map((t: Record<string, unknown>) => ({
     id: t.id,
     subject: t.properties.subject,
     content: t.properties.content,
@@ -349,7 +349,7 @@ async function listTasks() {
   const data = await api(
     `/crm/v3/objects/tasks?limit=${limit}&properties=hs_task_subject,hs_task_body,hs_task_status,hs_task_priority,hs_timestamp`,
   );
-  const tasks = data.results.map((t: unknown) => ({
+  const tasks = data.results.map((t: Record<string, unknown>) => ({
     id: t.id,
     subject: t.properties.hs_task_subject,
     body: t.properties.hs_task_body,
@@ -417,7 +417,7 @@ async function listNotes() {
   const data = await api(
     `/crm/v3/objects/notes?limit=${limit}&properties=hs_note_body,hs_timestamp`,
   );
-  const notes = data.results.map((n: unknown) => ({
+  const notes = data.results.map((n: Record<string, unknown>) => ({
     id: n.id,
     body: n.properties.hs_note_body,
     timestamp: n.properties.hs_timestamp,
@@ -482,10 +482,10 @@ async function createNote() {
 // ========== PIPELINES ==========
 async function listDealPipelines() {
   const data = await api("/crm/v3/pipelines/deals");
-  const pipelines = data.results.map((p: unknown) => ({
+  const pipelines = data.results.map((p: Record<string, unknown>) => ({
     id: p.id,
     label: p.label,
-    stages: p.stages.map((s: unknown) => ({
+    stages: p.stages.map((s: Record<string, unknown>) => ({
       id: s.id,
       label: s.label,
       displayOrder: s.displayOrder,
@@ -496,10 +496,10 @@ async function listDealPipelines() {
 
 async function listTicketPipelines() {
   const data = await api("/crm/v3/pipelines/tickets");
-  const pipelines = data.results.map((p: unknown) => ({
+  const pipelines = data.results.map((p: Record<string, unknown>) => ({
     id: p.id,
     label: p.label,
-    stages: p.stages.map((s: unknown) => ({
+    stages: p.stages.map((s: Record<string, unknown>) => ({
       id: s.id,
       label: s.label,
       displayOrder: s.displayOrder,
@@ -511,7 +511,7 @@ async function listTicketPipelines() {
 // ========== OWNERS ==========
 async function listOwners() {
   const data = await api("/crm/v3/owners");
-  const owners = data.results.map((o: unknown) => ({
+  const owners = data.results.map((o: Record<string, unknown>) => ({
     id: o.id,
     email: o.email,
     firstName: o.firstName,

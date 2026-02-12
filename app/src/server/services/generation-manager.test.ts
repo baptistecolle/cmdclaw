@@ -155,8 +155,45 @@ import {
   parseBashCommand,
 } from "@/server/ai/permission-checker";
 
-function createCtx(overrides: Partial<Record<string, unknown>> = {}) {
-  const ctx: unknown = {
+type GenerationCtx = {
+  id: string;
+  traceId: string;
+  conversationId: string;
+  userId: string;
+  status: string;
+  contentParts: unknown[];
+  assistantContent: string;
+  subscribers: Map<string, { id: string; callback: (event: unknown) => void }>;
+  abortController: AbortController;
+  pendingApproval: unknown;
+  pendingAuth: unknown;
+  usage: { inputTokens: number; outputTokens: number; totalCostUsd: number };
+  startedAt: Date;
+  lastSaveAt: Date;
+  isNewConversation: boolean;
+  model: string;
+  userMessageContent: string;
+  assistantMessageIds: Set<string>;
+  messageRoles: Map<string, string>;
+  pendingMessageParts: Map<string, unknown>;
+  backendType: string;
+  autoApprove: boolean;
+  [key: string]: unknown;
+};
+
+type GenerationManagerTestHarness = {
+  activeGenerations: Map<string, GenerationCtx>;
+  conversationToGeneration: Map<string, string>;
+  finishGeneration: (ctx: GenerationCtx, status: string) => Promise<void>;
+  runGeneration: (...args: unknown[]) => Promise<void>;
+};
+
+function asTestManager(): GenerationManagerTestHarness {
+  return generationManager as unknown as GenerationManagerTestHarness;
+}
+
+function createCtx(overrides: Partial<GenerationCtx> = {}): GenerationCtx {
+  const ctx: GenerationCtx = {
     id: "gen-1",
     traceId: "trace-1",
     conversationId: "conv-1",
@@ -211,14 +248,14 @@ describe("generationManager transitions", () => {
     generationFindFirstMock.mockResolvedValue(null);
     conversationFindFirstMock.mockResolvedValue(null);
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.clear();
     mgr.conversationToGeneration.clear();
   });
 
   it("cancels generation by aborting and delegating to finishGeneration", async () => {
     const ctx = createCtx();
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const finishSpy = vi
@@ -246,7 +283,7 @@ describe("generationManager transitions", () => {
       },
     });
     ctx.subscribers.set("sub-1", { id: "sub-1", callback });
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const result = await generationManager.submitApproval(
@@ -324,7 +361,7 @@ describe("generationManager transitions", () => {
     });
     ctx.subscribers.set("sub-1", { id: "sub-1", callback });
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const result = await generationManager.submitApproval(
@@ -396,7 +433,7 @@ describe("generationManager transitions", () => {
     });
     ctx.subscribers.set("sub-1", { id: "sub-1", callback });
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const result = await generationManager.submitApproval(
@@ -455,7 +492,7 @@ describe("generationManager transitions", () => {
     });
     ctx.subscribers.set("sub-1", { id: "sub-1", callback });
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const result = await generationManager.submitApproval(
@@ -486,7 +523,7 @@ describe("generationManager transitions", () => {
     const ctx = createCtx();
     ctx.subscribers.set("sub-1", { id: "sub-1", callback });
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const approvalPromise = generationManager.waitForApproval(ctx.id, {
@@ -525,7 +562,7 @@ describe("generationManager transitions", () => {
     });
     ctx.subscribers.set("sub-1", { id: "sub-1", callback });
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const first = await generationManager.submitAuthResult(
@@ -566,7 +603,7 @@ describe("generationManager transitions", () => {
 
   it("cancels on auth timeout", async () => {
     const ctx = createCtx();
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const finishSpy = vi
@@ -585,7 +622,7 @@ describe("generationManager transitions", () => {
   });
 
   it("starts a new generation and enqueues background run", async () => {
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     const runSpy = vi.spyOn(mgr, "runGeneration").mockResolvedValue(undefined);
 
     insertReturningMock
@@ -621,7 +658,7 @@ describe("generationManager transitions", () => {
   });
 
   it("rejects startGeneration when an active running generation already exists", async () => {
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(
       "gen-existing",
       createCtx({ id: "gen-existing", status: "running" }),
@@ -655,7 +692,7 @@ describe("generationManager transitions", () => {
   });
 
   it("starts workflow generation and keeps workflow context fields", async () => {
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     const runSpy = vi.spyOn(mgr, "runGeneration").mockResolvedValue(undefined);
 
     insertReturningMock
@@ -711,7 +748,7 @@ describe("generationManager transitions", () => {
         requestedAt: new Date().toISOString(),
       },
     });
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const status = await generationManager.getGenerationStatus(ctx.id);
@@ -829,7 +866,7 @@ describe("generationManager transitions", () => {
       },
     });
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const events = await collectEvents(
@@ -872,7 +909,7 @@ describe("generationManager transitions", () => {
   });
 
   it("dispatches runGeneration to session reset, direct backend, and opencode backend", async () => {
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     const resetSpy = vi
       .spyOn(mgr, "handleSessionReset")
       .mockResolvedValue(undefined);
@@ -910,7 +947,7 @@ describe("generationManager transitions", () => {
     });
     ctx.subscribers.set("sub-1", { id: "sub-1", callback });
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
     mgr.conversationToGeneration.set(ctx.conversationId, ctx.id);
 
@@ -939,7 +976,7 @@ describe("generationManager transitions", () => {
     });
     ctx.subscribers.set("sub-1", { id: "sub-1", callback });
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
     mgr.conversationToGeneration.set(ctx.conversationId, ctx.id);
 
@@ -976,7 +1013,7 @@ describe("generationManager transitions", () => {
         requestedAt: new Date().toISOString(),
       },
     });
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set("gen-denied", deniedCtx);
 
     await expect(
@@ -1006,7 +1043,7 @@ describe("generationManager transitions", () => {
     );
     expect(missing).toBe(false);
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     const ctx = createCtx({ pendingAuth: null });
     mgr.activeGenerations.set(ctx.id, ctx);
 
@@ -1062,7 +1099,7 @@ describe("generationManager transitions", () => {
     ).resolves.toEqual({ success: false });
 
     const ctx = createCtx({ autoApprove: true });
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     await expect(
@@ -1081,7 +1118,7 @@ describe("generationManager transitions", () => {
       conversationId: "conv-allowed",
       allowedIntegrations: ["slack", "github"],
     });
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
     mgr.conversationToGeneration.set(ctx.conversationId, ctx.id);
 
@@ -1094,7 +1131,7 @@ describe("generationManager transitions", () => {
   });
 
   it("builds workflow prompt sections only when workflow context is present", () => {
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
 
     expect(
       mgr.buildWorkflowPrompt(
@@ -1182,7 +1219,7 @@ describe("generationManager transitions", () => {
       },
     } as unknown);
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     const finishSpy = vi
       .spyOn(mgr, "finishGeneration")
       .mockResolvedValue(undefined);
@@ -1340,7 +1377,7 @@ describe("generationManager transitions", () => {
         .mockReturnValueOnce(secondStream as unknown),
     };
 
-    const mgr = generationManager as unknown;
+    const mgr = asTestManager();
     const finishSpy = vi
       .spyOn(mgr, "finishGeneration")
       .mockResolvedValue(undefined);

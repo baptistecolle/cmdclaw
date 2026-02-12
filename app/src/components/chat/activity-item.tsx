@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import {
   Wrench,
@@ -118,9 +119,11 @@ export function ActivityItem({ item }: Props) {
       const logo = getIntegrationLogo(integration);
       if (logo) {
         return (
-          <img
+          <Image
             src={logo}
             alt={getIntegrationDisplayName(integration)}
+            width={14}
+            height={14}
             className="h-3.5 w-3.5 flex-shrink-0"
           />
         );

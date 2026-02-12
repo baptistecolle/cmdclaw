@@ -45,7 +45,7 @@ async function search() {
   if (!res.ok) throw new Error(await res.text());
 
   const { results } = await res.json();
-  const items = results.map((item: unknown) => ({
+  const items = results.map((item: Record<string, unknown>) => ({
     id: item.id,
     type: item.object,
     title:
@@ -72,9 +72,9 @@ async function getPage(pageId: string) {
   const page = await pageRes.json();
   const blocks = blocksRes.ok ? (await blocksRes.json()).results : [];
 
-  const content = blocks.map((b: unknown) => ({
+  const content = blocks.map((b: Record<string, unknown>) => ({
     type: b.type,
-    text: b[b.type]?.rich_text?.map((t: unknown) => t.plain_text).join("") || "",
+    text: b[b.type]?.rich_text?.map((t: Record<string, unknown>) => t.plain_text).join("") || "",
   }));
 
   console.log(
@@ -161,7 +161,7 @@ async function listDatabases() {
   if (!res.ok) throw new Error(await res.text());
   const { results } = await res.json();
 
-  const dbs = results.map((db: unknown) => ({
+  const dbs = results.map((db: Record<string, unknown>) => ({
     id: db.id,
     title: db.title?.[0]?.plain_text || "Untitled",
     url: db.url,
@@ -184,7 +184,7 @@ async function queryDatabase(databaseId: string) {
   if (!res.ok) throw new Error(await res.text());
   const { results } = await res.json();
 
-  const entries = results.map((page: unknown) => {
+  const entries = results.map((page: Record<string, unknown>) => {
     const props: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(page.properties)) {
       const p = value as unknown;

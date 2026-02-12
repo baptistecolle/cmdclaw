@@ -1,4 +1,10 @@
-import { Queue, QueueEvents, Worker, type Processor } from "bullmq";
+import {
+  Queue,
+  QueueEvents,
+  Worker,
+  type ConnectionOptions,
+  type Processor,
+} from "bullmq";
 import IORedis from "ioredis";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
@@ -114,19 +120,18 @@ let queue: Queue<JobPayload, unknown, string> | null = null;
 let queueConnection: IORedis | null = null;
 
 function createRedisConnection(): IORedis {
-  // Cast to any due to ioredis version mismatch with bullmq's bundled version
-  return new IORedis(redisUrl, redisOptions) as unknown;
+  return new IORedis(redisUrl, redisOptions);
 }
 
 export const getQueue = (): Queue<JobPayload, unknown, string> => {
   if (!queue) {
     queueConnection = createRedisConnection();
     queue = new Queue<JobPayload, unknown, string>(queueName, {
-      connection: queueConnection as unknown,
+      connection: queueConnection as unknown as ConnectionOptions,
     });
   }
 
-  return queue;
+  return queue!;
 };
 
 export const startQueues = () => {
@@ -134,12 +139,12 @@ export const startQueues = () => {
   const queueEventsConnection = createRedisConnection();
 
   const worker = new Worker(queueName, processor, {
-    connection: workerConnection as unknown,
+    connection: workerConnection as unknown as ConnectionOptions,
     concurrency: Number(process.env.BULLMQ_CONCURRENCY ?? "5"),
   });
 
   const queueEvents = new QueueEvents(queueName, {
-    connection: queueEventsConnection as unknown,
+    connection: queueEventsConnection as unknown as ConnectionOptions,
   });
 
   queueEvents.on("completed", ({ jobId }) => {

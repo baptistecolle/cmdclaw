@@ -25,6 +25,24 @@ function verifyPluginSecret(authHeader: string | undefined): boolean {
   return authHeader === expected;
 }
 
+const integrationSchema = z.enum([
+  "gmail",
+  "google_calendar",
+  "google_docs",
+  "google_sheets",
+  "google_drive",
+  "notion",
+  "linear",
+  "github",
+  "airtable",
+  "slack",
+  "hubspot",
+  "linkedin",
+  "salesforce",
+  "reddit",
+  "twitter",
+]);
+
 /**
  * Plugin requests approval for a write operation.
  * Called by the integration-permissions plugin when detecting a write CLI command.
@@ -34,10 +52,10 @@ const approvalRequest = baseProcedure
     z.object({
       sandboxId: z.string(),
       conversationId: z.string(),
-      integration: z.string(),
+      integration: integrationSchema,
       operation: z.string(),
       command: z.string(),
-      toolInput: z.unknown(),
+      toolInput: z.record(z.string(), z.unknown()),
       authHeader: z.string().optional(),
     }),
   )
@@ -82,7 +100,7 @@ const approvalRequest = baseProcedure
       );
     if (
       allowedIntegrations &&
-      !allowedIntegrations.includes(input.integration as unknown)
+      !allowedIntegrations.includes(input.integration)
     ) {
       console.warn(
         "[Internal] Integration not allowed for workflow:",
@@ -93,7 +111,7 @@ const approvalRequest = baseProcedure
 
     // Wait for user approval via GenerationManager
     const decision = await generationManager.waitForApproval(genId, {
-      toolInput: input.toolInput as Record<string, unknown>,
+      toolInput: input.toolInput,
       integration: input.integration,
       operation: input.operation,
       command: input.command,
@@ -110,7 +128,7 @@ const authRequest = baseProcedure
   .input(
     z.object({
       conversationId: z.string(),
-      integration: z.string(),
+      integration: integrationSchema,
       reason: z.string().optional(),
       authHeader: z.string().optional(),
     }),
@@ -152,7 +170,7 @@ const authRequest = baseProcedure
       );
     if (
       allowedIntegrations &&
-      !allowedIntegrations.includes(input.integration as unknown)
+      !allowedIntegrations.includes(input.integration)
     ) {
       console.warn(
         "[Internal] Integration not allowed for workflow:",

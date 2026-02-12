@@ -33,7 +33,7 @@ function extractTextFromContent(content: unknown[]): string {
     if (element.paragraph) {
       const paragraphText =
         element.paragraph.elements
-          ?.map((el: unknown) => el.textRun?.content || "")
+          ?.map((el: Record<string, unknown>) => el.textRun?.content || "")
           .join("") || "";
       textParts.push(paragraphText);
     } else if (element.table) {
@@ -158,7 +158,7 @@ async function listDocuments() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const docs = files.map((f: unknown) => ({
+  const docs = files.map((f: Record<string, unknown>) => ({
     id: f.id,
     name: f.name,
     modifiedTime: f.modifiedTime,
@@ -186,7 +186,7 @@ async function searchDocuments() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const docs = files.map((f: unknown) => ({
+  const docs = files.map((f: Record<string, unknown>) => ({
     id: f.id,
     name: f.name,
     modifiedTime: f.modifiedTime,

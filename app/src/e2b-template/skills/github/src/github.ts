@@ -12,13 +12,13 @@ const headers = {
   "X-GitHub-Api-Version": "2022-11-28",
 };
 
-async function api(path: string, options?: RequestInit) {
+async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`https://api.github.com${path}`, {
     ...options,
     headers: { ...headers, ...options?.headers },
   });
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  return res.json();
+  return (await res.json()) as T;
 }
 
 const { positionals, values } = parseArgs({
@@ -46,9 +46,17 @@ async function listRepos() {
     sort: "updated",
     per_page: values.limit || "20",
   });
-  const repos = await api(`/user/repos?${params}`);
+  const repos = await api<
+    Array<{
+      full_name: string;
+      private: boolean;
+      language: string | null;
+      stargazers_count: number;
+      html_url: string;
+    }>
+  >(`/user/repos?${params}`);
 
-  const list = repos.map((r: unknown) => ({
+  const list = repos.map((r) => ({
     name: r.full_name,
     private: r.private,
     language: r.language,
@@ -69,11 +77,20 @@ async function listPRs() {
     state: values.state || "open",
     per_page: values.limit || "20",
   });
-  const prs = await api(
+  const prs = await api<
+    Array<{
+      number: number;
+      title: string;
+      user?: { login?: string };
+      draft?: boolean;
+      html_url: string;
+      created_at: string;
+    }>
+  >(
     `/repos/${values.owner}/${values.repo}/pulls?${params}`,
   );
 
-  const list = prs.map((pr: unknown) => ({
+  const list = prs.map((pr) => ({
     number: pr.number,
     title: pr.title,
     author: pr.user?.login,
@@ -92,8 +109,23 @@ async function getPR(prNumber: string) {
   }
 
   const [pr, reviews] = await Promise.all([
-    api(`/repos/${values.owner}/${values.repo}/pulls/${prNumber}`),
-    api(`/repos/${values.owner}/${values.repo}/pulls/${prNumber}/reviews`),
+    api<{
+      number: number;
+      title: string;
+      body: string | null;
+      state: string;
+      merged: boolean;
+      user?: { login?: string };
+      base?: { ref?: string };
+      head?: { ref?: string };
+      additions: number;
+      deletions: number;
+      changed_files: number;
+      html_url: string;
+    }>(`/repos/${values.owner}/${values.repo}/pulls/${prNumber}`),
+    api<Array<{ user?: { login?: string }; state: string }>>(
+      `/repos/${values.owner}/${values.repo}/pulls/${prNumber}/reviews`,
+    ),
   ]);
 
   console.log(
@@ -111,7 +143,7 @@ async function getPR(prNumber: string) {
         deletions: pr.deletions,
         files: pr.changed_files,
         url: pr.html_url,
-        reviews: reviews.map((r: unknown) => ({
+        reviews: reviews.map((r) => ({
           author: r.user?.login,
           state: r.state,
         })),
@@ -123,7 +155,7 @@ async function getPR(prNumber: string) {
 }
 
 async function myPRs() {
-  const user = await api("/user");
+  const user = await api<{ login: string }>("/user");
   const filterMap: Record<string, string> = {
     created: `author:${user.login}`,
     assigned: `assignee:${user.login}`,
@@ -131,11 +163,18 @@ async function myPRs() {
   };
 
   const q = `is:pr state:${values.state || "open"} ${filterMap[values.filter || "created"] || ""}`;
-  const result = await api(
+  const result = await api<{
+    items: Array<{
+      title: string;
+      repository_url: string;
+      number: number;
+      html_url: string;
+    }>;
+  }>(
     `/search/issues?q=${encodeURIComponent(q)}&per_page=30`,
   );
 
-  const prs = result.items.map((pr: unknown) => ({
+  const prs = result.items.map((pr) => ({
     title: pr.title,
     repo: pr.repository_url?.split("/").slice(-2).join("/"),
     number: pr.number,
@@ -153,16 +192,19 @@ async function createIssue() {
     process.exit(1);
   }
 
-  const issue = await api(`/repos/${values.owner}/${values.repo}/issues`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: values.title,
-      body: values.body,
-      labels: values.labels?.split(","),
-      assignees: values.assignees?.split(","),
-    }),
-  });
+  const issue = await api<{ number: number; title: string; html_url: string }>(
+    `/repos/${values.owner}/${values.repo}/issues`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: values.title,
+        body: values.body,
+        labels: values.labels?.split(","),
+        assignees: values.assignees?.split(","),
+      }),
+    },
+  );
 
   console.log(
     `Issue created: #${issue.number} - ${issue.title}\n${issue.html_url}`,
@@ -181,16 +223,25 @@ async function listIssues() {
   });
   if (values.labels) params.set("labels", values.labels);
 
-  const issues = await api(
+  const issues = await api<
+    Array<{
+      pull_request?: unknown;
+      number: number;
+      title: string;
+      user?: { login?: string };
+      labels?: Array<{ name: string }>;
+      html_url: string;
+    }>
+  >(
     `/repos/${values.owner}/${values.repo}/issues?${params}`,
   );
-  const filtered = issues.filter((i: unknown) => !i.pull_request);
+  const filtered = issues.filter((i) => !i.pull_request);
 
-  const list = filtered.map((i: unknown) => ({
+  const list = filtered.map((i) => ({
     number: i.number,
     title: i.title,
     author: i.user?.login,
-    labels: i.labels?.map((l: unknown) => l.name),
+    labels: i.labels?.map((l) => l.name),
     url: i.html_url,
   }));
 
@@ -203,11 +254,19 @@ async function searchCode() {
     process.exit(1);
   }
 
-  const result = await api(
+  const result = await api<{
+    total_count: number;
+    items: Array<{
+      name: string;
+      path: string;
+      repository?: { full_name?: string };
+      html_url: string;
+    }>;
+  }>(
     `/search/code?q=${encodeURIComponent(values.query)}&per_page=${values.limit || "10"}`,
   );
 
-  const results = result.items.map((item: unknown) => ({
+  const results = result.items.map((item) => ({
     name: item.name,
     path: item.path,
     repo: item.repository?.full_name,

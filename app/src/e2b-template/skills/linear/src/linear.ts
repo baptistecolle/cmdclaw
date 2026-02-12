@@ -48,7 +48,7 @@ async function listIssues() {
     }
   }`);
 
-  const issues = data.issues.nodes.map((i: unknown) => ({
+  const issues = data.issues.nodes.map((i: Record<string, unknown>) => ({
     identifier: i.identifier,
     title: i.title,
     state: i.state?.name,

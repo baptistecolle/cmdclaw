@@ -120,7 +120,7 @@ function OnboardingIntegrationsContent() {
         type,
         redirectUrl: `${window.location.origin}/onboarding/integrations`,
       });
-      window.location.href = result.authUrl;
+      window.location.assign(result.authUrl);
     } catch (error) {
       console.error("Failed to get auth URL:", error);
       setConnectingType(null);

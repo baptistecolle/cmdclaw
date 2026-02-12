@@ -17,6 +17,63 @@ import { proxyChatRequest } from "./llm-proxy";
 const MIN_RECONNECT_MS = 1000;
 const MAX_RECONNECT_MS = 30_000;
 
+type WSBaseMessage = { type: string; id?: string };
+type WSAuthenticatedMessage = WSBaseMessage & {
+  type: "authenticated";
+  deviceId?: string;
+};
+type WSSandboxSetupMessage = WSBaseMessage & {
+  type: "sandbox.setup";
+  conversationId: string;
+  workDir?: string;
+};
+type WSSandboxExecuteMessage = WSBaseMessage & {
+  type: "sandbox.execute";
+  conversationId: string;
+  command: string;
+  timeout?: number;
+  env?: Record<string, string>;
+};
+type WSSandboxWriteFileMessage = WSBaseMessage & {
+  type: "sandbox.writeFile";
+  path: string;
+  content: string;
+};
+type WSSandboxReadFileMessage = WSBaseMessage & {
+  type: "sandbox.readFile";
+  path: string;
+};
+type WSSandboxTeardownMessage = WSBaseMessage & {
+  type: "sandbox.teardown";
+  conversationId?: string;
+};
+type WSLLMChatMessage = WSBaseMessage & {
+  type: "llm.chat";
+  messages: unknown[];
+  tools?: Array<{
+    name: string;
+    description?: string;
+    input_schema?: Record<string, unknown>;
+  }>;
+  system?: string;
+  model?: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function toBaseMessage(value: unknown): WSBaseMessage | null {
+  const record = asRecord(value);
+  if (!record || typeof record.type !== "string") return null;
+  return {
+    type: record.type,
+    id: typeof record.id === "string" ? record.id : undefined,
+  };
+}
+
 export class WSClient {
   private ws: WebSocket | null = null;
   private serverUrl: string;
@@ -108,17 +165,26 @@ export class WSClient {
   }
 
   private handleMessage(raw: string): void {
-    let msg: unknown;
+    let parsed: unknown;
     try {
-      msg = JSON.parse(raw);
+      parsed = JSON.parse(raw);
     } catch {
       logger.error("ws", "Invalid JSON received");
       return;
     }
 
+    const msg = toBaseMessage(parsed);
+    const record = asRecord(parsed);
+    if (!msg || !record) {
+      logger.error("ws", "Invalid message shape");
+      return;
+    }
+
     switch (msg.type) {
       case "authenticated":
-        console.log(`  Connected as device ${msg.deviceId}`);
+        console.log(
+          `  Connected as device ${String((record as WSAuthenticatedMessage).deviceId ?? "unknown")}`,
+        );
         break;
 
       case "ping":
@@ -126,31 +192,55 @@ export class WSClient {
         break;
 
       case "sandbox.setup":
-        this.handleSandboxSetup(msg);
+        if (
+          typeof record.conversationId === "string" &&
+          (record.workDir === undefined || typeof record.workDir === "string")
+        ) {
+          this.handleSandboxSetup(record as WSSandboxSetupMessage);
+        }
         break;
 
       case "sandbox.execute":
-        this.handleSandboxExecute(msg);
+        if (
+          typeof record.conversationId === "string" &&
+          typeof record.command === "string"
+        ) {
+          this.handleSandboxExecute(record as WSSandboxExecuteMessage);
+        }
         break;
 
       case "sandbox.writeFile":
-        this.handleSandboxWriteFile(msg);
+        if (typeof record.path === "string" && typeof record.content === "string") {
+          this.handleSandboxWriteFile(record as WSSandboxWriteFileMessage);
+        }
         break;
 
       case "sandbox.readFile":
-        this.handleSandboxReadFile(msg);
+        if (typeof record.path === "string") {
+          this.handleSandboxReadFile(record as WSSandboxReadFileMessage);
+        }
         break;
 
       case "sandbox.teardown":
-        this.handleSandboxTeardown(msg);
+        if (
+          record.conversationId === undefined ||
+          typeof record.conversationId === "string"
+        ) {
+          this.handleSandboxTeardown(record as WSSandboxTeardownMessage);
+        }
         break;
 
       case "llm.chat":
-        this.handleLLMChat(msg);
+        if (Array.isArray(record.messages)) {
+          this.handleLLMChat(record as WSLLMChatMessage);
+        }
         break;
 
       case "error":
-        logger.error("ws", `Server error: ${msg.error}`);
+        logger.error(
+          "ws",
+          `Server error: ${typeof record.error === "string" ? record.error : "unknown"}`,
+        );
         break;
 
       default:
@@ -158,7 +248,7 @@ export class WSClient {
     }
   }
 
-  private handleSandboxSetup(msg: unknown): void {
+  private handleSandboxSetup(msg: WSSandboxSetupMessage): void {
     try {
       setupSandbox(msg.conversationId, msg.workDir);
       this.send({
@@ -176,7 +266,7 @@ export class WSClient {
     }
   }
 
-  private async handleSandboxExecute(msg: unknown): Promise<void> {
+  private async handleSandboxExecute(msg: WSSandboxExecuteMessage): Promise<void> {
     try {
       const result = await executeCommand(msg.command, {
         conversationId: msg.conversationId,
@@ -203,7 +293,7 @@ export class WSClient {
     }
   }
 
-  private handleSandboxWriteFile(msg: unknown): void {
+  private handleSandboxWriteFile(msg: WSSandboxWriteFileMessage): void {
     try {
       writeFile(msg.path, msg.content);
       this.send({
@@ -221,7 +311,7 @@ export class WSClient {
     }
   }
 
-  private handleSandboxReadFile(msg: unknown): void {
+  private handleSandboxReadFile(msg: WSSandboxReadFileMessage): void {
     try {
       const content = readFile(msg.path);
       this.send({
@@ -239,7 +329,7 @@ export class WSClient {
     }
   }
 
-  private handleSandboxTeardown(msg: unknown): void {
+  private handleSandboxTeardown(msg: WSSandboxTeardownMessage): void {
     try {
       if (msg.conversationId) {
         teardownSandbox(msg.conversationId);
@@ -259,7 +349,7 @@ export class WSClient {
     }
   }
 
-  private handleLLMChat(msg: unknown): void {
+  private handleLLMChat(msg: WSLLMChatMessage): void {
     proxyChatRequest(
       {
         messages: msg.messages,

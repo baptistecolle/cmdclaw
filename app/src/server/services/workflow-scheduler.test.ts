@@ -52,14 +52,18 @@ import {
   upsertWorkflowScheduleJob,
 } from "./workflow-scheduler";
 
-function createRow(overrides: Record<string, unknown> = {}) {
+type WorkflowScheduleRowInput = Parameters<typeof upsertWorkflowScheduleJob>[0];
+
+function createRow(
+  overrides: Partial<WorkflowScheduleRowInput> = {},
+): WorkflowScheduleRowInput {
   return {
     id: "wf-1",
     triggerType: "schedule",
     status: "on",
     schedule: { type: "interval", intervalMinutes: 10 },
     ...overrides,
-  } as unknown;
+  };
 }
 
 describe("workflow-scheduler", () => {

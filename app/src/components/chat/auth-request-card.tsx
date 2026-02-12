@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import {
   ChevronDown,
@@ -60,10 +61,12 @@ export function AuthRequestCard({
           {integrations.slice(0, 3).map((integration) => {
             const logo = getIntegrationLogo(integration);
             return logo ? (
-              <img
+              <Image
                 key={integration}
                 src={logo}
                 alt={getIntegrationDisplayName(integration)}
+                width={20}
+                height={20}
                 className="h-5 w-5 object-contain"
               />
             ) : null;
@@ -118,9 +121,11 @@ export function AuthRequestCard({
                 >
                   <div className="flex items-center gap-3">
                     {logo && (
-                      <img
+                      <Image
                         src={logo}
                         alt={displayName}
+                        width={24}
+                        height={24}
                         className="h-6 w-6 object-contain"
                       />
                     )}

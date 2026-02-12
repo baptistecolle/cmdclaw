@@ -131,15 +131,15 @@ async function createWorkflow(
     name: string;
     triggerType: string;
     prompt: string;
-    integrations?: string[];
-    schedule?: unknown;
+    integrations?: WorkflowIntegrationType[];
+    schedule?: WorkflowSchedule;
   },
 ): Promise<void> {
   const result = await client.workflow.create({
     name: opts.name,
     triggerType: opts.triggerType,
     prompt: opts.prompt,
-    allowedIntegrations: (opts.integrations ?? []) as unknown[],
+    allowedIntegrations: opts.integrations ?? [],
     schedule: opts.schedule,
   });
 
@@ -376,6 +376,37 @@ type ParsedArgs = {
   scheduleDayOfMonth?: number;
 };
 
+const integrationTypes = [
+  "gmail",
+  "google_calendar",
+  "google_docs",
+  "google_sheets",
+  "google_drive",
+  "notion",
+  "linear",
+  "github",
+  "airtable",
+  "slack",
+  "hubspot",
+  "linkedin",
+  "salesforce",
+  "reddit",
+  "twitter",
+] as const;
+type WorkflowIntegrationType = (typeof integrationTypes)[number];
+
+type WorkflowSchedule =
+  | { type: "interval"; intervalMinutes: number }
+  | { type: "daily"; time: string; timezone?: string }
+  | { type: "weekly"; time: string; daysOfWeek: number[]; timezone?: string }
+  | { type: "monthly"; time: string; dayOfMonth: number; timezone?: string };
+
+function isWorkflowIntegrationType(
+  value: string,
+): value is WorkflowIntegrationType {
+  return (integrationTypes as readonly string[]).includes(value);
+}
+
 function parseArgs(argv: string[]): ParsedArgs {
   const result: ParsedArgs = { args: [] };
 
@@ -428,7 +459,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   return result;
 }
 
-function buildSchedule(parsed: ParsedArgs): unknown {
+function buildSchedule(parsed: ParsedArgs): WorkflowSchedule | undefined {
   if (!parsed.scheduleType) return undefined;
   switch (parsed.scheduleType) {
     case "interval":
@@ -555,7 +586,9 @@ async function main(): Promise<void> {
             name: parsed.name,
             triggerType: parsed.triggerType,
             prompt: parsed.prompt,
-            integrations: parsed.integrations,
+            integrations: parsed.integrations?.filter(
+              isWorkflowIntegrationType,
+            ),
             schedule: buildSchedule(parsed),
           });
           break;

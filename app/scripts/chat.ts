@@ -376,7 +376,7 @@ async function runChatLoop(
 
 async function runGeneration(
   client: RouterClient<AppRouter>,
-  rl: readline.Interface,
+  rl: readline.Interface | null,
   content: string,
   conversationId: string | undefined,
   options: Args,
@@ -559,7 +559,7 @@ async function main(): Promise<void> {
     const attachments = args.files.map((f) => fileToAttachment(f));
     const result = await runGeneration(
       client,
-      null as unknown,
+      null,
       args.message,
       args.conversationId,
       args,

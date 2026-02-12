@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import NextImage from "next/image";
 import {
   useSkill,
   useUpdateSkill,
@@ -204,66 +205,81 @@ function SkillEditorPageContent() {
     }
   };
 
-  const getCurrentContent = (): string => {
-    const selectedFile = skill?.files.find((f) => f.id === selectedFileId);
-    if (selectedFile?.path === "SKILL.md") {
-      return serializeSkillContent(skillSlug, skillDescription, skillBody);
-    }
-    return editedContent;
-  };
+  const handleSaveFile = useCallback(
+    async (showNotificationIfNoChanges = false) => {
+      if (!selectedFileId) return;
 
-  const handleSaveFile = async (showNotificationIfNoChanges = false) => {
-    if (!selectedFileId) return;
+      const selectedFile = skill?.files.find((f) => f.id === selectedFileId);
+      if (!selectedFile) return;
 
-    const selectedFile = skill?.files.find((f) => f.id === selectedFileId);
-    if (!selectedFile) return;
+      const content =
+        selectedFile.path === "SKILL.md"
+          ? serializeSkillContent(skillSlug, skillDescription, skillBody)
+          : editedContent;
 
-    const content = getCurrentContent();
+      // Check if there are actual changes
+      const hasFileChanges = content !== selectedFile.content;
+      const hasMetadataChanges =
+        skillSlug !== skill?.name ||
+        skillDisplayName !== skill?.displayName ||
+        skillDescription !== skill?.description ||
+        skillIcon !== (skill?.icon ?? null);
 
-    // Check if there are actual changes
-    const hasFileChanges = content !== selectedFile.content;
-    const hasMetadataChanges =
-      skillSlug !== skill?.name ||
-      skillDisplayName !== skill?.displayName ||
-      skillDescription !== skill?.description ||
-      skillIcon !== (skill?.icon ?? null);
+      // Skip save if nothing changed
+      if (!hasFileChanges && !hasMetadataChanges) {
+        if (showNotificationIfNoChanges) {
+          setNotification({ type: "success", message: "Saved" });
+        }
+        return;
+      }
 
-    // Skip save if nothing changed
-    if (!hasFileChanges && !hasMetadataChanges) {
-      if (showNotificationIfNoChanges) {
+      setIsSaving(true);
+      try {
+        if (hasFileChanges) {
+          await updateFile.mutateAsync({
+            id: selectedFileId,
+            content,
+          });
+        }
+
+        if (hasMetadataChanges) {
+          // Also update skill metadata
+          await updateSkill.mutateAsync({
+            id: skillId,
+            name: skillSlug,
+            displayName: skillDisplayName,
+            description: skillDescription,
+            icon: skillIcon,
+          });
+        }
+
         setNotification({ type: "success", message: "Saved" });
+        refetch();
+      } catch {
+        setNotification({ type: "error", message: "Failed to save" });
+      } finally {
+        setIsSaving(false);
       }
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      if (hasFileChanges) {
-        await updateFile.mutateAsync({
-          id: selectedFileId,
-          content,
-        });
-      }
-
-      if (hasMetadataChanges) {
-        // Also update skill metadata
-        await updateSkill.mutateAsync({
-          id: skillId,
-          name: skillSlug,
-          displayName: skillDisplayName,
-          description: skillDescription,
-          icon: skillIcon,
-        });
-      }
-
-      setNotification({ type: "success", message: "Saved" });
-      refetch();
-    } catch {
-      setNotification({ type: "error", message: "Failed to save" });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    },
+    [
+      selectedFileId,
+      skill?.files,
+      skill?.name,
+      skill?.displayName,
+      skill?.description,
+      skill?.icon,
+      skillSlug,
+      skillDescription,
+      skillBody,
+      editedContent,
+      skillDisplayName,
+      skillIcon,
+      updateFile,
+      updateSkill,
+      skillId,
+      refetch,
+    ],
+  );
 
   const handleAddFile = async () => {
     if (!newFilePath.trim()) return;
@@ -446,6 +462,9 @@ function SkillEditorPageContent() {
     skillSlug,
     skillDescription,
     skillIcon,
+    selectedFileId,
+    handleSaveFile,
+    skill?.files,
   ]);
 
   // Cmd+S / Ctrl+S to save immediately
@@ -866,9 +885,12 @@ Add your skill instructions here..."
                 if (selectedDoc.mimeType.startsWith("image/")) {
                   return (
                     <div className="flex h-full items-center justify-center overflow-auto rounded-lg border bg-muted/30 p-4">
-                      <img
+                      <NextImage
                         src={documentUrl}
                         alt={selectedDoc.filename}
+                        width={1200}
+                        height={1200}
+                        unoptimized
                         className="max-h-full max-w-full object-contain"
                       />
                     </div>
@@ -904,8 +926,9 @@ Add your skill instructions here..."
             <div className="mx-4 w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
               <h3 className="text-lg font-semibold">Delete document</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Are you sure you want to delete "{documentToDelete.filename}"?
-                This action cannot be undone.
+                Are you sure you want to delete
+                &quot;{documentToDelete.filename}&quot;? This action cannot be
+                undone.
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <Button
@@ -928,8 +951,8 @@ Add your skill instructions here..."
             <div className="mx-4 w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
               <h3 className="text-lg font-semibold">Delete file</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Are you sure you want to delete "{fileToDelete.path}"? This
-                action cannot be undone.
+                Are you sure you want to delete &quot;{fileToDelete.path}
+                &quot;? This action cannot be undone.
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setFileToDelete(null)}>

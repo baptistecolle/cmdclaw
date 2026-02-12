@@ -174,45 +174,47 @@ function SheetsAddSheetPreview({
 }
 
 function ValuesPreview({ values }: { values: string }) {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(values);
-    if (Array.isArray(parsed)) {
-      return (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <tbody>
-              {parsed.slice(0, 5).map((row, i) => (
-                <tr key={i}>
-                  {Array.isArray(row) ? (
-                    row.map((cell, j) => (
-                      <td key={j} className="border px-2 py-1 bg-muted/30">
-                        {String(cell)}
-                      </td>
-                    ))
-                  ) : (
-                    <td className="border px-2 py-1 bg-muted/30">
-                      {String(row)}
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {parsed.length > 5 && (
-                <tr>
-                  <td
-                    className="border px-2 py-1 text-muted-foreground text-center"
-                    colSpan={100}
-                  >
-                    ... and {parsed.length - 5} more rows
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
+    parsed = JSON.parse(values);
   } catch {
     // Fall through to raw display
+  }
+
+  if (Array.isArray(parsed)) {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <tbody>
+            {parsed.slice(0, 5).map((row, i) => (
+              <tr key={i}>
+                {Array.isArray(row) ? (
+                  row.map((cell, j) => (
+                    <td key={j} className="border px-2 py-1 bg-muted/30">
+                      {String(cell)}
+                    </td>
+                  ))
+                ) : (
+                  <td className="border px-2 py-1 bg-muted/30">
+                    {String(row)}
+                  </td>
+                )}
+              </tr>
+            ))}
+            {parsed.length > 5 && (
+              <tr>
+                <td
+                  className="border px-2 py-1 text-muted-foreground text-center"
+                  colSpan={100}
+                >
+                  ... and {parsed.length - 5} more rows
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
   }
 
   return <PreviewContent>{values}</PreviewContent>;

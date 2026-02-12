@@ -94,7 +94,7 @@ async function removeAuthData(key: string): Promise<void> {
   await db.delete(whatsappAuthState).where(eq(whatsappAuthState.id, key));
 }
 
-async function useDbAuthState(): Promise<{
+async function createDbAuthState(): Promise<{
   state: AuthenticationState;
   saveCreds: () => Promise<void>;
 }> {
@@ -309,7 +309,7 @@ export async function ensureWhatsAppSocket(): Promise<void> {
   state.lastError = null;
 
   try {
-    const { state: authState, saveCreds } = await useDbAuthState();
+    const { state: authState, saveCreds } = await createDbAuthState();
 
     socket = makeWASocket({
       auth: authState,

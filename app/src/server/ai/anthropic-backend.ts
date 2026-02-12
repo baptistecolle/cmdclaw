@@ -128,12 +128,12 @@ function convertContentBlocks(
           type: "thinking",
           thinking: block.thinking,
           signature: block.signature,
-        } as unknown;
+        } as Anthropic.ContentBlockParam;
       case "image":
         return {
           type: "image",
           source: block.source,
-        } as unknown;
+        } as Anthropic.ContentBlockParam;
       default:
         return { type: "text", text: "" };
     }
@@ -173,10 +173,17 @@ function mapAnthropicEvent(event: Anthropic.MessageStreamEvent): StreamEvent[] {
           jsonDelta: delta.partial_json,
         });
       } else if (delta.type === "thinking_delta") {
+        const thinkingText =
+          typeof delta === "object" &&
+          delta !== null &&
+          "thinking" in delta &&
+          typeof delta.thinking === "string"
+            ? delta.thinking
+            : "";
         events.push({
           type: "thinking",
           thinkingId: `thinking-${event.index}`,
-          text: (delta as unknown).thinking || "",
+          text: thinkingText,
         });
       }
       break;
@@ -189,10 +196,17 @@ function mapAnthropicEvent(event: Anthropic.MessageStreamEvent): StreamEvent[] {
     }
 
     case "message_delta": {
-      if ((event.delta as unknown).stop_reason) {
+      const stopReason =
+        typeof event.delta === "object" &&
+        event.delta !== null &&
+        "stop_reason" in event.delta &&
+        typeof event.delta.stop_reason === "string"
+          ? event.delta.stop_reason
+          : null;
+      if (stopReason) {
         events.push({
           type: "done",
-          stopReason: (event.delta as unknown).stop_reason,
+          stopReason,
         });
       }
       if (event.usage) {

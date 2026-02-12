@@ -49,6 +49,7 @@ import {
 import type { IntegrationType } from "@/server/oauth/config";
 import {
   buildMemorySystemPrompt,
+  type MemoryFileType,
   readMemoryFile,
   searchMemoryWithSessions,
   syncMemoryToSandbox,
@@ -81,6 +82,10 @@ import type {
   QuestionRequest,
   ToolPart,
 } from "@opencode-ai/sdk/v2/client";
+
+function parseMemoryFileType(input: unknown): MemoryFileType | undefined {
+  return input === "daily" || input === "longterm" ? input : undefined;
+}
 
 // Event types for generation stream
 export type GenerationEvent =
@@ -1749,13 +1754,9 @@ class GenerationManager {
       // Build prompt parts (text + file attachments)
       // For non-image files, write them to the sandbox so the LLM can process them
       // via sandbox tools, rather than passing unsupported media types directly.
-      const promptParts: Array<{
-        type: string;
-        text?: string;
-        mime?: string;
-        url?: string;
-        filename?: string;
-      }> = [{ type: "text", text: ctx.userMessageContent }];
+      const promptParts: NonNullable<
+        Parameters<typeof client.session.prompt>[0]["parts"]
+      > = [{ type: "text", text: ctx.userMessageContent }];
       if (ctx.attachments && ctx.attachments.length > 0) {
         for (const a of ctx.attachments) {
           if (a.mimeType.startsWith("image/")) {
@@ -1829,7 +1830,7 @@ class GenerationManager {
       );
       const promptPromise = client.session.prompt({
         sessionID: sessionId,
-        parts: promptParts as unknown,
+        parts: promptParts,
         system: systemPrompt,
         model: modelConfig,
       });
@@ -1898,7 +1899,11 @@ class GenerationManager {
 
         // Check for session error
         if (event.type === "session.error") {
-          const error = (event.properties as unknown)?.error || "Unknown error";
+          const eventProps =
+            typeof event.properties === "object" && event.properties !== null
+              ? (event.properties as Record<string, unknown>)
+              : {};
+          const error = eventProps.error ?? "Unknown error";
           const errorMessage =
             typeof error === "string"
               ? error
@@ -2556,7 +2561,7 @@ class GenerationManager {
             userId: ctx.userId,
             query,
             limit: input.limit ? Number(input.limit) : undefined,
-            type: input.type as unknown,
+            type: parseMemoryFileType(input.type),
             date: input.date as string | undefined,
           });
           return { content: JSON.stringify({ results }, null, 2) };
@@ -2592,7 +2597,7 @@ class GenerationManager {
           const entry = await writeMemoryEntry({
             userId: ctx.userId,
             path: input.path as string | undefined,
-            type: input.type as unknown,
+            type: parseMemoryFileType(input.type),
             date: input.date as string | undefined,
             title: input.title as string | undefined,
             tags: input.tags as string[] | undefined,

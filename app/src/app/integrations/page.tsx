@@ -137,6 +137,14 @@ const integrationConfig = {
 
 type IntegrationType = keyof typeof integrationConfig;
 type OAuthIntegrationType = Exclude<IntegrationType, "whatsapp">;
+type CustomAuthType = "oauth2" | "api_key" | "bearer_token";
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
 
 function IntegrationsPageContent() {
   const searchParams = useSearchParams();
@@ -170,7 +178,7 @@ function IntegrationsPageContent() {
     name: "",
     description: "",
     baseUrl: "",
-    authType: "api_key" as "oauth2" | "api_key" | "bearer_token",
+    authType: "api_key" as CustomAuthType,
     apiKey: "",
     clientId: "",
     clientSecret: "",
@@ -212,17 +220,21 @@ function IntegrationsPageContent() {
     const error = searchParams.get("error");
 
     if (success) {
-      setNotification({
-        type: "success",
-        message: "Integration connected successfully!",
+      queueMicrotask(() => {
+        setNotification({
+          type: "success",
+          message: "Integration connected successfully!",
+        });
       });
       // Clear the URL params
       window.history.replaceState({}, "", "/integrations");
       refetch();
     } else if (error) {
-      setNotification({
-        type: "error",
-        message: `Failed to connect: ${error.replace(/_/g, " ")}`,
+      queueMicrotask(() => {
+        setNotification({
+          type: "error",
+          message: `Failed to connect: ${error.replace(/_/g, " ")}`,
+        });
       });
       window.history.replaceState({}, "", "/integrations");
     }
@@ -243,7 +255,7 @@ function IntegrationsPageContent() {
         type,
         redirectUrl: window.location.href,
       });
-      window.location.href = result.authUrl;
+      window.location.assign(result.authUrl);
     } catch (error) {
       console.error("Failed to get auth URL:", error);
       setConnectingType(null);
@@ -710,7 +722,8 @@ function IntegrationsPageContent() {
           </div>
         ) : (
           <div className="py-8 text-center text-sm text-muted-foreground">
-            No custom integrations yet. Click "Add Custom" to create one.
+            No custom integrations yet. Click &quot;Add Custom&quot; to create
+            one.
           </div>
         )}
       </div>
@@ -785,7 +798,7 @@ function IntegrationsPageContent() {
                   onChange={(e) =>
                     setCustomForm({
                       ...customForm,
-                      authType: e.target.value as unknown,
+                      authType: e.target.value as CustomAuthType,
                     })
                   }
                 >
@@ -952,7 +965,10 @@ function IntegrationsPageContent() {
                   } catch (error: unknown) {
                     setNotification({
                       type: "error",
-                      message: error?.message || "Failed to create integration",
+                      message: toErrorMessage(
+                        error,
+                        "Failed to create integration",
+                      ),
                     });
                   }
                 }}

@@ -31,21 +31,15 @@ export function ActivityFeed({
 }: Props) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
+  const shouldAutoScroll = isStreaming ? false : userHasScrolled;
 
   // Auto-scroll to bottom when new items arrive (unless user has scrolled up)
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || userHasScrolled) return;
+    if (!container || shouldAutoScroll) return;
 
     container.scrollTop = container.scrollHeight;
-  }, [items, userHasScrolled]);
-
-  // Reset user scroll tracking when streaming starts
-  useEffect(() => {
-    if (isStreaming) {
-      setUserHasScrolled(false);
-    }
-  }, [isStreaming]);
+  }, [items, shouldAutoScroll]);
 
   // Track user scroll
   const handleScroll = useCallback(() => {

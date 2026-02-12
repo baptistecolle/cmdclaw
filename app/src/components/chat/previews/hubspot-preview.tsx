@@ -214,24 +214,26 @@ function getDisplayFields(
 }
 
 function PropertiesPreview({ properties }: { properties: string }) {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(properties);
-    if (typeof parsed === "object" && parsed !== null) {
-      return (
-        <div className="rounded border bg-muted/30 divide-y">
-          {Object.entries(parsed).map(([key, value]) => (
-            <div key={key} className="flex px-3 py-2 text-sm">
-              <span className="font-medium text-muted-foreground w-32 shrink-0">
-                {key}
-              </span>
-              <span className="break-words">{String(value)}</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
+    parsed = JSON.parse(properties);
   } catch {
     // Fall through to raw display
+  }
+
+  if (typeof parsed === "object" && parsed !== null) {
+    return (
+      <div className="rounded border bg-muted/30 divide-y">
+        {Object.entries(parsed).map(([key, value]) => (
+          <div key={key} className="flex px-3 py-2 text-sm">
+            <span className="font-medium text-muted-foreground w-32 shrink-0">
+              {key}
+            </span>
+            <span className="break-words">{String(value)}</span>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (

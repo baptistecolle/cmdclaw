@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Square, Mic, Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -149,9 +150,12 @@ export function ChatInput({
               className="group relative flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs"
             >
               {a.preview ? (
-                <img
+                <Image
                   src={a.preview}
                   alt={a.file.name}
+                  width={32}
+                  height={32}
+                  unoptimized
                   className="h-8 w-8 rounded object-cover"
                 />
               ) : (

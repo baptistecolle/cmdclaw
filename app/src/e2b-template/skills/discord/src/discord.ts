@@ -20,7 +20,7 @@ async function api(
     body?: Record<string, unknown>;
     params?: Record<string, string>;
   } = {},
-) {
+): Promise<unknown> {
   const { method = "GET", body, params } = options;
   let url = `${API_BASE}${endpoint}`;
 
@@ -38,7 +38,13 @@ async function api(
   const data = await res.json();
 
   if (!res.ok) {
-    const errorDetail = data.message || JSON.stringify(data);
+    const errorDetail =
+      typeof data === "object" &&
+      data !== null &&
+      "message" in data &&
+      typeof data.message === "string"
+        ? data.message
+        : JSON.stringify(data);
     throw new Error(`Discord API Error (${res.status}): ${errorDetail}`);
   }
 
@@ -58,8 +64,14 @@ const { positionals, values } = parseArgs({
 const [command, ...args] = positionals;
 
 async function getGuilds() {
-  const data = await api("/users/@me/guilds");
-  const guilds = data.map((g: unknown) => ({
+  const data = (await api("/users/@me/guilds")) as Array<{
+    id: string;
+    name: string;
+    icon?: string;
+    owner?: boolean;
+    permissions?: string;
+  }>;
+  const guilds = data.map((g) => ({
     id: g.id,
     name: g.name,
     icon: g.icon,
@@ -70,10 +82,17 @@ async function getGuilds() {
 }
 
 async function getChannels(guildId: string) {
-  const data = await api(`/guilds/${guildId}/channels`);
+  const data = (await api(`/guilds/${guildId}/channels`)) as Array<{
+    id: string;
+    name: string;
+    type: number;
+    topic?: string;
+    position: number;
+    parent_id?: string;
+  }>;
   const channels = data
-    .filter((c: unknown) => c.type === 0 || c.type === 2 || c.type === 5)
-    .map((c: unknown) => ({
+    .filter((c) => c.type === 0 || c.type === 2 || c.type === 5)
+    .map((c) => ({
       id: c.id,
       name: c.name,
       type: c.type === 0 ? "text" : c.type === 2 ? "voice" : "announcement",
@@ -81,16 +100,28 @@ async function getChannels(guildId: string) {
       position: c.position,
       parentId: c.parent_id,
     }))
-    .sort((a: unknown, b: unknown) => a.position - b.position);
+    .sort((a, b) => a.position - b.position);
   console.log(JSON.stringify(channels, null, 2));
 }
 
 async function getMessages(channelId: string) {
   const limit = values.limit || "50";
-  const data = await api(`/channels/${channelId}/messages`, {
+  const data = (await api(`/channels/${channelId}/messages`, {
     params: { limit },
-  });
-  const messages = data.map((m: unknown) => ({
+  })) as Array<{
+    id: string;
+    author: {
+      id: string;
+      username: string;
+      global_name?: string;
+      bot?: boolean;
+    };
+    content: string;
+    timestamp: string;
+    attachments?: unknown[];
+    embeds?: unknown[];
+  }>;
+  const messages = data.map((m) => ({
     id: m.id,
     author: {
       id: m.author.id,
@@ -112,10 +143,10 @@ async function sendMessage(channelId: string) {
     process.exit(1);
   }
 
-  const data = await api(`/channels/${channelId}/messages`, {
+  const data = (await api(`/channels/${channelId}/messages`, {
     method: "POST",
     body: { content: values.text },
-  });
+  })) as { id: string; content: string; channel_id: string; timestamp: string };
 
   console.log(
     JSON.stringify(

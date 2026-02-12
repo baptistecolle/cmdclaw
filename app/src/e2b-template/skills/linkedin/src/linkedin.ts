@@ -63,9 +63,9 @@ async function listChats() {
 
   const data = await api(`/chats?${params}`);
   const chats =
-    data.items?.map((c: unknown) => ({
+    data.items?.map((c: Record<string, unknown>) => ({
       id: c.id,
-      attendees: c.attendees?.map((a: unknown) => ({
+      attendees: c.attendees?.map((a: Record<string, unknown>) => ({
         id: a.provider_id,
         name: a.display_name,
       })),
@@ -83,7 +83,7 @@ async function getChat(chatId: string) {
     JSON.stringify(
       {
         id: data.id,
-        attendees: data.attendees?.map((a: unknown) => ({
+        attendees: data.attendees?.map((a: Record<string, unknown>) => ({
           id: a.provider_id,
           name: a.display_name,
           headline: a.headline,
@@ -108,7 +108,7 @@ async function listMessages(chatId: string) {
 
   const data = await api(`/chats/${chatId}/messages?${params}`);
   const messages =
-    data.items?.map((m: unknown) => ({
+    data.items?.map((m: Record<string, unknown>) => ({
       id: m.id,
       text: m.text,
       sender: m.sender?.display_name,
@@ -222,7 +222,7 @@ async function searchUsers(query: string) {
   });
 
   const users =
-    data.items?.map((u: unknown) => ({
+    data.items?.map((u: Record<string, unknown>) => ({
       id: u.provider_id,
       name: u.display_name,
       headline: u.headline,
@@ -262,7 +262,7 @@ async function listPendingInvitations() {
   );
 
   const invitations =
-    data.items?.map((i: unknown) => ({
+    data.items?.map((i: Record<string, unknown>) => ({
       id: i.provider_id,
       name: i.display_name,
       headline: i.headline,
@@ -286,7 +286,7 @@ async function listConnections() {
   const data = await api(`/users/relations?${params}`);
 
   const connections =
-    data.items?.map((c: unknown) => ({
+    data.items?.map((c: Record<string, unknown>) => ({
       id: c.provider_id,
       name: c.display_name,
       headline: c.headline,
@@ -359,7 +359,7 @@ async function listPosts(profileId?: string) {
   const data = await api(`/posts?${params}`);
 
   const posts =
-    data.items?.map((p: unknown) => ({
+    data.items?.map((p: Record<string, unknown>) => ({
       id: p.id,
       text: p.text?.substring(0, 200),
       author: p.author?.display_name,
@@ -414,7 +414,7 @@ async function listCompanyPosts(companyId: string) {
   const data = await api(`/companies/${companyId}/posts?${params}`);
 
   const posts =
-    data.items?.map((p: unknown) => ({
+    data.items?.map((p: Record<string, unknown>) => ({
       id: p.id,
       text: p.text?.substring(0, 200),
       likesCount: p.likes_count,

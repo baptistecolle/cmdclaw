@@ -65,7 +65,7 @@ async function listFiles() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const items = files.map((f: unknown) => ({
+  const items = files.map((f: Record<string, unknown>) => ({
     id: f.id,
     name: f.name,
     mimeType: f.mimeType,
@@ -161,7 +161,7 @@ async function searchFiles() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const items = files.map((f: unknown) => ({
+  const items = files.map((f: Record<string, unknown>) => ({
     id: f.id,
     name: f.name,
     mimeType: f.mimeType,
@@ -277,7 +277,7 @@ async function listFolders() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const folders = files.map((f: unknown) => ({
+  const folders = files.map((f: Record<string, unknown>) => ({
     id: f.id,
     name: f.name,
     modifiedTime: f.modifiedTime,

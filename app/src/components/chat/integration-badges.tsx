@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   getIntegrationLogo,
   getIntegrationDisplayName,
@@ -47,6 +48,7 @@ function IntegrationBadge({
     size === "sm" ? "px-1.5 py-0.5 text-xs gap-1" : "px-2 py-1 text-sm gap-1.5";
 
   const iconSize = size === "sm" ? "h-3 w-3" : "h-4 w-4";
+  const iconPixels = size === "sm" ? 12 : 16;
   const nameMaxWidth = size === "sm" ? "max-w-[60px]" : "max-w-[80px]";
 
   return (
@@ -57,7 +59,15 @@ function IntegrationBadge({
       )}
       title={name}
     >
-      {logo && <img src={logo} alt={name} className={iconSize} />}
+      {logo && (
+        <Image
+          src={logo}
+          alt={name}
+          width={iconPixels}
+          height={iconPixels}
+          className={iconSize}
+        />
+      )}
       <span className={cn("truncate", nameMaxWidth)}>{name}</span>
     </div>
   );

@@ -11,13 +11,13 @@ const headers = {
   "Content-Type": "application/json",
 };
 
-async function api(path: string, options?: RequestInit) {
+async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`https://api.airtable.com/v0${path}`, {
     ...options,
     headers: { ...headers, ...options?.headers },
   });
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  return res.json();
+  return (await res.json()) as T;
 }
 
 const { positionals, values } = parseArgs({
@@ -40,8 +40,10 @@ const { positionals, values } = parseArgs({
 const [command] = positionals;
 
 async function listBases() {
-  const data = await api("/meta/bases");
-  const bases = data.bases.map((b: unknown) => ({
+  const data = await api<{
+    bases: Array<{ id: string; name: string; permissionLevel: string }>;
+  }>("/meta/bases");
+  const bases = data.bases.map((b) => ({
     id: b.id,
     name: b.name,
     permission: b.permissionLevel,
@@ -55,11 +57,17 @@ async function getSchema() {
     process.exit(1);
   }
 
-  const data = await api(`/meta/bases/${values.base}/tables`);
-  const tables = data.tables.map((t: unknown) => ({
+  const data = await api<{
+    tables: Array<{
+      id: string;
+      name: string;
+      fields: Array<{ name: string; type: string }>;
+    }>;
+  }>(`/meta/bases/${values.base}/tables`);
+  const tables = data.tables.map((t) => ({
     id: t.id,
     name: t.name,
-    fields: t.fields.map((f: unknown) => ({ name: f.name, type: f.type })),
+    fields: t.fields.map((f) => ({ name: f.name, type: f.type })),
   }));
 
   console.log(JSON.stringify(tables, null, 2));
@@ -75,10 +83,12 @@ async function listRecords() {
   if (values.view) params.set("view", values.view);
   if (values.filter) params.set("filterByFormula", values.filter);
 
-  const data = await api(
+  const data = await api<{
+    records: Array<{ id: string; fields: Record<string, unknown> }>;
+  }>(
     `/${values.base}/${encodeURIComponent(values.table)}?${params}`,
   );
-  const records = data.records.map((r: unknown) => ({ id: r.id, ...r.fields }));
+  const records = data.records.map((r) => ({ id: r.id, ...r.fields }));
   console.log(JSON.stringify(records, null, 2));
 }
 
@@ -90,7 +100,7 @@ async function getRecord() {
     process.exit(1);
   }
 
-  const record = await api(
+  const record = await api<{ id: string; fields: Record<string, unknown> }>(
     `/${values.base}/${encodeURIComponent(values.table)}/${values.record}`,
   );
   console.log(JSON.stringify({ id: record.id, ...record.fields }, null, 2));
@@ -105,7 +115,7 @@ async function createRecord() {
   }
 
   const fields = JSON.parse(values.fields);
-  const record = await api(
+  const record = await api<{ id: string; fields: Record<string, unknown> }>(
     `/${values.base}/${encodeURIComponent(values.table)}`,
     {
       method: "POST",
@@ -126,7 +136,7 @@ async function updateRecord() {
   }
 
   const fields = JSON.parse(values.fields);
-  const record = await api(
+  const record = await api<{ id: string; fields: Record<string, unknown> }>(
     `/${values.base}/${encodeURIComponent(values.table)}/${values.record}`,
     {
       method: "PATCH",
@@ -146,7 +156,7 @@ async function deleteRecord() {
     process.exit(1);
   }
 
-  const result = await api(
+  const result = await api<{ id: string }>(
     `/${values.base}/${encodeURIComponent(values.table)}/${values.record}`,
     { method: "DELETE" },
   );
@@ -172,10 +182,12 @@ async function searchRecords() {
     maxRecords: values.limit || "10",
   });
 
-  const data = await api(
+  const data = await api<{
+    records: Array<{ id: string; fields: Record<string, unknown> }>;
+  }>(
     `/${values.base}/${encodeURIComponent(values.table)}?${params}`,
   );
-  const records = data.records.map((r: unknown) => ({ id: r.id, ...r.fields }));
+  const records = data.records.map((r) => ({ id: r.id, ...r.fields }));
   console.log(JSON.stringify(records, null, 2));
 }
 

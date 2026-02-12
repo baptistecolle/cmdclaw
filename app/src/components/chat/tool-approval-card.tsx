@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Image from "next/image";
 import {
   ChevronDown,
   ChevronRight,
@@ -13,13 +14,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  getIntegrationIcon,
   getIntegrationLogo,
   getIntegrationDisplayName,
-  getIntegrationColor,
 } from "@/lib/integration-icons";
 import { parseCliCommand } from "@/lib/parse-cli-command";
-import { getPreviewComponent, GenericPreview } from "./previews";
+import { GenericPreview } from "./previews";
+import type { PreviewProps } from "./previews";
+import { SlackPreview } from "./previews/slack-preview";
+import { GmailPreview } from "./previews/gmail-preview";
+import { CalendarPreview } from "./previews/calendar-preview";
+import { DocsPreview } from "./previews/docs-preview";
+import { SheetsPreview } from "./previews/sheets-preview";
+import { DrivePreview } from "./previews/drive-preview";
+import { NotionPreview } from "./previews/notion-preview";
+import { LinearPreview } from "./previews/linear-preview";
+import { GithubPreview } from "./previews/github-preview";
+import { AirtablePreview } from "./previews/airtable-preview";
+import { HubspotPreview } from "./previews/hubspot-preview";
 
 export interface ToolApprovalCardProps {
   toolUseId: string;
@@ -33,6 +44,38 @@ export interface ToolApprovalCardProps {
   status: "pending" | "approved" | "denied";
   isLoading?: boolean;
   readonly?: boolean;
+}
+
+function renderPreview(
+  integration: string,
+  previewProps: PreviewProps,
+) {
+  switch (integration) {
+    case "slack":
+      return <SlackPreview {...previewProps} />;
+    case "gmail":
+      return <GmailPreview {...previewProps} />;
+    case "google_calendar":
+      return <CalendarPreview {...previewProps} />;
+    case "google_docs":
+      return <DocsPreview {...previewProps} />;
+    case "google_sheets":
+      return <SheetsPreview {...previewProps} />;
+    case "google_drive":
+      return <DrivePreview {...previewProps} />;
+    case "notion":
+      return <NotionPreview {...previewProps} />;
+    case "linear":
+      return <LinearPreview {...previewProps} />;
+    case "github":
+      return <GithubPreview {...previewProps} />;
+    case "airtable":
+      return <AirtablePreview {...previewProps} />;
+    case "hubspot":
+      return <HubspotPreview {...previewProps} />;
+    default:
+      return <GenericPreview {...previewProps} />;
+  }
 }
 
 export function ToolApprovalCard({
@@ -49,21 +92,14 @@ export function ToolApprovalCard({
   const [expanded, setExpanded] = useState(!readonly);
   const [showRawCommand, setShowRawCommand] = useState(false);
 
-  const Icon = getIntegrationIcon(integration);
   const logo = getIntegrationLogo(integration);
   const displayName = getIntegrationDisplayName(integration);
-  const colorClass = getIntegrationColor(integration);
 
   // Parse the command to extract structured data
   const parsedCommand = useMemo(() => {
     if (!command) return null;
     return parseCliCommand(command);
   }, [command]);
-
-  // Get the appropriate preview component
-  const PreviewComponent = useMemo(() => {
-    return getPreviewComponent(integration);
-  }, [integration]);
 
   // Build preview props
   const previewProps = useMemo(() => {
@@ -96,9 +132,13 @@ export function ToolApprovalCard({
           <ChevronRight className="h-4 w-4" />
         )}
         {logo ? (
-          <img src={logo} alt={displayName} className="h-4 w-4" />
-        ) : Icon ? (
-          <Icon className={cn("h-4 w-4", colorClass)} />
+          <Image
+            src={logo}
+            alt={displayName}
+            width={16}
+            height={16}
+            className="h-4 w-4"
+          />
         ) : (
           <ShieldAlert className="h-4 w-4 text-amber-500" />
         )}
@@ -135,11 +175,7 @@ export function ToolApprovalCard({
           {/* Formatted Preview */}
           {previewProps && (
             <div className="mb-3">
-              {PreviewComponent ? (
-                <PreviewComponent {...previewProps} />
-              ) : (
-                <GenericPreview {...previewProps} />
-              )}
+              {renderPreview(integration, previewProps)}
             </div>
           )}
 

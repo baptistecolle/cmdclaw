@@ -1,8 +1,32 @@
 import { env } from "@/env";
 import { generationManager } from "@/server/services/generation-manager";
 import { getTokensForIntegrations } from "@/server/integrations/cli-env";
+import { z } from "zod";
 
 export const runtime = "nodejs";
+
+const authRequestSchema = z.object({
+  conversationId: z.string().min(1),
+  integration: z.enum([
+    "gmail",
+    "google_calendar",
+    "google_docs",
+    "google_sheets",
+    "google_drive",
+    "notion",
+    "linear",
+    "github",
+    "airtable",
+    "slack",
+    "hubspot",
+    "linkedin",
+    "salesforce",
+    "reddit",
+    "twitter",
+  ]),
+  reason: z.string().optional(),
+  authHeader: z.string().optional(),
+});
 
 function verifyPluginSecret(
   authHeader: string | undefined,
@@ -26,7 +50,11 @@ function verifyPluginSecret(
 
 export async function POST(request: Request) {
   try {
-    const input = await request.json();
+    const parsed = authRequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return Response.json({ success: false }, { status: 400 });
+    }
+    const input = parsed.data;
 
     console.log("[Internal] Auth request:", {
       conversationId: input.conversationId,
@@ -61,7 +89,7 @@ export async function POST(request: Request) {
       );
     if (
       allowedIntegrations &&
-      !allowedIntegrations.includes(input.integration as unknown)
+      !allowedIntegrations.includes(input.integration)
     ) {
       console.warn(
         "[Internal] Integration not allowed for workflow:",

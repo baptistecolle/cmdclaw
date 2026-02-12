@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
@@ -577,7 +578,13 @@ export default function WorkflowEditorPage() {
                           checked={allowedIntegrations.includes(key)}
                           onCheckedChange={() => toggleIntegration(key)}
                         />
-                        <img src={logo} alt={label} className="h-4 w-4" />
+                        <Image
+                          src={logo}
+                          alt={label}
+                          width={16}
+                          height={16}
+                          className="h-4 w-4"
+                        />
                         <span>{label}</span>
                       </label>
                     ))}

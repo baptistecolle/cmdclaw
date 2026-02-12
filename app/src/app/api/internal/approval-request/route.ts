@@ -1,7 +1,33 @@
 import { env } from "@/env";
 import { generationManager } from "@/server/services/generation-manager";
+import { z } from "zod";
 
 export const runtime = "nodejs";
+
+const approvalRequestSchema = z.object({
+  conversationId: z.string().min(1),
+  integration: z.enum([
+    "gmail",
+    "google_calendar",
+    "google_docs",
+    "google_sheets",
+    "google_drive",
+    "notion",
+    "linear",
+    "github",
+    "airtable",
+    "slack",
+    "hubspot",
+    "linkedin",
+    "salesforce",
+    "reddit",
+    "twitter",
+  ]),
+  operation: z.string().min(1),
+  authHeader: z.string().optional(),
+  command: z.string().optional(),
+  toolInput: z.record(z.string(), z.unknown()).optional(),
+});
 
 function verifyPluginSecret(
   authHeader: string | undefined,
@@ -25,7 +51,11 @@ function verifyPluginSecret(
 
 export async function POST(request: Request) {
   try {
-    const input = await request.json();
+    const parsed = approvalRequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return Response.json({ decision: "deny" }, { status: 400 });
+    }
+    const input = parsed.data;
 
     console.log("[Internal] approvalRequest received:", {
       conversationId: input.conversationId,
@@ -66,7 +96,7 @@ export async function POST(request: Request) {
       );
     if (
       allowedIntegrations &&
-      !allowedIntegrations.includes(input.integration as unknown)
+      !allowedIntegrations.includes(input.integration)
     ) {
       console.warn(
         "[Internal] Integration not allowed for workflow:",
@@ -76,10 +106,10 @@ export async function POST(request: Request) {
     }
 
     const decision = await generationManager.waitForApproval(genId, {
-      toolInput: input.toolInput as Record<string, unknown>,
+      toolInput: input.toolInput ?? {},
       integration: input.integration,
       operation: input.operation,
-      command: input.command,
+      command: input.command ?? "",
     });
 
     return Response.json({ decision });

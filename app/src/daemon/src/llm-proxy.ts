@@ -11,6 +11,37 @@ interface LocalProvider {
   models: string[];
 }
 
+type LlmTool = {
+  name: string;
+  description?: string;
+  input_schema?: Record<string, unknown>;
+};
+
+type OpenAIStreamDelta = {
+  content?: string;
+  tool_calls?: Array<{
+    id?: string;
+    function?: { name?: string; arguments?: string };
+  }>;
+};
+
+type OpenAIStreamChunk = {
+  choices?: Array<{
+    delta?: OpenAIStreamDelta;
+    finish_reason?: string | null;
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  };
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 const PROVIDERS: { name: string; detectUrl: string; baseUrl: string }[] = [
   {
     name: "ollama",
@@ -39,12 +70,17 @@ export async function detectLocalProviders(): Promise<LocalProvider[]> {
       if (!res.ok) continue;
 
       const data = await res.json();
+      const dataObj = asRecord(data);
       let models: string[] = [];
 
-      if (provider.name === "ollama" && data.models) {
-        models = data.models.map((m: unknown) => m.name);
-      } else if (provider.name === "lm-studio" && data.data) {
-        models = data.data.map((m: unknown) => m.id);
+      if (provider.name === "ollama" && Array.isArray(dataObj?.models)) {
+        models = dataObj.models
+          .map((m) => asRecord(m)?.name)
+          .filter((m): m is string => typeof m === "string");
+      } else if (provider.name === "lm-studio" && Array.isArray(dataObj?.data)) {
+        models = dataObj.data
+          .map((m) => asRecord(m)?.id)
+          .filter((m): m is string => typeof m === "string");
       }
 
       found.push({
@@ -72,7 +108,7 @@ export async function detectLocalProviders(): Promise<LocalProvider[]> {
 export async function proxyChatRequest(
   request: {
     messages: unknown[];
-    tools?: unknown[];
+    tools?: LlmTool[];
     system?: string;
     model?: string;
   },
@@ -107,14 +143,26 @@ export async function proxyChatRequest(
     }
     messages.push(...(request.messages as unknown[]));
 
-    const body: unknown = {
+    const body: {
+      model: string;
+      messages: unknown[];
+      stream: true;
+      tools?: Array<{
+        type: "function";
+        function: {
+          name: string;
+          description?: string;
+          parameters?: Record<string, unknown>;
+        };
+      }>;
+    } = {
       model: model || targetProvider.models[0] || "default",
       messages,
       stream: true,
     };
 
-    if (request.tools && (request.tools as unknown[]).length > 0) {
-      body.tools = (request.tools as unknown[]).map((t: unknown) => ({
+    if (request.tools && request.tools.length > 0) {
+      body.tools = request.tools.map((t) => ({
         type: "function",
         function: {
           name: t.name,
@@ -163,7 +211,7 @@ export async function proxyChatRequest(
         }
 
         try {
-          const parsed = JSON.parse(data);
+          const parsed = JSON.parse(data) as OpenAIStreamChunk;
           const choice = parsed.choices?.[0];
           if (!choice) continue;
 

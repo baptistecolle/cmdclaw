@@ -44,6 +44,7 @@ import {
   type RuntimeActivitySegment,
   type RuntimeSnapshot,
 } from "@/lib/generation-runtime";
+import { PREFERRED_ZEN_FREE_MODEL } from "@/lib/zen-models";
 
 type TraceStatus = RuntimeSnapshot["traceStatus"];
 type ActivitySegment = Omit<RuntimeActivitySegment, "items"> & {
@@ -501,6 +502,7 @@ export function ChatArea({ conversationId }: Props) {
       setIsStreaming(false);
       setStreamError(null);
       setStreamingSandboxFiles([]);
+      setSelectedModel(PREFERRED_ZEN_FREE_MODEL);
       currentGenerationIdRef.current = undefined;
       resetInitTracking();
     }
@@ -519,6 +521,7 @@ export function ChatArea({ conversationId }: Props) {
       setIsStreaming(false);
       setStreamError(null);
       setStreamingSandboxFiles([]);
+      setSelectedModel(PREFERRED_ZEN_FREE_MODEL);
       currentGenerationIdRef.current = undefined;
       currentConversationIdRef.current = undefined;
       resetInitTracking();

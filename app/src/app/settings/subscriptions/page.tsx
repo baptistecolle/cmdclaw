@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -248,15 +249,15 @@ export default function SubscriptionsPage() {
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <img
+                    <Image
                       src={provider.logoUrl}
                       alt={provider.logoAlt}
+                      width={20}
+                      height={20}
                       className={cn(
                         "h-5 w-auto shrink-0",
                         provider.logoClassName,
                       )}
-                      loading="lazy"
-                      decoding="async"
                     />
                     <h3 className="font-medium">{provider.name}</h3>
                     {isConnected && (
@@ -312,12 +313,12 @@ export default function SubscriptionsPage() {
 
       <div className="mt-6 rounded-lg border border-muted bg-muted/30 p-4">
         <div className="flex items-start gap-2">
-          <img
+          <Image
             src="/integrations/anthropic.svg"
             alt="Anthropic logo"
+            width={16}
+            height={16}
             className="mt-0.5 h-4 w-auto shrink-0 dark:invert"
-            loading="lazy"
-            decoding="async"
           />
           <p className="text-xs text-muted-foreground">
             Anthropic models (Claude) are always available through Bap&apos;s

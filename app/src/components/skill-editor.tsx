@@ -12,7 +12,8 @@ import {
   handleCommandNavigation,
   type JSONContent,
 } from "novel";
-import { useRef } from "react";
+import type { Editor, Range } from "@tiptap/core";
+import { useEffect, useRef } from "react";
 import { defaultExtensions } from "./novel-extensions";
 import {
   Bold,
@@ -38,6 +39,20 @@ interface SkillEditorProps {
   className?: string;
 }
 
+type SuggestionCommandArgs = {
+  editor: Editor;
+  range: Range;
+};
+
+type MarkdownMark = { type: string; attrs?: { href?: string } };
+type MarkdownNode = {
+  type?: string;
+  text?: string;
+  attrs?: Record<string, unknown>;
+  marks?: MarkdownMark[];
+  content?: MarkdownNode[];
+};
+
 // Slash command suggestions
 const suggestionItems = [
   {
@@ -45,7 +60,7 @@ const suggestionItems = [
     description: "Just start writing with plain text",
     searchTerms: ["p", "paragraph"],
     icon: <Text className="h-4 w-4" />,
-    command: ({ editor, range }: unknown) => {
+    command: ({ editor, range }: SuggestionCommandArgs) => {
       editor.chain().focus().deleteRange(range).setParagraph().run();
     },
   },
@@ -54,7 +69,7 @@ const suggestionItems = [
     description: "Large section heading",
     searchTerms: ["title", "big", "large", "h1"],
     icon: <Heading1 className="h-4 w-4" />,
-    command: ({ editor, range }: unknown) => {
+    command: ({ editor, range }: SuggestionCommandArgs) => {
       editor
         .chain()
         .focus()
@@ -68,7 +83,7 @@ const suggestionItems = [
     description: "Medium section heading",
     searchTerms: ["subtitle", "medium", "h2"],
     icon: <Heading2 className="h-4 w-4" />,
-    command: ({ editor, range }: unknown) => {
+    command: ({ editor, range }: SuggestionCommandArgs) => {
       editor
         .chain()
         .focus()
@@ -82,7 +97,7 @@ const suggestionItems = [
     description: "Small section heading",
     searchTerms: ["small", "h3"],
     icon: <Heading3 className="h-4 w-4" />,
-    command: ({ editor, range }: unknown) => {
+    command: ({ editor, range }: SuggestionCommandArgs) => {
       editor
         .chain()
         .focus()
@@ -96,7 +111,7 @@ const suggestionItems = [
     description: "Create a bulleted list",
     searchTerms: ["unordered", "point", "ul"],
     icon: <List className="h-4 w-4" />,
-    command: ({ editor, range }: unknown) => {
+    command: ({ editor, range }: SuggestionCommandArgs) => {
       editor.chain().focus().deleteRange(range).toggleBulletList().run();
     },
   },
@@ -105,7 +120,7 @@ const suggestionItems = [
     description: "Create a numbered list",
     searchTerms: ["ordered", "ol"],
     icon: <ListOrdered className="h-4 w-4" />,
-    command: ({ editor, range }: unknown) => {
+    command: ({ editor, range }: SuggestionCommandArgs) => {
       editor.chain().focus().deleteRange(range).toggleOrderedList().run();
     },
   },
@@ -114,7 +129,7 @@ const suggestionItems = [
     description: "Add a block quote",
     searchTerms: ["blockquote"],
     icon: <Quote className="h-4 w-4" />,
-    command: ({ editor, range }: unknown) => {
+    command: ({ editor, range }: SuggestionCommandArgs) => {
       editor.chain().focus().deleteRange(range).toggleBlockquote().run();
     },
   },
@@ -123,7 +138,7 @@ const suggestionItems = [
     description: "Add a code block",
     searchTerms: ["codeblock", "pre"],
     icon: <CodeSquare className="h-4 w-4" />,
-    command: ({ editor, range }: unknown) => {
+    command: ({ editor, range }: SuggestionCommandArgs) => {
       editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
     },
   },
@@ -137,10 +152,12 @@ export function SkillEditor({
 }: SkillEditorProps) {
   const initialContent = useRef(content);
 
-  // Update initialContent when editorKey changes (file switch)
-  if (editorKey) {
-    initialContent.current = content;
-  }
+  // Update initial content when switching files.
+  useEffect(() => {
+    if (editorKey) {
+      initialContent.current = content;
+    }
+  }, [content, editorKey]);
 
   return (
     <EditorRoot>
@@ -179,7 +196,7 @@ export function SkillEditor({
                 <EditorCommandItem
                   key={item.title}
                   value={item.title}
-                  onCommand={(val) => item.command(val)}
+                  onCommand={(val) => item.command(val as SuggestionCommandArgs)}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer aria-selected:bg-accent"
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
@@ -476,7 +493,7 @@ function parseInlineContent(text: string): JSONContent[] {
 }
 
 // Convert editor content to markdown
-function editorToMarkdown(editor: unknown): string {
+function editorToMarkdown(editor: { getJSON: () => JSONContent } | null): string {
   if (!editor) return "";
 
   const json = editor.getJSON();
@@ -488,49 +505,50 @@ export function jsonToMarkdown(json: JSONContent): string {
   if (!json.content) return "";
 
   return json.content
-    .map((node: unknown) => {
-      switch (node.type) {
+    .map((node) => {
+      const markdownNode = node as MarkdownNode;
+      switch (markdownNode.type) {
         case "heading":
-          const level = node.attrs?.level || 1;
-          const headingText = getTextContent(node);
+          const level = Number(markdownNode.attrs?.level ?? 1);
+          const headingText = getTextContent(markdownNode);
           return "#".repeat(level) + " " + headingText;
         case "paragraph":
-          return getTextContent(node);
+          return getTextContent(markdownNode);
         case "bulletList":
-          return node.content
-            ?.map((item: unknown) => "- " + getTextContent(item))
+          return markdownNode.content
+            ?.map((item) => "- " + getTextContent(item))
             .join("\n");
         case "orderedList":
-          return node.content
-            ?.map((item: unknown, i: number) => `${i + 1}. ` + getTextContent(item))
+          return markdownNode.content
+            ?.map((item, i: number) => `${i + 1}. ` + getTextContent(item))
             .join("\n");
         case "blockquote":
-          const quoteText = getTextContent(node);
+          const quoteText = getTextContent(markdownNode);
           return quoteText
             .split("\n")
             .map((line: string) => "> " + line)
             .join("\n");
         case "codeBlock":
-          const lang = node.attrs?.language || "";
-          return "```" + lang + "\n" + getTextContent(node) + "\n```";
+          const lang = String(markdownNode.attrs?.language ?? "");
+          return "```" + lang + "\n" + getTextContent(markdownNode) + "\n```";
         case "horizontalRule":
           return "---";
         case "taskList":
-          return node.content
-            ?.map((item: unknown) => {
+          return markdownNode.content
+            ?.map((item) => {
               const checked = item.attrs?.checked ? "x" : " ";
               return `- [${checked}] ` + getTextContent(item);
             })
             .join("\n");
         default:
-          return getTextContent(node);
+          return getTextContent(markdownNode);
       }
     })
-    .filter((text: string) => text !== undefined)
+    .filter((text): text is string => typeof text === "string")
     .join("\n\n");
 }
 
-function getTextContent(node: unknown): string {
+function getTextContent(node: MarkdownNode): string {
   if (!node) return "";
   if (node.text) {
     let text = node.text;

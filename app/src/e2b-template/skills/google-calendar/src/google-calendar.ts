@@ -31,6 +31,21 @@ const { positionals, values } = parseArgs({
 
 const [command, ...args] = positionals;
 
+type CalendarDateTime = { dateTime?: string; date?: string; timeZone?: string };
+type CalendarEvent = {
+  id: string;
+  summary?: string;
+  description?: string;
+  start?: CalendarDateTime;
+  end?: CalendarDateTime;
+  location?: string;
+  status?: string;
+  attendees?: Array<{ email?: string; responseStatus?: string }>;
+  htmlLink?: string;
+  creator?: unknown;
+  organizer?: unknown;
+};
+
 async function listEvents() {
   const params = new URLSearchParams({
     maxResults: values.limit || "10",
@@ -49,8 +64,8 @@ async function listEvents() {
   );
   if (!res.ok) throw new Error(await res.text());
 
-  const { items = [] } = await res.json();
-  const events = items.map((event: unknown) => ({
+  const { items = [] } = (await res.json()) as { items?: CalendarEvent[] };
+  const events = items.map((event) => ({
     id: event.id,
     summary: event.summary || "(No title)",
     start: event.start?.dateTime || event.start?.date,
@@ -70,7 +85,7 @@ async function getEvent(eventId: string) {
   );
   if (!res.ok) throw new Error(await res.text());
 
-  const event = await res.json();
+  const event = (await res.json()) as CalendarEvent;
   console.log(
     JSON.stringify(
       {
@@ -81,7 +96,7 @@ async function getEvent(eventId: string) {
         end: event.end?.dateTime || event.end?.date,
         location: event.location,
         status: event.status,
-        attendees: event.attendees?.map((a: unknown) => ({
+        attendees: event.attendees?.map((a) => ({
           email: a.email,
           responseStatus: a.responseStatus,
         })),
@@ -107,7 +122,14 @@ async function createEvent() {
   }
 
   const isAllDay = !values.start.includes("T");
-  const event: unknown = {
+  const event: {
+    summary: string;
+    description?: string;
+    location?: string;
+    start?: { date?: string; dateTime?: string; timeZone?: string };
+    end?: { date?: string; dateTime?: string; timeZone?: string };
+    attendees?: Array<{ email: string }>;
+  } = {
     summary: values.summary,
     description: values.description,
     location: values.location,
@@ -141,7 +163,7 @@ async function createEvent() {
   });
 
   if (!res.ok) throw new Error(await res.text());
-  const created = await res.json();
+  const created = (await res.json()) as { htmlLink?: string };
   console.log(`Event created: ${created.htmlLink}`);
 }
 
@@ -154,7 +176,7 @@ async function updateEvent(eventId: string) {
     { headers },
   );
   if (!getRes.ok) throw new Error(await getRes.text());
-  const existing = await getRes.json();
+  const existing = (await getRes.json()) as CalendarEvent;
 
   // Update fields
   if (values.summary) existing.summary = values.summary;
@@ -216,8 +238,16 @@ async function listCalendars() {
   const res = await fetch(`${BASE_URL}/users/me/calendarList`, { headers });
   if (!res.ok) throw new Error(await res.text());
 
-  const { items = [] } = await res.json();
-  const calendars = items.map((cal: unknown) => ({
+  const { items = [] } = (await res.json()) as {
+    items?: Array<{
+      id: string;
+      summary: string;
+      description?: string;
+      primary?: boolean;
+      accessRole?: string;
+    }>;
+  };
+  const calendars = items.map((cal) => ({
     id: cal.id,
     summary: cal.summary,
     description: cal.description,
@@ -252,8 +282,8 @@ async function todayEvents() {
   );
   if (!res.ok) throw new Error(await res.text());
 
-  const { items = [] } = await res.json();
-  const events = items.map((event: unknown) => ({
+  const { items = [] } = (await res.json()) as { items?: CalendarEvent[] };
+  const events = items.map((event) => ({
     id: event.id,
     summary: event.summary || "(No title)",
     start: event.start?.dateTime || event.start?.date,

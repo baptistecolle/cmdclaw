@@ -41,8 +41,21 @@ export function DualPanelWorkspace({
 }: DualPanelWorkspaceProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ active: boolean }>({ active: false });
+  const pointerUpHandlerRef = useRef<(() => void) | null>(null);
   const [mobilePanel, setMobilePanel] = useState<"left" | "right">("right");
-  const [rightWidth, setRightWidth] = useState(defaultRightWidth);
+  const [rightWidth, setRightWidth] = useState(() => {
+    if (!storageKey || typeof window === "undefined") {
+      return defaultRightWidth;
+    }
+    const saved = window.localStorage.getItem(storageKey);
+    const parsed = Number(saved);
+    if (!Number.isFinite(parsed)) {
+      return defaultRightWidth;
+    }
+    const maxRight = 100 - minLeftWidth;
+    const minRight = minRightWidth;
+    return Math.min(Math.max(minRight, maxRight), Math.max(minRight, parsed));
+  });
 
   const bounds = useMemo(() => {
     const maxRight = 100 - minLeftWidth;
@@ -52,15 +65,6 @@ export function DualPanelWorkspace({
       maxRight: Math.max(minRight, maxRight),
     };
   }, [minLeftWidth, minRightWidth]);
-
-  useEffect(() => {
-    if (!storageKey || typeof window === "undefined") return;
-    const saved = window.localStorage.getItem(storageKey);
-    if (!saved) return;
-    const parsed = Number(saved);
-    if (!Number.isFinite(parsed)) return;
-    setRightWidth(Math.min(bounds.maxRight, Math.max(bounds.minRight, parsed)));
-  }, [bounds.maxRight, bounds.minRight, storageKey]);
 
   const setWidthWithinBounds = useCallback(
     (value: number) => {
@@ -90,7 +94,10 @@ export function DualPanelWorkspace({
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
     window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", stopDrag);
+    if (pointerUpHandlerRef.current) {
+      window.removeEventListener("pointerup", pointerUpHandlerRef.current);
+      pointerUpHandlerRef.current = null;
+    }
   }, [onPointerMove]);
 
   const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -99,7 +106,9 @@ export function DualPanelWorkspace({
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", stopDrag);
+    const handlePointerUp = () => stopDrag();
+    pointerUpHandlerRef.current = handlePointerUp;
+    window.addEventListener("pointerup", handlePointerUp);
   };
 
   useEffect(() => {

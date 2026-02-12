@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import { Paperclip, Download, FileIcon, Eye } from "lucide-react";
 import { MessageBubble } from "./message-bubble";
 import { CollapsedTrace } from "./collapsed-trace";
@@ -107,67 +108,6 @@ export function MessageItem({
     }
   };
 
-  // For user messages, show simple bubble + attachments
-  if (role === "user") {
-    return (
-      <div data-testid="chat-message-user" className="py-4 space-y-2">
-        {attachments && attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-end">
-            {attachments.map((a, i) =>
-              a.mimeType.startsWith("image/") && a.dataUrl ? (
-                <div key={i} className="relative group">
-                  <img
-                    src={a.dataUrl}
-                    alt={a.name}
-                    className="max-h-48 max-w-xs rounded-lg border object-cover"
-                  />
-                  {(a.id || a.dataUrl) && (
-                    <div className="absolute top-1 right-1 flex items-center gap-1 rounded-md bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => handleViewAttachment(a)}
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </button>
-                      <button type="button" onClick={() => handleDownload(a)}>
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div
-                  key={i}
-                  className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs"
-                >
-                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="max-w-[200px] truncate">{a.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleViewAttachment(a)}
-                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
-                  >
-                    <Eye className="h-3 w-3 text-muted-foreground" />
-                    <span>View</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDownload(a)}
-                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
-                  >
-                    <Download className="h-3 w-3 text-muted-foreground" />
-                    <span>Download</span>
-                  </button>
-                </div>
-              ),
-            )}
-          </div>
-        )}
-        <MessageBubble role="user" content={content} />
-      </div>
-    );
-  }
-
   const hasInterruptedMarker = useMemo(
     () =>
       !!parts?.some(
@@ -211,10 +151,10 @@ export function MessageItem({
           approval: null,
         };
       } else if (part.type === "tool_call") {
-        // Add tool call to current segment's items
-        currentSegment.items.push({
-          id: `activity-${part.id}`,
-          timestamp: Date.now() - (parts.length - i) * 1000,
+          // Add tool call to current segment's items
+          currentSegment.items.push({
+            id: `activity-${part.id}`,
+            timestamp: i + 1,
           type: "tool_call",
           content: part.name,
           toolName: part.name,
@@ -233,7 +173,7 @@ export function MessageItem({
       } else if (part.type === "thinking") {
         currentSegment.items.push({
           id: `activity-${part.id}`,
-          timestamp: Date.now() - (parts.length - i) * 1000,
+          timestamp: i + 1,
           type: "thinking",
           content: part.content,
         });
@@ -241,7 +181,7 @@ export function MessageItem({
       } else if (part.type === "system") {
         currentSegment.items.push({
           id: `activity-system-${activityIndex}`,
-          timestamp: Date.now() - (parts.length - i) * 1000,
+          timestamp: i + 1,
           type: "system",
           content: part.content,
         });
@@ -249,7 +189,7 @@ export function MessageItem({
       } else if (part.type === "text") {
         currentSegment.items.push({
           id: `activity-text-${activityIndex}`,
-          timestamp: Date.now() - (parts.length - i) * 1000,
+          timestamp: i + 1,
           type: "text",
           content: part.content,
         });
@@ -313,6 +253,70 @@ export function MessageItem({
 
   // Check if we have segments with approvals (need segmented display)
   const hasApprovals = segments.some((seg) => seg.approval !== null);
+
+  // For user messages, show simple bubble + attachments
+  if (role === "user") {
+    return (
+      <div data-testid="chat-message-user" className="py-4 space-y-2">
+        {attachments && attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 justify-end">
+            {attachments.map((a, i) =>
+              a.mimeType.startsWith("image/") && a.dataUrl ? (
+                <div key={i} className="relative group">
+                  <Image
+                    src={a.dataUrl}
+                    alt={a.name}
+                    width={320}
+                    height={192}
+                    unoptimized
+                    className="max-h-48 max-w-xs rounded-lg border object-cover"
+                  />
+                  {(a.id || a.dataUrl) && (
+                    <div className="absolute top-1 right-1 flex items-center gap-1 rounded-md bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => handleViewAttachment(a)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => handleDownload(a)}>
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  key={i}
+                  className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs"
+                >
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="max-w-[200px] truncate">{a.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleViewAttachment(a)}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
+                  >
+                    <Eye className="h-3 w-3 text-muted-foreground" />
+                    <span>View</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(a)}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
+                  >
+                    <Download className="h-3 w-3 text-muted-foreground" />
+                    <span>Download</span>
+                  </button>
+                </div>
+              ),
+            )}
+          </div>
+        )}
+        <MessageBubble role="user" content={content} />
+      </div>
+    );
+  }
 
   return (
     <div
