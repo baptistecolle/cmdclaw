@@ -19,8 +19,13 @@
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "bun test",
+    "test:unit": "bun test tests/unit",
+    "test:unit:watch": "bun test --watch tests/unit",
     "test:e2e": "playwright test",
+    "test:coverage": "bun test --coverage --coverage-reporter=text --coverage-reporter=lcov tests/unit",
+    "test:coverage:check": "bun run test:coverage",
+    "test:all": "bun run test:unit && bun run test:e2e",
     "worker": "bun --env-file=.env scripts/bullmq-worker.ts",
     "auth:generate": "bun x @better-auth/cli@latest generate --output src/server/db/auth-schema.ts -y",
     "docker-up:local": "docker compose up",
@@ -90,6 +95,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/bun": "^1.3.6",
     "@types/mime-types": "^3.0.1",

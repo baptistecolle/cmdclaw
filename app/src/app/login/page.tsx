@@ -61,13 +61,39 @@ function LoginContent() {
   const lastMethod = authClient.getLastUsedLoginMethod();
 
   useEffect(() => {
-    authClient.getSession().then((res) => {
-      if (res?.data?.session && res?.data?.user) {
-        router.replace(callbackUrl);
-      } else {
+    let isMounted = true;
+    let isRedirecting = false;
+
+    const timeoutId = window.setTimeout(() => {
+      if (isMounted) {
         setIsCheckingSession(false);
       }
-    });
+    }, 5000);
+
+    void authClient
+      .getSession()
+      .then((res) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (res?.data?.session && res?.data?.user) {
+          isRedirecting = true;
+          router.replace(callbackUrl);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        window.clearTimeout(timeoutId);
+        if (isMounted && !isRedirecting) {
+          setIsCheckingSession(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeoutId);
+    };
   }, [router, callbackUrl]);
 
   const requestMagicLink = async (event: React.FormEvent<HTMLFormElement>) => {

@@ -11,3 +11,8 @@ This repository is organized into several top-level folders. Each folder can hav
 
 ## Remarks
 - For any work inside a folder, check that folder for its own `AGENTS.md` and follow those instructions.
+
+## Testing
+
+Avoid mocks as much as possible, Test actual implementation, do not duplicate logic into tests
+try to colocated tests with the code they test when relevant.
