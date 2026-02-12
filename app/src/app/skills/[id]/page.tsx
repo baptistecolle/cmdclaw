@@ -178,54 +178,6 @@ function SkillEditorPageContent() {
     [isEditingSlug],
   );
 
-  const handleSelectFile = useCallback(
-    (fileId: string) => {
-      if (selectedFileId) {
-        // Auto-save current file before switching
-        void handleSaveFile();
-      }
-      const file = skill?.files.find((f) => f.id === fileId);
-      if (file) {
-        setSelectedFileId(fileId);
-        setSelectedDocumentId(null);
-        setDocumentUrl(null);
-        if (file.path === "SKILL.md") {
-          const parsed = parseSkillContent(file.content);
-          setSkillBody(parsed.body);
-        } else {
-          setEditedContent(file.content);
-        }
-      }
-    },
-    [handleSaveFile, selectedFileId, skill?.files],
-  );
-
-  const handleSelectDocument = useCallback(
-    async (docId: string) => {
-      if (selectedFileId) {
-        // Auto-save current file before switching
-        await handleSaveFile();
-      }
-      setSelectedFileId(null);
-      setSelectedDocumentId(docId);
-      setDocumentUrl(null);
-
-      const doc = skill?.documents?.find((d) => d.id === docId);
-      if (doc && isViewableDocument(doc.mimeType)) {
-        setIsLoadingDocumentUrl(true);
-        try {
-          const { url } = await getDocumentUrl.mutateAsync(docId);
-          setDocumentUrl(url);
-        } catch {
-          setNotification({ type: "error", message: "Failed to load document" });
-        } finally {
-          setIsLoadingDocumentUrl(false);
-        }
-      }
-    },
-    [getDocumentUrl, handleSaveFile, selectedFileId, skill?.documents],
-  );
-
   const handleSaveFile = useCallback(
     async (showNotificationIfNoChanges = false) => {
       if (!selectedFileId) {
@@ -304,6 +256,54 @@ function SkillEditorPageContent() {
       skillId,
       refetch,
     ],
+  );
+
+  const handleSelectFile = useCallback(
+    (fileId: string) => {
+      if (selectedFileId) {
+        // Auto-save current file before switching
+        void handleSaveFile();
+      }
+      const file = skill?.files.find((f) => f.id === fileId);
+      if (file) {
+        setSelectedFileId(fileId);
+        setSelectedDocumentId(null);
+        setDocumentUrl(null);
+        if (file.path === "SKILL.md") {
+          const parsed = parseSkillContent(file.content);
+          setSkillBody(parsed.body);
+        } else {
+          setEditedContent(file.content);
+        }
+      }
+    },
+    [handleSaveFile, selectedFileId, skill?.files],
+  );
+
+  const handleSelectDocument = useCallback(
+    async (docId: string) => {
+      if (selectedFileId) {
+        // Auto-save current file before switching
+        await handleSaveFile();
+      }
+      setSelectedFileId(null);
+      setSelectedDocumentId(docId);
+      setDocumentUrl(null);
+
+      const doc = skill?.documents?.find((d) => d.id === docId);
+      if (doc && isViewableDocument(doc.mimeType)) {
+        setIsLoadingDocumentUrl(true);
+        try {
+          const { url } = await getDocumentUrl.mutateAsync(docId);
+          setDocumentUrl(url);
+        } catch {
+          setNotification({ type: "error", message: "Failed to load document" });
+        } finally {
+          setIsLoadingDocumentUrl(false);
+        }
+      }
+    },
+    [getDocumentUrl, handleSaveFile, selectedFileId, skill?.documents],
   );
 
   const handleAddFile = useCallback(async () => {
