@@ -57,16 +57,14 @@ const PROVIDERS: { name: string; detectUrl: string; baseUrl: string }[] = [
  * Detect available local LLM providers.
  */
 export async function detectLocalProviders(): Promise<LocalProvider[]> {
-  const found: LocalProvider[] = [];
-
-  for (const provider of PROVIDERS) {
+  const checks = PROVIDERS.map(async (provider) => {
     try {
       const res = await fetch(provider.detectUrl, {
         signal: AbortSignal.timeout(2000),
       });
 
       if (!res.ok) {
-        continue;
+        return null;
       }
 
       const data = await res.json();
@@ -83,19 +81,20 @@ export async function detectLocalProviders(): Promise<LocalProvider[]> {
           .filter((m): m is string => typeof m === "string");
       }
 
-      found.push({
+      logger.info("llm-proxy", `Found ${provider.name} with ${models.length} models`);
+      return {
         name: provider.name,
         baseUrl: provider.baseUrl,
         models,
-      });
-
-      logger.info("llm-proxy", `Found ${provider.name} with ${models.length} models`);
+      } satisfies LocalProvider;
     } catch {
       // Provider not running
+      return null;
     }
-  }
+  });
 
-  return found;
+  const found = await Promise.all(checks);
+  return found.filter((provider): provider is LocalProvider => provider !== null);
 }
 
 /**
@@ -191,10 +190,10 @@ export async function proxyChatRequest(
     const decoder = new TextDecoder();
     let buffer = "";
 
-    while (true) {
+    const readChunk = async (): Promise<void> => {
       const { done, value } = await reader.read();
       if (done) {
-        break;
+        return;
       }
 
       buffer += decoder.decode(value, { stream: true });
@@ -263,7 +262,10 @@ export async function proxyChatRequest(
           // skip unparseable lines
         }
       }
-    }
+      return readChunk();
+    };
+
+    await readChunk();
 
     onDone();
   } catch (err) {

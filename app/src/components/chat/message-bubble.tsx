@@ -91,9 +91,9 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
             p: ({ children }) => (
               <p>
                 {Array.isArray(children)
-                  ? children.map((child, i) =>
+                  ? React.Children.map(children, (child) =>
                       typeof child === "string" ? (
-                        <span key={i}>{renderTextWithPaths(child)}</span>
+                        <span>{renderTextWithPaths(child)}</span>
                       ) : (
                         child
                       ),

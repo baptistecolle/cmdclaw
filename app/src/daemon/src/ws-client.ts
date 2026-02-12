@@ -100,17 +100,17 @@ export class WSClient {
       return;
     }
 
-    this.ws.onopen = () => {
+    this.ws.addEventListener("open", () => {
       logger.info("ws", "Connected");
       this.connected = true;
       this.reconnectDelay = MIN_RECONNECT_MS;
-    };
+    });
 
-    this.ws.onmessage = (event) => {
+    this.ws.addEventListener("message", (event) => {
       this.handleMessage(typeof event.data === "string" ? event.data : "");
-    };
+    });
 
-    this.ws.onclose = (event) => {
+    this.ws.addEventListener("close", (event) => {
       this.connected = false;
       logger.info("ws", `Disconnected: ${event.code} ${event.reason}`);
 
@@ -123,11 +123,11 @@ export class WSClient {
       if (this.shouldReconnect) {
         this.scheduleReconnect();
       }
-    };
+    });
 
-    this.ws.onerror = () => {
+    this.ws.addEventListener("error", () => {
       logger.error("ws", "WebSocket error");
-    };
+    });
   }
 
   disconnect(): void {

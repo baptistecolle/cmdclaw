@@ -213,9 +213,10 @@ export async function handleSlackEvent(payload: SlackEvent) {
       const slackText = convertMarkdownToSlack(responseText);
       // Split long messages (Slack limit ~4000 chars)
       const chunks = splitMessage(slackText, 3900);
-      for (const chunk of chunks) {
+      await chunks.reduce<Promise<void>>(async (prev, chunk) => {
+        await prev;
         await postMessage(channel, chunk, isDirectMessage ? undefined : threadTs);
-      }
+      }, Promise.resolve());
     }
   } catch (err) {
     console.error("[slack-bot] Error handling event:", err);

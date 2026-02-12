@@ -15,7 +15,9 @@ import { Pool } from "pg";
 import { createInterface } from "readline";
 import * as schema from "../src/server/db/schema";
 // Load env
-import "dotenv/config";
+import * as dotenvConfig from "dotenv/config";
+
+void dotenvConfig;
 
 const TEMPLATE_NAME = process.env.E2B_TEMPLATE || "bap-agent-dev";
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes

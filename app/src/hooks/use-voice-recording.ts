@@ -47,11 +47,11 @@ export function useVoiceRecording(): UseVoiceRecordingReturn {
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (event) => {
+      mediaRecorder.addEventListener("dataavailable", (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
-      };
+      });
 
       mediaRecorder.start();
       setIsRecording(true);
@@ -80,7 +80,7 @@ export function useVoiceRecording(): UseVoiceRecordingReturn {
         return;
       }
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.addEventListener("stop", () => {
         const mimeType = mediaRecorder.mimeType || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
 
@@ -92,7 +92,7 @@ export function useVoiceRecording(): UseVoiceRecordingReturn {
 
         setIsRecording(false);
         resolve(audioBlob);
-      };
+      }, { once: true });
 
       mediaRecorder.stop();
     });
@@ -110,13 +110,13 @@ export function useVoiceRecording(): UseVoiceRecordingReturn {
 export async function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.addEventListener("loadend", () => {
       const base64 = reader.result as string;
       // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
       const base64Data = base64.split(",")[1];
       resolve(base64Data);
-    };
-    reader.onerror = reject;
+    });
+    reader.addEventListener("error", () => reject(reader.error), { once: true });
     reader.readAsDataURL(blob);
   });
 }

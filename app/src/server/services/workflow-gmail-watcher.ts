@@ -257,8 +257,8 @@ export async function pollGmailWorkflowTriggers(): Promise<{
   const tokenCache = new Map<string, string>();
   let checked = 0;
   let enqueued = 0;
-
-  for (const item of watchable) {
+  await watchable.reduce<Promise<void>>(async (prev, item) => {
+    await prev;
     checked += 1;
 
     try {
@@ -283,46 +283,52 @@ export async function pollGmailWorkflowTriggers(): Promise<{
 
       const messageIds = await listRecentGmailMessages(accessToken, afterSeconds);
       if (messageIds.length === 0) {
-        continue;
+        return;
       }
 
-      const messages: GmailMessageSummary[] = [];
-      for (const messageId of messageIds) {
-        try {
-          const summary = await getGmailMessageSummary(accessToken, messageId);
-          if (summary) {
-            messages.push(summary);
+      const summaries = await Promise.all(
+        messageIds.map(async (messageId) => {
+          try {
+            return await getGmailMessageSummary(accessToken, messageId);
+          } catch (error) {
+            console.error(
+              `[workflow-gmail-watcher] failed to fetch message ${messageId} for workflow ${item.workflowId}`,
+              error,
+            );
+            return null;
           }
-        } catch (error) {
-          console.error(
-            `[workflow-gmail-watcher] failed to fetch message ${messageId} for workflow ${item.workflowId}`,
-            error,
-          );
-        }
-      }
+        }),
+      );
 
-      messages.sort((a, b) => a.internalDateMs - b.internalDateMs);
+      const messages = summaries
+        .filter((summary): summary is GmailMessageSummary => summary !== null)
+        .toSorted((a, b) => a.internalDateMs - b.internalDateMs);
 
-      for (const message of messages) {
-        if (lastProcessed !== null && message.internalDateMs <= lastProcessed) {
-          continue;
-        }
+      const enqueuedCount = await Promise.all(
+        messages.map(async (message) => {
+          if (lastProcessed !== null && message.internalDateMs <= lastProcessed) {
+            return 0;
+          }
 
-        const alreadyHandled = await hasRunForGmailMessage(item.workflowId, message.id);
-        if (alreadyHandled) {
-          continue;
-        }
+          const alreadyHandled = await hasRunForGmailMessage(item.workflowId, message.id);
+          if (alreadyHandled) {
+            return 0;
+          }
 
-        try {
-          await triggerWorkflowFromGmailMessage(item.workflowId, message);
-          enqueued += 1;
-        } catch (error) {
-          console.error(
-            `[workflow-gmail-watcher] failed to trigger workflow ${item.workflowId} for message ${message.id}`,
-            error,
-          );
-        }
-      }
+          try {
+            await triggerWorkflowFromGmailMessage(item.workflowId, message);
+            return 1;
+          } catch (error) {
+            console.error(
+              `[workflow-gmail-watcher] failed to trigger workflow ${item.workflowId} for message ${message.id}`,
+              error,
+            );
+            return 0;
+          }
+        }),
+      );
+
+      enqueued += enqueuedCount.reduce((sum, count) => sum + count, 0);
     } catch (error) {
       if (isGmailAuthError(error)) {
         try {
@@ -339,7 +345,7 @@ export async function pollGmailWorkflowTriggers(): Promise<{
       }
       console.error(`[workflow-gmail-watcher] failed for workflow ${item.workflowId}`, error);
     }
-  }
+  }, Promise.resolve());
 
   return { checked, enqueued };
 }

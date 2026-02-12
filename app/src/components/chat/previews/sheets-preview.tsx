@@ -172,11 +172,11 @@ function ValuesPreview({ values }: { values: string }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <tbody>
-            {parsed.slice(0, 5).map((row, i) => (
-              <tr key={i}>
+            {parsed.slice(0, 5).map((row) => (
+              <tr key={JSON.stringify(row)}>
                 {Array.isArray(row) ? (
-                  row.map((cell, j) => (
-                    <td key={j} className="border px-2 py-1 bg-muted/30">
+                  row.map((cell) => (
+                    <td key={String(cell)} className="border px-2 py-1 bg-muted/30">
                       {String(cell)}
                     </td>
                   ))

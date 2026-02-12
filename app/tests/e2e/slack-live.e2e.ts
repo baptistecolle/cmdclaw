@@ -15,7 +15,6 @@ type SlackApiResponse = {
 };
 
 const liveEnabled = process.env.E2E_LIVE === "1";
-const slackLiveEnabled = process.env.E2E_SLACK_LIVE === "1";
 const responseTimeoutMs = Number(process.env.E2E_SLACK_RESPONSE_TIMEOUT_MS ?? "120000");
 const pollIntervalMs = Number(process.env.E2E_SLACK_POLL_INTERVAL_MS ?? "2500");
 
@@ -120,8 +119,8 @@ function sleep(ms: number): Promise<void> {
 
 test.describe("@live slack bridge", () => {
   test.skip(
-    !liveEnabled || !slackLiveEnabled,
-    "Set E2E_LIVE=1 and E2E_SLACK_LIVE=1 to run Slack live e2e tests",
+    !liveEnabled,
+    "Set E2E_LIVE=1 to run Slack live e2e tests",
   );
 
   test.afterAll(async () => {
@@ -231,8 +230,10 @@ test.describe("@live slack bridge", () => {
     let replyText = "";
     let observedReplies: string[] = [];
     const deadline = Date.now() + responseTimeoutMs;
-
-    while (Date.now() < deadline) {
+    const pollReplies = async (): Promise<void> => {
+      if (Date.now() >= deadline) {
+        return;
+      }
       const repliesPayload = await slackApi(botToken, "conversations.replies", {
         channel: channelId,
         ts: rootTs,
@@ -253,11 +254,14 @@ test.describe("@live slack bridge", () => {
 
       if (candidate) {
         replyText = candidate;
-        break;
+        return;
       }
 
       await sleep(pollIntervalMs);
-    }
+      return pollReplies();
+    };
+
+    await pollReplies();
 
     expect(
       replyText,

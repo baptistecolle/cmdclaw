@@ -19,9 +19,9 @@ export function GenericPreview({ operation, args, positionalArgs }: PreviewProps
     <div>
       {hasPositional && (
         <PreviewSection title="Arguments">
-          {positionalArgs.map((arg, i) => (
+          {positionalArgs.map((arg) => (
             <span
-              key={i}
+              key={arg}
               className="inline-block mr-2 mb-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs"
             >
               {arg}

@@ -100,7 +100,11 @@ export class LocalLLMBackend implements LLMBackend {
     registerStreamListener(requestId, streamListener);
 
     try {
-      while (!done || queue.length > 0) {
+      const emitStream = async function* (): AsyncGenerator<StreamEvent, void, unknown> {
+        if (done && queue.length === 0) {
+          return;
+        }
+
         while (queue.length > 0) {
           const event = queue.shift()!;
           if (event === null) {
@@ -115,6 +119,12 @@ export class LocalLLMBackend implements LLMBackend {
             setTimeout(resolve, 100);
           });
         }
+
+        yield* emitStream();
+      };
+
+      for await (const event of emitStream()) {
+        yield event;
       }
     } finally {
       unregisterStreamListener(requestId);

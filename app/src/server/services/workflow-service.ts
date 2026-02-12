@@ -58,13 +58,13 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
     limit: 20,
   });
 
-  for (const run of candidateRuns) {
+  const updates = candidateRuns.map(async (run) => {
     const gen = run.generation;
     if (!gen) {
       const isLikelyOrphan =
         run.status === "running" && Date.now() - run.startedAt.getTime() > ORPHAN_RUN_GRACE_MS;
       if (!isLikelyOrphan) {
-        continue;
+        return;
       }
 
       await db
@@ -76,7 +76,7 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
         })
         .where(eq(workflowRun.id, run.id));
 
-      continue;
+      return;
     }
 
     if (
@@ -118,10 +118,10 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
           })
           .where(eq(workflowRun.id, run.id));
 
-        continue;
+        return;
       }
 
-      continue;
+      return;
     }
 
     const mappedStatus = mapGenerationStatusToWorkflowRunStatus(
@@ -136,7 +136,9 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
         errorMessage: run.errorMessage ?? gen.errorMessage ?? null,
       })
       .where(eq(workflowRun.id, run.id));
-  }
+  });
+
+  await Promise.all(updates);
 }
 
 export async function triggerWorkflowRun(params: {

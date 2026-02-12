@@ -198,27 +198,34 @@ export async function getOfficialIntegrationSkillIndex(): Promise<
     return result;
   }
 
-  for (const entry of entries) {
-    if (!entry.isDirectory()) {
-      continue;
-    }
-    const skillMdPath = path.join(skillsRoot, entry.name, "SKILL.md");
-    try {
-      const content = await fs.readFile(skillMdPath, "utf8");
-      const frontmatterName = extractFrontmatterValue(content, "name");
-      const description = extractFrontmatterValue(content, "description") ?? "";
-      const slug = normalizeIntegrationSkillSlug(frontmatterName ?? entry.name);
-      if (!slug) {
-        continue;
+  const directoryEntries = entries.filter((entry) => entry.isDirectory());
+  const records = await Promise.all(
+    directoryEntries.map(async (entry) => {
+      const skillMdPath = path.join(skillsRoot, entry.name, "SKILL.md");
+      try {
+        const content = await fs.readFile(skillMdPath, "utf8");
+        const frontmatterName = extractFrontmatterValue(content, "name");
+        const description = extractFrontmatterValue(content, "description") ?? "";
+        const slug = normalizeIntegrationSkillSlug(frontmatterName ?? entry.name);
+        if (!slug) {
+          return null;
+        }
+        return {
+          slug,
+          description,
+          dirName: entry.name,
+        } satisfies OfficialIntegrationSkill;
+      } catch {
+        return null;
       }
-      result.set(slug, {
-        slug,
-        description,
-        dirName: entry.name,
-      });
-    } catch {
+    }),
+  );
+
+  for (const record of records) {
+    if (!record) {
       continue;
     }
+    result.set(record.slug, record);
   }
 
   cachedOfficialSkills = result;
@@ -358,13 +365,11 @@ export async function resolvePreferredCommunitySkillsForUser(
     .where(and(...whereClauses))
     .orderBy(desc(integrationSkillPreference.updatedAt));
 
-  const out: Array<Extract<ResolvedIntegrationSkill, { source: "community" }>> = [];
-  for (const pref of prefs) {
-    const resolved = await resolveIntegrationSkillForUser(userId, pref.slug);
-    if (resolved?.source === "community") {
-      out.push(resolved);
-    }
-  }
-
-  return out;
+  const resolved = await Promise.all(
+    prefs.map((pref) => resolveIntegrationSkillForUser(userId, pref.slug)),
+  );
+  return resolved.filter(
+    (skill): skill is Extract<ResolvedIntegrationSkill, { source: "community" }> =>
+      skill?.source === "community",
+  );
 }

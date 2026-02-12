@@ -500,14 +500,10 @@ export async function listMemoryFiles(
     orderBy: [asc(memoryFile.type), desc(memoryFile.date)],
   });
 
-  const results: Array<{ path: string; text: string }> = [];
-  for (const file of files) {
-    const entry = await readMemoryFile({ userId, path: getFilePath(file) });
-    if (entry) {
-      results.push(entry);
-    }
-  }
-  return results;
+  const results = await Promise.all(
+    files.map((file) => readMemoryFile({ userId, path: getFilePath(file) })),
+  );
+  return results.filter((entry): entry is { path: string; text: string } => entry !== null);
 }
 
 export async function readSessionTranscriptByPath(
@@ -642,15 +638,12 @@ export async function writeSessionTranscriptFromConversation(input: {
     return null;
   }
 
-  const boundaryIndex = messages
-    .map((m, idx) =>
-      m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1,
-    )
-    .filter((idx) => idx >= 0)
-    .pop();
+  const boundaryIndex = messages.findLastIndex(
+    (m) => m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX),
+  );
 
   const sessionMessages =
-    boundaryIndex !== undefined ? messages.slice(boundaryIndex + 1) : messages;
+    boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
 
   const trimmedMessages =
     input.messageLimit && sessionMessages.length > input.messageLimit
@@ -860,7 +853,12 @@ export async function searchMemory(input: MemorySearchInput): Promise<MemorySear
 
   const scored = Array.from(combined.values())
     .map((row) => ({
-      ...row,
+      id: row.id,
+      fileId: row.fileId,
+      entryId: row.entryId,
+      content: row.content,
+      vectorScore: row.vectorScore,
+      textScore: row.textScore,
       score: 0.7 * row.vectorScore + 0.3 * row.textScore,
     }))
     .filter((row) => row.score >= DEFAULT_SCORE_THRESHOLD)
@@ -1001,7 +999,11 @@ async function searchSessionTranscripts(input: MemorySearchInput): Promise<Memor
 
   const scored = Array.from(combined.values())
     .map((row) => ({
-      ...row,
+      id: row.id,
+      transcriptId: row.transcriptId,
+      content: row.content,
+      vectorScore: row.vectorScore,
+      textScore: row.textScore,
       score: 0.7 * row.vectorScore + 0.3 * row.textScore,
     }))
     .filter((row) => row.score >= DEFAULT_SCORE_THRESHOLD)
@@ -1062,16 +1064,16 @@ export async function syncMemoryToSandbox(
   await ensureDir(`${MEMORY_BASE_PATH}/memory`);
   await ensureDir(SESSION_BASE_PATH);
 
-  const written: string[] = [];
-  for (const file of files) {
+  const memoryWrites = files.map(async (file) => {
     const fullPath = `${MEMORY_BASE_PATH}/${file.path}`;
     await writeFile(fullPath, file.text);
-    written.push(fullPath);
-  }
-  for (const transcript of transcripts) {
+    return fullPath;
+  });
+  const transcriptWrites = transcripts.map(async (transcript) => {
     const fullPath = `${MEMORY_BASE_PATH}/${transcript.path}`;
     await writeFile(fullPath, transcript.text);
-    written.push(fullPath);
-  }
-  return written;
+    return fullPath;
+  });
+
+  return Promise.all([...memoryWrites, ...transcriptWrites]);
 }

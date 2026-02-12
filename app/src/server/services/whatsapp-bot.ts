@@ -1,4 +1,4 @@
-import makeWASocket, {
+import createWASocket, {
   type AuthenticationState,
   Browsers,
   BufferJSON,
@@ -36,7 +36,7 @@ const state: WhatsAppState = {
   lastError: null,
 };
 
-let socket: ReturnType<typeof makeWASocket> | null = null;
+let socket: ReturnType<typeof createWASocket> | null = null;
 let isConnecting = false;
 
 function normalizePhoneNumber(input: string): string {
@@ -302,7 +302,7 @@ export async function ensureWhatsAppSocket(): Promise<void> {
   try {
     const { state: authState, saveCreds } = await createDbAuthState();
 
-    socket = makeWASocket({
+    socket = createWASocket({
       auth: authState,
       printQRInTerminal: false,
       browser: Browsers.macOS("Bap"),

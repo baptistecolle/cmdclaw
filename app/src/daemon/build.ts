@@ -31,7 +31,7 @@ async function build(): Promise<void> {
     process.exit(1);
   }
 
-  for (const target of filteredTargets) {
+  const buildJobs = filteredTargets.map((target) => {
     const ext = target.os === "win32" ? ".exe" : "";
     const outPath = `${outputDir}/bap-daemon-${target.os}-${target.arch}${ext}`;
 
@@ -55,13 +55,19 @@ async function build(): Promise<void> {
       },
     );
 
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      console.error(`Build failed for ${target.os}-${target.arch}`);
-      process.exit(1);
-    }
+    return proc.exited.then((exitCode) => {
+      if (exitCode !== 0) {
+        throw new Error(`Build failed for ${target.os}-${target.arch}`);
+      }
+      console.log(`  -> ${outPath}`);
+    });
+  });
 
-    console.log(`  -> ${outPath}`);
+  try {
+    await Promise.all(buildJobs);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : "Build failed");
+    process.exit(1);
   }
 
   console.log("\nBuild complete!");

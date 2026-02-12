@@ -79,7 +79,13 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
   const start = Date.now();
   let attempts = 0;
   let lastError: string | null = null;
-  while (Date.now() - start < maxWait) {
+  const pollUntilReady = async (): Promise<void> => {
+    if (Date.now() - start >= maxWait) {
+      throw new Error(
+        `OpenCode server in sandbox failed to start (url=${url}, attempts=${attempts}, waitedMs=${Date.now() - start}, lastError=${lastError || "unknown"})`,
+      );
+    }
+
     attempts += 1;
     try {
       const res = await fetch(`${url}/doc`, { method: "GET" });
@@ -92,10 +98,10 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
       lastError = "network_error";
     }
     await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error(
-    `OpenCode server in sandbox failed to start (url=${url}, attempts=${attempts}, waitedMs=${Date.now() - start}, lastError=${lastError || "unknown"})`,
-  );
+    return pollUntilReady();
+  };
+
+  return pollUntilReady();
 }
 
 /**
@@ -560,30 +566,24 @@ async function replayConversationHistory(
     return;
   }
 
-  const boundaryIndex = messages
-    .map((m, idx) =>
-      m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1,
-    )
-    .filter((idx) => idx >= 0)
-    .pop();
+  const boundaryIndex = messages.findLastIndex(
+    (m) => m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX),
+  );
 
   const sessionMessages =
-    boundaryIndex !== undefined ? messages.slice(boundaryIndex + 1) : messages;
+    boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
 
-  const summaryIndex = sessionMessages
-    .map((m, idx) =>
-      m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX) ? idx : -1,
-    )
-    .filter((idx) => idx >= 0)
-    .pop();
+  const summaryIndex = sessionMessages.findLastIndex(
+    (m) => m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX),
+  );
 
-  const summaryMessage = summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
+  const summaryMessage = summaryIndex >= 0 ? sessionMessages[summaryIndex] : undefined;
   const summaryText = summaryMessage
     ? summaryMessage.content.replace(COMPACTION_SUMMARY_PREFIX, "").trim()
     : null;
 
   const messagesAfterSummary =
-    summaryIndex !== undefined ? sessionMessages.slice(summaryIndex + 1) : sessionMessages;
+    summaryIndex >= 0 ? sessionMessages.slice(summaryIndex + 1) : sessionMessages;
 
   // Build conversation context
   const historyContext = messagesAfterSummary
@@ -642,37 +642,38 @@ export async function injectProviderAuth(client: OpencodeClient, userId: string)
     const auths = await db.query.providerAuth.findMany({
       where: eq(providerAuth.userId, userId),
     });
+    await Promise.all(
+      auths.map(async (auth) => {
+        try {
+          const access = decrypt(auth.accessToken);
 
-    for (const auth of auths) {
-      try {
-        const access = decrypt(auth.accessToken);
+          if (auth.provider === "kimi") {
+            await client.auth.set({
+              providerID: "kimi-for-coding",
+              auth: {
+                type: "api",
+                key: access,
+              },
+            });
+            console.log(`[E2B] Injected kimi-for-coding auth for user ${userId}`);
+            return;
+          }
 
-        if (auth.provider === "kimi") {
           await client.auth.set({
-            providerID: "kimi-for-coding",
+            providerID: auth.provider,
             auth: {
-              type: "api",
-              key: access,
+              type: "oauth",
+              access,
+              refresh: decrypt(auth.refreshToken),
+              expires: auth.expiresAt.getTime(),
             },
           });
-          console.log(`[E2B] Injected kimi-for-coding auth for user ${userId}`);
-          continue;
+          console.log(`[E2B] Injected ${auth.provider} auth for user ${userId}`);
+        } catch (err) {
+          console.error(`[E2B] Failed to inject ${auth.provider} auth:`, err);
         }
-
-        await client.auth.set({
-          providerID: auth.provider,
-          auth: {
-            type: "oauth",
-            access,
-            refresh: decrypt(auth.refreshToken),
-            expires: auth.expiresAt.getTime(),
-          },
-        });
-        console.log(`[E2B] Injected ${auth.provider} auth for user ${userId}`);
-      } catch (err) {
-        console.error(`[E2B] Failed to inject ${auth.provider} auth:`, err);
-      }
-    }
+      }),
+    );
   } catch (err) {
     console.error("[E2B] Failed to load provider auths:", err);
   }
@@ -746,7 +747,8 @@ export async function writeSkillsToSandbox(sandbox: Sandbox, userId: string): Pr
   const writtenSkills: string[] = [];
   let agentsContent = "# Custom Skills\n\n";
 
-  for (const s of skills) {
+  await skills.reduce<Promise<void>>(async (prev, s) => {
+    await prev;
     const skillDir = `/app/.opencode/skills/${s.name}`;
     await sandbox.commands.run(`mkdir -p "${skillDir}"`);
 
@@ -755,38 +757,37 @@ export async function writeSkillsToSandbox(sandbox: Sandbox, userId: string): Pr
     agentsContent += `${s.description}\n\n`;
     agentsContent += `Files available in: /app/.opencode/skills/${s.name}/\n\n`;
 
-    // Write skill files (text-based, stored in DB)
-    for (const file of s.files) {
-      const filePath = `${skillDir}/${file.path}`;
+    await Promise.all(
+      s.files.map(async (file) => {
+        const filePath = `${skillDir}/${file.path}`;
+        const lastSlash = filePath.lastIndexOf("/");
+        const parentDir = filePath.substring(0, lastSlash);
+        if (parentDir !== skillDir) {
+          await sandbox.commands.run(`mkdir -p "${parentDir}"`);
+        }
+        await sandbox.files.write(filePath, file.content);
+      }),
+    );
 
-      // Create parent directories if needed
-      const lastSlash = filePath.lastIndexOf("/");
-      const parentDir = filePath.substring(0, lastSlash);
-      if (parentDir !== skillDir) {
-        await sandbox.commands.run(`mkdir -p "${parentDir}"`);
-      }
-
-      await sandbox.files.write(filePath, file.content);
-    }
-
-    // Write skill documents (binary files from S3)
-    for (const doc of s.documents) {
-      try {
-        const buffer = await downloadFromS3(doc.storageKey);
-        const docPath = `${skillDir}/${doc.filename}`;
-        const arrayBuffer = new Uint8Array(buffer).buffer;
-        await sandbox.files.write(docPath, arrayBuffer);
-        console.log(`[E2B] Written document: ${doc.filename} (${doc.sizeBytes} bytes)`);
-      } catch (error) {
-        console.error(`[E2B] Failed to write document ${doc.filename}:`, error);
-      }
-    }
+    await Promise.all(
+      s.documents.map(async (doc) => {
+        try {
+          const buffer = await downloadFromS3(doc.storageKey);
+          const docPath = `${skillDir}/${doc.filename}`;
+          const arrayBuffer = new Uint8Array(buffer).buffer;
+          await sandbox.files.write(docPath, arrayBuffer);
+          console.log(`[E2B] Written document: ${doc.filename} (${doc.sizeBytes} bytes)`);
+        } catch (error) {
+          console.error(`[E2B] Failed to write document ${doc.filename}:`, error);
+        }
+      }),
+    );
 
     writtenSkills.push(s.name);
     console.log(
       `[E2B] Written skill: ${s.name} (${s.files.length} files, ${s.documents.length} documents)`,
     );
-  }
+  }, Promise.resolve());
 
   // Write AGENTS.md
   await sandbox.files.write("/app/.opencode/AGENTS.md", agentsContent);
@@ -832,22 +833,26 @@ export async function writeResolvedIntegrationSkillsToSandbox(
   await sandbox.commands.run("mkdir -p /app/.opencode/integration-skills");
   const written: string[] = [];
 
-  for (const skill of resolved) {
-    const skillDir = `/app/.opencode/integration-skills/${skill.slug}`;
-    await sandbox.commands.run(`mkdir -p "${skillDir}"`);
+  await Promise.all(
+    resolved.map(async (skill) => {
+      const skillDir = `/app/.opencode/integration-skills/${skill.slug}`;
+      await sandbox.commands.run(`mkdir -p "${skillDir}"`);
 
-    for (const file of skill.files) {
-      const filePath = `${skillDir}/${file.path}`;
-      const lastSlash = filePath.lastIndexOf("/");
-      const parentDir = filePath.substring(0, lastSlash);
-      if (parentDir !== skillDir) {
-        await sandbox.commands.run(`mkdir -p "${parentDir}"`);
-      }
-      await sandbox.files.write(filePath, file.content);
-    }
+      await Promise.all(
+        skill.files.map(async (file) => {
+          const filePath = `${skillDir}/${file.path}`;
+          const lastSlash = filePath.lastIndexOf("/");
+          const parentDir = filePath.substring(0, lastSlash);
+          if (parentDir !== skillDir) {
+            await sandbox.commands.run(`mkdir -p "${parentDir}"`);
+          }
+          await sandbox.files.write(filePath, file.content);
+        }),
+      );
 
-    written.push(skill.slug);
-  }
+      written.push(skill.slug);
+    }),
+  );
 
   return written;
 }

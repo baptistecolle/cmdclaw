@@ -257,11 +257,10 @@ async function interactiveLoop(client: RouterClient<AppRouter>): Promise<void> {
   });
 
   printUsage();
-
-  while (true) {
+  const runStep = async (): Promise<void> => {
     const line = (await ask(rl, "workflow> ")).trim();
     if (!line) {
-      continue;
+      return runStep();
     }
 
     const [cmd, ...rest] = line.split(/\s+/);
@@ -351,7 +350,11 @@ async function interactiveLoop(client: RouterClient<AppRouter>): Promise<void> {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`  Error: ${message}`);
     }
-  }
+
+    return runStep();
+  };
+
+  await runStep();
 }
 
 // ── Non-interactive mode ──

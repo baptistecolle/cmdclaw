@@ -160,16 +160,19 @@ export async function reconcileScheduledWorkflowJobs(): Promise<{
 
   let synced = 0;
   let failed = 0;
-
-  for (const row of rows) {
-    try {
-      await syncWorkflowScheduleJob(row);
-      synced += 1;
-    } catch (error) {
-      failed += 1;
-      console.error(`[workflow-scheduler] failed to reconcile workflow ${row.id}`, error);
-    }
-  }
+  const results = await Promise.all(
+    rows.map(async (row) => {
+      try {
+        await syncWorkflowScheduleJob(row);
+        return { synced: 1, failed: 0 };
+      } catch (error) {
+        console.error(`[workflow-scheduler] failed to reconcile workflow ${row.id}`, error);
+        return { synced: 0, failed: 1 };
+      }
+    }),
+  );
+  synced = results.reduce((sum, result) => sum + result.synced, 0);
+  failed = results.reduce((sum, result) => sum + result.failed, 0);
 
   return { synced, failed };
 }

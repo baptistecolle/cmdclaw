@@ -60,7 +60,12 @@ export async function authenticate(serverUrl: string): Promise<DaemonConfig | nu
   let pollingInterval = interval * 1000;
   const deadline = Date.now() + expiresIn * 1000;
 
-  while (Date.now() < deadline) {
+  const pollForToken = async (): Promise<DaemonConfig | null> => {
+    if (Date.now() >= deadline) {
+      console.error("  Code expired. Please try again.");
+      return null;
+    }
+
     await sleep(pollingInterval);
 
     try {
@@ -137,10 +142,11 @@ export async function authenticate(serverUrl: string): Promise<DaemonConfig | nu
     } catch {
       // Network error, retry
     }
-  }
 
-  console.error("  Code expired. Please try again.");
-  return null;
+    return pollForToken();
+  };
+
+  return pollForToken();
 }
 
 function sleep(ms: number): Promise<void> {

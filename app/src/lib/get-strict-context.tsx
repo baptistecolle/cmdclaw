@@ -8,10 +8,6 @@ function getStrictContext<T>(
 ] {
   const Context = React.createContext<T | undefined>(undefined);
 
-  const Provider = ({ value, children }: { value: T; children?: React.ReactNode }) => (
-    <Context.Provider value={value}>{children}</Context.Provider>
-  );
-
   const useSafeContext = () => {
     const ctx = React.useContext(Context);
     if (ctx === undefined) {
@@ -20,7 +16,7 @@ function getStrictContext<T>(
     return ctx;
   };
 
-  return [Provider, useSafeContext] as const;
+  return [Context.Provider, useSafeContext] as const;
 }
 
 export { getStrictContext };

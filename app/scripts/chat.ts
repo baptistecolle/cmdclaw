@@ -207,7 +207,12 @@ async function authenticate(serverUrl: string): Promise<ChatConfig | null> {
   let pollingInterval = interval * 1000;
   const deadline = Date.now() + expiresIn * 1000;
 
-  while (Date.now() < deadline) {
+  const pollForToken = async (): Promise<ChatConfig | null> => {
+    if (Date.now() >= deadline) {
+      console.error("Code expired. Please try again.");
+      return null;
+    }
+
     await sleep(pollingInterval);
 
     try {
@@ -254,10 +259,11 @@ async function authenticate(serverUrl: string): Promise<ChatConfig | null> {
     } catch {
       // retry
     }
-  }
 
-  console.error("Code expired. Please try again.");
-  return null;
+    return pollForToken();
+  };
+
+  return pollForToken();
 }
 
 function createClient(serverUrl: string, token: string): RouterClient<AppRouter> {
@@ -301,7 +307,7 @@ async function runChatLoop(
     }
   }
 
-  while (true) {
+  const runStep = async (): Promise<void> => {
     const input = (await ask(rl, conversationId ? "followup> " : "chat> ")).trim();
     if (!input) {
       console.log("Bye.");
@@ -317,28 +323,28 @@ async function runChatLoop(
       } catch (e) {
         console.error(e instanceof Error ? e.message : String(e));
       }
-      continue;
+      return runStep();
     }
 
     if (input === "/model") {
       console.log(`Current model: ${options.model ?? "auto"}`);
-      continue;
+      return runStep();
     }
 
     if (input.startsWith("/model ")) {
       const model = input.slice(7).trim();
       if (!model) {
         console.log("Usage: /model <id>");
-        continue;
+        return runStep();
       }
       options.model = model;
       console.log(`Switched model to: ${options.model}`);
-      continue;
+      return runStep();
     }
 
     if (input === "/models") {
       await printFreeModels();
-      continue;
+      return runStep();
     }
 
     const attachments = pendingFiles.length ? pendingFiles : undefined;
@@ -350,7 +356,11 @@ async function runChatLoop(
     }
 
     conversationId = result.conversationId;
-  }
+
+    return runStep();
+  };
+
+  await runStep();
 }
 
 async function runGeneration(

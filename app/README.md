@@ -58,7 +58,7 @@ This test verifies the Slack provider flow end-to-end:
 Run:
 
 ```bash
-E2E_LIVE=1 E2E_SLACK_LIVE=1 E2E_SLACK_CHANNEL_ID=<channel-id> bun run test:e2e:live:slack
+E2E_LIVE=1 E2E_SLACK_CHANNEL_ID=<channel-id> bun run test:e2e:live:slack
 ```
 
 Required environment variables:

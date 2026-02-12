@@ -205,18 +205,22 @@ function handleMessage(ws: ServerWebSocket<WebSocketData>, raw: string): void {
 function startHeartbeat(): void {
   setInterval(async () => {
     const now = Date.now();
+    const heartbeatTasks: Promise<void>[] = [];
     for (const [deviceId, conn] of connections) {
       if (now - conn.lastPing > HEARTBEAT_TIMEOUT_MS) {
         console.log(`[WS] Device ${deviceId} timed out`);
         conn.ws.close(4002, "Heartbeat timeout");
-        await handleDisconnect(conn.ws);
+        heartbeatTasks.push(handleDisconnect(conn.ws));
       } else {
         try {
           conn.ws.send(JSON.stringify({ type: "ping" }));
         } catch {
-          await handleDisconnect(conn.ws);
+          heartbeatTasks.push(handleDisconnect(conn.ws));
         }
       }
+    }
+    if (heartbeatTasks.length > 0) {
+      await Promise.all(heartbeatTasks);
     }
   }, HEARTBEAT_INTERVAL_MS);
 }

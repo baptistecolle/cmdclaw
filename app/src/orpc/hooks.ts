@@ -764,7 +764,19 @@ export function useGeneration() {
       let retries = 0;
 
       try {
-        while (!signal.aborted) {
+        const streamUntilDone = async (): Promise<{
+          generationId: string;
+          conversationId: string;
+        } | null> => {
+          if (signal.aborted) {
+            return currentGenerationId && currentConversationId
+              ? {
+                  generationId: currentGenerationId,
+                  conversationId: currentConversationId,
+                }
+              : null;
+          }
+
           let streamNotReady = false;
           const result = await runGenerationStream({
             client,
@@ -832,14 +844,10 @@ export function useGeneration() {
                 }
               : null;
           }
-        }
+          return streamUntilDone();
+        };
 
-        return currentGenerationId && currentConversationId
-          ? {
-              generationId: currentGenerationId,
-              conversationId: currentConversationId,
-            }
-          : null;
+        return streamUntilDone();
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return null;
@@ -861,7 +869,11 @@ export function useGeneration() {
       let retries = 0;
 
       try {
-        while (!signal.aborted && currentGenerationId) {
+        const streamUntilDone = async (): Promise<void> => {
+          if (signal.aborted || !currentGenerationId) {
+            return;
+          }
+
           let streamNotReady = false;
           await runGenerationStream({
             client,
@@ -897,7 +909,10 @@ export function useGeneration() {
           if (!shouldContinue) {
             return;
           }
-        }
+          return streamUntilDone();
+        };
+
+        await streamUntilDone();
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return;

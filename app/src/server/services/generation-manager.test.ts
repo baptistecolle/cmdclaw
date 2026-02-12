@@ -73,15 +73,15 @@ vi.mock("@/server/sandbox/factory", () => ({
 }));
 
 vi.mock("@/server/ai/anthropic-backend", () => ({
-  AnthropicBackend: class AnthropicBackend {},
+  AnthropicBackend: vi.fn(() => ({})),
 }));
 
 vi.mock("@/server/ai/openai-backend", () => ({
-  OpenAIBackend: class OpenAIBackend {},
+  OpenAIBackend: vi.fn(() => ({})),
 }));
 
 vi.mock("@/server/ai/local-backend", () => ({
-  LocalLLMBackend: class LocalLLMBackend {},
+  LocalLLMBackend: vi.fn(() => ({})),
 }));
 
 vi.mock("@/server/ai/tools", () => ({

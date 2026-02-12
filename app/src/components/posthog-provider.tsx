@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import posthog from "posthog-js";
+import posthogClientLib from "posthog-js";
 import { PostHogProvider, usePostHog } from "posthog-js/react";
 import { Suspense, useEffect } from "react";
 import { env } from "@/env";
@@ -12,7 +12,7 @@ const posthogHost = env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://app.posthog.com";
 const isPosthogEnabled = Boolean(posthogKey);
 
 if (isPosthogEnabled) {
-  posthog.init(posthogKey!, {
+  posthogClientLib.init(posthogKey!, {
     api_host: posthogHost,
     capture_pageview: false,
   });
@@ -88,7 +88,7 @@ export function PostHogClientProvider({ children }: PostHogClientProviderProps) 
   }
 
   return (
-    <PostHogProvider client={posthog}>
+    <PostHogProvider client={posthogClientLib}>
       <Suspense fallback={null}>
         <PostHogPageView />
       </Suspense>

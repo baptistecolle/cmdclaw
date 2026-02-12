@@ -86,17 +86,22 @@ async function callMemoryApi(operation: string, payload: MemoryToolInput) {
 
 export const MemoryPlugin = async () => {
   return {
-    tools: MEMORY_TOOLS.map((tool) => ({
-      ...tool,
-      execute: async (args: MemoryToolInput) => {
+    tools: MEMORY_TOOLS.map((tool) => {
+      const execute = async (args: MemoryToolInput) => {
         const operation = tool.name.replace("memory_", "");
         const result = await callMemoryApi(operation, args);
         if (!result?.success) {
           throw new Error(result?.error || "Memory tool failed");
         }
         return result;
-      },
-    })),
+      };
+      return {
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.input_schema,
+        execute,
+      };
+    }),
   };
 };
 

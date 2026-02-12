@@ -251,9 +251,12 @@ export function MessageItem({
       <div data-testid="chat-message-user" className="py-4 space-y-2">
         {attachments && attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 justify-end">
-            {attachments.map((a, i) =>
+            {attachments.map((a) =>
               a.mimeType.startsWith("image/") && a.dataUrl ? (
-                <div key={i} className="relative group">
+                <div
+                  key={a.id ?? `${a.name}-${a.mimeType}-${a.dataUrl}`}
+                  className="relative group"
+                >
                   <Image
                     src={a.dataUrl}
                     alt={a.name}
@@ -275,7 +278,7 @@ export function MessageItem({
                 </div>
               ) : (
                 <div
-                  key={i}
+                  key={a.id ?? `${a.name}-${a.mimeType}-${a.dataUrl}`}
                   className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs"
                 >
                   <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />

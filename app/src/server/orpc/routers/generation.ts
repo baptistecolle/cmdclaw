@@ -7,6 +7,41 @@ import { generationManager } from "@/server/services/generation-manager";
 import { logServerEvent } from "@/server/utils/observability";
 import { protectedProcedure } from "../middleware";
 
+type ActiveGenerationStatus =
+  | "idle"
+  | "generating"
+  | "awaiting_approval"
+  | "awaiting_auth"
+  | "paused"
+  | "complete"
+  | "error";
+
+function mapGenerationStatus(
+  genStatus: string | null | undefined,
+): ActiveGenerationStatus | null {
+  if (!genStatus) {
+    return null;
+  }
+  switch (genStatus) {
+    case "running":
+      return "generating";
+    case "completed":
+      return "complete";
+    case "cancelled":
+      return "idle";
+    case "awaiting_approval":
+      return "awaiting_approval";
+    case "awaiting_auth":
+      return "awaiting_auth";
+    case "paused":
+      return "paused";
+    case "error":
+      return "error";
+    default:
+      return null;
+  }
+}
+
 // Schema for generation events (same structure as GenerationEvent type)
 const generationEventSchema = z.discriminatedUnion("type", [
   z.object({
@@ -336,17 +371,7 @@ const getActiveGeneration = protectedProcedure
   .output(
     z.object({
       generationId: z.string().nullable(),
-      status: z
-        .enum([
-          "idle",
-          "generating",
-          "awaiting_approval",
-          "awaiting_auth",
-          "paused",
-          "complete",
-          "error",
-        ])
-        .nullable(),
+      status: z.enum(["idle", "generating", "awaiting_approval", "awaiting_auth", "paused", "complete", "error"]).nullable(),
     }),
   )
   .handler(async ({ input, context }) => {
@@ -363,48 +388,13 @@ const getActiveGeneration = protectedProcedure
       throw new Error("Access denied");
     }
 
-    // Map generation status to conversation status
-    const mapStatus = (
-      genStatus: string | null | undefined,
-    ):
-      | "idle"
-      | "generating"
-      | "awaiting_approval"
-      | "awaiting_auth"
-      | "paused"
-      | "complete"
-      | "error"
-      | null => {
-      if (!genStatus) {
-        return null;
-      }
-      switch (genStatus) {
-        case "running":
-          return "generating";
-        case "completed":
-          return "complete";
-        case "cancelled":
-          return "idle";
-        case "awaiting_approval":
-          return "awaiting_approval";
-        case "awaiting_auth":
-          return "awaiting_auth";
-        case "paused":
-          return "paused";
-        case "error":
-          return "error";
-        default:
-          return null;
-      }
-    };
-
     // Check for in-memory generation first
     const activeGenId = generationManager.getGenerationForConversation(input.conversationId);
     if (activeGenId) {
       const genStatus = await generationManager.getGenerationStatus(activeGenId);
       return {
         generationId: activeGenId,
-        status: mapStatus(genStatus?.status),
+        status: mapGenerationStatus(genStatus?.status),
       };
     }
 

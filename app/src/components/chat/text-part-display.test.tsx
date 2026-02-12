@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
-import "@testing-library/jest-dom/vitest";
+import * as jestDomVitest from "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { TextPartDisplay } from "./text-part-display";
+
+void jestDomVitest;
 
 describe("TextPartDisplay", () => {
   it("renders content", () => {

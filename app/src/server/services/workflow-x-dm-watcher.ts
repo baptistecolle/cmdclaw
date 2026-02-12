@@ -100,23 +100,22 @@ async function listWatchableWorkflows(): Promise<WatchableWorkflow[]> {
     .innerJoin(integrationToken, eq(integrationToken.integrationId, integration.id))
     .where(and(eq(workflow.status, "on"), eq(workflow.triggerType, X_DM_TRIGGER_TYPE)));
 
-  const watchable: WatchableWorkflow[] = [];
-  for (const row of rows) {
+  return rows.flatMap((row) => {
     if (typeof row.accountId !== "string" || row.accountId.length === 0) {
-      continue;
+      return [];
     }
-    watchable.push({
-      workflowId: row.workflowId,
-      integrationId: row.integrationId,
-      accountId: row.accountId,
-      accessToken: row.accessToken,
-      refreshToken: row.refreshToken,
-      expiresAt: row.expiresAt,
-      scopes: row.scopes,
-    });
-  }
-
-  return watchable;
+    return [
+      {
+        workflowId: row.workflowId,
+        integrationId: row.integrationId,
+        accountId: row.accountId,
+        accessToken: row.accessToken,
+        refreshToken: row.refreshToken,
+        expiresAt: row.expiresAt,
+        scopes: row.scopes,
+      },
+    ];
+  });
 }
 
 async function getWorkflowLastProcessedEventId(workflowId: string): Promise<string | null> {
@@ -256,14 +255,15 @@ export async function pollXDmWorkflowTriggers(): Promise<{
   let checked = 0;
   let enqueued = 0;
 
-  for (const item of watchable) {
+  await watchable.reduce<Promise<void>>(async (prev, item) => {
+    await prev;
     checked += 1;
 
     if (!hasRequiredScopes(item.scopes)) {
       console.warn(
         `[workflow-x-dm-watcher] workflow ${item.workflowId} skipped: connected X integration is missing dm.read/users.read scope`,
       );
-      continue;
+      return;
     }
 
     try {
@@ -282,7 +282,7 @@ export async function pollXDmWorkflowTriggers(): Promise<{
       const lastProcessedEventId = await getWorkflowLastProcessedEventId(item.workflowId);
       const events = await listRecentXDmEvents(accessToken);
       if (events.length === 0) {
-        continue;
+        return;
       }
 
       const incoming = events
@@ -292,22 +292,27 @@ export async function pollXDmWorkflowTriggers(): Promise<{
         )
         .toSorted((a, b) => compareEventId(a.id, b.id));
 
-      for (const event of incoming) {
-        const alreadyHandled = await hasRunForXDmEvent(item.workflowId, event.id);
-        if (alreadyHandled) {
-          continue;
-        }
+      const enqueuedCount = await Promise.all(
+        incoming.map(async (event) => {
+          const alreadyHandled = await hasRunForXDmEvent(item.workflowId, event.id);
+          if (alreadyHandled) {
+            return 0;
+          }
 
-        try {
-          await triggerWorkflowFromXDm(item.workflowId, event);
-          enqueued += 1;
-        } catch (error) {
-          console.error(
-            `[workflow-x-dm-watcher] failed to trigger workflow ${item.workflowId} for dm ${event.id}`,
-            error,
-          );
-        }
-      }
+          try {
+            await triggerWorkflowFromXDm(item.workflowId, event);
+            return 1;
+          } catch (error) {
+            console.error(
+              `[workflow-x-dm-watcher] failed to trigger workflow ${item.workflowId} for dm ${event.id}`,
+              error,
+            );
+            return 0;
+          }
+        }),
+      );
+
+      enqueued += enqueuedCount.reduce((sum, count) => sum + count, 0);
     } catch (error) {
       if (isTokenAuthError(error)) {
         console.warn(
@@ -316,7 +321,7 @@ export async function pollXDmWorkflowTriggers(): Promise<{
       }
       console.error(`[workflow-x-dm-watcher] failed for workflow ${item.workflowId}`, error);
     }
-  }
+  }, Promise.resolve());
 
   return { checked, enqueued };
 }

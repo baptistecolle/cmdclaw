@@ -84,17 +84,19 @@ export async function submitToCommunityRepo(customIntegrationId: string): Promis
       },
     ];
 
-    for (const file of files) {
-      await fetch(`${apiBase}/contents/${file.path}`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify({
-          message: `Add ${integ.name} integration`,
-          content: Buffer.from(file.content).toString("base64"),
-          branch: branchName,
+    await Promise.all(
+      files.map((file) =>
+        fetch(`${apiBase}/contents/${file.path}`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({
+            message: `Add ${integ.name} integration`,
+            content: Buffer.from(file.content).toString("base64"),
+            branch: branchName,
+          }),
         }),
-      });
-    }
+      ),
+    );
 
     // Create PR
     const prRes = await fetch(`${apiBase}/pulls`, {

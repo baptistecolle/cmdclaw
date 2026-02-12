@@ -37,6 +37,26 @@ type GmailMessage = {
   payload?: GmailPart;
 };
 
+function extractBody(part: GmailPart): string {
+  if (part.body?.data) {
+    return Buffer.from(part.body.data, "base64").toString("utf-8");
+  }
+  if (part.parts) {
+    for (const p of part.parts) {
+      if (p.mimeType === "text/plain") {
+        return extractBody(p);
+      }
+    }
+    for (const p of part.parts) {
+      const r = extractBody(p);
+      if (r) {
+        return r;
+      }
+    }
+  }
+  return "";
+}
+
 async function listEmails() {
   const params = new URLSearchParams({ maxResults: values.limit || "10" });
   if (values.query) {
@@ -93,26 +113,6 @@ async function getEmail(messageId: string) {
   const email = (await res.json()) as GmailMessage;
   const getHeader = (name: string) =>
     email.payload?.headers?.find((h) => h.name === name)?.value || "";
-
-  const extractBody = (part: GmailPart): string => {
-    if (part.body?.data) {
-      return Buffer.from(part.body.data, "base64").toString("utf-8");
-    }
-    if (part.parts) {
-      for (const p of part.parts) {
-        if (p.mimeType === "text/plain") {
-          return extractBody(p);
-        }
-      }
-      for (const p of part.parts) {
-        const r = extractBody(p);
-        if (r) {
-          return r;
-        }
-      }
-    }
-    return "";
-  };
 
   console.log(
     JSON.stringify(

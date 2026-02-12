@@ -162,19 +162,20 @@ export async function collectNewSandboxFiles(
       return true;
     });
 
-  const files: Array<{ path: string; content: Buffer }> = [];
+  const files = await Promise.all(
+    paths.map(async (filePath) => {
+      try {
+        const content = await readSandboxFileAsBuffer(sandbox, filePath);
+        return { path: filePath, content };
+      } catch (err) {
+        // Skip files we can't read
+        console.warn(`[SandboxFileService] Could not read file ${filePath}:`, err);
+        return null;
+      }
+    }),
+  );
 
-  for (const filePath of paths) {
-    try {
-      const content = await readSandboxFileAsBuffer(sandbox, filePath);
-      files.push({ path: filePath, content });
-    } catch (err) {
-      // Skip files we can't read
-      console.warn(`[SandboxFileService] Could not read file ${filePath}:`, err);
-    }
-  }
-
-  return files;
+  return files.filter((file): file is { path: string; content: Buffer } => file !== null);
 }
 
 /**
@@ -222,17 +223,18 @@ export async function collectNewE2BFiles(
       return true;
     });
 
-  const files: Array<{ path: string; content: Buffer }> = [];
+  const files = await Promise.all(
+    paths.map(async (filePath) => {
+      try {
+        const content = await readE2BSandboxFileAsBuffer(sandbox, filePath);
+        return { path: filePath, content };
+      } catch (err) {
+        // Skip files we can't read
+        console.warn(`[SandboxFileService] Could not read E2B file ${filePath}:`, err);
+        return null;
+      }
+    }),
+  );
 
-  for (const filePath of paths) {
-    try {
-      const content = await readE2BSandboxFileAsBuffer(sandbox, filePath);
-      files.push({ path: filePath, content });
-    } catch (err) {
-      // Skip files we can't read
-      console.warn(`[SandboxFileService] Could not read E2B file ${filePath}:`, err);
-    }
-  }
-
-  return files;
+  return files.filter((file): file is { path: string; content: Buffer } => file !== null);
 }

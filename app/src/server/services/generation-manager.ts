@@ -2688,30 +2688,24 @@ class GenerationManager {
     messages: MessageRow[],
     options?: { sandbox?: SandboxBackend; llm?: LLMBackend },
   ): Promise<{ summaryText: string | null; sessionMessages: MessageRow[] }> {
-    const boundaryIndex = messages
-      .map((m, idx) =>
-        m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1,
-      )
-      .filter((idx) => idx >= 0)
-      .pop();
+    const boundaryIndex = messages.findLastIndex(
+      (m) => m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX),
+    );
 
     const sessionMessages =
-      boundaryIndex !== undefined ? messages.slice(boundaryIndex + 1) : messages;
+      boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
 
-    const summaryIndex = sessionMessages
-      .map((m, idx) =>
-        m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX) ? idx : -1,
-      )
-      .filter((idx) => idx >= 0)
-      .pop();
+    const summaryIndex = sessionMessages.findLastIndex(
+      (m) => m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX),
+    );
 
-    const summaryMessage = summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
+    const summaryMessage = summaryIndex >= 0 ? sessionMessages[summaryIndex] : undefined;
     const summaryText = summaryMessage
       ? summaryMessage.content.replace(COMPACTION_SUMMARY_PREFIX, "").trim()
       : null;
 
     const messagesAfterSummary =
-      summaryIndex !== undefined ? sessionMessages.slice(summaryIndex + 1) : sessionMessages;
+      summaryIndex >= 0 ? sessionMessages.slice(summaryIndex + 1) : sessionMessages;
 
     const conversationMessages = messagesAfterSummary.filter(
       (m) => m.role === "user" || m.role === "assistant",

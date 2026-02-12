@@ -27,6 +27,15 @@ type Props = {
   onStopRecording?: () => void;
 };
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result as string), { once: true });
+    reader.addEventListener("error", () => reject(reader.error), { once: true });
+    reader.readAsDataURL(file);
+  });
+}
+
 export function ChatInput({
   onSend,
   onStop,
@@ -76,14 +85,6 @@ export function ChatInput({
       return prev.filter((_, i) => i !== index);
     });
   }, []);
-
-  const readFileAsDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
 
   const handleSubmit = async () => {
     if ((!value.trim() && attachments.length === 0) || disabled) {
@@ -152,7 +153,7 @@ export function ChatInput({
         <div className="flex flex-wrap gap-2 px-1">
           {attachments.map((a, i) => (
             <div
-              key={i}
+              key={`${a.file.name}-${a.file.lastModified}-${a.file.size}`}
               className="group relative flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs"
             >
               {a.preview ? (

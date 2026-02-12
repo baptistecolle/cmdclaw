@@ -11,6 +11,8 @@ type Props = {
 };
 
 export function StreamingMessage({ parts }: Props) {
+  const partKeyCounts = new Map<string, number>();
+
   return (
     <div className="flex gap-3 py-4">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
@@ -29,25 +31,28 @@ export function StreamingMessage({ parts }: Props) {
         )}
 
         {parts.map((part, index) => {
+          const baseKey =
+            part.type === "text"
+              ? `text:${part.content}`
+              : part.type === "thinking"
+                ? `thinking:${part.id}`
+                : part.type === "tool_call"
+                  ? `tool:${part.id}`
+                  : `system:${part.content}`;
+          const occurrence = (partKeyCounts.get(baseKey) ?? 0) + 1;
+          partKeyCounts.set(baseKey, occurrence);
+          const partKey = `${baseKey}:${occurrence}`;
+
           if (part.type === "text") {
             const isLast = index === parts.length - 1;
             return (
-              <TextPartDisplay key={`text-${index}`} content={part.content} isStreaming={isLast} />
+              <TextPartDisplay key={partKey} content={part.content} isStreaming={isLast} />
             );
           } else if (part.type === "thinking") {
             const isLast = index === parts.length - 1;
-            return (
-              <ThinkingPartDisplay key={part.id} content={part.content} isStreaming={isLast} />
-            );
+            return <ThinkingPartDisplay key={partKey} content={part.content} isStreaming={isLast} />;
           } else if (part.type === "tool_call") {
-            return (
-              <ToolCallDisplay
-                key={part.id}
-                name={part.name}
-                input={part.input}
-                result={part.result}
-              />
-            );
+            return <ToolCallDisplay key={partKey} name={part.name} input={part.input} result={part.result} />;
           } else {
             // Skip approval parts - they're shown separately in the approval card
             return null;
