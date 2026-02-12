@@ -70,12 +70,7 @@ const suggestionItems = [
     searchTerms: ["title", "big", "large", "h1"],
     icon: <Heading1 className="h-4 w-4" />,
     command: ({ editor, range }: SuggestionCommandArgs) => {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .setNode("heading", { level: 1 })
-        .run();
+      editor.chain().focus().deleteRange(range).setNode("heading", { level: 1 }).run();
     },
   },
   {
@@ -84,12 +79,7 @@ const suggestionItems = [
     searchTerms: ["subtitle", "medium", "h2"],
     icon: <Heading2 className="h-4 w-4" />,
     command: ({ editor, range }: SuggestionCommandArgs) => {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .setNode("heading", { level: 2 })
-        .run();
+      editor.chain().focus().deleteRange(range).setNode("heading", { level: 2 }).run();
     },
   },
   {
@@ -98,12 +88,7 @@ const suggestionItems = [
     searchTerms: ["small", "h3"],
     icon: <Heading3 className="h-4 w-4" />,
     command: ({ editor, range }: SuggestionCommandArgs) => {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .setNode("heading", { level: 3 })
-        .run();
+      editor.chain().focus().deleteRange(range).setNode("heading", { level: 3 }).run();
     },
   },
   {
@@ -144,12 +129,7 @@ const suggestionItems = [
   },
 ];
 
-export function SkillEditor({
-  content,
-  onChange,
-  editorKey,
-  className,
-}: SkillEditorProps) {
+export function SkillEditor({ content, onChange, editorKey, className }: SkillEditorProps) {
   const initialContent = useRef(content);
 
   // Update initial content when switching files.
@@ -204,9 +184,7 @@ export function SkillEditor({
                   </div>
                   <div>
                     <p className="font-medium">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.description}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{item.description}</p>
                   </div>
                 </EditorCommandItem>
               ))}
@@ -288,10 +266,7 @@ export function parseMarkdownToJSON(markdown: string): JSONContent | undefined {
       content.push({
         type: "codeBlock",
         attrs: { language: lang || null },
-        content:
-          codeLines.length > 0
-            ? [{ type: "text", text: codeLines.join("\n") }]
-            : undefined,
+        content: codeLines.length > 0 ? [{ type: "text", text: codeLines.join("\n") }] : undefined,
       });
       continue;
     }
@@ -515,9 +490,7 @@ export function jsonToMarkdown(json: JSONContent): string {
         case "paragraph":
           return getTextContent(markdownNode);
         case "bulletList":
-          return markdownNode.content
-            ?.map((item) => "- " + getTextContent(item))
-            .join("\n");
+          return markdownNode.content?.map((item) => "- " + getTextContent(item)).join("\n");
         case "orderedList":
           return markdownNode.content
             ?.map((item, i: number) => `${i + 1}. ` + getTextContent(item))
@@ -607,11 +580,7 @@ export function parseSkillContent(content: string): {
   };
 }
 
-export function serializeSkillContent(
-  name: string,
-  description: string,
-  body: string,
-): string {
+export function serializeSkillContent(name: string, description: string, body: string): string {
   return `---
 name: ${name}
 description: ${description}

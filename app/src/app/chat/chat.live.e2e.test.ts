@@ -3,12 +3,9 @@ import { expect, test } from "../../../tests/e2e/live-fixtures";
 import type { Page } from "@playwright/test";
 
 const liveEnabled = process.env.E2E_LIVE === "1";
-const storageStatePath =
-  process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
+const storageStatePath = process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
 const promptText = process.env.E2E_CHAT_PROMPT ?? "hi";
-const responseTimeoutMs = Number(
-  process.env.E2E_RESPONSE_TIMEOUT_MS ?? "90000",
-);
+const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "90000");
 async function selectModel(page: Page, modelId: string): Promise<void> {
   await page.getByTestId("chat-model-selector").click();
   const option = page.getByTestId(`chat-model-option-${modelId}`).first();
@@ -20,9 +17,7 @@ async function selectModel(page: Page, modelId: string): Promise<void> {
 
   const expectedLabel = (await option.textContent())?.trim() || modelId;
   await option.click();
-  await expect(page.getByTestId("chat-model-selector")).toContainText(
-    expectedLabel,
-  );
+  await expect(page.getByTestId("chat-model-selector")).toContainText(expectedLabel);
 }
 
 test.describe("@live chat", () => {

@@ -91,9 +91,7 @@ export function isWorkflowSchedulable(row: WorkflowScheduleRow): boolean {
   );
 }
 
-function buildRepeatOptions(
-  schedule: WorkflowSchedule,
-): Omit<RepeatOptions, "key"> {
+function buildRepeatOptions(schedule: WorkflowSchedule): Omit<RepeatOptions, "key"> {
   if (schedule.type === "interval") {
     return { every: schedule.intervalMinutes * 60 * 1000 };
   }
@@ -106,48 +104,36 @@ function buildRepeatOptions(
   }
 
   if (schedule.type === "weekly") {
-    const days = [...new Set(schedule.daysOfWeek)]
-      .sort((a, b) => a - b)
-      .join(",");
+    const days = [...new Set(schedule.daysOfWeek)].sort((a, b) => a - b).join(",");
     return { pattern: `${minute} ${hour} * * ${days}`, tz };
   }
 
   return { pattern: `${minute} ${hour} ${schedule.dayOfMonth} * *`, tz };
 }
 
-export async function removeWorkflowScheduleJob(
-  workflowId: string,
-): Promise<void> {
+export async function removeWorkflowScheduleJob(workflowId: string): Promise<void> {
   const queue = getQueue();
   await queue.removeJobScheduler(getWorkflowSchedulerId(workflowId));
 }
 
-export async function upsertWorkflowScheduleJob(
-  row: WorkflowScheduleRow,
-): Promise<void> {
+export async function upsertWorkflowScheduleJob(row: WorkflowScheduleRow): Promise<void> {
   const schedule = parseWorkflowSchedule(row.schedule);
   if (!schedule) {
     throw new Error(`Workflow "${row.id}" has invalid schedule payload`);
   }
 
   const queue = getQueue();
-  await queue.upsertJobScheduler(
-    getWorkflowSchedulerId(row.id),
-    buildRepeatOptions(schedule),
-    {
-      name: SCHEDULED_WORKFLOW_JOB_NAME,
-      data: {
-        source: "schedule",
-        workflowId: row.id,
-        scheduleType: schedule.type,
-      },
+  await queue.upsertJobScheduler(getWorkflowSchedulerId(row.id), buildRepeatOptions(schedule), {
+    name: SCHEDULED_WORKFLOW_JOB_NAME,
+    data: {
+      source: "schedule",
+      workflowId: row.id,
+      scheduleType: schedule.type,
     },
-  );
+  });
 }
 
-export async function syncWorkflowScheduleJob(
-  row: WorkflowScheduleRow,
-): Promise<void> {
+export async function syncWorkflowScheduleJob(row: WorkflowScheduleRow): Promise<void> {
   if (isWorkflowSchedulable(row)) {
     await upsertWorkflowScheduleJob(row);
     return;
@@ -179,10 +165,7 @@ export async function reconcileScheduledWorkflowJobs(): Promise<{
       synced += 1;
     } catch (error) {
       failed += 1;
-      console.error(
-        `[workflow-scheduler] failed to reconcile workflow ${row.id}`,
-        error,
-      );
+      console.error(`[workflow-scheduler] failed to reconcile workflow ${row.id}`, error);
     }
   }
 

@@ -4,12 +4,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "@/env";
-import type {
-  LLMBackend,
-  ChatParams,
-  StreamEvent,
-  ContentBlock,
-} from "./llm-backend";
+import type { LLMBackend, ChatParams, StreamEvent, ContentBlock } from "./llm-backend";
 
 export class AnthropicBackend implements LLMBackend {
   private client: Anthropic;
@@ -30,10 +25,7 @@ export class AnthropicBackend implements LLMBackend {
     // Convert our message format to Anthropic format
     const messages = params.messages.map((m) => ({
       role: m.role as "user" | "assistant",
-      content:
-        typeof m.content === "string"
-          ? m.content
-          : convertContentBlocks(m.content),
+      content: typeof m.content === "string" ? m.content : convertContentBlocks(m.content),
     }));
 
     // Build tools in Anthropic format
@@ -90,11 +82,7 @@ export class AnthropicBackend implements LLMBackend {
   }
 
   async listModels(): Promise<string[]> {
-    return [
-      "claude-sonnet-4-20250514",
-      "claude-opus-4-20250514",
-      "claude-haiku-3-5-20241022",
-    ];
+    return ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-3-5-20241022"];
   }
 
   isAvailable(): boolean {
@@ -102,9 +90,7 @@ export class AnthropicBackend implements LLMBackend {
   }
 }
 
-function convertContentBlocks(
-  blocks: ContentBlock[],
-): Anthropic.ContentBlockParam[] {
+function convertContentBlocks(blocks: ContentBlock[]): Anthropic.ContentBlockParam[] {
   return blocks.map((block): Anthropic.ContentBlockParam => {
     switch (block.type) {
       case "text":

@@ -24,12 +24,7 @@ export function setVerbose(v: boolean): void {
   verbose = v;
 }
 
-function log(
-  level: LogLevel,
-  component: string,
-  message: string,
-  data?: unknown,
-): void {
+function log(level: LogLevel, component: string, message: string, data?: unknown): void {
   const entry = {
     time: new Date().toISOString(),
     level,
@@ -50,17 +45,9 @@ function log(
 
   // Write to stdout if verbose or if level >= warn
   if (verbose || level === "warn" || level === "error") {
-    const prefix =
-      level === "error"
-        ? "\x1b[31m"
-        : level === "warn"
-          ? "\x1b[33m"
-          : "\x1b[2m";
+    const prefix = level === "error" ? "\x1b[31m" : level === "warn" ? "\x1b[33m" : "\x1b[2m";
     const reset = "\x1b[0m";
-    console.error(
-      `${prefix}[${component}] ${message}${reset}`,
-      data !== undefined ? data : "",
-    );
+    console.error(`${prefix}[${component}] ${message}${reset}`, data !== undefined ? data : "");
   }
 }
 

@@ -5,13 +5,7 @@
  */
 
 import { logger } from "./logger";
-import {
-  setupSandbox,
-  executeCommand,
-  writeFile,
-  readFile,
-  teardownSandbox,
-} from "./sandbox";
+import { setupSandbox, executeCommand, writeFile, readFile, teardownSandbox } from "./sandbox";
 import { proxyChatRequest } from "./llm-proxy";
 
 const MIN_RECONNECT_MS = 1000;
@@ -60,9 +54,7 @@ type WSLLMChatMessage = WSBaseMessage & {
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 }
 
 function toBaseMessage(value: unknown): WSBaseMessage | null {
@@ -201,10 +193,7 @@ export class WSClient {
         break;
 
       case "sandbox.execute":
-        if (
-          typeof record.conversationId === "string" &&
-          typeof record.command === "string"
-        ) {
+        if (typeof record.conversationId === "string" && typeof record.command === "string") {
           this.handleSandboxExecute(record as WSSandboxExecuteMessage);
         }
         break;
@@ -222,10 +211,7 @@ export class WSClient {
         break;
 
       case "sandbox.teardown":
-        if (
-          record.conversationId === undefined ||
-          typeof record.conversationId === "string"
-        ) {
+        if (record.conversationId === undefined || typeof record.conversationId === "string") {
           this.handleSandboxTeardown(record as WSSandboxTeardownMessage);
         }
         break;

@@ -73,9 +73,7 @@ type PostHogClientProviderProps = {
   children: React.ReactNode;
 };
 
-export function PostHogClientProvider({
-  children,
-}: PostHogClientProviderProps) {
+export function PostHogClientProvider({ children }: PostHogClientProviderProps) {
   if (!isPosthogEnabled) {
     return <>{children}</>;
   }

@@ -1,17 +1,6 @@
-import {
-  PreviewProps,
-  PreviewField,
-  PreviewSection,
-  IntegrationLogo,
-} from "./preview-styles";
+import { PreviewProps, PreviewField, PreviewSection, IntegrationLogo } from "./preview-styles";
 
-type HubSpotObjectType =
-  | "contacts"
-  | "companies"
-  | "deals"
-  | "tickets"
-  | "tasks"
-  | "notes";
+type HubSpotObjectType = "contacts" | "companies" | "deals" | "tickets" | "tasks" | "notes";
 
 const OBJECT_LABELS: Record<HubSpotObjectType, string> = {
   contacts: "Contact",
@@ -24,10 +13,7 @@ const OBJECT_LABELS: Record<HubSpotObjectType, string> = {
 
 export function HubspotPreview({ operation, args }: PreviewProps) {
   // Parse operation: "contacts.create" -> { object: "contacts", action: "create" }
-  const [objectType, action] = operation.split(".") as [
-    HubSpotObjectType,
-    string,
-  ];
+  const [objectType, action] = operation.split(".") as [HubSpotObjectType, string];
 
   if (!objectType || !action) return null;
 
@@ -35,13 +21,7 @@ export function HubspotPreview({ operation, args }: PreviewProps) {
 
   switch (action) {
     case "create":
-      return (
-        <HubspotCreatePreview
-          args={args}
-          objectType={objectType}
-          objectLabel={objectLabel}
-        />
-      );
+      return <HubspotCreatePreview args={args} objectType={objectType} objectLabel={objectLabel} />;
     case "update":
       return <HubspotUpdatePreview args={args} objectLabel={objectLabel} />;
     case "complete":
@@ -57,11 +37,7 @@ interface HubspotPreviewComponentProps {
   objectLabel: string;
 }
 
-function HubspotCreatePreview({
-  args,
-  objectType,
-  objectLabel,
-}: HubspotPreviewComponentProps) {
+function HubspotCreatePreview({ args, objectType, objectLabel }: HubspotPreviewComponentProps) {
   // Extract common fields based on object type
   const fields = getDisplayFields(objectType!, args);
 
@@ -76,15 +52,11 @@ function HubspotCreatePreview({
         <div className="rounded border bg-muted/30 p-3">
           <div className="flex items-center gap-2 mb-2">
             <IntegrationLogo integration="hubspot" size={16} />
-            <span className="font-medium">
-              {getPrimaryField(objectType!, args)}
-            </span>
+            <span className="font-medium">{getPrimaryField(objectType!, args)}</span>
           </div>
 
           {fields.map(([label, value]) =>
-            value ? (
-              <PreviewField key={label} label={label} value={value} />
-            ) : null,
+            value ? <PreviewField key={label} label={label} value={value} /> : null,
           )}
         </div>
       </PreviewSection>
@@ -226,9 +198,7 @@ function PropertiesPreview({ properties }: { properties: string }) {
       <div className="rounded border bg-muted/30 divide-y">
         {Object.entries(parsed).map(([key, value]) => (
           <div key={key} className="flex px-3 py-2 text-sm">
-            <span className="font-medium text-muted-foreground w-32 shrink-0">
-              {key}
-            </span>
+            <span className="font-medium text-muted-foreground w-32 shrink-0">{key}</span>
             <span className="break-words">{String(value)}</span>
           </div>
         ))}
@@ -236,9 +206,5 @@ function PropertiesPreview({ properties }: { properties: string }) {
     );
   }
 
-  return (
-    <pre className="rounded bg-muted p-2 text-xs overflow-x-auto">
-      {properties}
-    </pre>
-  );
+  return <pre className="rounded bg-muted p-2 text-xs overflow-x-auto">{properties}</pre>;
 }

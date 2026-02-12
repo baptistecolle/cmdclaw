@@ -242,9 +242,7 @@ async function getDeal(id: string) {
 
 async function createDeal() {
   if (!values.name || !values.pipeline || !values.stage) {
-    console.error(
-      "Required: --name <deal name> --pipeline <pipeline id> --stage <stage id>",
-    );
+    console.error("Required: --name <deal name> --pipeline <pipeline id> --stage <stage id>");
     process.exit(1);
   }
   const properties: Record<string, string> = {
@@ -311,9 +309,7 @@ async function getTicket(id: string) {
 
 async function createTicket() {
   if (!values.subject || !values.pipeline || !values.stage) {
-    console.error(
-      "Required: --subject <subject> --pipeline <pipeline id> --stage <stage id>",
-    );
+    console.error("Required: --subject <subject> --pipeline <pipeline id> --stage <stage id>");
     process.exit(1);
   }
   const properties: Record<string, string> = {
@@ -393,8 +389,7 @@ async function createTask() {
     hs_task_type: "TODO",
   };
   if (values.body) properties.hs_task_body = values.body;
-  if (values.due)
-    properties.hs_timestamp = new Date(values.due).getTime().toString();
+  if (values.due) properties.hs_timestamp = new Date(values.due).getTime().toString();
 
   const data = await api("/crm/v3/objects/tasks", {
     method: "POST",
@@ -443,37 +438,22 @@ async function createNote() {
   // Associate with contact, company, or deal if specified
   const noteId = data.id;
   if (values.contact) {
-    await api(
-      `/crm/v4/objects/notes/${noteId}/associations/contacts/${values.contact}`,
-      {
-        method: "PUT",
-        body: JSON.stringify([
-          { associationCategory: "HUBSPOT_DEFINED", associationTypeId: 202 },
-        ]),
-      },
-    );
+    await api(`/crm/v4/objects/notes/${noteId}/associations/contacts/${values.contact}`, {
+      method: "PUT",
+      body: JSON.stringify([{ associationCategory: "HUBSPOT_DEFINED", associationTypeId: 202 }]),
+    });
   }
   if (values.company) {
-    await api(
-      `/crm/v4/objects/notes/${noteId}/associations/companies/${values.company}`,
-      {
-        method: "PUT",
-        body: JSON.stringify([
-          { associationCategory: "HUBSPOT_DEFINED", associationTypeId: 190 },
-        ]),
-      },
-    );
+    await api(`/crm/v4/objects/notes/${noteId}/associations/companies/${values.company}`, {
+      method: "PUT",
+      body: JSON.stringify([{ associationCategory: "HUBSPOT_DEFINED", associationTypeId: 190 }]),
+    });
   }
   if (values.deal) {
-    await api(
-      `/crm/v4/objects/notes/${noteId}/associations/deals/${values.deal}`,
-      {
-        method: "PUT",
-        body: JSON.stringify([
-          { associationCategory: "HUBSPOT_DEFINED", associationTypeId: 214 },
-        ]),
-      },
-    );
+    await api(`/crm/v4/objects/notes/${noteId}/associations/deals/${values.deal}`, {
+      method: "PUT",
+      body: JSON.stringify([{ associationCategory: "HUBSPOT_DEFINED", associationTypeId: 214 }]),
+    });
   }
 
   console.log(`Note created with ID: ${noteId}`);

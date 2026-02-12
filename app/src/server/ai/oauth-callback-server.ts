@@ -26,9 +26,7 @@ const OAUTH_PORT = 1455;
 
 function getAppUrl() {
   return (
-    env.APP_URL ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    `http://localhost:${process.env.PORT ?? 3000}`
+    env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`
   );
 }
 
@@ -54,9 +52,7 @@ export function ensureOAuthCallbackServer(): void {
     const settingsUrl = new URL("/settings/subscriptions", getAppUrl());
 
     if (error) {
-      console.error(
-        `[OAuthCallback] OAuth error: ${errorDescription || error}`,
-      );
+      console.error(`[OAuthCallback] OAuth error: ${errorDescription || error}`);
       settingsUrl.searchParams.set("provider_error", error);
       res.writeHead(302, { Location: settingsUrl.toString() });
       res.end();
@@ -111,10 +107,7 @@ export function ensureOAuthCallbackServer(): void {
 
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
-        console.error(
-          `[OAuthCallback] Token exchange failed for ${provider}:`,
-          errorText,
-        );
+        console.error(`[OAuthCallback] Token exchange failed for ${provider}:`, errorText);
         settingsUrl.searchParams.set("provider_error", "token_exchange_failed");
         res.writeHead(302, { Location: settingsUrl.toString() });
         res.end();
@@ -158,9 +151,7 @@ export function ensureOAuthCallbackServer(): void {
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
-      console.warn(
-        `[OAuthCallback] Port ${OAUTH_PORT} already in use (OpenCode may be running)`,
-      );
+      console.warn(`[OAuthCallback] Port ${OAUTH_PORT} already in use (OpenCode may be running)`);
     } else {
       console.error(`[OAuthCallback] Server error:`, err);
     }

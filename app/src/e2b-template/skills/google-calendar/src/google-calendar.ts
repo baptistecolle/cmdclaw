@@ -2,9 +2,7 @@ import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_CALENDAR_ACCESS_TOKEN;
 if (!TOKEN) {
-  console.error(
-    "Error: GOOGLE_CALENDAR_ACCESS_TOKEN environment variable required",
-  );
+  console.error("Error: GOOGLE_CALENDAR_ACCESS_TOKEN environment variable required");
   process.exit(1);
 }
 
@@ -58,10 +56,7 @@ async function listEvents() {
   if (values.timeMax) params.set("timeMax", values.timeMax);
 
   const calendarId = encodeURIComponent(values.calendar || "primary");
-  const res = await fetch(
-    `${BASE_URL}/calendars/${calendarId}/events?${params}`,
-    { headers },
-  );
+  const res = await fetch(`${BASE_URL}/calendars/${calendarId}/events?${params}`, { headers });
   if (!res.ok) throw new Error(await res.text());
 
   const { items = [] } = (await res.json()) as { items?: CalendarEvent[] };
@@ -79,10 +74,7 @@ async function listEvents() {
 
 async function getEvent(eventId: string) {
   const calendarId = encodeURIComponent(values.calendar || "primary");
-  const res = await fetch(
-    `${BASE_URL}/calendars/${calendarId}/events/${eventId}`,
-    { headers },
-  );
+  const res = await fetch(`${BASE_URL}/calendars/${calendarId}/events/${eventId}`, { headers });
   if (!res.ok) throw new Error(await res.text());
 
   const event = (await res.json()) as CalendarEvent;
@@ -112,12 +104,8 @@ async function getEvent(eventId: string) {
 
 async function createEvent() {
   if (!values.summary || !values.start || !values.end) {
-    console.error(
-      "Required: --summary <title> --start <datetime> --end <datetime>",
-    );
-    console.error(
-      "Datetime format: 2024-01-15T09:00:00 or 2024-01-15 (all-day)",
-    );
+    console.error("Required: --summary <title> --start <datetime> --end <datetime>");
+    console.error("Datetime format: 2024-01-15T09:00:00 or 2024-01-15 (all-day)");
     process.exit(1);
   }
 
@@ -150,9 +138,7 @@ async function createEvent() {
   }
 
   if (values.attendees) {
-    event.attendees = values.attendees
-      .split(",")
-      .map((email) => ({ email: email.trim() }));
+    event.attendees = values.attendees.split(",").map((email) => ({ email: email.trim() }));
   }
 
   const calendarId = encodeURIComponent(values.calendar || "primary");
@@ -171,10 +157,7 @@ async function updateEvent(eventId: string) {
   const calendarId = encodeURIComponent(values.calendar || "primary");
 
   // First get the existing event
-  const getRes = await fetch(
-    `${BASE_URL}/calendars/${calendarId}/events/${eventId}`,
-    { headers },
-  );
+  const getRes = await fetch(`${BASE_URL}/calendars/${calendarId}/events/${eventId}`, { headers });
   if (!getRes.ok) throw new Error(await getRes.text());
   const existing = (await getRes.json()) as CalendarEvent;
 
@@ -207,14 +190,11 @@ async function updateEvent(eventId: string) {
     }
   }
 
-  const res = await fetch(
-    `${BASE_URL}/calendars/${calendarId}/events/${eventId}`,
-    {
-      method: "PUT",
-      headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify(existing),
-    },
-  );
+  const res = await fetch(`${BASE_URL}/calendars/${calendarId}/events/${eventId}`, {
+    method: "PUT",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify(existing),
+  });
 
   if (!res.ok) throw new Error(await res.text());
   console.log(`Event updated: ${eventId}`);
@@ -222,13 +202,10 @@ async function updateEvent(eventId: string) {
 
 async function deleteEvent(eventId: string) {
   const calendarId = encodeURIComponent(values.calendar || "primary");
-  const res = await fetch(
-    `${BASE_URL}/calendars/${calendarId}/events/${eventId}`,
-    {
-      method: "DELETE",
-      headers,
-    },
-  );
+  const res = await fetch(`${BASE_URL}/calendars/${calendarId}/events/${eventId}`, {
+    method: "DELETE",
+    headers,
+  });
 
   if (!res.ok && res.status !== 204) throw new Error(await res.text());
   console.log(`Event deleted: ${eventId}`);
@@ -261,11 +238,7 @@ async function listCalendars() {
 async function todayEvents() {
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + 1,
-  );
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
   const params = new URLSearchParams({
     maxResults: "50",
@@ -276,10 +249,7 @@ async function todayEvents() {
   });
 
   const calendarId = encodeURIComponent(values.calendar || "primary");
-  const res = await fetch(
-    `${BASE_URL}/calendars/${calendarId}/events?${params}`,
-    { headers },
-  );
+  const res = await fetch(`${BASE_URL}/calendars/${calendarId}/events?${params}`, { headers });
   if (!res.ok) throw new Error(await res.text());
 
   const { items = [] } = (await res.json()) as { items?: CalendarEvent[] };

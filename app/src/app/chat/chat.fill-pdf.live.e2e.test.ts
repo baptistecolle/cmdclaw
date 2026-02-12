@@ -5,21 +5,13 @@ import { expect, test } from "../../../tests/e2e/live-fixtures";
 import type { Download, Page, Response } from "@playwright/test";
 
 const liveEnabled = process.env.E2E_LIVE === "1";
-const storageStatePath =
-  process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
-const responseTimeoutMs = Number(
-  process.env.E2E_RESPONSE_TIMEOUT_MS ?? "120000",
-);
-const artifactTimeoutMs = Number(
-  process.env.E2E_ARTIFACT_TIMEOUT_MS ?? "45000",
-);
+const storageStatePath = process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
+const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "120000");
+const artifactTimeoutMs = Number(process.env.E2E_ARTIFACT_TIMEOUT_MS ?? "45000");
 const fillPdfPrompt =
   process.env.E2E_FILL_PDF_PROMPT ??
   "I attached a PDF form. Fill the PDF with the name Sandra wherever a name is requested. Save the output as filled-sandra.pdf and reply with one short confirmation sentence.";
-const fixturePdfPath = resolve(
-  process.cwd(),
-  "tests/e2e/fixtures/questionnaire-auto.pdf",
-);
+const fixturePdfPath = resolve(process.cwd(), "tests/e2e/fixtures/questionnaire-auto.pdf");
 
 async function selectModel(page: Page, modelId: string): Promise<void> {
   await page.getByTestId("chat-model-selector").click();
@@ -32,9 +24,7 @@ async function selectModel(page: Page, modelId: string): Promise<void> {
 
   const expectedLabel = (await option.textContent())?.trim() || modelId;
   await option.click();
-  await expect(page.getByTestId("chat-model-selector")).toContainText(
-    expectedLabel,
-  );
+  await expect(page.getByTestId("chat-model-selector")).toContainText(expectedLabel);
 }
 
 async function ensureAutoApproveEnabled(page: Page): Promise<void> {
@@ -52,9 +42,7 @@ async function ensureAutoApproveEnabled(page: Page): Promise<void> {
 
 function findFirstHttpUrl(value: unknown): string | null {
   if (typeof value === "string") {
-    return value.startsWith("http://") || value.startsWith("https://")
-      ? value
-      : null;
+    return value.startsWith("http://") || value.startsWith("https://") ? value : null;
   }
 
   if (Array.isArray(value)) {
@@ -93,8 +81,7 @@ async function readDownloadedPdfBytes(
 
   const sandboxDownloadResponsePromise = page.waitForResponse(
     (response: Response) =>
-      response.request().method() === "POST" &&
-      response.url().includes("downloadSandboxFile"),
+      response.request().method() === "POST" && response.url().includes("downloadSandboxFile"),
     { timeout: artifactTimeoutMs },
   );
 
@@ -112,16 +99,12 @@ async function readDownloadedPdfBytes(
   const presignedUrl = findFirstHttpUrl(sandboxDownloadPayload);
 
   if (!presignedUrl) {
-    throw new Error(
-      "Failed to resolve a presigned download URL after clicking the PDF artifact.",
-    );
+    throw new Error("Failed to resolve a presigned download URL after clicking the PDF artifact.");
   }
 
   const pdfResponse = await page.request.get(presignedUrl);
   if (!pdfResponse.ok()) {
-    throw new Error(
-      `Failed to download PDF from presigned URL: HTTP ${pdfResponse.status()}`,
-    );
+    throw new Error(`Failed to download PDF from presigned URL: HTTP ${pdfResponse.status()}`);
   }
 
   return Buffer.from(await pdfResponse.body());
@@ -135,9 +118,7 @@ test.describe("@live chat fill-pdf", () => {
     page,
     liveChatModel,
   }, testInfo) => {
-    test.setTimeout(
-      Math.max(responseTimeoutMs + artifactTimeoutMs + 45_000, 180_000),
-    );
+    test.setTimeout(Math.max(responseTimeoutMs + artifactTimeoutMs + 45_000, 180_000));
 
     if (!existsSync(storageStatePath)) {
       throw new Error(
@@ -185,8 +166,7 @@ test.describe("@live chat fill-pdf", () => {
         },
         {
           timeout: responseTimeoutMs,
-          message:
-            "Assistant did not produce a persisted message within timeout",
+          message: "Assistant did not produce a persisted message within timeout",
         },
       )
       .toBe("assistant");
@@ -215,19 +195,13 @@ test.describe("@live chat fill-pdf", () => {
       .toBe("ok");
 
     const assistantMessage = page.getByTestId("chat-message-assistant").last();
-    const pdfOutputButton = assistantMessage
-      .locator("button", { hasText: /\.pdf/i })
-      .first();
+    const pdfOutputButton = assistantMessage.locator("button", { hasText: /\.pdf/i }).first();
     await expect(
       pdfOutputButton,
       "Assistant output did not expose a downloadable PDF artifact.",
     ).toBeVisible({ timeout: artifactTimeoutMs });
 
-    const pdfBytes = await readDownloadedPdfBytes(
-      page,
-      pdfOutputButton.click(),
-      testInfo,
-    );
+    const pdfBytes = await readDownloadedPdfBytes(page, pdfOutputButton.click(), testInfo);
 
     expect(pdfBytes.byteLength).toBeGreaterThan(100);
     expect(pdfBytes.subarray(0, 5).toString("utf8")).toBe("%PDF-");

@@ -58,13 +58,10 @@ function formatError(err: unknown): string {
 
 async function main(): Promise<void> {
   const loaded = loadConfig();
-  const serverUrl =
-    process.env.BAP_SERVER_URL || loaded?.serverUrl || DEFAULT_SERVER_URL;
+  const serverUrl = process.env.BAP_SERVER_URL || loaded?.serverUrl || DEFAULT_SERVER_URL;
 
   if (!isLocalServerUrl(serverUrl)) {
-    console.log(
-      `[chat-auth] skipping bootstrap for non-local server: ${serverUrl}`,
-    );
+    console.log(`[chat-auth] skipping bootstrap for non-local server: ${serverUrl}`);
     return;
   }
 
@@ -81,10 +78,7 @@ async function main(): Promise<void> {
     closePool = dbModule.closePool;
     const { user, session } = schemaModule;
 
-    const minRemainingMinutes = parsePositiveInt(
-      process.env.CHAT_AUTH_MIN_REMAINING_MINUTES,
-      10,
-    );
+    const minRemainingMinutes = parsePositiveInt(process.env.CHAT_AUTH_MIN_REMAINING_MINUTES, 10);
 
     if (loaded?.token && loaded.serverUrl === serverUrl) {
       const existing = await auth.api.getSession({
@@ -96,9 +90,7 @@ async function main(): Promise<void> {
         if (Number.isFinite(expiresAt.getTime())) {
           const minRemainingMs = minRemainingMinutes * 60 * 1000;
           if (expiresAt.getTime() > Date.now() + minRemainingMs) {
-            console.log(
-              `[chat-auth] existing token is valid until ${expiresAt.toISOString()}`,
-            );
+            console.log(`[chat-auth] existing token is valid until ${expiresAt.toISOString()}`);
             return;
           }
         }
@@ -106,9 +98,7 @@ async function main(): Promise<void> {
     }
 
     const email =
-      process.env.CHAT_AUTH_EMAIL ||
-      process.env.E2E_TEST_EMAIL ||
-      DEFAULT_CHAT_AUTH_EMAIL;
+      process.env.CHAT_AUTH_EMAIL || process.env.E2E_TEST_EMAIL || DEFAULT_CHAT_AUTH_EMAIL;
     const name = process.env.CHAT_AUTH_NAME || DEFAULT_CHAT_AUTH_NAME;
     const now = new Date();
 
@@ -163,9 +153,7 @@ async function main(): Promise<void> {
     console.log(`[chat-auth] config=${CONFIG_PATH}`);
     console.log(`[chat-auth] expiresAt=${expiresAt.toISOString()}`);
   } catch (err) {
-    console.warn(
-      `[chat-auth] local auth bootstrap skipped: ${formatError(err)}`,
-    );
+    console.warn(`[chat-auth] local auth bootstrap skipped: ${formatError(err)}`);
   } finally {
     if (closePool) {
       await closePool();

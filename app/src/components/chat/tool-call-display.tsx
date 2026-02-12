@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  Wrench,
-  Check,
-  Loader2,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Wrench, Check, Loader2 } from "lucide-react";
 
 type Props = {
   name: string;
@@ -25,11 +19,7 @@ export function ToolCallDisplay({ name, input, result }: Props) {
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
       >
-        {expanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
+        {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         <Wrench className="h-4 w-4 text-muted-foreground" />
         <span className="flex-1 font-mono text-xs">{name}</span>
         {isComplete ? (
@@ -49,13 +39,9 @@ export function ToolCallDisplay({ name, input, result }: Props) {
           </div>
           {result !== undefined && (
             <div>
-              <p className="text-xs font-medium text-muted-foreground">
-                Result:
-              </p>
+              <p className="text-xs font-medium text-muted-foreground">Result:</p>
               <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-xs">
-                {typeof result === "string"
-                  ? result
-                  : JSON.stringify(result, null, 2)}
+                {typeof result === "string" ? result : JSON.stringify(result, null, 2)}
               </pre>
             </div>
           )}

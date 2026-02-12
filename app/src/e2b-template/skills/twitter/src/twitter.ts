@@ -38,8 +38,7 @@ async function api(
   const data = await res.json();
 
   if (!res.ok) {
-    const errorDetail =
-      data.detail || data.title || JSON.stringify(data.errors || data);
+    const errorDetail = data.detail || data.title || JSON.stringify(data.errors || data);
     throw new Error(`Twitter API Error (${res.status}): ${errorDetail}`);
   }
 
@@ -101,8 +100,7 @@ async function getTimeline() {
   const data = await api(`/users/${userId}/reverse_chronological_timeline`, {
     params: {
       max_results: values.limit || "10",
-      "tweet.fields":
-        "id,text,author_id,created_at,public_metrics,conversation_id",
+      "tweet.fields": "id,text,author_id,created_at,public_metrics,conversation_id",
       expansions: "author_id",
       "user.fields": "username,name",
     },
@@ -213,8 +211,7 @@ async function getFollowers() {
   const data = await api(`/users/${userId}/followers`, {
     params: {
       max_results: values.limit || "10",
-      "user.fields":
-        "id,name,username,description,profile_image_url,public_metrics",
+      "user.fields": "id,name,username,description,profile_image_url,public_metrics",
     },
   });
 
@@ -229,8 +226,7 @@ async function getFollowing() {
   const data = await api(`/users/${userId}/following`, {
     params: {
       max_results: values.limit || "10",
-      "user.fields":
-        "id,name,username,description,profile_image_url,public_metrics",
+      "user.fields": "id,name,username,description,profile_image_url,public_metrics",
     },
   });
 
@@ -298,9 +294,7 @@ async function likeTweet(tweetId: string) {
     body: { tweet_id: tweetId },
   });
 
-  console.log(
-    JSON.stringify({ success: true, liked: data.data.liked }, null, 2),
-  );
+  console.log(JSON.stringify({ success: true, liked: data.data.liked }, null, 2));
 }
 
 // Unlike a tweet
@@ -318,9 +312,7 @@ async function unlikeTweet(tweetId: string) {
     throw new Error(`Twitter API Error: ${JSON.stringify(data)}`);
   }
 
-  console.log(
-    JSON.stringify({ success: true, liked: data.data.liked }, null, 2),
-  );
+  console.log(JSON.stringify({ success: true, liked: data.data.liked }, null, 2));
 }
 
 // Retweet
@@ -333,9 +325,7 @@ async function retweet(tweetId: string) {
     body: { tweet_id: tweetId },
   });
 
-  console.log(
-    JSON.stringify({ success: true, retweeted: data.data.retweeted }, null, 2),
-  );
+  console.log(JSON.stringify({ success: true, retweeted: data.data.retweeted }, null, 2));
 }
 
 // Unretweet
@@ -353,9 +343,7 @@ async function unretweet(tweetId: string) {
     throw new Error(`Twitter API Error: ${JSON.stringify(data)}`);
   }
 
-  console.log(
-    JSON.stringify({ success: true, retweeted: data.data.retweeted }, null, 2),
-  );
+  console.log(JSON.stringify({ success: true, retweeted: data.data.retweeted }, null, 2));
 }
 
 // Follow a user
@@ -368,9 +356,7 @@ async function followUser(targetUserId: string) {
     body: { target_user_id: targetUserId },
   });
 
-  console.log(
-    JSON.stringify({ success: true, following: data.data.following }, null, 2),
-  );
+  console.log(JSON.stringify({ success: true, following: data.data.following }, null, 2));
 }
 
 // Unfollow a user
@@ -378,22 +364,17 @@ async function unfollowUser(targetUserId: string) {
   const me = await api("/users/me");
   const userId = me.data.id;
 
-  const res = await fetch(
-    `${API_BASE}/users/${userId}/following/${targetUserId}`,
-    {
-      method: "DELETE",
-      headers,
-    },
-  );
+  const res = await fetch(`${API_BASE}/users/${userId}/following/${targetUserId}`, {
+    method: "DELETE",
+    headers,
+  });
 
   const data = await res.json();
   if (!res.ok) {
     throw new Error(`Twitter API Error: ${JSON.stringify(data)}`);
   }
 
-  console.log(
-    JSON.stringify({ success: true, following: data.data.following }, null, 2),
-  );
+  console.log(JSON.stringify({ success: true, following: data.data.following }, null, 2));
 }
 
 function showHelp() {

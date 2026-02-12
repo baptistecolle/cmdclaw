@@ -86,9 +86,7 @@ async function listPRs() {
       html_url: string;
       created_at: string;
     }>
-  >(
-    `/repos/${values.owner}/${values.repo}/pulls?${params}`,
-  );
+  >(`/repos/${values.owner}/${values.repo}/pulls?${params}`);
 
   const list = prs.map((pr) => ({
     number: pr.number,
@@ -170,9 +168,7 @@ async function myPRs() {
       number: number;
       html_url: string;
     }>;
-  }>(
-    `/search/issues?q=${encodeURIComponent(q)}&per_page=30`,
-  );
+  }>(`/search/issues?q=${encodeURIComponent(q)}&per_page=30`);
 
   const prs = result.items.map((pr) => ({
     title: pr.title,
@@ -206,9 +202,7 @@ async function createIssue() {
     },
   );
 
-  console.log(
-    `Issue created: #${issue.number} - ${issue.title}\n${issue.html_url}`,
-  );
+  console.log(`Issue created: #${issue.number} - ${issue.title}\n${issue.html_url}`);
 }
 
 async function listIssues() {
@@ -232,9 +226,7 @@ async function listIssues() {
       labels?: Array<{ name: string }>;
       html_url: string;
     }>
-  >(
-    `/repos/${values.owner}/${values.repo}/issues?${params}`,
-  );
+  >(`/repos/${values.owner}/${values.repo}/issues?${params}`);
   const filtered = issues.filter((i) => !i.pull_request);
 
   const list = filtered.map((i) => ({
@@ -262,9 +254,7 @@ async function searchCode() {
       repository?: { full_name?: string };
       html_url: string;
     }>;
-  }>(
-    `/search/code?q=${encodeURIComponent(values.query)}&per_page=${values.limit || "10"}`,
-  );
+  }>(`/search/code?q=${encodeURIComponent(values.query)}&per_page=${values.limit || "10"}`);
 
   const results = result.items.map((item) => ({
     name: item.name,

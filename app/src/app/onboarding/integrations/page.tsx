@@ -140,10 +140,7 @@ function OnboardingIntegrationsContent() {
   const integrationsList = Array.isArray(integrations) ? integrations : [];
   const connectedIntegrations = new Set(integrationsList.map((i) => i.type));
 
-  const renderIntegrationIcon = (
-    type: IntegrationType,
-    isRecommended: boolean,
-  ) => {
+  const renderIntegrationIcon = (type: IntegrationType, isRecommended: boolean) => {
     const config = integrationConfig[type];
     const isConnected = connectedIntegrations.has(type);
     const isConnecting = connectingType === type;
@@ -167,9 +164,7 @@ function OnboardingIntegrationsContent() {
           </div>
         )}
         {isRecommended && !isConnected && (
-          <span className="text-[10px] font-medium text-primary">
-            Recommended
-          </span>
+          <span className="text-[10px] font-medium text-primary">Recommended</span>
         )}
         {isConnecting ? (
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -182,9 +177,7 @@ function OnboardingIntegrationsContent() {
             <Image src={config.icon} alt={config.name} width={32} height={32} />
           </div>
         )}
-        <span className="text-xs font-medium text-muted-foreground">
-          {config.name}
-        </span>
+        <span className="text-xs font-medium text-muted-foreground">{config.name}</span>
       </button>
     );
   };
@@ -201,21 +194,17 @@ function OnboardingIntegrationsContent() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight mb-2">
-            Connect your tools
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight mb-2">Connect your tools</h1>
           <p className="text-muted-foreground">
-            Connect your apps to let the AI assistant help you with tasks like
-            reading emails, scheduling meetings, and managing documents.
+            Connect your apps to let the AI assistant help you with tasks like reading emails,
+            scheduling meetings, and managing documents.
           </p>
         </div>
 
         <div className="bg-card rounded-2xl border p-6 mb-6">
           {/* Recommended integrations */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-            {recommendedIntegrations.map((type) =>
-              renderIntegrationIcon(type, true),
-            )}
+            {recommendedIntegrations.map((type) => renderIntegrationIcon(type, true))}
           </div>
 
           <div className="relative mb-6">
@@ -223,32 +212,21 @@ function OnboardingIntegrationsContent() {
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">
-                More integrations
-              </span>
+              <span className="bg-card px-2 text-muted-foreground">More integrations</span>
             </div>
           </div>
 
           {/* Other integrations */}
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
-            {otherIntegrations.map((type) =>
-              renderIntegrationIcon(type, false),
-            )}
+            {otherIntegrations.map((type) => renderIntegrationIcon(type, false))}
           </div>
         </div>
 
         <div className="flex gap-3 justify-center">
-          <Button
-            variant="ghost"
-            onClick={handleSkip}
-            disabled={completeOnboarding.isPending}
-          >
+          <Button variant="ghost" onClick={handleSkip} disabled={completeOnboarding.isPending}>
             Skip for now
           </Button>
-          <Button
-            onClick={handleContinue}
-            disabled={completeOnboarding.isPending}
-          >
+          <Button onClick={handleContinue} disabled={completeOnboarding.isPending}>
             {completeOnboarding.isPending ? "Loading..." : "Continue"}
           </Button>
         </div>

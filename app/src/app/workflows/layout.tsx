@@ -3,11 +3,7 @@
 import { AppShell } from "@/components/app-shell";
 import { usePathname } from "next/navigation";
 
-export default function WorkflowsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function WorkflowsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isRunsRoute = pathname?.startsWith("/workflows/runs");
 

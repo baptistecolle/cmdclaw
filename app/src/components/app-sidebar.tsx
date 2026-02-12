@@ -17,11 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -197,9 +193,7 @@ export function AppSidebar() {
                 </>
               )}
             </div>
-            {reportError && (
-              <p className="mt-2 text-xs text-destructive">{reportError}</p>
-            )}
+            {reportError && <p className="mt-2 text-xs text-destructive">{reportError}</p>}
           </div>
           <SheetFooter className="border-t">
             <Button
@@ -223,13 +217,7 @@ export function AppSidebar() {
           prefetch={false}
           className="mb-4 flex h-9 w-9 items-center justify-center"
         >
-          <Image
-            src="/logo.png"
-            alt="Bap"
-            width={28}
-            height={28}
-            className="object-contain"
-          />
+          <Image src="/logo.png" alt="Bap" width={28} height={28} className="object-contain" />
         </Link>
 
         {/* Nav items */}
@@ -308,19 +296,13 @@ export function AppSidebar() {
             {userEmail && (
               <>
                 <DropdownMenuLabel className="font-normal">
-                  <span className="text-xs text-muted-foreground">
-                    {userEmail}
-                  </span>
+                  <span className="text-xs text-muted-foreground">{userEmail}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
               </>
             )}
             <DropdownMenuItem asChild>
-              <Link
-                href="/settings"
-                prefetch={false}
-                className="flex items-center gap-2"
-              >
+              <Link href="/settings" prefetch={false} className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>
               </Link>
@@ -335,11 +317,7 @@ export function AppSidebar() {
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem asChild>
-                <Link
-                  href="/login"
-                  prefetch={false}
-                  className="flex items-center gap-2"
-                >
+                <Link href="/login" prefetch={false} className="flex items-center gap-2">
                   <LogOut className="h-4 w-4" />
                   <span>Log in</span>
                 </Link>

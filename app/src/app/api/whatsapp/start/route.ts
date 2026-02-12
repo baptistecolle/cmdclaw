@@ -1,8 +1,5 @@
 import { auth } from "@/lib/auth";
-import {
-  ensureWhatsAppSocket,
-  getWhatsAppStatus,
-} from "@/server/services/whatsapp-bot";
+import { ensureWhatsAppSocket, getWhatsAppStatus } from "@/server/services/whatsapp-bot";
 
 export async function POST(request: Request) {
   const sessionData = await auth.api.getSession({ headers: request.headers });

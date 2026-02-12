@@ -6,11 +6,7 @@ import {
   IntegrationLogo,
 } from "./preview-styles";
 
-export function DrivePreview({
-  operation,
-  args,
-  positionalArgs,
-}: PreviewProps) {
+export function DrivePreview({ operation, args, positionalArgs }: PreviewProps) {
   switch (operation) {
     case "upload":
       return <DriveUploadPreview args={args} />;
@@ -23,11 +19,7 @@ export function DrivePreview({
   }
 }
 
-function DriveUploadPreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function DriveUploadPreview({ args }: { args: Record<string, string | undefined> }) {
   const file = args.file;
   const name = args.name;
   const folder = args.folder;
@@ -50,11 +42,7 @@ function DriveUploadPreview({
   );
 }
 
-function DriveMkdirPreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function DriveMkdirPreview({ args }: { args: Record<string, string | undefined> }) {
   const name = args.name;
   const parent = args.parent;
 

@@ -17,17 +17,8 @@ type TooltipProviderProps = TooltipProviderPrimitiveProps & {
   openDelay?: number;
 };
 
-function TooltipProvider({
-  openDelay,
-  delayDuration = 0,
-  ...props
-}: TooltipProviderProps) {
-  return (
-    <TooltipProviderPrimitive
-      delayDuration={openDelay ?? delayDuration}
-      {...props}
-    />
-  );
+function TooltipProvider({ openDelay, delayDuration = 0, ...props }: TooltipProviderProps) {
+  return <TooltipProviderPrimitive delayDuration={openDelay ?? delayDuration} {...props} />;
 }
 
 type TooltipProps = TooltipPrimitiveProps & {
@@ -50,12 +41,7 @@ function TooltipTrigger({ ...props }: TooltipTriggerProps) {
 
 type TooltipContentProps = TooltipContentPrimitiveProps;
 
-function TooltipContent({
-  className,
-  sideOffset,
-  children,
-  ...props
-}: TooltipContentProps) {
+function TooltipContent({ className, sideOffset, children, ...props }: TooltipContentProps) {
   return (
     <TooltipPortalPrimitive>
       <TooltipContentPrimitive

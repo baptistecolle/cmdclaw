@@ -71,10 +71,7 @@ const getAuthUrl = protectedProcedure
   .handler(async ({ input, context }) => {
     // LinkedIn uses Unipile hosted auth instead of standard OAuth
     if (input.type === "linkedin") {
-      const url = await generateLinkedInAuthUrl(
-        context.user.id,
-        input.redirectUrl,
-      );
+      const url = await generateLinkedInAuthUrl(context.user.id, input.redirectUrl);
       return { authUrl: url };
     }
 
@@ -82,9 +79,7 @@ const getAuthUrl = protectedProcedure
 
     // Generate PKCE code_verifier for providers that require it
     const pkceProviders = ["airtable", "salesforce", "twitter"];
-    const codeVerifier = pkceProviders.includes(input.type)
-      ? generateCodeVerifier()
-      : undefined;
+    const codeVerifier = pkceProviders.includes(input.type) ? generateCodeVerifier() : undefined;
 
     const state = Buffer.from(
       JSON.stringify({
@@ -237,10 +232,7 @@ const handleCallback = protectedProcedure
       const error = await tokenResponse.text();
       console.error("Token exchange failed:", error);
       console.error("Response status:", tokenResponse.status);
-      console.error(
-        "Response headers:",
-        Object.fromEntries(tokenResponse.headers.entries()),
-      );
+      console.error("Response headers:", Object.fromEntries(tokenResponse.headers.entries()));
       throw new ORPCError("INTERNAL_SERVER_ERROR", {
         message: "Failed to exchange code for tokens",
       });
@@ -268,10 +260,7 @@ const handleCallback = protectedProcedure
 
     // Create or update integration
     const existingIntegration = await context.db.query.integration.findFirst({
-      where: and(
-        eq(integration.userId, context.user.id),
-        eq(integration.type, stateData.type),
-      ),
+      where: and(eq(integration.userId, context.user.id), eq(integration.type, stateData.type)),
     });
 
     let integId: string;
@@ -303,17 +292,13 @@ const handleCallback = protectedProcedure
     }
 
     // Delete old tokens and store new ones
-    await context.db
-      .delete(integrationToken)
-      .where(eq(integrationToken.integrationId, integId));
+    await context.db.delete(integrationToken).where(eq(integrationToken.integrationId, integId));
 
     await context.db.insert(integrationToken).values({
       integrationId: integId,
       accessToken: accessToken,
       refreshToken: tokens.refresh_token,
-      expiresAt: tokens.expires_in
-        ? new Date(Date.now() + tokens.expires_in * 1000)
-        : null,
+      expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
       idToken: tokens.id_token,
     });
 
@@ -336,12 +321,7 @@ const toggle = protectedProcedure
     const result = await context.db
       .update(integration)
       .set({ enabled: input.enabled })
-      .where(
-        and(
-          eq(integration.id, input.id),
-          eq(integration.userId, context.user.id),
-        ),
-      )
+      .where(and(eq(integration.id, input.id), eq(integration.userId, context.user.id)))
       .returning({ id: integration.id });
 
     if (result.length === 0) {
@@ -357,10 +337,7 @@ const disconnect = protectedProcedure
   .handler(async ({ input, context }) => {
     // First, get the integration to check if it's LinkedIn
     const existingIntegration = await context.db.query.integration.findFirst({
-      where: and(
-        eq(integration.id, input.id),
-        eq(integration.userId, context.user.id),
-      ),
+      where: and(eq(integration.id, input.id), eq(integration.userId, context.user.id)),
     });
 
     if (!existingIntegration) {
@@ -368,10 +345,7 @@ const disconnect = protectedProcedure
     }
 
     // For LinkedIn, also delete the Unipile account
-    if (
-      existingIntegration.type === "linkedin" &&
-      existingIntegration.providerAccountId
-    ) {
+    if (existingIntegration.type === "linkedin" && existingIntegration.providerAccountId) {
       try {
         await deleteUnipileAccount(existingIntegration.providerAccountId);
       } catch (error) {
@@ -521,44 +495,41 @@ const createCustomIntegration = protectedProcedure
     return { id: created.id, slug: created.slug };
   });
 
-const listCustomIntegrations = protectedProcedure.handler(
-  async ({ context }) => {
-    const integrations = await context.db.query.customIntegration.findMany({
-      where: or(
-        eq(customIntegration.createdByUserId, context.user.id),
-        eq(customIntegration.isBuiltIn, true),
-      ),
-    });
+const listCustomIntegrations = protectedProcedure.handler(async ({ context }) => {
+  const integrations = await context.db.query.customIntegration.findMany({
+    where: or(
+      eq(customIntegration.createdByUserId, context.user.id),
+      eq(customIntegration.isBuiltIn, true),
+    ),
+  });
 
-    // Get user's credentials for these integrations
-    const credentials =
-      await context.db.query.customIntegrationCredential.findMany({
-        where: eq(customIntegrationCredential.userId, context.user.id),
-      });
+  // Get user's credentials for these integrations
+  const credentials = await context.db.query.customIntegrationCredential.findMany({
+    where: eq(customIntegrationCredential.userId, context.user.id),
+  });
 
-    const credMap = new Map(credentials.map((c) => [c.customIntegrationId, c]));
+  const credMap = new Map(credentials.map((c) => [c.customIntegrationId, c]));
 
-    return integrations.map((i) => {
-      const cred = credMap.get(i.id);
-      return {
-        id: i.id,
-        slug: i.slug,
-        name: i.name,
-        description: i.description,
-        iconUrl: i.iconUrl,
-        baseUrl: i.baseUrl,
-        authType: i.authType,
-        isBuiltIn: i.isBuiltIn,
-        communityStatus: i.communityStatus,
-        communityPrUrl: i.communityPrUrl,
-        createdAt: i.createdAt,
-        connected: !!cred,
-        enabled: cred?.enabled ?? false,
-        displayName: cred?.displayName ?? null,
-      };
-    });
-  },
-);
+  return integrations.map((i) => {
+    const cred = credMap.get(i.id);
+    return {
+      id: i.id,
+      slug: i.slug,
+      name: i.name,
+      description: i.description,
+      iconUrl: i.iconUrl,
+      baseUrl: i.baseUrl,
+      authType: i.authType,
+      isBuiltIn: i.isBuiltIn,
+      communityStatus: i.communityStatus,
+      communityPrUrl: i.communityPrUrl,
+      createdAt: i.createdAt,
+      connected: !!cred,
+      enabled: cred?.enabled ?? false,
+      displayName: cred?.displayName ?? null,
+    };
+  });
+});
 
 const getCustomIntegration = protectedProcedure
   .input(z.object({ slug: z.string() }))
@@ -640,10 +611,7 @@ const disconnectCustomIntegration = protectedProcedure
       .where(
         and(
           eq(customIntegrationCredential.userId, context.user.id),
-          eq(
-            customIntegrationCredential.customIntegrationId,
-            input.customIntegrationId,
-          ),
+          eq(customIntegrationCredential.customIntegrationId, input.customIntegrationId),
         ),
       );
 
@@ -659,10 +627,7 @@ const toggleCustomIntegration = protectedProcedure
       .where(
         and(
           eq(customIntegrationCredential.userId, context.user.id),
-          eq(
-            customIntegrationCredential.customIntegrationId,
-            input.customIntegrationId,
-          ),
+          eq(customIntegrationCredential.customIntegrationId, input.customIntegrationId),
         ),
       )
       .returning({ id: customIntegrationCredential.id });
@@ -741,8 +706,7 @@ const getCustomAuthUrl = protectedProcedure
       }),
     ).toString("base64url");
 
-    const appUrl =
-      process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+    const appUrl = process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -820,8 +784,7 @@ const handleCustomCallback = protectedProcedure
     const clientId = decrypt(cred.clientId);
     const clientSecret = decrypt(cred.clientSecret);
     const oauth = integ.oauthConfig;
-    const appUrl =
-      process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+    const appUrl = process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
     const tokenBody = new URLSearchParams({
       grant_type: "authorization_code",
@@ -867,9 +830,7 @@ const handleCustomCallback = protectedProcedure
       .set({
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token ?? null,
-        expiresAt: tokens.expires_in
-          ? new Date(Date.now() + tokens.expires_in * 1000)
-          : null,
+        expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
         enabled: true,
       })
       .where(eq(customIntegrationCredential.id, cred.id));

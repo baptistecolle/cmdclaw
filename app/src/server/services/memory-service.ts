@@ -106,10 +106,7 @@ function resolveFileType(input: MemoryWriteInput | MemoryGetInput): {
   const path = "path" in input ? input.path : undefined;
   if (path) {
     const normalized = path.trim().replace(/^\//, "");
-    if (
-      normalized.toLowerCase() === "memory.md" ||
-      normalized === "MEMORY.md"
-    ) {
+    if (normalized.toLowerCase() === "memory.md" || normalized === "MEMORY.md") {
       return { type: "longterm", date: null };
     }
     const match = normalized.match(/^memory\/(\d{4}-\d{2}-\d{2})\.md$/i);
@@ -150,10 +147,7 @@ function slugify(value: string): string {
     .slice(0, 60);
 }
 
-function formatEntryMarkdown(
-  file: MemoryFileRow,
-  entry: MemoryEntryRow,
-): string {
+function formatEntryMarkdown(file: MemoryFileRow, entry: MemoryEntryRow): string {
   const createdAt = entry.createdAt || new Date();
   const timeLabel = formatTimeOnly(createdAt);
   const title = entry.title?.trim();
@@ -186,9 +180,7 @@ function formatTranscriptMarkdown(params: {
   body: string;
 }): string {
   const metaLines = params.metadata
-    .filter(
-      ([, value]) => value !== null && value !== undefined && value !== "",
-    )
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
     .map(([label, value]) => `- ${label}: ${value}`);
   const metaBlock = metaLines.length > 0 ? metaLines.join("\n") : "";
   const parts = [
@@ -227,9 +219,7 @@ export async function ensureMemoryFile(params: {
     where: and(
       eq(memoryFile.userId, params.userId),
       eq(memoryFile.type, params.type),
-      params.type === "daily" && params.date
-        ? eq(memoryFile.date, params.date)
-        : sql`TRUE`,
+      params.type === "daily" && params.date ? eq(memoryFile.date, params.date) : sql`TRUE`,
     ),
   });
 
@@ -264,10 +254,7 @@ async function resolveMemorySettings(userId: string) {
 
 async function getOpenAIApiKey(userId: string): Promise<string | null> {
   const auth = await db.query.providerAuth.findFirst({
-    where: and(
-      eq(providerAuth.userId, userId),
-      eq(providerAuth.provider, "openai"),
-    ),
+    where: and(eq(providerAuth.userId, userId), eq(providerAuth.provider, "openai")),
   });
   if (auth) {
     try {
@@ -366,9 +353,7 @@ export function chunkMarkdown(
   return chunks;
 }
 
-export async function writeMemoryEntry(
-  input: MemoryWriteInput,
-): Promise<MemoryEntryRow> {
+export async function writeMemoryEntry(input: MemoryWriteInput): Promise<MemoryEntryRow> {
   const resolved = resolveFileType(input);
   if (!resolved) {
     throw new Error("Invalid memory path or type");
@@ -452,9 +437,7 @@ export async function readMemoryFile(
     where: and(
       eq(memoryFile.userId, input.userId),
       eq(memoryFile.type, resolved.type),
-      resolved.type === "daily" && resolved.date
-        ? eq(memoryFile.date, resolved.date)
-        : sql`TRUE`,
+      resolved.type === "daily" && resolved.date ? eq(memoryFile.date, resolved.date) : sql`TRUE`,
     ),
   });
 
@@ -470,9 +453,7 @@ export async function readMemoryFile(
       ? `# ${file.date ? formatDateOnly(file.date) : "Unknown Date"}`
       : "# Long-term Memory";
 
-  const body = entries
-    .map((entry) => formatEntryMarkdown(file, entry))
-    .join("\n\n");
+  const body = entries.map((entry) => formatEntryMarkdown(file, entry)).join("\n\n");
 
   return {
     path: getFilePath(file),
@@ -505,10 +486,7 @@ export async function readSessionTranscriptByPath(
   if (!normalized.toLowerCase().startsWith("sessions/")) return null;
 
   const transcript = await db.query.sessionTranscript.findFirst({
-    where: and(
-      eq(sessionTranscript.userId, input.userId),
-      eq(sessionTranscript.path, normalized),
-    ),
+    where: and(eq(sessionTranscript.userId, input.userId), eq(sessionTranscript.path, normalized)),
   });
 
   if (!transcript) return null;
@@ -614,10 +592,7 @@ export async function writeSessionTranscriptFromConversation(input: {
   excludeUserMessages?: string[];
 }): Promise<SessionTranscriptRow | null> {
   const convo = await db.query.conversation.findFirst({
-    where: and(
-      eq(conversation.id, input.conversationId),
-      eq(conversation.userId, input.userId),
-    ),
+    where: and(eq(conversation.id, input.conversationId), eq(conversation.userId, input.userId)),
   });
   if (!convo) return null;
 
@@ -630,9 +605,7 @@ export async function writeSessionTranscriptFromConversation(input: {
 
   const boundaryIndex = messages
     .map((m, idx) =>
-      m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX)
-        ? idx
-        : -1,
+      m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1,
     )
     .filter((idx) => idx >= 0)
     .pop();
@@ -645,9 +618,7 @@ export async function writeSessionTranscriptFromConversation(input: {
       ? sessionMessages.slice(-input.messageLimit)
       : sessionMessages;
 
-  const excluded = new Set(
-    (input.excludeUserMessages || []).map((value) => value.trim()),
-  );
+  const excluded = new Set((input.excludeUserMessages || []).map((value) => value.trim()));
 
   const messagesForTranscript = trimmedMessages.filter((m) => {
     if (m.role === "user" && excluded.has(m.content.trim())) {
@@ -657,12 +628,8 @@ export async function writeSessionTranscriptFromConversation(input: {
   });
   if (messagesForTranscript.length === 0) return null;
 
-  const lastUser = [...messagesForTranscript]
-    .reverse()
-    .find((m) => m.role === "user");
-  const lastAssistant = [...messagesForTranscript]
-    .reverse()
-    .find((m) => m.role === "assistant");
+  const lastUser = [...messagesForTranscript].reverse().find((m) => m.role === "user");
+  const lastAssistant = [...messagesForTranscript].reverse().find((m) => m.role === "assistant");
   const title = await generateConversationTitle(
     lastUser?.content ?? "",
     lastAssistant?.content ?? "",
@@ -671,15 +638,9 @@ export async function writeSessionTranscriptFromConversation(input: {
   const lines: string[] = [];
   for (const msg of messagesForTranscript) {
     const time = msg.createdAt ? format(msg.createdAt, "HH:mm") : "";
-    if (
-      msg.role === "assistant" &&
-      msg.contentParts &&
-      msg.contentParts.length > 0
-    ) {
+    if (msg.role === "assistant" && msg.contentParts && msg.contentParts.length > 0) {
       const textParts = msg.contentParts
-        .filter(
-          (p): p is Extract<ContentPart, { type: "text" }> => p.type === "text",
-        )
+        .filter((p): p is Extract<ContentPart, { type: "text" }> => p.type === "text")
         .map((p) => p.text)
         .join("");
       lines.push(`**${msg.role} ${time}**\n${textParts || msg.content}`);
@@ -689,8 +650,7 @@ export async function writeSessionTranscriptFromConversation(input: {
   }
 
   const startedAt = messagesForTranscript[0]?.createdAt ?? null;
-  const endedAt =
-    messagesForTranscript[messagesForTranscript.length - 1]?.createdAt ?? null;
+  const endedAt = messagesForTranscript[messagesForTranscript.length - 1]?.createdAt ?? null;
   const transcriptTitle = title || "Session Transcript";
   const transcriptBody = lines.join("\n\n");
   const content = formatTranscriptMarkdown({
@@ -721,9 +681,7 @@ export async function writeSessionTranscriptFromConversation(input: {
   });
 }
 
-export async function searchMemory(
-  input: MemorySearchInput,
-): Promise<MemorySearchResult[]> {
+export async function searchMemory(input: MemorySearchInput): Promise<MemorySearchResult[]> {
   const limit = Math.max(1, Math.min(input.limit ?? DEFAULT_SEARCH_LIMIT, 20));
   const settings = await resolveMemorySettings(input.userId);
 
@@ -765,18 +723,12 @@ export async function searchMemory(
   }> = [];
 
   if (settings.provider === "openai") {
-    const queryEmbedding = await embedTexts(
-      input.userId,
-      [input.query],
-      settings.model,
-    );
+    const queryEmbedding = await embedTexts(input.userId, [input.query], settings.model);
     if (queryEmbedding && queryEmbedding[0]) {
       const vectorLiteral = `[${queryEmbedding[0].map((v) => Number(v).toFixed(6)).join(",")}]`;
       const distanceExpr = sql.raw(`embedding <=> '${vectorLiteral}'`);
       const fileClause =
-        fileFilter.length > 0
-          ? sql`and ${memoryChunk.fileId} in ${fileFilter}`
-          : sql``;
+        fileFilter.length > 0 ? sql`and ${memoryChunk.fileId} in ${fileFilter}` : sql``;
 
       const vectorResult = await db.execute(sql`
         select
@@ -798,9 +750,7 @@ export async function searchMemory(
   }
 
   const fileClause =
-    fileFilter.length > 0
-      ? sql`and ${memoryChunk.fileId} in ${fileFilter}`
-      : sql``;
+    fileFilter.length > 0 ? sql`and ${memoryChunk.fileId} in ${fileFilter}` : sql``;
 
   const textResult = await db.execute(sql`
     select
@@ -825,8 +775,7 @@ export async function searchMemory(
     rank: number;
   }>;
 
-  const maxRank =
-    textRows.reduce((max, row) => Math.max(max, Number(row.rank) || 0), 0) || 1;
+  const maxRank = textRows.reduce((max, row) => Math.max(max, Number(row.rank) || 0), 0) || 1;
 
   const combined = new Map<
     string,
@@ -900,10 +849,7 @@ export async function searchMemory(
   return scored.map((row) => {
     const file = fileMap.get(row.fileId);
     const entry = row.entryId ? entryMap.get(row.entryId) : null;
-    const snippet =
-      row.content.length > 240
-        ? `${row.content.slice(0, 240)}...`
-        : row.content;
+    const snippet = row.content.length > 240 ? `${row.content.slice(0, 240)}...` : row.content;
     return {
       id: row.id,
       fileId: row.fileId,
@@ -917,9 +863,7 @@ export async function searchMemory(
   });
 }
 
-async function searchSessionTranscripts(
-  input: MemorySearchInput,
-): Promise<MemorySearchResult[]> {
+async function searchSessionTranscripts(input: MemorySearchInput): Promise<MemorySearchResult[]> {
   const settings = await resolveMemorySettings(input.userId);
   const limit = Math.max(1, Math.min(input.limit ?? DEFAULT_SEARCH_LIMIT, 20));
 
@@ -931,11 +875,7 @@ async function searchSessionTranscripts(
   }> = [];
 
   if (settings.provider === "openai") {
-    const queryEmbedding = await embedTexts(
-      input.userId,
-      [input.query],
-      settings.model,
-    );
+    const queryEmbedding = await embedTexts(input.userId, [input.query], settings.model);
     if (queryEmbedding && queryEmbedding[0]) {
       const vectorLiteral = `[${queryEmbedding[0].map((v) => Number(v).toFixed(6)).join(",")}]`;
       const distanceExpr = sql.raw(`embedding <=> '${vectorLiteral}'`);
@@ -977,8 +917,7 @@ async function searchSessionTranscripts(
     rank: number;
   }>;
 
-  const maxRank =
-    textRows.reduce((max, row) => Math.max(max, Number(row.rank) || 0), 0) || 1;
+  const maxRank = textRows.reduce((max, row) => Math.max(max, Number(row.rank) || 0), 0) || 1;
 
   const combined = new Map<
     string,
@@ -1028,9 +967,7 @@ async function searchSessionTranscripts(
 
   if (scored.length === 0) return [];
 
-  const transcriptIds = Array.from(
-    new Set(scored.map((row) => row.transcriptId)),
-  );
+  const transcriptIds = Array.from(new Set(scored.map((row) => row.transcriptId)));
   const transcripts = await db.query.sessionTranscript.findMany({
     where: inArray(sessionTranscript.id, transcriptIds),
   });
@@ -1038,10 +975,7 @@ async function searchSessionTranscripts(
 
   return scored.map((row) => {
     const transcript = transcriptMap.get(row.transcriptId);
-    const snippet =
-      row.content.length > 240
-        ? `${row.content.slice(0, 240)}...`
-        : row.content;
+    const snippet = row.content.length > 240 ? `${row.content.slice(0, 240)}...` : row.content;
     return {
       id: row.id,
       fileId: row.transcriptId,
@@ -1064,9 +998,7 @@ export async function searchMemoryWithSessions(
   }
 
   const sessionResults = await searchSessionTranscripts(input);
-  const merged = [...memoryResults, ...sessionResults].sort(
-    (a, b) => b.score - a.score,
-  );
+  const merged = [...memoryResults, ...sessionResults].sort((a, b) => b.score - a.score);
   const limit = Math.max(1, Math.min(input.limit ?? DEFAULT_SEARCH_LIMIT, 20));
   return merged.slice(0, limit);
 }

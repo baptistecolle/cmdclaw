@@ -61,9 +61,7 @@ export class BYOCSandboxBackend implements SandboxBackend {
 
   async writeFile(path: string, content: string | Uint8Array): Promise<void> {
     const strContent =
-      typeof content === "string"
-        ? content
-        : Buffer.from(content).toString("base64");
+      typeof content === "string" ? content : Buffer.from(content).toString("base64");
 
     const response = await waitForResponse(this.deviceId, {
       type: "sandbox.writeFile",

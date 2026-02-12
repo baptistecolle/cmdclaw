@@ -1,8 +1,7 @@
 import { env } from "@/env";
 
 const getUnipileBaseUrl = () => `https://${env.UNIPILE_DSN}`;
-const getAppUrl = () =>
-  env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+const getAppUrl = () => env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 interface UnipileAccount {
   id: string;
@@ -32,27 +31,24 @@ export async function generateLinkedInAuthUrl(
   userId: string,
   redirectUrl: string,
 ): Promise<string> {
-  const response = await fetch(
-    `${getUnipileBaseUrl()}/api/v1/hosted/accounts/link`,
-    {
-      method: "POST",
-      headers: {
-        "X-API-KEY": env.UNIPILE_API_KEY!,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        type: "create",
-        providers: ["LINKEDIN"],
-        api_url: getUnipileBaseUrl(),
-        expiresOn: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-        notify_url: `${getAppUrl()}/api/integrations/linkedin/webhook?userId=${encodeURIComponent(userId)}`,
-        success_redirect_url: redirectUrl,
-        failure_redirect_url: redirectUrl,
-        name: userId,
-      }),
+  const response = await fetch(`${getUnipileBaseUrl()}/api/v1/hosted/accounts/link`, {
+    method: "POST",
+    headers: {
+      "X-API-KEY": env.UNIPILE_API_KEY!,
+      "Content-Type": "application/json",
+      Accept: "application/json",
     },
-  );
+    body: JSON.stringify({
+      type: "create",
+      providers: ["LINKEDIN"],
+      api_url: getUnipileBaseUrl(),
+      expiresOn: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      notify_url: `${getAppUrl()}/api/integrations/linkedin/webhook?userId=${encodeURIComponent(userId)}`,
+      success_redirect_url: redirectUrl,
+      failure_redirect_url: redirectUrl,
+      name: userId,
+    }),
+  });
 
   if (!response.ok) {
     const error = await response.text();
@@ -64,18 +60,13 @@ export async function generateLinkedInAuthUrl(
   return data.url;
 }
 
-export async function getUnipileAccount(
-  accountId: string,
-): Promise<UnipileAccount> {
-  const response = await fetch(
-    `${getUnipileBaseUrl()}/api/v1/accounts/${accountId}`,
-    {
-      headers: {
-        "X-API-KEY": env.UNIPILE_API_KEY!,
-        Accept: "application/json",
-      },
+export async function getUnipileAccount(accountId: string): Promise<UnipileAccount> {
+  const response = await fetch(`${getUnipileBaseUrl()}/api/v1/accounts/${accountId}`, {
+    headers: {
+      "X-API-KEY": env.UNIPILE_API_KEY!,
+      Accept: "application/json",
     },
-  );
+  });
 
   if (!response.ok) {
     const error = await response.text();
@@ -86,18 +77,13 @@ export async function getUnipileAccount(
   return response.json();
 }
 
-export async function getLinkedInProfile(
-  accountId: string,
-): Promise<UnipileProfile> {
-  const response = await fetch(
-    `${getUnipileBaseUrl()}/api/v1/users/me?account_id=${accountId}`,
-    {
-      headers: {
-        "X-API-KEY": env.UNIPILE_API_KEY!,
-        Accept: "application/json",
-      },
+export async function getLinkedInProfile(accountId: string): Promise<UnipileProfile> {
+  const response = await fetch(`${getUnipileBaseUrl()}/api/v1/users/me?account_id=${accountId}`, {
+    headers: {
+      "X-API-KEY": env.UNIPILE_API_KEY!,
+      Accept: "application/json",
     },
-  );
+  });
 
   if (!response.ok) {
     const error = await response.text();
@@ -109,16 +95,13 @@ export async function getLinkedInProfile(
 }
 
 export async function deleteUnipileAccount(accountId: string): Promise<void> {
-  const response = await fetch(
-    `${getUnipileBaseUrl()}/api/v1/accounts/${accountId}`,
-    {
-      method: "DELETE",
-      headers: {
-        "X-API-KEY": env.UNIPILE_API_KEY!,
-        Accept: "application/json",
-      },
+  const response = await fetch(`${getUnipileBaseUrl()}/api/v1/accounts/${accountId}`, {
+    method: "DELETE",
+    headers: {
+      "X-API-KEY": env.UNIPILE_API_KEY!,
+      Accept: "application/json",
     },
-  );
+  });
 
   if (!response.ok) {
     const error = await response.text();

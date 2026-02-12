@@ -32,20 +32,12 @@ export function StreamingMessage({ parts }: Props) {
           if (part.type === "text") {
             const isLast = index === parts.length - 1;
             return (
-              <TextPartDisplay
-                key={`text-${index}`}
-                content={part.content}
-                isStreaming={isLast}
-              />
+              <TextPartDisplay key={`text-${index}`} content={part.content} isStreaming={isLast} />
             );
           } else if (part.type === "thinking") {
             const isLast = index === parts.length - 1;
             return (
-              <ThinkingPartDisplay
-                key={part.id}
-                content={part.content}
-                isStreaming={isLast}
-              />
+              <ThinkingPartDisplay key={part.id} content={part.content} isStreaming={isLast} />
             );
           } else if (part.type === "tool_call") {
             return (

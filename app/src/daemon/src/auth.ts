@@ -13,9 +13,7 @@ import { hostname, platform, arch } from "os";
 
 const CLIENT_ID = "bap-daemon";
 
-export async function authenticate(
-  serverUrl: string,
-): Promise<DaemonConfig | null> {
+export async function authenticate(serverUrl: string): Promise<DaemonConfig | null> {
   console.log("\n  Authenticating with", serverUrl, "\n");
 
   // 1. Request device code via Better Auth
@@ -83,18 +81,15 @@ export async function authenticate(
         const deviceName = hostname() || "My Device";
         const devicePlatform = `${platform()} ${arch()}`;
 
-        const registerRes = await fetch(
-          `${serverUrl}/api/rpc/device.register`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              token: data.access_token,
-              deviceName,
-              platform: devicePlatform,
-            }),
-          },
-        );
+        const registerRes = await fetch(`${serverUrl}/api/rpc/device.register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token: data.access_token,
+            deviceName,
+            platform: devicePlatform,
+          }),
+        });
 
         if (!registerRes.ok) {
           console.error("  Failed to register device");

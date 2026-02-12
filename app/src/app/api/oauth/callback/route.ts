@@ -13,15 +13,11 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error("OAuth error:", error);
-    return NextResponse.redirect(
-      new URL(`/integrations?error=${error}`, request.url),
-    );
+    return NextResponse.redirect(new URL(`/integrations?error=${error}`, request.url));
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(
-      new URL("/integrations?error=missing_params", request.url),
-    );
+    return NextResponse.redirect(new URL("/integrations?error=missing_params", request.url));
   }
 
   // Get session
@@ -30,9 +26,7 @@ export async function GET(request: NextRequest) {
   });
 
   if (!sessionData?.user) {
-    return NextResponse.redirect(
-      new URL("/login?error=unauthorized", request.url),
-    );
+    return NextResponse.redirect(new URL("/login?error=unauthorized", request.url));
   }
 
   // Parse state
@@ -46,9 +40,7 @@ export async function GET(request: NextRequest) {
   try {
     stateData = JSON.parse(Buffer.from(state, "base64url").toString());
   } catch {
-    return NextResponse.redirect(
-      new URL("/integrations?error=invalid_state", request.url),
-    );
+    return NextResponse.redirect(new URL("/integrations?error=invalid_state", request.url));
   }
 
   // Helper to build redirect URL with the correct base path
@@ -106,9 +98,7 @@ export async function GET(request: NextRequest) {
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
       console.error("Token exchange failed:", error);
-      return NextResponse.redirect(
-        buildRedirectUrl("error=token_exchange_failed"),
-      );
+      return NextResponse.redirect(buildRedirectUrl("error=token_exchange_failed"));
     }
 
     const tokens = await tokenResponse.json();
@@ -147,10 +137,7 @@ export async function GET(request: NextRequest) {
 
     // Create or update integration
     const existingIntegration = await db.query.integration.findFirst({
-      where: and(
-        eq(integration.userId, sessionData.user.id),
-        eq(integration.type, stateData.type),
-      ),
+      where: and(eq(integration.userId, sessionData.user.id), eq(integration.type, stateData.type)),
     });
 
     let integId: string;
@@ -182,9 +169,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Delete old tokens and store new ones
-    await db
-      .delete(integrationToken)
-      .where(eq(integrationToken.integrationId, integId));
+    await db.delete(integrationToken).where(eq(integrationToken.integrationId, integId));
 
     await db.insert(integrationToken).values({
       integrationId: integId,

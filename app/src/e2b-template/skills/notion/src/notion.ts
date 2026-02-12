@@ -78,11 +78,7 @@ async function getPage(pageId: string) {
   }));
 
   console.log(
-    JSON.stringify(
-      { id: page.id, url: page.url, properties: page.properties, content },
-      null,
-      2,
-    ),
+    JSON.stringify({ id: page.id, url: page.url, properties: page.properties, content }, null, 2),
   );
 }
 
@@ -135,14 +131,11 @@ async function appendContent(pageId: string) {
     paragraph: { rich_text: [{ type: "text", text: { content: line } }] },
   }));
 
-  const res = await fetch(
-    `https://api.notion.com/v1/blocks/${pageId}/children`,
-    {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({ children }),
-    },
-  );
+  const res = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ children }),
+  });
 
   if (!res.ok) throw new Error(await res.text());
   console.log("Content appended successfully.");
@@ -172,14 +165,11 @@ async function listDatabases() {
 }
 
 async function queryDatabase(databaseId: string) {
-  const res = await fetch(
-    `https://api.notion.com/v1/databases/${databaseId}/query`,
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ page_size: parseInt(values.limit || "10") }),
-    },
-  );
+  const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ page_size: parseInt(values.limit || "10") }),
+  });
 
   if (!res.ok) throw new Error(await res.text());
   const { results } = await res.json();

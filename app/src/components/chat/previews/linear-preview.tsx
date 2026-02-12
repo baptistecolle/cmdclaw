@@ -7,28 +7,18 @@ import {
   IntegrationLogo,
 } from "./preview-styles";
 
-export function LinearPreview({
-  operation,
-  args,
-  positionalArgs,
-}: PreviewProps) {
+export function LinearPreview({ operation, args, positionalArgs }: PreviewProps) {
   switch (operation) {
     case "create":
       return <LinearCreatePreview args={args} />;
     case "update":
-      return (
-        <LinearUpdatePreview args={args} positionalArgs={positionalArgs} />
-      );
+      return <LinearUpdatePreview args={args} positionalArgs={positionalArgs} />;
     default:
       return null;
   }
 }
 
-function LinearCreatePreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function LinearCreatePreview({ args }: { args: Record<string, string | undefined> }) {
   const team = args.team || args.t;
   const title = args.title;
   const description = args.d || args.description;
@@ -60,9 +50,7 @@ function LinearCreatePreview({
             <IntegrationLogo integration="linear" size={16} />
             <span className="font-medium">{title || "Untitled Issue"}</span>
             {priorityInfo && (
-              <PreviewBadge variant={priorityInfo.variant}>
-                {priorityInfo.label}
-              </PreviewBadge>
+              <PreviewBadge variant={priorityInfo.variant}>{priorityInfo.label}</PreviewBadge>
             )}
           </div>
 

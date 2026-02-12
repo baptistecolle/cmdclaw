@@ -1,16 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  EmojiPicker,
-  EmojiPickerContent,
-  EmojiPickerSearch,
-} from "@/components/ui/emoji-picker";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { EmojiPicker, EmojiPickerContent, EmojiPickerSearch } from "@/components/ui/emoji-picker";
 import { cn } from "@/lib/utils";
 import { FileText } from "lucide-react";
 
@@ -20,17 +12,9 @@ interface IconPickerProps {
   children?: React.ReactNode;
 }
 
-export function IconDisplay({
-  icon,
-  className,
-}: {
-  icon?: string | null;
-  className?: string;
-}) {
+export function IconDisplay({ icon, className }: { icon?: string | null; className?: string }) {
   if (!icon) {
-    return (
-      <FileText className={cn("h-5 w-5 text-muted-foreground", className)} />
-    );
+    return <FileText className={cn("h-5 w-5 text-muted-foreground", className)} />;
   }
 
   return <span className={cn("text-lg leading-none", className)}>{icon}</span>;

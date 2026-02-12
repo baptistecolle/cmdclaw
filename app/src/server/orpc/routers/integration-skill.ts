@@ -54,10 +54,7 @@ const createFromChat = protectedProcedure
       };
     } catch (error) {
       throw new ORPCError("BAD_REQUEST", {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to create integration skill",
+        message: error instanceof Error ? error.message : "Failed to create integration skill",
       });
     }
   });
@@ -122,10 +119,7 @@ const getResolvedForUser = protectedProcedure
   .input(z.object({ slug: z.string().min(1).max(64) }))
   .handler(async ({ input, context }) => {
     const slug = normalizeIntegrationSkillSlug(input.slug);
-    const resolved = await resolveIntegrationSkillForUser(
-      context.user.id,
-      slug,
-    );
+    const resolved = await resolveIntegrationSkillForUser(context.user.id, slug);
 
     const pref = await context.db.query.integrationSkillPreference.findFirst({
       where: and(
@@ -196,21 +190,14 @@ const setPreference = protectedProcedure
         slug,
         preferredSource: input.preferredSource,
         preferredSkillId:
-          input.preferredSource === "community"
-            ? (input.preferredSkillId ?? null)
-            : null,
+          input.preferredSource === "community" ? (input.preferredSkillId ?? null) : null,
       })
       .onConflictDoUpdate({
-        target: [
-          integrationSkillPreference.userId,
-          integrationSkillPreference.slug,
-        ],
+        target: [integrationSkillPreference.userId, integrationSkillPreference.slug],
         set: {
           preferredSource: input.preferredSource,
           preferredSkillId:
-            input.preferredSource === "community"
-              ? (input.preferredSkillId ?? null)
-              : null,
+            input.preferredSource === "community" ? (input.preferredSkillId ?? null) : null,
           updatedAt: new Date(),
         },
       });
@@ -330,9 +317,7 @@ const listPublic = protectedProcedure
       .optional(),
   )
   .handler(async ({ input }) => {
-    const slug = input?.slug
-      ? normalizeIntegrationSkillSlug(input.slug)
-      : undefined;
+    const slug = input?.slug ? normalizeIntegrationSkillSlug(input.slug) : undefined;
     const limit = input?.limit ?? 50;
 
     const filters = [

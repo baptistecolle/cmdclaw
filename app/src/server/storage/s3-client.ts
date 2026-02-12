@@ -14,11 +14,7 @@ let s3Client: S3Client | null = null;
 
 export function getS3Client(): S3Client {
   if (!s3Client) {
-    if (
-      !env.S3_ENDPOINT ||
-      !env.S3_ACCESS_KEY_ID ||
-      !env.S3_SECRET_ACCESS_KEY
-    ) {
+    if (!env.S3_ENDPOINT || !env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
       throw new Error(
         "S3 configuration is incomplete. Check S3_ENDPOINT, S3_ACCESS_KEY_ID, and S3_SECRET_ACCESS_KEY.",
       );
@@ -60,11 +56,7 @@ export async function ensureBucket(): Promise<void> {
 }
 
 // Upload file to S3
-export async function uploadToS3(
-  key: string,
-  body: Buffer,
-  contentType: string,
-): Promise<void> {
+export async function uploadToS3(key: string, body: Buffer, contentType: string): Promise<void> {
   const client = getS3Client();
 
   await client.send(
@@ -128,11 +120,7 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
 }
 
 // Generate storage key for a skill document
-export function generateStorageKey(
-  userId: string,
-  skillId: string,
-  filename: string,
-): string {
+export function generateStorageKey(userId: string, skillId: string, filename: string): string {
   const timestamp = Date.now();
   const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
   return `skills/${userId}/${skillId}/${timestamp}-${sanitizedFilename}`;

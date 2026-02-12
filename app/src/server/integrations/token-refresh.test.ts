@@ -1,45 +1,39 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  updateWhereMock,
-  selectWhereMock,
-  findManyMock,
-  dbMock,
-  getOAuthConfigMock,
-  decryptMock,
-} = vi.hoisted(() => {
-  const updateWhereMock = vi.fn();
-  const updateSetMock = vi.fn(() => ({ where: updateWhereMock }));
-  const updateMock = vi.fn(() => ({ set: updateSetMock }));
+const { updateWhereMock, selectWhereMock, findManyMock, dbMock, getOAuthConfigMock, decryptMock } =
+  vi.hoisted(() => {
+    const updateWhereMock = vi.fn();
+    const updateSetMock = vi.fn(() => ({ where: updateWhereMock }));
+    const updateMock = vi.fn(() => ({ set: updateSetMock }));
 
-  const selectWhereMock = vi.fn();
-  const selectInnerJoinMock = vi.fn(() => ({ where: selectWhereMock }));
-  const selectFromMock = vi.fn(() => ({ innerJoin: selectInnerJoinMock }));
-  const selectMock = vi.fn(() => ({ from: selectFromMock }));
-  const findManyMock = vi.fn();
-  const decryptMock = vi.fn((value: string) => value);
+    const selectWhereMock = vi.fn();
+    const selectInnerJoinMock = vi.fn(() => ({ where: selectWhereMock }));
+    const selectFromMock = vi.fn(() => ({ innerJoin: selectInnerJoinMock }));
+    const selectMock = vi.fn(() => ({ from: selectFromMock }));
+    const findManyMock = vi.fn();
+    const decryptMock = vi.fn((value: string) => value);
 
-  const dbMock = {
-    update: updateMock,
-    select: selectMock,
-    query: {
-      customIntegrationCredential: {
-        findMany: findManyMock,
+    const dbMock = {
+      update: updateMock,
+      select: selectMock,
+      query: {
+        customIntegrationCredential: {
+          findMany: findManyMock,
+        },
       },
-    },
-  };
+    };
 
-  const getOAuthConfigMock = vi.fn();
+    const getOAuthConfigMock = vi.fn();
 
-  return {
-    updateWhereMock,
-    selectWhereMock,
-    findManyMock,
-    dbMock,
-    getOAuthConfigMock,
-    decryptMock,
-  };
-});
+    return {
+      updateWhereMock,
+      selectWhereMock,
+      findManyMock,
+      dbMock,
+      getOAuthConfigMock,
+      decryptMock,
+    };
+  });
 
 vi.mock("@/server/db/client", () => ({
   db: dbMock,
@@ -62,11 +56,7 @@ vi.mock("drizzle-orm", async (importOriginal) => {
   };
 });
 
-import {
-  getValidAccessToken,
-  getValidTokensForUser,
-  getValidCustomTokens,
-} from "./token-refresh";
+import { getValidAccessToken, getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
 
 function mockFetchOk(payload: unknown) {
   vi.stubGlobal(
@@ -192,11 +182,7 @@ describe("token-refresh", () => {
 
     const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
 
-    for (const [index, provider] of [
-      "notion",
-      "airtable",
-      "reddit",
-    ].entries()) {
+    for (const [index, provider] of ["notion", "airtable", "reddit"].entries()) {
       const [, options] = fetchMock.mock.calls[index]!;
       const headers = options?.headers as Record<string, string>;
       const body = options?.body as URLSearchParams;

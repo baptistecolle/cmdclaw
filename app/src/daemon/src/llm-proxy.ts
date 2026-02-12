@@ -37,9 +37,7 @@ type OpenAIStreamChunk = {
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 }
 
 const PROVIDERS: { name: string; detectUrl: string; baseUrl: string }[] = [
@@ -89,10 +87,7 @@ export async function detectLocalProviders(): Promise<LocalProvider[]> {
         models,
       });
 
-      logger.info(
-        "llm-proxy",
-        `Found ${provider.name} with ${models.length} models`,
-      );
+      logger.info("llm-proxy", `Found ${provider.name} with ${models.length} models`);
     } catch {
       // Provider not running
     }

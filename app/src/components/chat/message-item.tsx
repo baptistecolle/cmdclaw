@@ -6,11 +6,7 @@ import { Paperclip, Download, FileIcon, Eye } from "lucide-react";
 import { MessageBubble } from "./message-bubble";
 import { CollapsedTrace } from "./collapsed-trace";
 import { ToolApprovalCard } from "./tool-approval-card";
-import type {
-  MessagePart,
-  AttachmentData,
-  SandboxFileData,
-} from "./message-list";
+import type { MessagePart, AttachmentData, SandboxFileData } from "./message-list";
 import type { IntegrationType } from "@/lib/integration-icons";
 import type { ActivityItemData } from "./activity-item";
 import { useDownloadAttachment, useDownloadSandboxFile } from "@/orpc/hooks";
@@ -50,15 +46,11 @@ export function MessageItem({
   sandboxFiles,
 }: Props) {
   // Track expanded state for each segment
-  const [expandedSegments, setExpandedSegments] = useState<Set<string>>(
-    new Set(),
-  );
+  const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
   const { mutateAsync: downloadAttachment } = useDownloadAttachment();
   const { mutateAsync: downloadSandboxFile } = useDownloadSandboxFile();
 
-  const getAttachmentUrl = async (
-    attachment: AttachmentData,
-  ): Promise<string | null> => {
+  const getAttachmentUrl = async (attachment: AttachmentData): Promise<string | null> => {
     if (attachment.id) {
       const result = await downloadAttachment(attachment.id);
       return result.url;
@@ -109,10 +101,7 @@ export function MessageItem({
   };
 
   const hasInterruptedMarker = useMemo(
-    () =>
-      !!parts?.some(
-        (p) => p.type === "system" && p.content === "Interrupted by user",
-      ),
+    () => !!parts?.some((p) => p.type === "system" && p.content === "Interrupted by user"),
     [parts],
   );
 
@@ -151,10 +140,10 @@ export function MessageItem({
           approval: null,
         };
       } else if (part.type === "tool_call") {
-          // Add tool call to current segment's items
-          currentSegment.items.push({
-            id: `activity-${part.id}`,
-            timestamp: i + 1,
+        // Add tool call to current segment's items
+        currentSegment.items.push({
+          id: `activity-${part.id}`,
+          timestamp: i + 1,
           type: "tool_call",
           content: part.name,
           toolName: part.name,
@@ -210,10 +199,7 @@ export function MessageItem({
     parts &&
     parts.some(
       (p) =>
-        p.type === "text" ||
-        p.type === "thinking" ||
-        p.type === "tool_call" ||
-        p.type === "system",
+        p.type === "text" || p.type === "thinking" || p.type === "tool_call" || p.type === "system",
     );
 
   // Check if there was an error
@@ -226,9 +212,7 @@ export function MessageItem({
     }
 
     // Find the last text part to display after the trace
-    const textParts = parts.filter(
-      (p): p is MessagePart & { type: "text" } => p.type === "text",
-    );
+    const textParts = parts.filter((p): p is MessagePart & { type: "text" } => p.type === "text");
     if (textParts.length === 0) {
       return "";
     }
@@ -273,10 +257,7 @@ export function MessageItem({
                   />
                   {(a.id || a.dataUrl) && (
                     <div className="absolute top-1 right-1 flex items-center gap-1 rounded-md bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => handleViewAttachment(a)}
-                      >
+                      <button type="button" onClick={() => handleViewAttachment(a)}>
                         <Eye className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => handleDownload(a)}>
@@ -431,9 +412,7 @@ export function MessageItem({
 
       {/* If no text and no trace, show empty indicator */}
       {!textContent && !hasTrace && !sandboxFiles?.length && (
-        <div className="text-sm text-muted-foreground italic">
-          Task completed
-        </div>
+        <div className="text-sm text-muted-foreground italic">Task completed</div>
       )}
     </div>
   );

@@ -58,9 +58,7 @@ export function useVoiceRecording(): UseVoiceRecordingReturn {
     } catch (err) {
       if (err instanceof Error) {
         if (err.name === "NotAllowedError") {
-          setError(
-            "Microphone permission denied. Please allow access in browser settings.",
-          );
+          setError("Microphone permission denied. Please allow access in browser settings.");
         } else if (err.name === "NotFoundError") {
           setError("No microphone found. Please connect a microphone.");
         } else {

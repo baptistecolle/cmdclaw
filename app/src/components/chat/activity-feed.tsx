@@ -48,8 +48,7 @@ export function ActivityFeed({
 
     const threshold = 20;
     const isAtBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight <
-      threshold;
+      container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
 
     // If user scrolls up from bottom, mark as user-scrolled
     // If they scroll back to bottom, reset
@@ -90,9 +89,7 @@ export function ActivityFeed({
           </div>
         )}
         <div className="flex-1" />
-        <span className="text-xs text-muted-foreground/60">
-          {items.length} items
-        </span>
+        <span className="text-xs text-muted-foreground/60">{items.length} items</span>
         {isExpanded ? (
           <ChevronUp className="h-4 w-4 text-muted-foreground" />
         ) : (
@@ -114,9 +111,7 @@ export function ActivityFeed({
           onScroll={handleScroll}
           className={cn(
             "overflow-y-auto px-3 py-2",
-            isExpanded
-              ? `h-[${MAX_EXPANDED_HEIGHT}px]`
-              : `h-[${COLLAPSED_HEIGHT}px]`,
+            isExpanded ? `h-[${MAX_EXPANDED_HEIGHT}px]` : `h-[${COLLAPSED_HEIGHT}px]`,
           )}
           style={{
             height: isExpanded ? MAX_EXPANDED_HEIGHT : COLLAPSED_HEIGHT,

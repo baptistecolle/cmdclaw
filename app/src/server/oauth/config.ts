@@ -31,8 +31,7 @@ export type OAuthConfig = {
   }>;
 };
 
-const getAppUrl = () =>
-  env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+const getAppUrl = () => env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 const configs: Record<IntegrationType, () => OAuthConfig> = {
   gmail: () => ({
@@ -63,12 +62,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
-    scopes: [
-      "https://www.googleapis.com/auth/calendar",
-      "openid",
-      "email",
-      "profile",
-    ],
+    scopes: ["https://www.googleapis.com/auth/calendar", "openid", "email", "profile"],
     getUserInfo: async (accessToken) => {
       const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -84,12 +78,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
-    scopes: [
-      "https://www.googleapis.com/auth/documents",
-      "openid",
-      "email",
-      "profile",
-    ],
+    scopes: ["https://www.googleapis.com/auth/documents", "openid", "email", "profile"],
     getUserInfo: async (accessToken) => {
       const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -105,12 +94,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
-    scopes: [
-      "https://www.googleapis.com/auth/spreadsheets",
-      "openid",
-      "email",
-      "profile",
-    ],
+    scopes: ["https://www.googleapis.com/auth/spreadsheets", "openid", "email", "profile"],
     getUserInfo: async (accessToken) => {
       const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -214,12 +198,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     authUrl: "https://airtable.com/oauth2/v1/authorize",
     tokenUrl: "https://airtable.com/oauth2/v1/token",
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
-    scopes: [
-      "data.records:read",
-      "data.records:write",
-      "schema.bases:read",
-      "user.email:read",
-    ],
+    scopes: ["data.records:read", "data.records:write", "schema.bases:read", "user.email:read"],
     getUserInfo: async (accessToken) => {
       const res = await fetch("https://api.airtable.com/v0/meta/whoami", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -280,15 +259,12 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     ],
     getUserInfo: async (accessToken) => {
       // Get token info which includes the user email
-      const tokenRes = await fetch(
-        `https://api.hubapi.com/oauth/v1/access-tokens/${accessToken}`,
-      );
+      const tokenRes = await fetch(`https://api.hubapi.com/oauth/v1/access-tokens/${accessToken}`);
       const tokenData = await tokenRes.json();
 
       return {
         id: String(tokenData.hub_id),
-        displayName:
-          tokenData.user ?? tokenData.hub_domain ?? String(tokenData.hub_id),
+        displayName: tokenData.user ?? tokenData.hub_domain ?? String(tokenData.hub_id),
         metadata: {
           portalId: tokenData.hub_id,
           userId: tokenData.user_id,
@@ -320,12 +296,9 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
     scopes: ["api", "refresh_token", "openid"],
     getUserInfo: async (accessToken: string) => {
-      const res = await fetch(
-        "https://login.salesforce.com/services/oauth2/userinfo",
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        },
-      );
+      const res = await fetch("https://login.salesforce.com/services/oauth2/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
       const data = await res.json();
       return {
         id: data.user_id,

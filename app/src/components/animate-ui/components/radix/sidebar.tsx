@@ -12,15 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Sheet,
-  SheetContent,
-} from "@/components/animate-ui/components/radix/sheet";
+import { Sheet, SheetContent } from "@/components/animate-ui/components/radix/sheet";
 import { TooltipProvider } from "@/components/animate-ui/components/radix/tooltip";
-import {
-  Highlight,
-  HighlightItem,
-} from "@/components/animate-ui/primitives/effects/highlight";
+import { Highlight, HighlightItem } from "@/components/animate-ui/primitives/effects/highlight";
 import { getStrictContext } from "@/lib/get-strict-context";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
@@ -40,8 +34,7 @@ type SidebarContextProps = {
   toggleSidebar: () => void;
 };
 
-const [LocalSidebarProvider, useSidebar] =
-  getStrictContext<SidebarContextProps>("SidebarContext");
+const [LocalSidebarProvider, useSidebar] = getStrictContext<SidebarContextProps>("SidebarContext");
 
 type SidebarProviderProps = React.ComponentProps<"div"> & {
   defaultOpen?: boolean;
@@ -88,10 +81,7 @@ function SidebarProvider({
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
-      ) {
+      if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         toggleSidebar();
       }
@@ -431,11 +421,7 @@ type SidebarGroupLabelProps = React.ComponentProps<"div"> & {
   asChild?: boolean;
 };
 
-function SidebarGroupLabel({
-  className,
-  asChild = false,
-  ...props
-}: SidebarGroupLabelProps) {
+function SidebarGroupLabel({ className, asChild = false, ...props }: SidebarGroupLabelProps) {
   const Comp = asChild ? Slot.Root : "div";
 
   return (
@@ -456,11 +442,7 @@ type SidebarGroupActionProps = React.ComponentProps<"button"> & {
   asChild?: boolean;
 };
 
-function SidebarGroupAction({
-  className,
-  asChild = false,
-  ...props
-}: SidebarGroupActionProps) {
+function SidebarGroupAction({ className, asChild = false, ...props }: SidebarGroupActionProps) {
   const Comp = asChild ? Slot.Root : "button";
 
   return (
@@ -481,10 +463,7 @@ function SidebarGroupAction({
 
 type SidebarGroupContentProps = React.ComponentProps<"div">;
 
-function SidebarGroupContent({
-  className,
-  ...props
-}: SidebarGroupContentProps) {
+function SidebarGroupContent({ className, ...props }: SidebarGroupContentProps) {
   return (
     <div
       data-slot="sidebar-group-content"
@@ -654,11 +633,7 @@ type SidebarMenuSkeletonProps = React.ComponentProps<"div"> & {
   showIcon?: boolean;
 };
 
-function SidebarMenuSkeleton({
-  className,
-  showIcon = false,
-  ...props
-}: SidebarMenuSkeletonProps) {
+function SidebarMenuSkeleton({ className, showIcon = false, ...props }: SidebarMenuSkeletonProps) {
   const id = React.useId();
   // Deterministic width between 50 to 90% so render stays pure.
   const width = React.useMemo(() => {
@@ -673,12 +648,7 @@ function SidebarMenuSkeleton({
       className={cn("flex h-8 items-center gap-2 rounded-md px-2", className)}
       {...props}
     >
-      {showIcon && (
-        <Skeleton
-          className="size-4 rounded-md"
-          data-sidebar="menu-skeleton-icon"
-        />
-      )}
+      {showIcon && <Skeleton className="size-4 rounded-md" data-sidebar="menu-skeleton-icon" />}
       <Skeleton
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"

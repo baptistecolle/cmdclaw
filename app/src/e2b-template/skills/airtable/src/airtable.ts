@@ -85,18 +85,14 @@ async function listRecords() {
 
   const data = await api<{
     records: Array<{ id: string; fields: Record<string, unknown> }>;
-  }>(
-    `/${values.base}/${encodeURIComponent(values.table)}?${params}`,
-  );
+  }>(`/${values.base}/${encodeURIComponent(values.table)}?${params}`);
   const records = data.records.map((r) => ({ id: r.id, ...r.fields }));
   console.log(JSON.stringify(records, null, 2));
 }
 
 async function getRecord() {
   if (!values.base || !values.table || !values.record) {
-    console.error(
-      "Required: --base <baseId> --table <table> --record <recordId>",
-    );
+    console.error("Required: --base <baseId> --table <table> --record <recordId>");
     process.exit(1);
   }
 
@@ -108,9 +104,7 @@ async function getRecord() {
 
 async function createRecord() {
   if (!values.base || !values.table || !values.fields) {
-    console.error(
-      "Required: --base <baseId> --table <table> --fields '<json>'",
-    );
+    console.error("Required: --base <baseId> --table <table> --fields '<json>'");
     process.exit(1);
   }
 
@@ -150,9 +144,7 @@ async function updateRecord() {
 
 async function deleteRecord() {
   if (!values.base || !values.table || !values.record) {
-    console.error(
-      "Required: --base <baseId> --table <table> --record <recordId>",
-    );
+    console.error("Required: --base <baseId> --table <table> --record <recordId>");
     process.exit(1);
   }
 
@@ -164,12 +156,7 @@ async function deleteRecord() {
 }
 
 async function searchRecords() {
-  if (
-    !values.base ||
-    !values.table ||
-    !values.search ||
-    !values["search-field"]
-  ) {
+  if (!values.base || !values.table || !values.search || !values["search-field"]) {
     console.error(
       "Required: --base <baseId> --table <table> --search <value> --search-field <fieldName>",
     );
@@ -184,9 +171,7 @@ async function searchRecords() {
 
   const data = await api<{
     records: Array<{ id: string; fields: Record<string, unknown> }>;
-  }>(
-    `/${values.base}/${encodeURIComponent(values.table)}?${params}`,
-  );
+  }>(`/${values.base}/${encodeURIComponent(values.table)}?${params}`);
   const records = data.records.map((r) => ({ id: r.id, ...r.fields }));
   console.log(JSON.stringify(records, null, 2));
 }

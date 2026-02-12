@@ -6,28 +6,18 @@ import {
   IntegrationLogo,
 } from "./preview-styles";
 
-export function NotionPreview({
-  operation,
-  args,
-  positionalArgs,
-}: PreviewProps) {
+export function NotionPreview({ operation, args, positionalArgs }: PreviewProps) {
   switch (operation) {
     case "create":
       return <NotionCreatePreview args={args} />;
     case "append":
-      return (
-        <NotionAppendPreview args={args} positionalArgs={positionalArgs} />
-      );
+      return <NotionAppendPreview args={args} positionalArgs={positionalArgs} />;
     default:
       return null;
   }
 }
 
-function NotionCreatePreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function NotionCreatePreview({ args }: { args: Record<string, string | undefined> }) {
   const parent = args.parent;
   const title = args.title;
   const content = args.content;

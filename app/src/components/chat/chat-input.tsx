@@ -58,9 +58,7 @@ export function ChatInput({
       const toAdd: AttachmentItem[] = [];
       for (const file of fileArray.slice(0, remaining)) {
         if (file.size > MAX_FILE_SIZE) continue;
-        const preview = file.type.startsWith("image/")
-          ? URL.createObjectURL(file)
-          : undefined;
+        const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
         toAdd.push({ file, preview });
       }
       return [...prev, ...toAdd];

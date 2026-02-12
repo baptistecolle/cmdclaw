@@ -8,10 +8,7 @@ import type { RouterClient } from "@orpc/server";
 import type { AppRouter } from "../src/server/orpc";
 import { createGenerationRuntime } from "../src/lib/generation-runtime";
 import { runGenerationStream } from "../src/lib/generation-stream";
-import {
-  fetchOpencodeFreeModels,
-  resolveDefaultOpencodeFreeModel,
-} from "../src/lib/zen-models";
+import { fetchOpencodeFreeModels, resolveDefaultOpencodeFreeModel } from "../src/lib/zen-models";
 
 type ChatConfig = {
   serverUrl: string;
@@ -119,14 +116,10 @@ function parseArgs(argv: string[]): Args {
 function printHelp(): void {
   console.log("\nUsage: bun run chat [options]\n");
   console.log("Options:");
-  console.log(
-    "  -s, --server <url>        Server URL (default http://localhost:3000)",
-  );
+  console.log("  -s, --server <url>        Server URL (default http://localhost:3000)");
   console.log("  -c, --conversation <id>   Continue an existing conversation");
   console.log("  -m, --message <text>      Send one message and exit");
-  console.log(
-    "  -M, --model <id>          Model id to use (default resolves to a free model)",
-  );
+  console.log("  -M, --model <id>          Model id to use (default resolves to a free model)");
   console.log("  --list-models             List free model ids and exit");
   console.log("  --auto-approve            Auto-approve tool calls");
   console.log("  --show-thinking           Print thinking events");
@@ -134,9 +127,7 @@ function printHelp(): void {
   console.log("  --auth                    Run auth flow and exit");
   console.log("  --token <token>           Use provided auth token directly");
   console.log("  --reset-auth              Clear saved token and re-auth");
-  console.log(
-    "  -f, --file <path>         Attach file (can be used multiple times)",
-  );
+  console.log("  -f, --file <path>         Attach file (can be used multiple times)");
   console.log("  -h, --help                Show help\n");
   console.log("Interactive commands:");
   console.log("  /file <path>              Attach file before sending");
@@ -267,10 +258,7 @@ async function authenticate(serverUrl: string): Promise<ChatConfig | null> {
   return null;
 }
 
-function createClient(
-  serverUrl: string,
-  token: string,
-): RouterClient<AppRouter> {
+function createClient(serverUrl: string, token: string): RouterClient<AppRouter> {
   const link = new RPCLink({
     url: `${serverUrl}/api/rpc`,
     headers: () => ({ Authorization: `Bearer ${token}` }),
@@ -312,9 +300,7 @@ async function runChatLoop(
   }
 
   while (true) {
-    const input = (
-      await ask(rl, conversationId ? "followup> " : "chat> ")
-    ).trim();
+    const input = (await ask(rl, conversationId ? "followup> " : "chat> ")).trim();
     if (!input) {
       console.log("Bye.");
       return;
@@ -325,9 +311,7 @@ async function runChatLoop(
       const filePath = input.slice(6).trim();
       try {
         pendingFiles.push(fileToAttachment(filePath));
-        console.log(
-          `Attached: ${basename(filePath)} (${pendingFiles.length} file(s) pending)`,
-        );
+        console.log(`Attached: ${basename(filePath)} (${pendingFiles.length} file(s) pending)`);
       } catch (e) {
         console.error(e instanceof Error ? e.message : String(e));
       }
@@ -358,14 +342,7 @@ async function runChatLoop(
     const attachments = pendingFiles.length ? pendingFiles : undefined;
     pendingFiles = [];
 
-    const result = await runGeneration(
-      client,
-      rl,
-      input,
-      conversationId,
-      options,
-      attachments,
-    );
+    const result = await runGeneration(client, rl, input, conversationId, options, attachments);
     if (!result) {
       return;
     }
@@ -429,14 +406,11 @@ async function runGeneration(
             return;
           }
 
-          const decision = (await ask(rl, "Approve? (y/n) "))
-            .trim()
-            .toLowerCase();
+          const decision = (await ask(rl, "Approve? (y/n) ")).trim().toLowerCase();
           await client.generation.submitApproval({
             generationId: approval.generationId,
             toolUseId: approval.toolUseId,
-            decision:
-              decision === "y" || decision === "yes" ? "approve" : "deny",
+            decision: decision === "y" || decision === "yes" ? "approve" : "deny",
           });
         },
         onApprovalResult: (toolUseId, decision) => {
@@ -445,9 +419,7 @@ async function runGeneration(
         },
         onAuthNeeded: (auth) => {
           runtime.handleAuthNeeded(auth);
-          process.stdout.write(
-            `\n[auth_needed] ${auth.integrations.join(", ")}\n`,
-          );
+          process.stdout.write(`\n[auth_needed] ${auth.integrations.join(", ")}\n`);
         },
         onAuthProgress: (connected, remaining) => {
           runtime.handleAuthProgress(connected, remaining);
@@ -493,9 +465,7 @@ async function runGeneration(
     });
 
     if (!result) {
-      throw new Error(
-        "Generation stream closed before a terminal event (done/error/cancelled)",
-      );
+      throw new Error("Generation stream closed before a terminal event (done/error/cancelled)");
     }
 
     return result;
@@ -522,10 +492,7 @@ async function main(): Promise<void> {
 
   const loaded = loadConfig();
   const serverUrl =
-    args.serverUrl ||
-    loaded?.serverUrl ||
-    process.env.BAP_SERVER_URL ||
-    DEFAULT_SERVER_URL;
+    args.serverUrl || loaded?.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
 
   let config = loaded;
   if (args.token) {
@@ -547,9 +514,7 @@ async function main(): Promise<void> {
     }
   }
 
-  args.model = await resolveDefaultOpencodeFreeModel(
-    args.model ?? process.env.BAP_CHAT_MODEL,
-  );
+  args.model = await resolveDefaultOpencodeFreeModel(args.model ?? process.env.BAP_CHAT_MODEL);
   console.log(`[model] ${args.model}`);
 
   const client = createClient(serverUrl, config.token);
@@ -663,9 +628,7 @@ async function validatePersistedAssistantMessage(
     );
   }
 
-  const persistedParts = Array.isArray(savedMessage.contentParts)
-    ? savedMessage.contentParts
-    : [];
+  const persistedParts = Array.isArray(savedMessage.contentParts) ? savedMessage.contentParts : [];
   if (expected.parts.length > 0 && persistedParts.length === 0) {
     throw new Error(
       "Validation failed: stream produced activity/text but saved message has no contentParts",

@@ -40,10 +40,7 @@ type SheetOverlayProps = SheetOverlayPrimitiveProps;
 
 function SheetOverlay({ className, ...props }: SheetOverlayProps) {
   return (
-    <SheetOverlayPrimitive
-      className={cn("fixed inset-0 z-50 bg-black/50", className)}
-      {...props}
-    />
+    <SheetOverlayPrimitive className={cn("fixed inset-0 z-50 bg-black/50", className)} {...props} />
   );
 }
 
@@ -86,9 +83,7 @@ function SheetContent({
       >
         <SheetTitlePrimitive className="sr-only">{title}</SheetTitlePrimitive>
         {description && (
-          <SheetDescriptionPrimitive className="sr-only">
-            {description}
-          </SheetDescriptionPrimitive>
+          <SheetDescriptionPrimitive className="sr-only">{description}</SheetDescriptionPrimitive>
         )}
         {children}
         {showCloseButton && (
@@ -105,22 +100,14 @@ function SheetContent({
 type SheetHeaderProps = SheetHeaderPrimitiveProps;
 
 function SheetHeader({ className, ...props }: SheetHeaderProps) {
-  return (
-    <SheetHeaderPrimitive
-      className={cn("flex flex-col gap-1.5 p-4", className)}
-      {...props}
-    />
-  );
+  return <SheetHeaderPrimitive className={cn("flex flex-col gap-1.5 p-4", className)} {...props} />;
 }
 
 type SheetFooterProps = SheetFooterPrimitiveProps;
 
 function SheetFooter({ className, ...props }: SheetFooterProps) {
   return (
-    <SheetFooterPrimitive
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
-      {...props}
-    />
+    <SheetFooterPrimitive className={cn("mt-auto flex flex-col gap-2 p-4", className)} {...props} />
   );
 }
 
@@ -128,10 +115,7 @@ type SheetTitleProps = SheetTitlePrimitiveProps;
 
 function SheetTitle({ className, ...props }: SheetTitleProps) {
   return (
-    <SheetTitlePrimitive
-      className={cn("text-foreground font-semibold", className)}
-      {...props}
-    />
+    <SheetTitlePrimitive className={cn("text-foreground font-semibold", className)} {...props} />
   );
 }
 

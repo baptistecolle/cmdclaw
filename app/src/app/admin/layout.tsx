@@ -12,11 +12,7 @@ const adminTabs = [
   { label: "WhatsApp", href: "/admin/whatsapp" },
 ];
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAdmin, isLoading } = useIsAdmin();
 
@@ -37,9 +33,7 @@ export default function AdminLayout({
               <nav className="sticky top-0 z-10 mb-6 flex gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
                 {adminTabs.map((tab) => {
                   const isActive =
-                    tab.href === "/admin"
-                      ? pathname === "/admin"
-                      : pathname.startsWith(tab.href);
+                    tab.href === "/admin" ? pathname === "/admin" : pathname.startsWith(tab.href);
                   return (
                     <Link
                       key={tab.href}

@@ -24,10 +24,7 @@ export async function POST(request: NextRequest) {
     const accountStatus = body.AccountStatus;
     if (!accountStatus) {
       console.error("Missing AccountStatus in webhook payload");
-      return NextResponse.json(
-        { ok: false, error: "Missing AccountStatus" },
-        { status: 400 },
-      );
+      return NextResponse.json({ ok: false, error: "Missing AccountStatus" }, { status: 400 });
     }
 
     const { account_id, message } = accountStatus;
@@ -36,10 +33,7 @@ export async function POST(request: NextRequest) {
 
     if (!account_id) {
       console.error("Missing account_id in webhook payload");
-      return NextResponse.json(
-        { ok: false, error: "Missing account_id" },
-        { status: 400 },
-      );
+      return NextResponse.json({ ok: false, error: "Missing account_id" }, { status: 400 });
     }
 
     switch (message) {
@@ -47,9 +41,7 @@ export async function POST(request: NextRequest) {
         if (!userId) {
           // userId not available via webhook (Unipile strips query params)
           // Integration will be linked via redirect instead
-          console.log(
-            "CREATION_SUCCESS received - integration will be linked via redirect",
-          );
+          console.log("CREATION_SUCCESS received - integration will be linked via redirect");
           return NextResponse.json({ ok: true });
         }
 
@@ -57,10 +49,7 @@ export async function POST(request: NextRequest) {
           const account = await getUnipileAccount(account_id);
 
           const existingIntegration = await db.query.integration.findFirst({
-            where: and(
-              eq(integration.userId, userId),
-              eq(integration.type, "linkedin"),
-            ),
+            where: and(eq(integration.userId, userId), eq(integration.type, "linkedin")),
           });
 
           if (existingIntegration) {
@@ -90,14 +79,9 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          console.log(
-            `LinkedIn integration created/updated for user ${userId}`,
-          );
+          console.log(`LinkedIn integration created/updated for user ${userId}`);
         } catch (error) {
-          console.error(
-            "Failed to fetch Unipile account or create integration:",
-            error,
-          );
+          console.error("Failed to fetch Unipile account or create integration:", error);
           return NextResponse.json(
             { ok: false, error: "Failed to process account" },
             { status: 500 },
@@ -119,9 +103,7 @@ export async function POST(request: NextRequest) {
             .set({ enabled: false })
             .where(eq(integration.id, existingIntegration.id));
 
-          console.log(
-            `LinkedIn integration disabled for account ${account_id}: ${message}`,
-          );
+          console.log(`LinkedIn integration disabled for account ${account_id}: ${message}`);
         }
         break;
       }
@@ -133,9 +115,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("LinkedIn webhook error:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
   }
 }

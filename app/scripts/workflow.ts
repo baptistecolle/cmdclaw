@@ -26,10 +26,7 @@ function loadConfig(): ChatConfig | null {
   }
 }
 
-function createClient(
-  serverUrl: string,
-  token: string,
-): RouterClient<AppRouter> {
+function createClient(serverUrl: string, token: string): RouterClient<AppRouter> {
   const link = new RPCLink({
     url: `${serverUrl}/api/rpc`,
     headers: () => ({ Authorization: `Bearer ${token}` }),
@@ -89,10 +86,7 @@ async function listWorkflows(client: RouterClient<AppRouter>): Promise<void> {
   }
 }
 
-async function getWorkflow(
-  client: RouterClient<AppRouter>,
-  id: string,
-): Promise<void> {
+async function getWorkflow(client: RouterClient<AppRouter>, id: string): Promise<void> {
   const wf = await client.workflow.get({ id });
   console.log(`\n  Workflow: ${wf.name}`);
   console.log(`  ID:      ${wf.id}`);
@@ -103,16 +97,12 @@ async function getWorkflow(
     `  Integrations: ${wf.allowedIntegrations.length > 0 ? wf.allowedIntegrations.join(", ") : "none"}`,
   );
   if (wf.allowedCustomIntegrations.length > 0)
-    console.log(
-      `  Custom Integrations: ${wf.allowedCustomIntegrations.join(", ")}`,
-    );
+    console.log(`  Custom Integrations: ${wf.allowedCustomIntegrations.join(", ")}`);
   console.log(`  Created: ${formatDate(wf.createdAt)}`);
   console.log(`  Updated: ${formatDate(wf.updatedAt)}`);
   console.log(`\n  Prompt:\n    ${wf.prompt.replace(/\n/g, "\n    ")}`);
-  if (wf.promptDo)
-    console.log(`\n  Do:\n    ${wf.promptDo.replace(/\n/g, "\n    ")}`);
-  if (wf.promptDont)
-    console.log(`\n  Don't:\n    ${wf.promptDont.replace(/\n/g, "\n    ")}`);
+  if (wf.promptDo) console.log(`\n  Do:\n    ${wf.promptDo.replace(/\n/g, "\n    ")}`);
+  if (wf.promptDont) console.log(`\n  Don't:\n    ${wf.promptDont.replace(/\n/g, "\n    ")}`);
 
   if (wf.runs.length > 0) {
     console.log(`\n  Recent runs (${wf.runs.length}):`);
@@ -148,10 +138,7 @@ async function createWorkflow(
   );
 }
 
-async function deleteWorkflow(
-  client: RouterClient<AppRouter>,
-  id: string,
-): Promise<void> {
+async function deleteWorkflow(client: RouterClient<AppRouter>, id: string): Promise<void> {
   await client.workflow.delete({ id });
   console.log(`\n  Deleted workflow ${id}\n`);
 }
@@ -187,10 +174,7 @@ async function triggerWorkflow(
   console.log(`  Conversation:   ${result.conversationId}\n`);
 }
 
-async function viewRun(
-  client: RouterClient<AppRouter>,
-  id: string,
-): Promise<void> {
+async function viewRun(client: RouterClient<AppRouter>, id: string): Promise<void> {
   const run = await client.workflow.getRun({ id });
   console.log(`\n  Run: ${run.id}`);
   console.log(`  Workflow: ${run.workflowId}`);
@@ -200,25 +184,18 @@ async function viewRun(
   if (run.generationId) console.log(`  Generation: ${run.generationId}`);
   if (run.errorMessage) console.log(`  Error: ${run.errorMessage}`);
   if (run.triggerPayload)
-    console.log(
-      `  Trigger payload: ${JSON.stringify(run.triggerPayload, null, 2)}`,
-    );
+    console.log(`  Trigger payload: ${JSON.stringify(run.triggerPayload, null, 2)}`);
 
   if (run.events.length > 0) {
     console.log(`\n  Events (${run.events.length}):`);
     for (const evt of run.events) {
-      console.log(
-        `    [${evt.type}] ${formatDate(evt.createdAt)}  ${JSON.stringify(evt.payload)}`,
-      );
+      console.log(`    [${evt.type}] ${formatDate(evt.createdAt)}  ${JSON.stringify(evt.payload)}`);
     }
   }
   console.log();
 }
 
-async function listRuns(
-  client: RouterClient<AppRouter>,
-  workflowId: string,
-): Promise<void> {
+async function listRuns(client: RouterClient<AppRouter>, workflowId: string): Promise<void> {
   const runs = await client.workflow.listRuns({ workflowId });
   if (runs.length === 0) {
     console.log("\n  No runs found.\n");
@@ -401,9 +378,7 @@ type WorkflowSchedule =
   | { type: "weekly"; time: string; daysOfWeek: number[]; timezone?: string }
   | { type: "monthly"; time: string; dayOfMonth: number; timezone?: string };
 
-function isWorkflowIntegrationType(
-  value: string,
-): value is WorkflowIntegrationType {
+function isWorkflowIntegrationType(value: string): value is WorkflowIntegrationType {
   return (integrationTypes as readonly string[]).includes(value);
 }
 
@@ -531,10 +506,7 @@ async function main(): Promise<void> {
   }
 
   const serverUrl =
-    parsed.serverUrl ||
-    config.serverUrl ||
-    process.env.BAP_SERVER_URL ||
-    DEFAULT_SERVER_URL;
+    parsed.serverUrl || config.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
   const client = createClient(serverUrl, config.token);
 
   // Non-interactive: run single command
@@ -574,9 +546,7 @@ async function main(): Promise<void> {
         case "create":
         case "new": {
           if (!parsed.name || !parsed.triggerType || !parsed.prompt) {
-            console.error(
-              "Error: create requires --name, --trigger, and --prompt flags.",
-            );
+            console.error("Error: create requires --name, --trigger, and --prompt flags.");
             console.error(
               "Example: bun run workflow create --name 'My Workflow' --trigger schedule --prompt 'Do something'",
             );
@@ -586,9 +556,7 @@ async function main(): Promise<void> {
             name: parsed.name,
             triggerType: parsed.triggerType,
             prompt: parsed.prompt,
-            integrations: parsed.integrations?.filter(
-              isWorkflowIntegrationType,
-            ),
+            integrations: parsed.integrations?.filter(isWorkflowIntegrationType),
             schedule: buildSchedule(parsed),
           });
           break;

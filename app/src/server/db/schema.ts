@@ -131,12 +131,7 @@ export const accountRelations = relations(account, ({ one }) => ({
 
 // ========== CHAT SCHEMA ==========
 
-export const messageRoleEnum = pgEnum("message_role", [
-  "user",
-  "assistant",
-  "system",
-  "tool",
-]);
+export const messageRoleEnum = pgEnum("message_role", ["user", "assistant", "system", "tool"]);
 
 export const generationStatusEnum = pgEnum("generation_status", [
   "idle",
@@ -158,10 +153,7 @@ export const generationRecordStatusEnum = pgEnum("generation_record_status", [
   "error",
 ]);
 
-export const conversationTypeEnum = pgEnum("conversation_type", [
-  "chat",
-  "workflow",
-]);
+export const conversationTypeEnum = pgEnum("conversation_type", ["chat", "workflow"]);
 
 export const conversation = pgTable(
   "conversation",
@@ -176,9 +168,7 @@ export const conversation = pgTable(
     opencodeSessionId: text("opencode_session_id"),
     model: text("model").default("claude-sonnet-4-20250514"),
     // Generation tracking
-    generationStatus: generationStatusEnum("generation_status")
-      .default("idle")
-      .notNull(),
+    generationStatus: generationStatusEnum("generation_status").default("idle").notNull(),
     currentGenerationId: text("current_generation_id"),
     // Auto-approve sensitive operations without user confirmation
     autoApprove: boolean("auto_approve").default(false).notNull(),
@@ -343,13 +333,8 @@ export const workflow = pgTable(
     promptDo: text("prompt_do"),
     promptDont: text("prompt_dont"),
     autoApprove: boolean("auto_approve").default(true).notNull(),
-    allowedIntegrations: integrationTypeEnum("allowed_integrations")
-      .array()
-      .notNull(),
-    allowedCustomIntegrations: text("allowed_custom_integrations")
-      .array()
-      .notNull()
-      .default([]),
+    allowedIntegrations: integrationTypeEnum("allowed_integrations").array().notNull(),
+    allowedCustomIntegrations: text("allowed_custom_integrations").array().notNull().default([]),
     // Schedule configuration for time-based triggers (JSON object)
     schedule: jsonb("schedule"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -461,21 +446,16 @@ export const integrationToken = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
-    index("integration_token_integration_id_idx").on(table.integrationId),
-  ],
+  (table) => [index("integration_token_integration_id_idx").on(table.integrationId)],
 );
 
 // ========== RELATIONS ==========
 
-export const conversationRelations = relations(
-  conversation,
-  ({ one, many }) => ({
-    user: one(user, { fields: [conversation.userId], references: [user.id] }),
-    messages: many(message),
-    generations: many(generation),
-  }),
-);
+export const conversationRelations = relations(conversation, ({ one, many }) => ({
+  user: one(user, { fields: [conversation.userId], references: [user.id] }),
+  messages: many(message),
+  generations: many(generation),
+}));
 
 export const messageAttachment = pgTable(
   "message_attachment",
@@ -535,15 +515,12 @@ export const messageRelations = relations(message, ({ one, many }) => ({
   sandboxFiles: many(sandboxFile),
 }));
 
-export const messageAttachmentRelations = relations(
-  messageAttachment,
-  ({ one }) => ({
-    message: one(message, {
-      fields: [messageAttachment.messageId],
-      references: [message.id],
-    }),
+export const messageAttachmentRelations = relations(messageAttachment, ({ one }) => ({
+  message: one(message, {
+    fields: [messageAttachment.messageId],
+    references: [message.id],
   }),
-);
+}));
 
 export const sandboxFileRelations = relations(sandboxFile, ({ one }) => ({
   message: one(message, {
@@ -584,30 +561,24 @@ export const workflowRunRelations = relations(workflowRun, ({ one, many }) => ({
   events: many(workflowRunEvent),
 }));
 
-export const workflowRunEventRelations = relations(
-  workflowRunEvent,
-  ({ one }) => ({
-    run: one(workflowRun, {
-      fields: [workflowRunEvent.workflowRunId],
-      references: [workflowRun.id],
-    }),
+export const workflowRunEventRelations = relations(workflowRunEvent, ({ one }) => ({
+  run: one(workflowRun, {
+    fields: [workflowRunEvent.workflowRunId],
+    references: [workflowRun.id],
   }),
-);
+}));
 
 export const integrationRelations = relations(integration, ({ one, many }) => ({
   user: one(user, { fields: [integration.userId], references: [user.id] }),
   tokens: many(integrationToken),
 }));
 
-export const integrationTokenRelations = relations(
-  integrationToken,
-  ({ one }) => ({
-    integration: one(integration, {
-      fields: [integrationToken.integrationId],
-      references: [integration.id],
-    }),
+export const integrationTokenRelations = relations(integrationToken, ({ one }) => ({
+  integration: one(integration, {
+    fields: [integrationToken.integrationId],
+    references: [integration.id],
   }),
-);
+}));
 
 // ========== SKILL SCHEMA ==========
 
@@ -709,10 +680,7 @@ export const skillDocumentRelations = relations(skillDocument, ({ one }) => ({
 
 // ========== MEMORY SCHEMA ==========
 
-export const memoryFileTypeEnum = pgEnum("memory_file_type", [
-  "longterm",
-  "daily",
-]);
+export const memoryFileTypeEnum = pgEnum("memory_file_type", ["longterm", "daily"]);
 
 export const memoryFile = pgTable(
   "memory_file",
@@ -736,11 +704,7 @@ export const memoryFile = pgTable(
   },
   (table) => [
     index("memory_file_user_id_idx").on(table.userId),
-    unique("memory_file_user_type_date_idx").on(
-      table.userId,
-      table.type,
-      table.date,
-    ),
+    unique("memory_file_user_type_date_idx").on(table.userId, table.type, table.date),
   ],
 );
 
@@ -920,34 +884,28 @@ export const sessionTranscriptChunk = pgTable(
   ],
 );
 
-export const sessionTranscriptRelations = relations(
-  sessionTranscript,
-  ({ one, many }) => ({
-    user: one(user, {
-      fields: [sessionTranscript.userId],
-      references: [user.id],
-    }),
-    conversation: one(conversation, {
-      fields: [sessionTranscript.conversationId],
-      references: [conversation.id],
-    }),
-    chunks: many(sessionTranscriptChunk),
+export const sessionTranscriptRelations = relations(sessionTranscript, ({ one, many }) => ({
+  user: one(user, {
+    fields: [sessionTranscript.userId],
+    references: [user.id],
   }),
-);
+  conversation: one(conversation, {
+    fields: [sessionTranscript.conversationId],
+    references: [conversation.id],
+  }),
+  chunks: many(sessionTranscriptChunk),
+}));
 
-export const sessionTranscriptChunkRelations = relations(
-  sessionTranscriptChunk,
-  ({ one }) => ({
-    user: one(user, {
-      fields: [sessionTranscriptChunk.userId],
-      references: [user.id],
-    }),
-    transcript: one(sessionTranscript, {
-      fields: [sessionTranscriptChunk.transcriptId],
-      references: [sessionTranscript.id],
-    }),
+export const sessionTranscriptChunkRelations = relations(sessionTranscriptChunk, ({ one }) => ({
+  user: one(user, {
+    fields: [sessionTranscriptChunk.userId],
+    references: [user.id],
   }),
-);
+  transcript: one(sessionTranscript, {
+    fields: [sessionTranscriptChunk.transcriptId],
+    references: [sessionTranscript.id],
+  }),
+}));
 
 // ========== PROVIDER AUTH SCHEMA ==========
 // Stores encrypted provider credentials for subscription providers (ChatGPT, Gemini, Kimi)
@@ -1122,23 +1080,17 @@ export const customIntegrationCredential = pgTable(
   (table) => [
     index("custom_cred_user_id_idx").on(table.userId),
     index("custom_cred_integration_id_idx").on(table.customIntegrationId),
-    unique("custom_cred_user_integration_idx").on(
-      table.userId,
-      table.customIntegrationId,
-    ),
+    unique("custom_cred_user_integration_idx").on(table.userId, table.customIntegrationId),
   ],
 );
 
-export const customIntegrationRelations = relations(
-  customIntegration,
-  ({ one, many }) => ({
-    createdBy: one(user, {
-      fields: [customIntegration.createdByUserId],
-      references: [user.id],
-    }),
-    credentials: many(customIntegrationCredential),
+export const customIntegrationRelations = relations(customIntegration, ({ one, many }) => ({
+  createdBy: one(user, {
+    fields: [customIntegration.createdByUserId],
+    references: [user.id],
   }),
-);
+  credentials: many(customIntegrationCredential),
+}));
 
 export const customIntegrationCredentialRelations = relations(
   customIntegrationCredential,
@@ -1159,10 +1111,7 @@ export const integrationSkillSourceEnum = pgEnum("integration_skill_source", [
   "community",
 ]);
 
-export const integrationSkillVisibilityEnum = pgEnum(
-  "integration_skill_visibility",
-  ["public"],
-);
+export const integrationSkillVisibilityEnum = pgEnum("integration_skill_visibility", ["public"]);
 
 export const integrationSkill = pgTable(
   "integration_skill",
@@ -1174,9 +1123,7 @@ export const integrationSkill = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull(),
     source: integrationSkillSourceEnum("source").notNull(),
-    visibility: integrationSkillVisibilityEnum("visibility")
-      .default("public")
-      .notNull(),
+    visibility: integrationSkillVisibilityEnum("visibility").default("public").notNull(),
     createdByUserId: text("created_by_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
@@ -1211,9 +1158,7 @@ export const integrationSkillFile = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
-    index("integration_skill_file_skill_id_idx").on(table.integrationSkillId),
-  ],
+  (table) => [index("integration_skill_file_skill_id_idx").on(table.integrationSkillId)],
 );
 
 export const integrationSkillPreference = pgTable(
@@ -1227,10 +1172,9 @@ export const integrationSkillPreference = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     slug: text("slug").notNull(),
     preferredSource: integrationSkillSourceEnum("preferred_source").notNull(),
-    preferredSkillId: text("preferred_skill_id").references(
-      () => integrationSkill.id,
-      { onDelete: "set null" },
-    ),
+    preferredSkillId: text("preferred_skill_id").references(() => integrationSkill.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -1244,26 +1188,20 @@ export const integrationSkillPreference = pgTable(
   ],
 );
 
-export const integrationSkillRelations = relations(
-  integrationSkill,
-  ({ one, many }) => ({
-    createdBy: one(user, {
-      fields: [integrationSkill.createdByUserId],
-      references: [user.id],
-    }),
-    files: many(integrationSkillFile),
+export const integrationSkillRelations = relations(integrationSkill, ({ one, many }) => ({
+  createdBy: one(user, {
+    fields: [integrationSkill.createdByUserId],
+    references: [user.id],
   }),
-);
+  files: many(integrationSkillFile),
+}));
 
-export const integrationSkillFileRelations = relations(
-  integrationSkillFile,
-  ({ one }) => ({
-    integrationSkill: one(integrationSkill, {
-      fields: [integrationSkillFile.integrationSkillId],
-      references: [integrationSkill.id],
-    }),
+export const integrationSkillFileRelations = relations(integrationSkillFile, ({ one }) => ({
+  integrationSkill: one(integrationSkill, {
+    fields: [integrationSkillFile.integrationSkillId],
+    references: [integrationSkill.id],
   }),
-);
+}));
 
 export const integrationSkillPreferenceRelations = relations(
   integrationSkillPreference,
@@ -1313,15 +1251,12 @@ export const whatsappUserLink = pgTable(
   ],
 );
 
-export const whatsappUserLinkRelations = relations(
-  whatsappUserLink,
-  ({ one }) => ({
-    user: one(user, {
-      fields: [whatsappUserLink.userId],
-      references: [user.id],
-    }),
+export const whatsappUserLinkRelations = relations(whatsappUserLink, ({ one }) => ({
+  user: one(user, {
+    fields: [whatsappUserLink.userId],
+    references: [user.id],
   }),
-);
+}));
 
 export const whatsappLinkCode = pgTable(
   "whatsapp_link_code",
@@ -1343,15 +1278,12 @@ export const whatsappLinkCode = pgTable(
   ],
 );
 
-export const whatsappLinkCodeRelations = relations(
-  whatsappLinkCode,
-  ({ one }) => ({
-    user: one(user, {
-      fields: [whatsappLinkCode.userId],
-      references: [user.id],
-    }),
+export const whatsappLinkCodeRelations = relations(whatsappLinkCode, ({ one }) => ({
+  user: one(user, {
+    fields: [whatsappLinkCode.userId],
+    references: [user.id],
   }),
-);
+}));
 
 export const whatsappConversation = pgTable(
   "whatsapp_conversation",
@@ -1375,19 +1307,16 @@ export const whatsappConversation = pgTable(
   ],
 );
 
-export const whatsappConversationRelations = relations(
-  whatsappConversation,
-  ({ one }) => ({
-    conversation: one(conversation, {
-      fields: [whatsappConversation.conversationId],
-      references: [conversation.id],
-    }),
-    user: one(user, {
-      fields: [whatsappConversation.userId],
-      references: [user.id],
-    }),
+export const whatsappConversationRelations = relations(whatsappConversation, ({ one }) => ({
+  conversation: one(conversation, {
+    fields: [whatsappConversation.conversationId],
+    references: [conversation.id],
   }),
-);
+  user: one(user, {
+    fields: [whatsappConversation.userId],
+    references: [user.id],
+  }),
+}));
 
 // ─── Slack Bot ───────────────────────────────────────────────
 
@@ -1405,10 +1334,7 @@ export const slackUserLink = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("slack_user_link_team_user_idx").on(
-      table.slackTeamId,
-      table.slackUserId,
-    ),
+    uniqueIndex("slack_user_link_team_user_idx").on(table.slackTeamId, table.slackUserId),
     index("slack_user_link_user_id_idx").on(table.userId),
   ],
 );
@@ -1438,28 +1364,21 @@ export const slackConversation = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("slack_conversation_thread_idx").on(
-      table.teamId,
-      table.channelId,
-      table.threadTs,
-    ),
+    uniqueIndex("slack_conversation_thread_idx").on(table.teamId, table.channelId, table.threadTs),
     index("slack_conversation_conversation_id_idx").on(table.conversationId),
   ],
 );
 
-export const slackConversationRelations = relations(
-  slackConversation,
-  ({ one }) => ({
-    conversation: one(conversation, {
-      fields: [slackConversation.conversationId],
-      references: [conversation.id],
-    }),
-    user: one(user, {
-      fields: [slackConversation.userId],
-      references: [user.id],
-    }),
+export const slackConversationRelations = relations(slackConversation, ({ one }) => ({
+  conversation: one(conversation, {
+    fields: [slackConversation.conversationId],
+    references: [conversation.id],
   }),
-);
+  user: one(user, {
+    fields: [slackConversation.userId],
+    references: [user.id],
+  }),
+}));
 
 // Aggregated schema used by better-auth's drizzle adapter.
 export const authSchema = {

@@ -168,10 +168,7 @@ const startGeneration = protectedProcedure
         {
           elapsedMs: Date.now() - startedAt,
           conversationId: input.conversationId,
-          error:
-            error instanceof Error
-              ? `${error.name}: ${error.message}`
-              : String(error),
+          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
         },
         logContext,
       );
@@ -197,10 +194,7 @@ const subscribeGeneration = protectedProcedure
     };
     logServerEvent("info", "RPC_SUBSCRIBE_GENERATION_OPENED", {}, logContext);
 
-    const stream = generationManager.subscribeToGeneration(
-      input.generationId,
-      context.user.id,
-    );
+    const stream = generationManager.subscribeToGeneration(input.generationId, context.user.id);
 
     try {
       for await (const event of stream) {
@@ -220,10 +214,7 @@ const cancelGeneration = protectedProcedure
   )
   .output(z.object({ success: z.boolean() }))
   .handler(async ({ input, context }) => {
-    const success = await generationManager.cancelGeneration(
-      input.generationId,
-      context.user.id,
-    );
+    const success = await generationManager.cancelGeneration(input.generationId, context.user.id);
     return { success };
   });
 
@@ -331,9 +322,7 @@ const getGenerationStatus = protectedProcedure
       throw new Error("Access denied");
     }
 
-    const status = await generationManager.getGenerationStatus(
-      input.generationId,
-    );
+    const status = await generationManager.getGenerationStatus(input.generationId);
     return status;
   });
 
@@ -408,12 +397,9 @@ const getActiveGeneration = protectedProcedure
     };
 
     // Check for in-memory generation first
-    const activeGenId = generationManager.getGenerationForConversation(
-      input.conversationId,
-    );
+    const activeGenId = generationManager.getGenerationForConversation(input.conversationId);
     if (activeGenId) {
-      const genStatus =
-        await generationManager.getGenerationStatus(activeGenId);
+      const genStatus = await generationManager.getGenerationStatus(activeGenId);
       return {
         generationId: activeGenId,
         status: mapStatus(genStatus?.status),

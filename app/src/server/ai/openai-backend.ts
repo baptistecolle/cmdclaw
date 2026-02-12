@@ -4,12 +4,7 @@
  */
 
 import OpenAI from "openai";
-import type {
-  LLMBackend,
-  ChatParams,
-  StreamEvent,
-  ChatMessage,
-} from "./llm-backend";
+import type { LLMBackend, ChatParams, StreamEvent, ChatMessage } from "./llm-backend";
 
 export class OpenAIBackend implements LLMBackend {
   private client: OpenAI;
@@ -28,8 +23,8 @@ export class OpenAIBackend implements LLMBackend {
     const maxTokens = params.maxTokens || 16384;
 
     // Convert messages to OpenAI format
-    const messages: OpenAI.ChatCompletionMessageParam[] = params.messages.map(
-      (m) => convertMessage(m),
+    const messages: OpenAI.ChatCompletionMessageParam[] = params.messages.map((m) =>
+      convertMessage(m),
     );
 
     if (params.system) {
@@ -37,16 +32,14 @@ export class OpenAIBackend implements LLMBackend {
     }
 
     // Convert tools to OpenAI format
-    const tools: OpenAI.ChatCompletionTool[] | undefined = params.tools?.map(
-      (t) => ({
-        type: "function" as const,
-        function: {
-          name: t.name,
-          description: t.description,
-          parameters: t.input_schema,
-        },
-      }),
-    );
+    const tools: OpenAI.ChatCompletionTool[] | undefined = params.tools?.map((t) => ({
+      type: "function" as const,
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.input_schema,
+      },
+    }));
 
     try {
       const stream = await this.client.chat.completions.create({
@@ -201,10 +194,7 @@ function convertMessage(m: ChatMessage): OpenAI.ChatCompletionMessageParam {
       parts.push({
         role: "tool",
         tool_call_id: block.tool_use_id,
-        content:
-          typeof block.content === "string"
-            ? block.content
-            : JSON.stringify(block.content),
+        content: typeof block.content === "string" ? block.content : JSON.stringify(block.content),
       });
     }
   }

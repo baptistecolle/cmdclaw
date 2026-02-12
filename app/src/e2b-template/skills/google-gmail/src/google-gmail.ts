@@ -28,10 +28,9 @@ async function listEmails() {
   const params = new URLSearchParams({ maxResults: values.limit || "10" });
   if (values.query) params.set("q", values.query);
 
-  const listRes = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
-    { headers },
-  );
+  const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`, {
+    headers,
+  });
   if (!listRes.ok) throw new Error(await listRes.text());
 
   const { messages = [] } = await listRes.json();
@@ -74,11 +73,9 @@ async function getEmail(messageId: string) {
     email.payload?.headers?.find((h: Record<string, unknown>) => h.name === name)?.value || "";
 
   const extractBody = (part: Record<string, unknown>): string => {
-    if (part.body?.data)
-      return Buffer.from(part.body.data, "base64").toString("utf-8");
+    if (part.body?.data) return Buffer.from(part.body.data, "base64").toString("utf-8");
     if (part.parts) {
-      for (const p of part.parts)
-        if (p.mimeType === "text/plain") return extractBody(p);
+      for (const p of part.parts) if (p.mimeType === "text/plain") return extractBody(p);
       for (const p of part.parts) {
         const r = extractBody(p);
         if (r) return r;
@@ -131,14 +128,11 @@ async function sendEmail() {
     .join("\r\n");
 
   const raw = Buffer.from(emailLines).toString("base64url");
-  const res = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages/send`,
-    {
-      method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ raw }),
-    },
-  );
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw }),
+  });
 
   if (!res.ok) throw new Error(await res.text());
   const { id } = await res.json();

@@ -14,24 +14,14 @@ type Props = {
 };
 
 // Regex to match file paths like /app/file.txt or /home/user/file.pdf
-const FILE_PATH_REGEX =
-  /(?<!\S)(\/(?:app|home\/user)\/[^\s\])"']+\.[a-zA-Z0-9]+)(?!\S)/g;
+const FILE_PATH_REGEX = /(?<!\S)(\/(?:app|home\/user)\/[^\s\])"']+\.[a-zA-Z0-9]+)(?!\S)/g;
 
-export function MessageBubble({
-  role,
-  content,
-  className,
-  sandboxFiles,
-  onFileClick,
-}: Props) {
+export function MessageBubble({ role, content, className, sandboxFiles, onFileClick }: Props) {
   const isUser = role === "user";
 
   if (isUser) {
     return (
-      <div
-        data-testid="chat-bubble-user"
-        className={cn("flex justify-end", className)}
-      >
+      <div data-testid="chat-bubble-user" className={cn("flex justify-end", className)}>
         <div className="max-w-[80%] rounded-lg bg-primary px-4 py-2 text-primary-foreground">
           <p className="whitespace-pre-wrap text-sm">{content}</p>
         </div>

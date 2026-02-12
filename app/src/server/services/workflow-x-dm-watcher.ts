@@ -1,11 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import {
-  integration,
-  integrationToken,
-  workflow,
-  workflowRun,
-} from "@/server/db/schema";
+import { integration, integrationToken, workflow, workflowRun } from "@/server/db/schema";
 import { getValidAccessToken } from "@/server/integrations/token-refresh";
 import { X_DM_WORKFLOW_JOB_NAME, getQueue } from "@/server/queues";
 
@@ -100,21 +95,12 @@ async function listWatchableWorkflows(): Promise<WatchableWorkflow[]> {
         eq(integration.enabled, true),
       ),
     )
-    .innerJoin(
-      integrationToken,
-      eq(integrationToken.integrationId, integration.id),
-    )
-    .where(
-      and(
-        eq(workflow.status, "on"),
-        eq(workflow.triggerType, X_DM_TRIGGER_TYPE),
-      ),
-    );
+    .innerJoin(integrationToken, eq(integrationToken.integrationId, integration.id))
+    .where(and(eq(workflow.status, "on"), eq(workflow.triggerType, X_DM_TRIGGER_TYPE)));
 
   const watchable: WatchableWorkflow[] = [];
   for (const row of rows) {
-    if (typeof row.accountId !== "string" || row.accountId.length === 0)
-      continue;
+    if (typeof row.accountId !== "string" || row.accountId.length === 0) continue;
     watchable.push({
       workflowId: row.workflowId,
       integrationId: row.integrationId,
@@ -129,9 +115,7 @@ async function listWatchableWorkflows(): Promise<WatchableWorkflow[]> {
   return watchable;
 }
 
-async function getWorkflowLastProcessedEventId(
-  workflowId: string,
-): Promise<string | null> {
+async function getWorkflowLastProcessedEventId(workflowId: string): Promise<string | null> {
   const result = await db
     .select({
       maxEventId: sql<
@@ -149,10 +133,7 @@ async function getWorkflowLastProcessedEventId(
   return result[0]?.maxEventId ?? null;
 }
 
-async function hasRunForXDmEvent(
-  workflowId: string,
-  eventId: string,
-): Promise<boolean> {
+async function hasRunForXDmEvent(workflowId: string, eventId: string): Promise<boolean> {
   const rows = await db
     .select({ id: workflowRun.id })
     .from(workflowRun)
@@ -186,18 +167,13 @@ async function listRecentXDmEvents(accessToken: string): Promise<XDmSummary[]> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `X DM list request failed (${response.status}): ${errorText}`,
-    );
+    throw new Error(`X DM list request failed (${response.status}): ${errorText}`);
   }
 
   const data = (await response.json()) as XDmListResponse;
   const usersById = new Map(
     (data.includes?.users ?? [])
-      .filter(
-        (user): user is { id: string; username?: string; name?: string } =>
-          !!user.id,
-      )
+      .filter((user): user is { id: string; username?: string; name?: string } => !!user.id)
       .map((user) => [user.id, user]),
   );
 
@@ -229,10 +205,7 @@ function compareEventId(a: string, b: string): number {
   }
 }
 
-async function triggerWorkflowFromXDm(
-  workflowId: string,
-  dm: XDmSummary,
-): Promise<void> {
+async function triggerWorkflowFromXDm(workflowId: string, dm: XDmSummary): Promise<void> {
   const queue = getQueue();
   await queue.add(
     X_DM_WORKFLOW_JOB_NAME,
@@ -296,26 +269,19 @@ export async function pollXDmWorkflowTriggers(): Promise<{
         tokenCache.set(item.integrationId, accessToken);
       }
 
-      const lastProcessedEventId = await getWorkflowLastProcessedEventId(
-        item.workflowId,
-      );
+      const lastProcessedEventId = await getWorkflowLastProcessedEventId(item.workflowId);
       const events = await listRecentXDmEvents(accessToken);
       if (events.length === 0) continue;
 
       const incoming = events
         .filter((event) => event.senderId !== item.accountId)
         .filter((event) =>
-          lastProcessedEventId
-            ? compareEventId(event.id, lastProcessedEventId) > 0
-            : true,
+          lastProcessedEventId ? compareEventId(event.id, lastProcessedEventId) > 0 : true,
         )
         .sort((a, b) => compareEventId(a.id, b.id));
 
       for (const event of incoming) {
-        const alreadyHandled = await hasRunForXDmEvent(
-          item.workflowId,
-          event.id,
-        );
+        const alreadyHandled = await hasRunForXDmEvent(item.workflowId, event.id);
         if (alreadyHandled) continue;
 
         try {
@@ -334,10 +300,7 @@ export async function pollXDmWorkflowTriggers(): Promise<{
           `[workflow-x-dm-watcher] auth error for workflow ${item.workflowId}; reconnect X integration may be required`,
         );
       }
-      console.error(
-        `[workflow-x-dm-watcher] failed for workflow ${item.workflowId}`,
-        error,
-      );
+      console.error(`[workflow-x-dm-watcher] failed for workflow ${item.workflowId}`, error);
     }
   }
 

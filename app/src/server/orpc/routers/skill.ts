@@ -23,11 +23,7 @@ function toSkillSlug(name: string): string {
 }
 
 // Generate default SKILL.md content
-function generateSkillMd(
-  displayName: string,
-  slug: string,
-  description: string,
-): string {
+function generateSkillMd(displayName: string, slug: string, description: string): string {
   return `---
 name: ${slug}
 description: ${description}
@@ -224,10 +220,7 @@ const addFile = protectedProcedure
   .handler(async ({ input, context }) => {
     // Verify ownership
     const existingSkill = await context.db.query.skill.findFirst({
-      where: and(
-        eq(skill.id, input.skillId),
-        eq(skill.userId, context.user.id),
-      ),
+      where: and(eq(skill.id, input.skillId), eq(skill.userId, context.user.id)),
     });
 
     if (!existingSkill) {
@@ -320,10 +313,7 @@ const uploadDocument = protectedProcedure
   .handler(async ({ input, context }) => {
     // Verify skill ownership
     const existingSkill = await context.db.query.skill.findFirst({
-      where: and(
-        eq(skill.id, input.skillId),
-        eq(skill.userId, context.user.id),
-      ),
+      where: and(eq(skill.id, input.skillId), eq(skill.userId, context.user.id)),
     });
 
     if (!existingSkill) {
@@ -345,11 +335,7 @@ const uploadDocument = protectedProcedure
 
     // Ensure bucket exists and upload to S3
     await ensureBucket();
-    const storageKey = generateStorageKey(
-      context.user.id,
-      input.skillId,
-      input.filename,
-    );
+    const storageKey = generateStorageKey(context.user.id, input.skillId, input.filename);
     await uploadToS3(storageKey, fileBuffer, input.mimeType);
 
     // Save metadata to database
@@ -410,9 +396,7 @@ const deleteDocument = protectedProcedure
     await deleteFromS3(document.storageKey);
 
     // Delete from database
-    await context.db
-      .delete(skillDocument)
-      .where(eq(skillDocument.id, input.id));
+    await context.db.delete(skillDocument).where(eq(skillDocument.id, input.id));
 
     return { success: true };
   });

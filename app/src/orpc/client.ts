@@ -19,9 +19,7 @@ async function fetchWithAuthRedirect(
 
   if (response.status === 401 && typeof window !== "undefined") {
     // Redirect to login with current path as callback
-    const callbackUrl = encodeURIComponent(
-      window.location.pathname + window.location.search,
-    );
+    const callbackUrl = encodeURIComponent(window.location.pathname + window.location.search);
     window.location.href = `/login?callbackUrl=${callbackUrl}`;
     // Return a never-resolving promise to prevent further processing
     return new Promise(() => {});

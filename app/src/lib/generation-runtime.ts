@@ -1,9 +1,4 @@
-export type TraceStatus =
-  | "streaming"
-  | "complete"
-  | "error"
-  | "waiting_approval"
-  | "waiting_auth";
+export type TraceStatus = "streaming" | "complete" | "error" | "waiting_approval" | "waiting_auth";
 
 export type RuntimeMessagePart =
   | { type: "text"; content: string }
@@ -305,11 +300,7 @@ export class GenerationRuntime {
   handleToolResult(toolName: string, result: unknown): void {
     for (let i = this.parts.length - 1; i >= 0; i -= 1) {
       const part = this.parts[i];
-      if (
-        part.type === "tool_call" &&
-        part.name === toolName &&
-        part.result === undefined
-      ) {
+      if (part.type === "tool_call" && part.name === toolName && part.result === undefined) {
         part.result = result;
         break;
       }
@@ -321,9 +312,7 @@ export class GenerationRuntime {
         .reverse()
         .find(
           (item) =>
-            item.type === "tool_call" &&
-            item.content === toolName &&
-            item.status === "running",
+            item.type === "tool_call" && item.content === toolName && item.status === "running",
         );
       if (toolItem) {
         toolItem.status = "complete";
@@ -372,10 +361,7 @@ export class GenerationRuntime {
     }
   }
 
-  handleApprovalResult(
-    toolUseId: string,
-    decision: "approved" | "denied",
-  ): void {
+  handleApprovalResult(toolUseId: string, decision: "approved" | "denied"): void {
     this.setApprovalStatus(toolUseId, decision);
     this.traceStatus = "streaming";
   }
@@ -421,10 +407,7 @@ export class GenerationRuntime {
 
   setAuthCancelled(): void {
     for (const seg of this.segments) {
-      if (
-        seg.auth &&
-        (seg.auth.status === "pending" || seg.auth.status === "connecting")
-      ) {
+      if (seg.auth && (seg.auth.status === "pending" || seg.auth.status === "connecting")) {
         seg.auth.status = "cancelled";
         break;
       }
@@ -433,10 +416,7 @@ export class GenerationRuntime {
 
   handleAuthProgress(connected: string, remaining: string[]): void {
     for (const seg of this.segments) {
-      if (
-        seg.auth &&
-        (seg.auth.status === "pending" || seg.auth.status === "connecting")
-      ) {
+      if (seg.auth && (seg.auth.status === "pending" || seg.auth.status === "connecting")) {
         if (!seg.auth.connectedIntegrations.includes(connected)) {
           seg.auth.connectedIntegrations.push(connected);
         }
@@ -474,10 +454,7 @@ export class GenerationRuntime {
     this.traceStatus = "error";
   }
 
-  handleCancelled(data?: {
-    generationId?: string;
-    conversationId?: string;
-  }): void {
+  handleCancelled(data?: { generationId?: string; conversationId?: string }): void {
     if (data?.generationId) {
       this.currentGenerationId = data.generationId;
     }
@@ -575,16 +552,11 @@ export class GenerationRuntime {
 
   buildAssistantMessage(): RuntimeAssistantMessage {
     const content = this.parts
-      .filter(
-        (p): p is RuntimeMessagePart & { type: "text" } => p.type === "text",
-      )
+      .filter((p): p is RuntimeMessagePart & { type: "text" } => p.type === "text")
       .map((p) => p.content)
       .join("");
 
-    const approvalMap = new Map<
-      string,
-      RuntimeMessagePart & { type: "approval" }
-    >();
+    const approvalMap = new Map<string, RuntimeMessagePart & { type: "approval" }>();
     for (const seg of this.segments) {
       if (!seg.approval || seg.approval.status === "pending") {
         continue;
@@ -620,13 +592,9 @@ export class GenerationRuntime {
 
     return {
       content,
-      parts:
-        partsWithApprovals.length > 0
-          ? partsWithApprovals
-          : this.parts.map((p) => ({ ...p })),
+      parts: partsWithApprovals.length > 0 ? partsWithApprovals : this.parts.map((p) => ({ ...p })),
       integrationsUsed: [...this.integrationsUsed],
-      sandboxFiles:
-        this.sandboxFiles.length > 0 ? [...this.sandboxFiles] : undefined,
+      sandboxFiles: this.sandboxFiles.length > 0 ? [...this.sandboxFiles] : undefined,
     };
   }
 

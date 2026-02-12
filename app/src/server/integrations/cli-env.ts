@@ -1,8 +1,5 @@
 import { db } from "@/server/db/client";
-import {
-  integration,
-  customIntegrationCredential,
-} from "@/server/db/schema";
+import { integration, customIntegrationCredential } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
 import type { IntegrationType } from "@/server/oauth/config";
@@ -27,9 +24,7 @@ const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
   twitter: "TWITTER_ACCESS_TOKEN",
 };
 
-export async function getCliEnvForUser(
-  userId: string,
-): Promise<Record<string, string>> {
+export async function getCliEnvForUser(userId: string): Promise<Record<string, string>> {
   const cliEnv: Record<string, string> = {};
 
   // Get valid tokens, refreshing any that are expired or about to expire
@@ -127,19 +122,13 @@ export async function getCliEnvForUser(
             }
           }
         } catch (e) {
-          console.error(
-            `Failed to decrypt API key for custom integration ${integ.slug}:`,
-            e,
-          );
+          console.error(`Failed to decrypt API key for custom integration ${integ.slug}:`, e);
         }
       } else if (integ.authType === "bearer_token" && cred.apiKey) {
         try {
           cliEnv[`${slug}_ACCESS_TOKEN`] = decrypt(cred.apiKey);
         } catch (e) {
-          console.error(
-            `Failed to decrypt bearer token for custom integration ${integ.slug}:`,
-            e,
-          );
+          console.error(`Failed to decrypt bearer token for custom integration ${integ.slug}:`, e);
         }
       } else if (integ.authType === "oauth2") {
         // Use refreshed token if available, otherwise use stored token
@@ -188,9 +177,7 @@ export async function getCliInstructionsWithCustom(
   }
 }
 
-export function getCliInstructions(
-  connectedIntegrations: IntegrationType[],
-): string {
+export function getCliInstructions(connectedIntegrations: IntegrationType[]): string {
   // Helper to show connection status
   const statusTag = (type: IntegrationType) =>
     connectedIntegrations.includes(type) ? "✓ Connected" : "⚡ Auth Required";
@@ -489,9 +476,7 @@ ${instructions}
 `;
 }
 
-export async function getEnabledIntegrationTypes(
-  userId: string,
-): Promise<IntegrationType[]> {
+export async function getEnabledIntegrationTypes(userId: string): Promise<IntegrationType[]> {
   const results = await db
     .select({ type: integration.type })
     .from(integration)
@@ -550,10 +535,7 @@ export async function getTokensForIntegrations(
     });
 
     if (salesforceIntegration && salesforceIntegration.metadata) {
-      const metadata = salesforceIntegration.metadata as Record<
-        string,
-        unknown
-      >;
+      const metadata = salesforceIntegration.metadata as Record<string, unknown>;
       if (metadata.instanceUrl) {
         tokens.SALESFORCE_INSTANCE_URL = metadata.instanceUrl as string;
       }

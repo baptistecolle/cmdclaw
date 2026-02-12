@@ -12,11 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface Device {
   id: string;
@@ -67,20 +63,14 @@ export function DeviceSelector({ selectedDeviceId, onSelect }: Props) {
   // Don't render if no devices are available
   if (devices.length === 0) return null;
 
-  const selected = selectedDeviceId
-    ? devices.find((d) => d.id === selectedDeviceId)
-    : null;
+  const selected = selectedDeviceId ? devices.find((d) => d.id === selectedDeviceId) : null;
 
   return (
     <DropdownMenu>
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 px-2 text-xs"
-            >
+            <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs">
               {selected ? (
                 <>
                   <Monitor className="h-3 w-3" />

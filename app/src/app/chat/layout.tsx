@@ -43,9 +43,7 @@ function formatChatToMarkdown(messages: Message[], title?: string): string {
         lines.push(`- \`${tc.name}\``);
         if (tc.result !== undefined) {
           const resultStr =
-            typeof tc.result === "string"
-              ? tc.result
-              : JSON.stringify(tc.result, null, 2);
+            typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result, null, 2);
           lines.push("  ```");
           lines.push(`  ${resultStr.split("\n").join("\n  ")}`);
           lines.push("  ```");
@@ -104,11 +102,7 @@ function CopyButton() {
   );
 }
 
-export default function ChatLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const { isAdmin } = useIsAdmin();
   const params = useParams();
   const conversationId = params?.conversationId as string | undefined;
@@ -139,15 +133,11 @@ export default function ChatLayout({
             <SidebarTrigger />
             <span className="text-sm font-medium">Chat</span>
             {isAdmin && conversationId && (
-              <span className="text-xs text-muted-foreground font-mono">
-                ID: {conversationId}
-              </span>
+              <span className="text-xs text-muted-foreground font-mono">ID: {conversationId}</span>
             )}
             {isAdmin && <CopyButton />}
           </header>
-          <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">
-            {children}
-          </div>
+          <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">{children}</div>
         </SidebarInset>
       </SidebarProvider>
     </AppShell>

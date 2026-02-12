@@ -23,9 +23,7 @@ function getPhoneNumber(user: unknown): string {
 
 export default function SettingsPage() {
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    "loading",
-  );
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -70,9 +68,7 @@ export default function SettingsPage() {
     setSaving(true);
 
     try {
-      const fullName = [firstName.trim(), lastName.trim()]
-        .filter(Boolean)
-        .join(" ");
+      const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
       await authClient.updateUser({
         name: fullName,
         phoneNumber: phoneNumber || undefined,
@@ -166,9 +162,7 @@ export default function SettingsPage() {
     <div>
       <div className="mb-6">
         <h2 className="text-xl font-semibold">General Settings</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage your account information.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Manage your account information.</p>
       </div>
 
       {notification && (
@@ -189,22 +183,13 @@ export default function SettingsPage() {
         <div className="space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium">Email</label>
-            <Input
-              type="email"
-              value={user.email}
-              disabled
-              className="bg-muted/50"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Email cannot be changed.
-            </p>
+            <Input type="email" value={user.email} disabled className="bg-muted/50" />
+            <p className="mt-1 text-xs text-muted-foreground">Email cannot be changed.</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm font-medium">
-                First name
-              </label>
+              <label className="mb-2 block text-sm font-medium">First name</label>
               <Input
                 type="text"
                 value={firstName}
@@ -214,9 +199,7 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">
-                Last name
-              </label>
+              <label className="mb-2 block text-sm font-medium">Last name</label>
               <Input
                 type="text"
                 value={lastName}
@@ -227,9 +210,7 @@ export default function SettingsPage() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium">
-              Phone number
-            </label>
+            <label className="mb-2 block text-sm font-medium">Phone number</label>
             <PhoneInput
               defaultCountry="US"
               international
@@ -238,9 +219,7 @@ export default function SettingsPage() {
               onChange={(value) => setPhoneNumber(value ?? "")}
               placeholder="Enter your phone number"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
-              will be used for whatsapp
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">will be used for whatsapp</p>
             {phoneNumber ? (
               <Button
                 type="button"
@@ -278,8 +257,7 @@ export default function SettingsPage() {
       <div className="mt-10 border-t pt-6">
         <h3 className="text-lg font-semibold">WhatsApp Linking</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Generate a link code, then send it from your WhatsApp number to
-          connect.
+          Generate a link code, then send it from your WhatsApp number to connect.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Button onClick={handleGenerateLinkCode} disabled={linkLoading}>

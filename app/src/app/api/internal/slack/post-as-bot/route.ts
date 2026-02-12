@@ -62,20 +62,14 @@ export async function POST(request: Request) {
   }
 
   if (!env.SLACK_BOT_TOKEN) {
-    return Response.json(
-      { ok: false, error: "Slack bot token not configured" },
-      { status: 500 },
-    );
+    return Response.json({ ok: false, error: "Slack bot token not configured" }, { status: 500 });
   }
 
   let payload: RelayPayload;
   try {
     payload = (await request.json()) as RelayPayload;
   } catch {
-    return Response.json(
-      { ok: false, error: "Invalid JSON payload" },
-      { status: 400 },
-    );
+    return Response.json({ ok: false, error: "Invalid JSON payload" }, { status: 400 });
   }
 
   const channel = payload.channel?.trim();
@@ -84,10 +78,7 @@ export async function POST(request: Request) {
   const conversationId = payload.conversationId?.trim();
 
   if (!channel || !text) {
-    return Response.json(
-      { ok: false, error: "channel and text are required" },
-      { status: 400 },
-    );
+    return Response.json({ ok: false, error: "channel and text are required" }, { status: 400 });
   }
 
   const allowedChannels = getAllowedChannels();
@@ -99,8 +90,7 @@ export async function POST(request: Request) {
   }
 
   if (conversationId) {
-    const genId =
-      generationManager.getGenerationForConversation(conversationId);
+    const genId = generationManager.getGenerationForConversation(conversationId);
     if (!genId) {
       return Response.json(
         { ok: false, error: "No active generation for conversation" },

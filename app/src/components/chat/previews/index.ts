@@ -46,9 +46,7 @@ export const INTEGRATION_PREVIEWS: Record<string, IntegrationPreviewConfig> = {
  * @param integration - The integration name (e.g., "slack", "gmail")
  * @returns The preview component or null if not found
  */
-export function getPreviewComponent(
-  integration: string,
-): PreviewComponent | null {
+export function getPreviewComponent(integration: string): PreviewComponent | null {
   return INTEGRATION_PREVIEWS[integration]?.component || null;
 }
 

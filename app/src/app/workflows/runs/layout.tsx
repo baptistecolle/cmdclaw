@@ -2,11 +2,7 @@
 
 import { WorkflowRunsSidebar } from "@/components/workflows/workflow-runs-sidebar";
 
-export default function WorkflowRunsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function WorkflowRunsLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background">
       <div className="flex h-full min-h-0 w-full flex-1">

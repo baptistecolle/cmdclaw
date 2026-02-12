@@ -20,11 +20,7 @@ export function SlackPreview({ operation, args }: PreviewProps) {
   }
 }
 
-function SlackSendPreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function SlackSendPreview({ args }: { args: Record<string, string | undefined> }) {
   const channel = args.c || args.channel;
   const text = args.t || args.text;
   const thread = args.thread;
@@ -33,9 +29,7 @@ function SlackSendPreview({
     <div>
       <div className="flex items-center gap-2 mb-3">
         <IntegrationLogo integration="slack" size={16} />
-        <span className="text-sm font-medium">
-          {thread ? "Reply to Thread" : "Send Message"}
-        </span>
+        <span className="text-sm font-medium">{thread ? "Reply to Thread" : "Send Message"}</span>
         {thread && <PreviewBadge>In Thread</PreviewBadge>}
       </div>
 
@@ -53,11 +47,7 @@ function SlackSendPreview({
   );
 }
 
-function SlackReactPreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function SlackReactPreview({ args }: { args: Record<string, string | undefined> }) {
   const channel = args.c || args.channel;
   const timestamp = args.ts;
   const emoji = args.e || args.emoji;
@@ -73,9 +63,7 @@ function SlackReactPreview({
         <PreviewField label="Channel" value={channel} mono />
         <PreviewField label="Message" value={timestamp} mono />
         <div className="mt-2">
-          <span className="text-xs font-medium text-muted-foreground">
-            Emoji:{" "}
-          </span>
+          <span className="text-xs font-medium text-muted-foreground">Emoji: </span>
           <span className="text-lg">:{emoji}:</span>
         </div>
       </PreviewSection>
@@ -83,11 +71,7 @@ function SlackReactPreview({
   );
 }
 
-function SlackUploadPreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function SlackUploadPreview({ args }: { args: Record<string, string | undefined> }) {
   const channel = args.c || args.channel;
   const file = args.file;
   const comment = args.comment;

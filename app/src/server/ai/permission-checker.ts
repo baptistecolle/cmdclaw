@@ -27,15 +27,7 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
 
 const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
   slack: {
-    read: [
-      "channels",
-      "history",
-      "search",
-      "recent",
-      "users",
-      "user",
-      "thread",
-    ],
+    read: ["channels", "history", "search", "recent", "users", "user", "thread"],
     write: ["send", "react", "upload"],
   },
   gmail: {
@@ -137,16 +129,7 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
     write: ["create", "update"],
   },
   reddit: {
-    read: [
-      "feed",
-      "subreddit",
-      "post",
-      "user",
-      "search",
-      "multireddit",
-      "inbox",
-      "subscriptions",
-    ],
+    read: ["feed", "subreddit", "post", "user", "search", "multireddit", "inbox", "subscriptions"],
     write: [
       "vote",
       "comment",
@@ -245,9 +228,7 @@ export function parseBashCommand(command: string): ParsedCommand | null {
   }
 
   const permissions = TOOL_PERMISSIONS[integration];
-  const isWrite = permissions
-    ? permissions.write.includes(finalOperation)
-    : false;
+  const isWrite = permissions ? permissions.write.includes(finalOperation) : false;
 
   return {
     integration,

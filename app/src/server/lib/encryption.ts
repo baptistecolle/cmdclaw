@@ -7,9 +7,7 @@ const IV_LENGTH = 12;
 function getKey(): Buffer {
   const key = env.ENCRYPTION_KEY;
   if (!key) {
-    throw new Error(
-      "ENCRYPTION_KEY environment variable is required for credential encryption",
-    );
+    throw new Error("ENCRYPTION_KEY environment variable is required for credential encryption");
   }
   return Buffer.from(key, "hex");
 }
@@ -25,11 +23,7 @@ export function encrypt(plaintext: string): string {
   const tag = cipher.getAuthTag();
 
   // Format: iv:ciphertext:tag (all base64)
-  return [
-    iv.toString("base64"),
-    encrypted.toString("base64"),
-    tag.toString("base64"),
-  ].join(":");
+  return [iv.toString("base64"), encrypted.toString("base64"), tag.toString("base64")].join(":");
 }
 
 export function decrypt(encrypted: string): string {

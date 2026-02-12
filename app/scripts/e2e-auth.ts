@@ -88,9 +88,7 @@ async function ensureUser(): Promise<{ id: string; email: string }> {
   return { id: userId, email };
 }
 
-async function createSession(
-  userId: string,
-): Promise<{ token: string; expiresAt: Date }> {
+async function createSession(userId: string): Promise<{ token: string; expiresAt: Date }> {
   const now = new Date();
   const ttlHours = Number(process.env.E2E_SESSION_TTL_HOURS ?? "24");
   const expiresAt = new Date(now.getTime() + ttlHours * 60 * 60 * 1000);
@@ -119,10 +117,7 @@ async function buildStorageState(
   const secure = url.protocol === "https:";
   const expires = Math.floor(expiresAt.getTime() / 1000);
   const secret = getAuthSecret();
-  const signedToken = (await serializeSignedCookie("", token, secret)).replace(
-    "=",
-    "",
-  );
+  const signedToken = (await serializeSignedCookie("", token, secret)).replace("=", "");
 
   const cookies: StorageCookie[] = [
     {
@@ -180,9 +175,7 @@ async function main(): Promise<void> {
   )?.value;
 
   if (!signedToken) {
-    throw new Error(
-      "Failed to create signed better-auth.session_token cookie.",
-    );
+    throw new Error("Failed to create signed better-auth.session_token cookie.");
   }
 
   await verifySessionCookie(signedToken);

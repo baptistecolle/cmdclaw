@@ -18,11 +18,7 @@ import {
 } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  SkillEditor,
-  parseSkillContent,
-  serializeSkillContent,
-} from "@/components/skill-editor";
+import { SkillEditor, parseSkillContent, serializeSkillContent } from "@/components/skill-editor";
 import {
   ArrowLeft,
   Loader2,
@@ -67,9 +63,7 @@ function SkillEditorPageContent() {
   const getDocumentUrl = useGetDocumentUrl();
 
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
-    null,
-  );
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode>("rich");
   const [isSaving, setIsSaving] = useState(false);
   const [showAddFile, setShowAddFile] = useState(false);
@@ -321,8 +315,7 @@ function SkillEditorPageContent() {
   };
 
   const handleDeleteSkill = async () => {
-    if (!confirm(`Delete skill "${skillDisplayName}"? This cannot be undone.`))
-      return;
+    if (!confirm(`Delete skill "${skillDisplayName}"? This cannot be undone.`)) return;
 
     try {
       await deleteSkill.mutateAsync(skillId);
@@ -405,8 +398,7 @@ function SkillEditorPageContent() {
 
   const getDocumentIcon = (mimeType: string) => {
     if (mimeType.startsWith("image/")) return Image;
-    if (mimeType.includes("spreadsheet") || mimeType.includes("excel"))
-      return FileSpreadsheet;
+    if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) return FileSpreadsheet;
     return File;
   };
 
@@ -636,9 +628,7 @@ function SkillEditorPageContent() {
               className="text-left text-sm text-muted-foreground hover:text-foreground"
             >
               {skillDescription || (
-                <span className="text-muted-foreground/50">
-                  Add a description...
-                </span>
+                <span className="text-muted-foreground/50">Add a description...</span>
               )}
             </button>
           )}
@@ -787,11 +777,7 @@ function SkillEditorPageContent() {
                 }
               }}
             />
-            <Button
-              size="sm"
-              onClick={handleAddFile}
-              disabled={!newFilePath.trim()}
-            >
+            <Button size="sm" onClick={handleAddFile} disabled={!newFilePath.trim()}>
               Add
             </Button>
             <Button
@@ -820,11 +806,7 @@ function SkillEditorPageContent() {
                 />
               ) : isSkillMd && editorMode === "markdown" ? (
                 <textarea
-                  value={serializeSkillContent(
-                    skillSlug,
-                    skillDescription,
-                    skillBody,
-                  )}
+                  value={serializeSkillContent(skillSlug, skillDescription, skillBody)}
                   onChange={(e) => {
                     const parsed = parseSkillContent(e.target.value);
                     setSkillSlug(parsed.name);
@@ -857,9 +839,7 @@ Add your skill instructions here..."
           )}
           {selectedDocumentId &&
             (() => {
-              const selectedDoc = skill.documents?.find(
-                (d) => d.id === selectedDocumentId,
-              );
+              const selectedDoc = skill.documents?.find((d) => d.id === selectedDocumentId);
               if (!selectedDoc) return null;
 
               const isViewable = isViewableDocument(selectedDoc.mimeType);
@@ -909,9 +889,7 @@ Add your skill instructions here..."
                       {formatFileSize(selectedDoc.sizeBytes)}
                     </p>
                   </div>
-                  <Button
-                    onClick={() => handleDownloadDocument(selectedDoc.id)}
-                  >
+                  <Button onClick={() => handleDownloadDocument(selectedDoc.id)}>
                     <Download className="mr-2 h-4 w-4" />
                     Download
                   </Button>
@@ -926,15 +904,11 @@ Add your skill instructions here..."
             <div className="mx-4 w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
               <h3 className="text-lg font-semibold">Delete document</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Are you sure you want to delete
-                &quot;{documentToDelete.filename}&quot;? This action cannot be
-                undone.
+                Are you sure you want to delete &quot;{documentToDelete.filename}&quot;? This action
+                cannot be undone.
               </p>
               <div className="mt-4 flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setDocumentToDelete(null)}
-                >
+                <Button variant="outline" onClick={() => setDocumentToDelete(null)}>
                   Cancel
                 </Button>
                 <Button variant="destructive" onClick={handleDeleteDocument}>

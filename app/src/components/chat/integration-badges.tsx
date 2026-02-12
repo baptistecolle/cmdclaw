@@ -14,21 +14,13 @@ type Props = {
   className?: string;
 };
 
-export function IntegrationBadges({
-  integrations,
-  size = "sm",
-  className,
-}: Props) {
+export function IntegrationBadges({ integrations, size = "sm", className }: Props) {
   if (integrations.length === 0) return null;
 
   return (
     <div className={cn("flex items-center gap-1 flex-wrap", className)}>
       {integrations.map((integration) => (
-        <IntegrationBadge
-          key={integration}
-          integration={integration}
-          size={size}
-        />
+        <IntegrationBadge key={integration} integration={integration} size={size} />
       ))}
     </div>
   );
@@ -44,8 +36,7 @@ function IntegrationBadge({
   const logo = getIntegrationLogo(integration);
   const name = getIntegrationDisplayName(integration);
 
-  const sizeClasses =
-    size === "sm" ? "px-1.5 py-0.5 text-xs gap-1" : "px-2 py-1 text-sm gap-1.5";
+  const sizeClasses = size === "sm" ? "px-1.5 py-0.5 text-xs gap-1" : "px-2 py-1 text-sm gap-1.5";
 
   const iconSize = size === "sm" ? "h-3 w-3" : "h-4 w-4";
   const iconPixels = size === "sm" ? 12 : 16;
@@ -60,13 +51,7 @@ function IntegrationBadge({
       title={name}
     >
       {logo && (
-        <Image
-          src={logo}
-          alt={name}
-          width={iconPixels}
-          height={iconPixels}
-          className={iconSize}
-        />
+        <Image src={logo} alt={name} width={iconPixels} height={iconPixels} className={iconSize} />
       )}
       <span className={cn("truncate", nameMaxWidth)}>{name}</span>
     </div>

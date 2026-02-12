@@ -52,9 +52,7 @@ function getJidPhoneNumber(jid: string): string {
   return normalizePhoneNumber(number);
 }
 
-function extractMessageText(
-  msg: proto.IMessage | null | undefined,
-): string | null {
+function extractMessageText(msg: proto.IMessage | null | undefined): string | null {
   if (!msg) return null;
   if (msg.conversation) return msg.conversation;
   if (msg.extendedTextMessage?.text) return msg.extendedTextMessage.text;
@@ -98,26 +96,19 @@ async function createDbAuthState(): Promise<{
   state: AuthenticationState;
   saveCreds: () => Promise<void>;
 }> {
-  const storedCreds = (await readAuthData("creds.json")) as ReturnType<
-    typeof initAuthCreds
-  > | null;
+  const storedCreds = (await readAuthData("creds.json")) as ReturnType<typeof initAuthCreds> | null;
   const creds = storedCreds ?? initAuthCreds();
   return {
     state: {
       creds,
       keys: {
-        get: async <T extends keyof SignalDataTypeMap>(
-          type: T,
-          ids: string[],
-        ) => {
+        get: async <T extends keyof SignalDataTypeMap>(type: T, ids: string[]) => {
           const data: { [id: string]: SignalDataTypeMap[T] } = {};
           await Promise.all(
             ids.map(async (id) => {
               let value = await readAuthData(`${type}-${id}.json`);
               if (type === "app-state-sync-key" && value) {
-                value = proto.Message.AppStateSyncKeyData.fromObject(
-                  value as object,
-                );
+                value = proto.Message.AppStateSyncKeyData.fromObject(value as object);
               }
               data[id] = (value ?? null) as SignalDataTypeMap[T];
             }),
@@ -131,9 +122,7 @@ async function createDbAuthState(): Promise<{
             for (const id of Object.keys(entries)) {
               const value = entries[id];
               const key = `${category}-${id}.json`;
-              tasks.push(
-                value ? writeAuthData(key, value) : removeAuthData(key),
-              );
+              tasks.push(value ? writeAuthData(key, value) : removeAuthData(key));
             }
           }
           await Promise.all(tasks);
@@ -146,10 +135,7 @@ async function createDbAuthState(): Promise<{
   };
 }
 
-async function getOrCreateConversation(
-  waJid: string,
-  userId: string,
-): Promise<string> {
+async function getOrCreateConversation(waJid: string, userId: string): Promise<string> {
   const existing = await db.query.whatsappConversation.findFirst({
     where: eq(whatsappConversation.waJid, waJid),
   });
@@ -174,22 +160,12 @@ async function getOrCreateConversation(
   return newConv!.id;
 }
 
-async function collectGenerationResponse(
-  generationId: string,
-  userId: string,
-): Promise<string> {
+async function collectGenerationResponse(generationId: string, userId: string): Promise<string> {
   const parts: string[] = [];
-  for await (const event of generationManager.subscribeToGeneration(
-    generationId,
-    userId,
-  )) {
+  for await (const event of generationManager.subscribeToGeneration(generationId, userId)) {
     if (event.type === "text") {
       parts.push(event.content);
-    } else if (
-      event.type === "done" ||
-      event.type === "error" ||
-      event.type === "cancelled"
-    ) {
+    } else if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
       break;
     }
   }
@@ -215,9 +191,7 @@ async function handleLinkCode(waJid: string, messageText: string) {
   });
 
   const senderNumber = getJidPhoneNumber(waJid);
-  const userNumber = linkedUser?.phoneNumber
-    ? normalizePhoneNumber(linkedUser.phoneNumber)
-    : "";
+  const userNumber = linkedUser?.phoneNumber ? normalizePhoneNumber(linkedUser.phoneNumber) : "";
 
   if (!userNumber || userNumber !== senderNumber) {
     await socket?.sendMessage(waJid, {
@@ -257,11 +231,7 @@ async function handleLinkCode(waJid: string, messageText: string) {
   return true;
 }
 
-async function handleIncomingMessage(
-  waJid: string,
-  text: string,
-  displayName: string,
-) {
+async function handleIncomingMessage(waJid: string, text: string, displayName: string) {
   const link = await db.query.whatsappUserLink.findFirst({
     where: eq(whatsappUserLink.waJid, waJid),
   });
@@ -285,10 +255,7 @@ async function handleIncomingMessage(
       autoApprove: true,
     });
 
-    const responseText = await collectGenerationResponse(
-      generationId,
-      link.userId,
-    );
+    const responseText = await collectGenerationResponse(generationId, link.userId);
 
     if (responseText) {
       await socket?.sendMessage(waJid, { text: responseText });
@@ -335,8 +302,7 @@ export async function ensureWhatsAppSocket(): Promise<void> {
       if (update.connection === "close") {
         state.status = "disconnected";
         const reason = update.lastDisconnect?.error;
-        const statusCode = (reason as { output?: { statusCode?: number } })
-          ?.output?.statusCode;
+        const statusCode = (reason as { output?: { statusCode?: number } })?.output?.statusCode;
         if (statusCode === DisconnectReason.loggedOut) {
           state.lastError = "WhatsApp logged out. Reconnect required.";
         }
@@ -350,8 +316,7 @@ export async function ensureWhatsAppSocket(): Promise<void> {
         if (message.key?.fromMe) return;
 
         const waJid = message.key?.remoteJid;
-        if (!waJid || waJid === "status@broadcast" || waJid.endsWith("@g.us"))
-          return;
+        if (!waJid || waJid === "status@broadcast" || waJid.endsWith("@g.us")) return;
 
         const text = extractMessageText(message.message);
         if (!text) return;
@@ -363,8 +328,7 @@ export async function ensureWhatsAppSocket(): Promise<void> {
       }
     });
   } catch (err) {
-    state.lastError =
-      err instanceof Error ? err.message : "Failed to connect WhatsApp";
+    state.lastError = err instanceof Error ? err.message : "Failed to connect WhatsApp";
     state.status = "disconnected";
   } finally {
     isConnecting = false;

@@ -1,7 +1,4 @@
-import {
-  PreviewProps,
-  IntegrationLogo,
-} from "./preview-styles";
+import { PreviewProps, IntegrationLogo } from "./preview-styles";
 
 export function GmailPreview({ operation, args }: PreviewProps) {
   switch (operation) {
@@ -12,11 +9,7 @@ export function GmailPreview({ operation, args }: PreviewProps) {
   }
 }
 
-function GmailSendPreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function GmailSendPreview({ args }: { args: Record<string, string | undefined> }) {
   const to = args.to;
   const cc = args.cc;
   const bcc = args.bcc;
@@ -57,9 +50,7 @@ function GmailSendPreview({
 
       {/* Email body */}
       <div className="rounded-b border bg-background p-3">
-        <div className="text-sm whitespace-pre-wrap">
-          {body || "(no content)"}
-        </div>
+        <div className="text-sm whitespace-pre-wrap">{body || "(no content)"}</div>
       </div>
     </div>
   );

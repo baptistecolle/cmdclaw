@@ -2,20 +2,10 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  Check,
-  X,
-  Loader2,
-  Link2,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X, Loader2, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  getIntegrationDisplayName,
-  getIntegrationLogo,
-} from "@/lib/integration-icons";
+import { getIntegrationDisplayName, getIntegrationLogo } from "@/lib/integration-icons";
 
 export interface AuthRequestCardProps {
   integrations: string[];
@@ -52,11 +42,7 @@ export function AuthRequestCard({
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
       >
-        {expanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
+        {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         <div className="flex items-center -space-x-1">
           {integrations.slice(0, 3).map((integration) => {
             const logo = getIntegrationLogo(integration);
@@ -104,9 +90,7 @@ export function AuthRequestCard({
 
       {expanded && (
         <div className="border-t px-3 py-3">
-          {reason && (
-            <p className="mb-3 text-sm text-muted-foreground">{reason}</p>
-          )}
+          {reason && <p className="mb-3 text-sm text-muted-foreground">{reason}</p>}
 
           <div className="space-y-3">
             {integrations.map((integration) => {
@@ -115,10 +99,7 @@ export function AuthRequestCard({
               const isConnected = connectedIntegrations.includes(integration);
 
               return (
-                <div
-                  key={integration}
-                  className="flex items-center justify-between"
-                >
+                <div key={integration} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {logo && (
                       <Image

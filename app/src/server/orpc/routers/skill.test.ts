@@ -101,9 +101,7 @@ describe("skillRouter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     generateStorageKeyMock.mockReturnValue("skills/user-1/skill-1/doc.pdf");
-    getPresignedDownloadUrlMock.mockResolvedValue(
-      "https://example.com/presigned-url",
-    );
+    getPresignedDownloadUrlMock.mockResolvedValue("https://example.com/presigned-url");
   });
 
   it("lists user skills and maps file counts", async () => {
@@ -252,12 +250,8 @@ describe("skillRouter", () => {
       skillId: "skill-1",
       path: "SKILL.md",
     });
-    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain(
-      "name: my-skill",
-    );
-    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain(
-      "# My Skill",
-    );
+    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain("name: my-skill");
+    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain("# My Skill");
   });
 
   it("returns BAD_REQUEST when create receives a name that cannot produce a slug", async () => {
@@ -353,9 +347,7 @@ describe("skillRouter", () => {
       id: "skill-1",
       userId: "user-1",
     });
-    context.mocks.insertReturningMock.mockResolvedValue([
-      { id: "file-1", path: "notes.md" },
-    ]);
+    context.mocks.insertReturningMock.mockResolvedValue([{ id: "file-1", path: "notes.md" }]);
 
     const result = await skillRouterAny.addFile({
       input: {
@@ -494,18 +486,9 @@ describe("skillRouter", () => {
       context,
     });
 
-    expect(validateFileUploadMock).toHaveBeenCalledWith(
-      "doc.pdf",
-      "application/pdf",
-      4,
-      2,
-    );
+    expect(validateFileUploadMock).toHaveBeenCalledWith("doc.pdf", "application/pdf", 4, 2);
     expect(ensureBucketMock).toHaveBeenCalledTimes(1);
-    expect(generateStorageKeyMock).toHaveBeenCalledWith(
-      "user-1",
-      "skill-1",
-      "doc.pdf",
-    );
+    expect(generateStorageKeyMock).toHaveBeenCalledWith("user-1", "skill-1", "doc.pdf");
     expect(uploadToS3Mock).toHaveBeenCalledWith(
       "skills/user-1/skill-1/doc.pdf",
       expect.any(Buffer),
@@ -577,9 +560,7 @@ describe("skillRouter", () => {
       context,
     });
 
-    expect(getPresignedDownloadUrlMock).toHaveBeenCalledWith(
-      "skills/user-1/skill-1/doc.pdf",
-    );
+    expect(getPresignedDownloadUrlMock).toHaveBeenCalledWith("skills/user-1/skill-1/doc.pdf");
     expect(result).toEqual({
       url: "https://example.com/presigned-url",
       filename: "doc.pdf",
@@ -616,9 +597,7 @@ describe("skillRouter", () => {
       context,
     });
 
-    expect(deleteFromS3Mock).toHaveBeenCalledWith(
-      "skills/user-1/skill-1/doc.pdf",
-    );
+    expect(deleteFromS3Mock).toHaveBeenCalledWith("skills/user-1/skill-1/doc.pdf");
     expect(result).toEqual({ success: true });
   });
 

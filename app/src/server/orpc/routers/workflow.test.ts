@@ -266,8 +266,7 @@ describe("workflowRouter", () => {
       input: { id: "wf-1" },
       context,
     });
-    const getRunsArgs =
-      context.db.query.workflowRun.findMany.mock.calls[0]?.[0];
+    const getRunsArgs = context.db.query.workflowRun.findMany.mock.calls[0]?.[0];
     const getRunsOrderBy = getRunsArgs.orderBy(
       { startedAt: "started-col" },
       { desc: (value: unknown) => `d:${value}` },
@@ -655,9 +654,7 @@ describe("workflowRouter", () => {
       context,
     });
 
-    expect(context.mocks.updateSetMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "" }),
-    );
+    expect(context.mocks.updateSetMock).toHaveBeenCalledWith(expect.objectContaining({ name: "" }));
   });
 
   it("falls back to first prompt sentence when update name generation is empty", async () => {
@@ -764,9 +761,7 @@ describe("workflowRouter", () => {
   it("returns INTERNAL_SERVER_ERROR when scheduler cleanup fails during delete", async () => {
     const context = createContext();
     context.mocks.deleteReturningMock.mockResolvedValue([{ id: "wf-1" }]);
-    removeWorkflowScheduleJobMock.mockRejectedValueOnce(
-      new Error("queue unavailable"),
-    );
+    removeWorkflowScheduleJobMock.mockRejectedValueOnce(new Error("queue unavailable"));
 
     await expect(
       workflowRouterAny.delete({
@@ -884,8 +879,7 @@ describe("workflowRouter", () => {
       input: { id: "run-1" },
       context,
     });
-    const eventArgs =
-      context.db.query.workflowRunEvent.findMany.mock.calls[0]?.[0];
+    const eventArgs = context.db.query.workflowRunEvent.findMany.mock.calls[0]?.[0];
     const eventsOrderBy = eventArgs.orderBy(
       { createdAt: "created-col" },
       { asc: (value: unknown) => `a:${value}` },
@@ -973,8 +967,7 @@ describe("workflowRouter", () => {
       input: { workflowId: "wf-1", limit: 10 },
       context,
     });
-    const listRunsArgs =
-      context.db.query.workflowRun.findMany.mock.calls[0]?.[0];
+    const listRunsArgs = context.db.query.workflowRun.findMany.mock.calls[0]?.[0];
     const listRunsOrderBy = listRunsArgs.orderBy(
       { startedAt: "started-col" },
       { desc: (value: unknown) => `d:${value}` },

@@ -188,9 +188,7 @@ describe("integrationSkillRouter", () => {
 
   it("maps Error instances from createFromChat to BAD_REQUEST with the original message", async () => {
     const context = createContext();
-    createCommunityIntegrationSkillMock.mockRejectedValue(
-      new Error("already exists"),
-    );
+    createCommunityIntegrationSkillMock.mockRejectedValue(new Error("already exists"));
 
     await expect(
       integrationSkillRouterAny.createFromChat({
@@ -255,8 +253,7 @@ describe("integrationSkillRouter", () => {
       input: { slug: "slack" },
       context,
     });
-    const findManyArgs =
-      context.db.query.integrationSkill.findMany.mock.calls[0]?.[0];
+    const findManyArgs = context.db.query.integrationSkill.findMany.mock.calls[0]?.[0];
     const orderByResult = findManyArgs.orderBy(
       { createdAt: "createdAt-field" },
       { desc: (value: unknown) => `desc(${String(value)})` },
@@ -305,9 +302,7 @@ describe("integrationSkillRouter", () => {
     const context = createContext();
     getOfficialIntegrationSkillIndexMock.mockResolvedValue(new Map());
     context.db.query.integrationSkill.findMany.mockResolvedValue([]);
-    context.db.query.integrationSkillPreference.findFirst.mockResolvedValue(
-      null,
-    );
+    context.db.query.integrationSkillPreference.findFirst.mockResolvedValue(null);
 
     const result = await integrationSkillRouterAny.listBySlug({
       input: { slug: "slack" },
@@ -331,19 +326,14 @@ describe("integrationSkillRouter", () => {
       dirName: "slack",
     };
     resolveIntegrationSkillForUserMock.mockResolvedValue(resolved);
-    context.db.query.integrationSkillPreference.findFirst.mockResolvedValue(
-      null,
-    );
+    context.db.query.integrationSkillPreference.findFirst.mockResolvedValue(null);
 
     const result = await integrationSkillRouterAny.getResolvedForUser({
       input: { slug: "slack" },
       context,
     });
 
-    expect(resolveIntegrationSkillForUserMock).toHaveBeenCalledWith(
-      "user-1",
-      "slack",
-    );
+    expect(resolveIntegrationSkillForUserMock).toHaveBeenCalledWith("user-1", "slack");
     expect(result).toEqual({
       slug: "slack",
       resolved,
@@ -441,9 +431,7 @@ describe("integrationSkillRouter", () => {
   it("saves official preference with null preferredSkillId", async () => {
     const context = createContext();
     getOfficialIntegrationSkillIndexMock.mockResolvedValue(
-      new Map([
-        ["slack", { slug: "slack", description: "", dirName: "slack" }],
-      ]),
+      new Map([["slack", { slug: "slack", description: "", dirName: "slack" }]]),
     );
 
     const result = await integrationSkillRouterAny.setPreference({
@@ -525,9 +513,7 @@ describe("integrationSkillRouter", () => {
       description: "Old",
       createdByUserId: "user-1",
     });
-    validateIntegrationSkillFilePathMock.mockImplementation(
-      (path: string) => path !== "../bad.md",
-    );
+    validateIntegrationSkillFilePathMock.mockImplementation((path: string) => path !== "../bad.md");
 
     await expect(
       integrationSkillRouterAny.updateCommunitySkill({
@@ -684,8 +670,7 @@ describe("integrationSkillRouter", () => {
     const result = await integrationSkillRouterAny.listPublic({
       input: undefined,
     });
-    const findManyArgs =
-      dbMock.query.integrationSkill.findMany.mock.calls[0]?.[0];
+    const findManyArgs = dbMock.query.integrationSkill.findMany.mock.calls[0]?.[0];
     const orderByResult = findManyArgs.orderBy(
       { createdAt: "createdAt-field" },
       { desc: (value: unknown) => `desc(${String(value)})` },
@@ -716,9 +701,7 @@ describe("integrationSkillRouter", () => {
       input: { slug: "  GitHub  ", limit: 10 },
     });
 
-    expect(normalizeIntegrationSkillSlugMock).toHaveBeenCalledWith(
-      "  GitHub  ",
-    );
+    expect(normalizeIntegrationSkillSlugMock).toHaveBeenCalledWith("  GitHub  ");
     expect(dbMock.query.integrationSkill.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 10 }),
     );

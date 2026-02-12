@@ -19,9 +19,7 @@ export default function WorkflowRunPage() {
           <div className="h-9 w-9" />
           <div>
             <h2 className="text-sm font-medium">Workflow run</h2>
-            <p className="font-mono text-xs text-muted-foreground">
-              ID: {runId}
-            </p>
+            <p className="font-mono text-xs text-muted-foreground">ID: {runId}</p>
           </div>
         </div>
         <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -32,9 +30,7 @@ export default function WorkflowRunPage() {
   }
 
   if (!run) {
-    return (
-      <div className="p-6 text-sm text-muted-foreground">Run not found.</div>
-    );
+    return <div className="p-6 text-sm text-muted-foreground">Run not found.</div>;
   }
 
   if (!run.conversationId) {
@@ -46,13 +42,11 @@ export default function WorkflowRunPage() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h2 className="text-lg font-semibold">
-            Run details unavailable in chat view
-          </h2>
+          <h2 className="text-lg font-semibold">Run details unavailable in chat view</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          This run does not have a linked conversation, so it cannot be opened
-          in the chat interface.
+          This run does not have a linked conversation, so it cannot be opened in the chat
+          interface.
         </p>
       </div>
     );
@@ -68,9 +62,7 @@ export default function WorkflowRunPage() {
         </Button>
         <div>
           <h2 className="text-sm font-medium">Workflow run</h2>
-          <p className="text-xs text-muted-foreground font-mono">
-            ID: {run.id}
-          </p>
+          <p className="text-xs text-muted-foreground font-mono">ID: {run.id}</p>
         </div>
       </div>
       <div className="flex min-h-0 flex-1 overflow-hidden bg-background">

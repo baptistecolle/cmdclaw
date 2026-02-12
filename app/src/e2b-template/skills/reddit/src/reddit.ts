@@ -70,14 +70,8 @@ function formatComment(comment: Record<string, unknown>): unknown {
     author: data.author,
     body: data.body,
     score: data.score,
-    created: data.created_utc
-      ? new Date(data.created_utc * 1000).toISOString()
-      : undefined,
-    replies:
-      data.replies?.data?.children
-        ?.map(formatComment)
-        .filter(Boolean)
-        .slice(0, 3) || [],
+    created: data.created_utc ? new Date(data.created_utc * 1000).toISOString() : undefined,
+    replies: data.replies?.data?.children?.map(formatComment).filter(Boolean).slice(0, 3) || [],
   };
 }
 

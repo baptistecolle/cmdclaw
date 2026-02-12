@@ -54,9 +54,7 @@ import {
 
 type WorkflowScheduleRowInput = Parameters<typeof upsertWorkflowScheduleJob>[0];
 
-function createRow(
-  overrides: Partial<WorkflowScheduleRowInput> = {},
-): WorkflowScheduleRowInput {
+function createRow(overrides: Partial<WorkflowScheduleRowInput> = {}): WorkflowScheduleRowInput {
   return {
     id: "wf-1",
     triggerType: "schedule",
@@ -82,12 +80,8 @@ describe("workflow-scheduler", () => {
   it("detects whether a workflow row is schedulable", () => {
     expect(isWorkflowSchedulable(createRow())).toBe(true);
     expect(isWorkflowSchedulable(createRow({ status: "off" }))).toBe(false);
-    expect(isWorkflowSchedulable(createRow({ triggerType: "manual" }))).toBe(
-      false,
-    );
-    expect(
-      isWorkflowSchedulable(createRow({ schedule: { type: "daily" } })),
-    ).toBe(false);
+    expect(isWorkflowSchedulable(createRow({ triggerType: "manual" }))).toBe(false);
+    expect(isWorkflowSchedulable(createRow({ schedule: { type: "daily" } }))).toBe(false);
   });
 
   it("removes scheduler jobs by workflow id", async () => {

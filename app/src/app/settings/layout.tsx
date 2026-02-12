@@ -12,11 +12,7 @@ const settingsTabs = [
   { label: "Devices", href: "/settings/devices" },
 ];
 
-export default function SettingsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
@@ -26,9 +22,7 @@ export default function SettingsLayout({
           <nav className="sticky top-0 z-10 mb-6 flex gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
             {settingsTabs.map((tab) => {
               const isActive =
-                tab.href === "/settings"
-                  ? pathname === "/settings"
-                  : pathname.startsWith(tab.href);
+                tab.href === "/settings" ? pathname === "/settings" : pathname.startsWith(tab.href);
               return (
                 <Link
                   key={tab.href}

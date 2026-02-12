@@ -1,8 +1,5 @@
 import { Sandbox } from "e2b";
-import {
-  createOpencodeClient,
-  type OpencodeClient,
-} from "@opencode-ai/sdk/v2/client";
+import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk/v2/client";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
 import { skill, message, providerAuth } from "@/server/db/schema";
@@ -14,10 +11,7 @@ import { eq, and, asc } from "drizzle-orm";
 import { downloadFromS3 } from "@/server/storage/s3-client";
 import { decrypt } from "@/server/utils/encryption";
 import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integration-skill-service";
-import {
-  logServerEvent,
-  type ObservabilityContext,
-} from "@/server/utils/observability";
+import { logServerEvent, type ObservabilityContext } from "@/server/utils/observability";
 import type { SandboxBackend, ExecuteResult } from "./types";
 
 // Use custom template with OpenCode pre-installed
@@ -235,9 +229,7 @@ export async function getOrCreateSandbox(
 
   // Set SANDBOX_ID env var (needed by plugin)
   try {
-    await sandbox.commands.run(
-      `echo "export SANDBOX_ID=${sandbox.sandboxId}" >> ~/.bashrc`,
-    );
+    await sandbox.commands.run(`echo "export SANDBOX_ID=${sandbox.sandboxId}" >> ~/.bashrc`);
   } catch (error) {
     logServerEvent(
       "warn",
@@ -361,9 +353,7 @@ export async function getOrCreateSandbox(
 /**
  * Get the OpenCode client for a conversation's sandbox
  */
-export function getOpencodeClient(
-  conversationId: string,
-): OpencodeClient | undefined {
+export function getOpencodeClient(conversationId: string): OpencodeClient | undefined {
   const state = activeSandboxes.get(conversationId);
   return state?.client;
 }
@@ -371,9 +361,7 @@ export function getOpencodeClient(
 /**
  * Get the sandbox state for a conversation
  */
-export function getSandboxState(
-  conversationId: string,
-): SandboxState | undefined {
+export function getSandboxState(conversationId: string): SandboxState | undefined {
   return activeSandboxes.get(conversationId);
 }
 
@@ -510,11 +498,7 @@ export async function getOrCreateSession(
       },
       { ...telemetryContext, sessionId },
     );
-    await replayConversationHistory(
-      state.client,
-      sessionId,
-      config.conversationId,
-    );
+    await replayConversationHistory(state.client, sessionId, config.conversationId);
     logLifecycle(
       "SESSION_REPLAY_COMPLETED",
       {
@@ -567,9 +551,7 @@ async function replayConversationHistory(
 
   const boundaryIndex = messages
     .map((m, idx) =>
-      m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX)
-        ? idx
-        : -1,
+      m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1,
     )
     .filter((idx) => idx >= 0)
     .pop();
@@ -579,23 +561,18 @@ async function replayConversationHistory(
 
   const summaryIndex = sessionMessages
     .map((m, idx) =>
-      m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX)
-        ? idx
-        : -1,
+      m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX) ? idx : -1,
     )
     .filter((idx) => idx >= 0)
     .pop();
 
-  const summaryMessage =
-    summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
+  const summaryMessage = summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
   const summaryText = summaryMessage
     ? summaryMessage.content.replace(COMPACTION_SUMMARY_PREFIX, "").trim()
     : null;
 
   const messagesAfterSummary =
-    summaryIndex !== undefined
-      ? sessionMessages.slice(summaryIndex + 1)
-      : sessionMessages;
+    summaryIndex !== undefined ? sessionMessages.slice(summaryIndex + 1) : sessionMessages;
 
   // Build conversation context
   const historyContext = messagesAfterSummary
@@ -623,9 +600,7 @@ async function replayConversationHistory(
     .filter(Boolean)
     .join("\n\n");
 
-  const summaryBlock = summaryText
-    ? `Summary of previous conversation:\n${summaryText}\n\n`
-    : "";
+  const summaryBlock = summaryText ? `Summary of previous conversation:\n${summaryText}\n\n` : "";
 
   // Inject history as context using noReply: true
   await client.session.prompt({
@@ -645,10 +620,7 @@ async function replayConversationHistory(
  * Called after sandbox creation to give OpenCode access to the user's
  * ChatGPT/Gemini/Kimi subscriptions.
  */
-export async function injectProviderAuth(
-  client: OpencodeClient,
-  userId: string,
-): Promise<void> {
+export async function injectProviderAuth(client: OpencodeClient, userId: string): Promise<void> {
   try {
     const auths = await db.query.providerAuth.findMany({
       where: eq(providerAuth.userId, userId),
@@ -734,10 +706,7 @@ export function isE2BConfigured(): boolean {
 /**
  * Write user's skills to the sandbox as AGENTS.md format
  */
-export async function writeSkillsToSandbox(
-  sandbox: Sandbox,
-  userId: string,
-): Promise<string[]> {
+export async function writeSkillsToSandbox(sandbox: Sandbox, userId: string): Promise<string[]> {
   // Fetch all enabled skills for user with their files and documents
   const skills = await db.query.skill.findMany({
     where: and(eq(skill.userId, userId), eq(skill.enabled, true)),
@@ -789,9 +758,7 @@ export async function writeSkillsToSandbox(
         const docPath = `${skillDir}/${doc.filename}`;
         const arrayBuffer = new Uint8Array(buffer).buffer;
         await sandbox.files.write(docPath, arrayBuffer);
-        console.log(
-          `[E2B] Written document: ${doc.filename} (${doc.sizeBytes} bytes)`,
-        );
+        console.log(`[E2B] Written document: ${doc.filename} (${doc.sizeBytes} bytes)`);
       } catch (error) {
         console.error(`[E2B] Failed to write document ${doc.filename}:`, error);
       }
@@ -839,10 +806,7 @@ export async function writeResolvedIntegrationSkillsToSandbox(
   userId: string,
   allowedSlugs?: string[],
 ): Promise<string[]> {
-  const resolved = await resolvePreferredCommunitySkillsForUser(
-    userId,
-    allowedSlugs,
-  );
+  const resolved = await resolvePreferredCommunitySkillsForUser(userId, allowedSlugs);
   if (resolved.length === 0) {
     return [];
   }

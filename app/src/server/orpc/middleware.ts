@@ -12,27 +12,25 @@ export type AuthenticatedContext = ORPCContext & {
 };
 
 // Protected procedure requiring authentication
-export const protectedProcedure = baseProcedure.use(
-  async ({ context, next }) => {
-    if (!context.user || !context.session) {
-      console.error("[Auth Middleware] No user or session found");
-      throw new ORPCError("UNAUTHORIZED", { message: "You must be logged in" });
-    }
+export const protectedProcedure = baseProcedure.use(async ({ context, next }) => {
+  if (!context.user || !context.session) {
+    console.error("[Auth Middleware] No user or session found");
+    throw new ORPCError("UNAUTHORIZED", { message: "You must be logged in" });
+  }
 
-    try {
-      return await next({
-        context: {
-          ...context,
-          user: context.user,
-          session: context.session,
-        } satisfies AuthenticatedContext,
-      });
-    } catch (error) {
-      console.error("[Procedure Error]", error);
-      throw error;
-    }
-  },
-);
+  try {
+    return await next({
+      context: {
+        ...context,
+        user: context.user,
+        session: context.session,
+      } satisfies AuthenticatedContext,
+    });
+  } catch (error) {
+    console.error("[Procedure Error]", error);
+    throw error;
+  }
+});
 
 // Optional auth - passes through but includes user if available
 export const optionalAuthProcedure = baseProcedure;

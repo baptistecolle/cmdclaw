@@ -2,12 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  MessageList,
-  type Message,
-  type MessagePart,
-  type AttachmentData,
-} from "./message-list";
+import { MessageList, type Message, type MessagePart, type AttachmentData } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
 import { DeviceSelector } from "./device-selector";
@@ -28,12 +23,7 @@ import {
   type SandboxFileData,
 } from "@/orpc/hooks";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
-import {
-  MessageSquare,
-  AlertCircle,
-  Activity,
-  CircleCheck,
-} from "lucide-react";
+import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useHotkeys } from "react-hotkeys-hook";
 import { usePostHog } from "posthog-js/react";
@@ -97,13 +87,10 @@ function getAgentInitLabel(status: string | null): string {
 export function ChatArea({ conversationId }: Props) {
   const queryClient = useQueryClient();
   const posthog = usePostHog();
-  const { data: existingConversation, isLoading } =
-    useConversation(conversationId);
+  const { data: existingConversation, isLoading } = useConversation(conversationId);
   const { startGeneration, subscribeToGeneration, abort } = useGeneration();
-  const { mutateAsync: submitApproval, isPending: isApproving } =
-    useSubmitApproval();
-  const { mutateAsync: submitAuthResult, isPending: isSubmittingAuth } =
-    useSubmitAuthResult();
+  const { mutateAsync: submitApproval, isPending: isApproving } = useSubmitApproval();
+  const { mutateAsync: submitAuthResult, isPending: isSubmittingAuth } = useSubmitAuthResult();
   const { mutateAsync: getAuthUrl } = useGetAuthUrl();
   const { mutateAsync: cancelGeneration } = useCancelGeneration();
   const { data: activeGeneration } = useActiveGeneration(conversationId);
@@ -118,25 +105,17 @@ export function ChatArea({ conversationId }: Props) {
   const [streamError, setStreamError] = useState<string | null>(null);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [localAutoApprove, setLocalAutoApprove] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(
-    "claude-sonnet-4-20250514",
-  );
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(
-    undefined,
-  );
+  const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-20250514");
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
 
   // Segmented activity feed state
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
-  const [, setIntegrationsUsed] = useState<
-    Set<IntegrationType>
-  >(new Set());
+  const [, setIntegrationsUsed] = useState<Set<IntegrationType>>(new Set());
   const [, setTraceStatus] = useState<TraceStatus>("complete");
   const [agentInitStatus, setAgentInitStatus] = useState<string | null>(null);
 
   // Sandbox files collected during streaming
-  const [, setStreamingSandboxFiles] = useState<
-    SandboxFileData[]
-  >([]);
+  const [, setStreamingSandboxFiles] = useState<SandboxFileData[]>([]);
 
   // Current conversation ID (may be set during streaming for new conversations)
   const currentConversationIdRef = useRef<string | undefined>(conversationId);
@@ -150,9 +129,7 @@ export function ChatArea({ conversationId }: Props) {
   const initSignalReceivedAtRef = useRef<number | null>(null);
   const initSignalEventTypeRef = useRef<string | null>(null);
   const initTimeoutEventSentRef = useRef(false);
-  const initWatchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const initWatchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetInitTracking = useCallback(() => {
     initTrackingStartedAtRef.current = null;
@@ -184,10 +161,7 @@ export function ChatArea({ conversationId }: Props) {
       });
 
       initWatchdogTimerRef.current = setTimeout(() => {
-        if (
-          !initTrackingStartedAtRef.current ||
-          initSignalReceivedAtRef.current
-        ) {
+        if (!initTrackingStartedAtRef.current || initSignalReceivedAtRef.current) {
           return;
         }
         initTimeoutEventSentRef.current = true;
@@ -208,10 +182,7 @@ export function ChatArea({ conversationId }: Props) {
 
   const markInitSignal = useCallback(
     (eventType: string, metadata?: Record<string, unknown>) => {
-      if (
-        !initTrackingStartedAtRef.current ||
-        initSignalReceivedAtRef.current
-      ) {
+      if (!initTrackingStartedAtRef.current || initSignalReceivedAtRef.current) {
         return;
       }
       const now = Date.now();
@@ -240,10 +211,7 @@ export function ChatArea({ conversationId }: Props) {
 
   const markInitMissingAtEnd = useCallback(
     (endReason: string, metadata?: Record<string, unknown>) => {
-      if (
-        !initTrackingStartedAtRef.current ||
-        initSignalReceivedAtRef.current
-      ) {
+      if (!initTrackingStartedAtRef.current || initSignalReceivedAtRef.current) {
         return;
       }
 
@@ -307,9 +275,7 @@ export function ChatArea({ conversationId }: Props) {
         })),
       })),
     );
-    setIntegrationsUsed(
-      new Set(snapshot.integrationsUsed as IntegrationType[]),
-    );
+    setIntegrationsUsed(new Set(snapshot.integrationsUsed as IntegrationType[]));
     setStreamingSandboxFiles(snapshot.sandboxFiles as SandboxFileData[]);
     setTraceStatus(snapshot.traceStatus);
   }, []);
@@ -340,12 +306,7 @@ export function ChatArea({ conversationId }: Props) {
   const { mutateAsync: updateAutoApprove } = useUpdateAutoApprove();
 
   // Voice recording
-  const {
-    isRecording,
-    error: voiceError,
-    startRecording,
-    stopRecording,
-  } = useVoiceRecording();
+  const { isRecording, error: voiceError, startRecording, stopRecording } = useVoiceRecording();
   const { mutateAsync: transcribe } = useTranscribe();
 
   // Load existing messages
@@ -430,10 +391,7 @@ export function ChatArea({ conversationId }: Props) {
           // Map persisted attachments
           let attachments: AttachmentData[] | undefined;
           const mAny = m as Record<string, unknown>;
-          if (
-            Array.isArray(mAny.attachments) &&
-            (mAny.attachments as unknown[]).length > 0
-          ) {
+          if (Array.isArray(mAny.attachments) && (mAny.attachments as unknown[]).length > 0) {
             attachments = (
               mAny.attachments as Array<{
                 id: string;
@@ -451,10 +409,7 @@ export function ChatArea({ conversationId }: Props) {
 
           // Map persisted sandbox files
           let sandboxFiles: SandboxFileData[] | undefined;
-          if (
-            Array.isArray(mAny.sandboxFiles) &&
-            (mAny.sandboxFiles as unknown[]).length > 0
-          ) {
+          if (Array.isArray(mAny.sandboxFiles) && (mAny.sandboxFiles as unknown[]).length > 0) {
             sandboxFiles = (
               mAny.sandboxFiles as Array<{
                 fileId: string;
@@ -777,9 +732,7 @@ export function ChatArea({ conversationId }: Props) {
   // Helper to toggle segment expansion
   const toggleSegmentExpand = useCallback((segmentId: string) => {
     setSegments((prev) =>
-      prev.map((seg) =>
-        seg.id === segmentId ? { ...seg, isExpanded: !seg.isExpanded } : seg,
-      ),
+      prev.map((seg) => (seg.id === segmentId ? { ...seg, isExpanded: !seg.isExpanded } : seg)),
     );
   }, []);
 
@@ -809,8 +762,7 @@ export function ChatArea({ conversationId }: Props) {
       runtimeRef.current = runtime;
       syncFromRuntime(runtime);
 
-      const effectiveConversationId =
-        currentConversationIdRef.current ?? conversationId;
+      const effectiveConversationId = currentConversationIdRef.current ?? conversationId;
       await startGeneration(
         {
           conversationId: effectiveConversationId,
@@ -905,9 +857,7 @@ export function ChatArea({ conversationId }: Props) {
                 content: assistant.content,
                 parts: assistant.parts as MessagePart[],
                 integrationsUsed: assistant.integrationsUsed,
-                sandboxFiles: assistant.sandboxFiles as
-                  | SandboxFileData[]
-                  | undefined,
+                sandboxFiles: assistant.sandboxFiles as SandboxFileData[] | undefined,
               } as Message & {
                 integrationsUsed?: IntegrationType[];
                 sandboxFiles?: SandboxFileData[];
@@ -928,11 +878,7 @@ export function ChatArea({ conversationId }: Props) {
 
             // Update URL for new conversations without remounting
             if (!conversationId && newConversationId) {
-              window.history.replaceState(
-                null,
-                "",
-                `/chat/${newConversationId}`,
-              );
+              window.history.replaceState(null, "", `/chat/${newConversationId}`);
             }
           },
           onError: (message) => {
@@ -1246,9 +1192,7 @@ export function ChatArea({ conversationId }: Props) {
                               !segment.auth
                             }
                             isExpanded={segment.isExpanded}
-                            onToggleExpand={() =>
-                              toggleSegmentExpand(segment.id)
-                            }
+                            onToggleExpand={() => toggleSegmentExpand(segment.id)}
                             integrationsUsed={segmentIntegrations}
                           />
                         )}
@@ -1264,12 +1208,8 @@ export function ChatArea({ conversationId }: Props) {
                             command={segment.approval.command}
                             status={segment.approval.status}
                             isLoading={isApproving}
-                            onApprove={() =>
-                              handleApprove(segment.approval!.toolUseId)
-                            }
-                            onDeny={() =>
-                              handleDeny(segment.approval!.toolUseId)
-                            }
+                            onApprove={() => handleApprove(segment.approval!.toolUseId)}
+                            onDeny={() => handleDeny(segment.approval!.toolUseId)}
                           />
                         )}
 
@@ -1277,9 +1217,7 @@ export function ChatArea({ conversationId }: Props) {
                         {segment.auth && (
                           <AuthRequestCard
                             integrations={segment.auth.integrations}
-                            connectedIntegrations={
-                              segment.auth.connectedIntegrations
-                            }
+                            connectedIntegrations={segment.auth.connectedIntegrations}
                             reason={segment.auth.reason}
                             status={segment.auth.status}
                             isLoading={isSubmittingAuth}
@@ -1324,21 +1262,15 @@ export function ChatArea({ conversationId }: Props) {
                 onModelChange={setSelectedModel}
                 disabled={isStreaming}
               />
-              <DeviceSelector
-                selectedDeviceId={selectedDeviceId}
-                onSelect={setSelectedDeviceId}
-              />
+              <DeviceSelector selectedDeviceId={selectedDeviceId} onSelect={setSelectedDeviceId} />
             </div>
             <div className="flex items-center gap-2">
               <Switch
                 id="auto-approve"
                 checked={
                   conversationId
-                    ? ((
-                        existingConversation as
-                          | { autoApprove?: boolean }
-                          | undefined
-                      )?.autoApprove ?? false)
+                    ? ((existingConversation as { autoApprove?: boolean } | undefined)
+                        ?.autoApprove ?? false)
                     : localAutoApprove
                 }
                 onCheckedChange={(checked) => {

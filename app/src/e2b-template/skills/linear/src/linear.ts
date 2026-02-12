@@ -73,8 +73,7 @@ async function getIssue(identifier: string) {
     }
   }`);
 
-  if (!data.issues.nodes.length)
-    throw new Error(`Issue ${identifier} not found`);
+  if (!data.issues.nodes.length) throw new Error(`Issue ${identifier} not found`);
   console.log(JSON.stringify(data.issues.nodes[0], null, 2));
 }
 
@@ -89,8 +88,7 @@ async function createIssue() {
   const teamData = await graphql(
     `query { teams(filter: { key: { eq: "${values.team}" } }) { nodes { id } } }`,
   );
-  if (!teamData.teams.nodes.length)
-    throw new Error(`Team ${values.team} not found`);
+  if (!teamData.teams.nodes.length) throw new Error(`Team ${values.team} not found`);
 
   const input: Record<string, unknown> = {
     teamId: teamData.teams.nodes[0].id,
@@ -103,8 +101,7 @@ async function createIssue() {
     const userData = await graphql(
       `query { users(filter: { email: { eq: "${values.assignee}" } }) { nodes { id } } }`,
     );
-    if (userData.users.nodes.length)
-      input.assigneeId = userData.users.nodes[0].id;
+    if (userData.users.nodes.length) input.assigneeId = userData.users.nodes[0].id;
   }
 
   const data = await graphql(
@@ -133,8 +130,7 @@ async function updateIssue(identifier: string) {
   const issueData = await graphql(`query {
     issues(filter: { identifier: { eq: "${identifier}" } }) { nodes { id team { id } } }
   }`);
-  if (!issueData.issues.nodes.length)
-    throw new Error(`Issue ${identifier} not found`);
+  if (!issueData.issues.nodes.length) throw new Error(`Issue ${identifier} not found`);
 
   const input: Record<string, unknown> = {};
   if (values.title) input.title = values.title;
@@ -146,8 +142,7 @@ async function updateIssue(identifier: string) {
     const stateData = await graphql(`query {
       workflowStates(filter: { team: { id: { eq: "${teamId}" } }, name: { eq: "${values.state}" } }) { nodes { id } }
     }`);
-    if (stateData.workflowStates.nodes.length)
-      input.stateId = stateData.workflowStates.nodes[0].id;
+    if (stateData.workflowStates.nodes.length) input.stateId = stateData.workflowStates.nodes[0].id;
   }
 
   const data = await graphql(

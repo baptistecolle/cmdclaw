@@ -10,11 +10,7 @@ type Props = {
   defaultExpanded?: boolean;
 };
 
-export function ThinkingPartDisplay({
-  content,
-  isStreaming,
-  defaultExpanded = false,
-}: Props) {
+export function ThinkingPartDisplay({ content, isStreaming, defaultExpanded = false }: Props) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   // Preview: first 80 chars or first line
@@ -55,9 +51,7 @@ export function ThinkingPartDisplay({
       {/* Content - collapsible */}
       {isExpanded && (
         <div className="border-t border-muted-foreground/20 px-3 py-2">
-          <p className="whitespace-pre-wrap text-sm text-muted-foreground italic">
-            {content}
-          </p>
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground italic">{content}</p>
           {isStreaming && (
             <span className="inline-block h-4 w-1 animate-pulse bg-muted-foreground/50" />
           )}

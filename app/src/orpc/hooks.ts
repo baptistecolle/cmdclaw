@@ -22,10 +22,7 @@ function isStreamNotReadyError(message: string | undefined): boolean {
   return (message ?? "").trim() === STREAM_NOT_READY_ERROR;
 }
 
-async function waitForRetry(
-  signal: AbortSignal,
-  delayMs: number,
-): Promise<boolean> {
+async function waitForRetry(signal: AbortSignal, delayMs: number): Promise<boolean> {
   if (signal.aborted) return false;
   return await new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => {
@@ -173,8 +170,7 @@ export function useLinkLinkedIn() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (accountId: string) =>
-      client.integration.linkLinkedIn({ accountId }),
+    mutationFn: (accountId: string) => client.integration.linkLinkedIn({ accountId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integration"] });
     },
@@ -289,8 +285,7 @@ export function useDeleteCustomIntegration() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) =>
-      client.integration.deleteCustomIntegration({ id }),
+    mutationFn: (id: string) => client.integration.deleteCustomIntegration({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customIntegration"] });
     },
@@ -299,13 +294,8 @@ export function useDeleteCustomIntegration() {
 
 export function useGetCustomAuthUrl() {
   return useMutation({
-    mutationFn: ({
-      slug,
-      redirectUrl,
-    }: {
-      slug: string;
-      redirectUrl: string;
-    }) => client.integration.getCustomAuthUrl({ slug, redirectUrl }),
+    mutationFn: ({ slug, redirectUrl }: { slug: string; redirectUrl: string }) =>
+      client.integration.getCustomAuthUrl({ slug, redirectUrl }),
   });
 }
 
@@ -389,13 +379,8 @@ export function useCreateSkill() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      displayName,
-      description,
-    }: {
-      displayName: string;
-      description: string;
-    }) => client.skill.create({ displayName, description }),
+    mutationFn: ({ displayName, description }: { displayName: string; description: string }) =>
+      client.skill.create({ displayName, description }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["skill"] });
     },
@@ -453,15 +438,8 @@ export function useAddSkillFile() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      skillId,
-      path,
-      content,
-    }: {
-      skillId: string;
-      path: string;
-      content: string;
-    }) => client.skill.addFile({ skillId, path, content }),
+    mutationFn: ({ skillId, path, content }: { skillId: string; path: string; content: string }) =>
+      client.skill.addFile({ skillId, path, content }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["skill"] });
     },
@@ -592,8 +570,7 @@ export function useTriggerWorkflow() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { id: string; payload?: unknown }) =>
-      client.workflow.trigger(input),
+    mutationFn: (input: { id: string; payload?: unknown }) => client.workflow.trigger(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workflow"] });
     },
@@ -727,8 +704,7 @@ export function useOpencodeFreeModels() {
 // Hook for initiating subscription provider OAuth connection
 export function useConnectProvider() {
   return useMutation({
-    mutationFn: (provider: OAuthSubscriptionProvider) =>
-      client.providerAuth.connect({ provider }),
+    mutationFn: (provider: OAuthSubscriptionProvider) => client.providerAuth.connect({ provider }),
   });
 }
 
@@ -737,8 +713,7 @@ export function useDisconnectProvider() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (provider: SubscriptionProvider) =>
-      client.providerAuth.disconnect({ provider }),
+    mutationFn: (provider: SubscriptionProvider) => client.providerAuth.disconnect({ provider }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["providerAuth"] });
     },
@@ -802,12 +777,7 @@ export function useGeneration() {
                 });
               },
               onDone: (generationId, conversationId, messageId, usage) => {
-                callbacks.onDone?.(
-                  generationId,
-                  conversationId,
-                  messageId,
-                  usage,
-                );
+                callbacks.onDone?.(generationId, conversationId, messageId, usage);
                 queryClient.invalidateQueries({ queryKey: ["conversation"] });
               },
               onError: (message) => {
@@ -848,10 +818,7 @@ export function useGeneration() {
           }
 
           retries += 1;
-          const shouldContinue = await waitForRetry(
-            signal,
-            STREAM_RETRY_DELAY_MS,
-          );
+          const shouldContinue = await waitForRetry(signal, STREAM_RETRY_DELAY_MS);
           if (!shouldContinue) {
             return currentGenerationId && currentConversationId
               ? {
@@ -872,9 +839,7 @@ export function useGeneration() {
         if (error instanceof Error && error.name === "AbortError") {
           return null;
         }
-        callbacks.onError?.(
-          error instanceof Error ? error.message : "Unknown error",
-        );
+        callbacks.onError?.(error instanceof Error ? error.message : "Unknown error");
         return null;
       } finally {
         abortControllerRef.current = null;
@@ -899,18 +864,8 @@ export function useGeneration() {
             signal,
             callbacks: {
               ...callbacks,
-              onDone: (
-                doneGenerationId,
-                doneConversationId,
-                messageId,
-                usage,
-              ) => {
-                callbacks.onDone?.(
-                  doneGenerationId,
-                  doneConversationId,
-                  messageId,
-                  usage,
-                );
+              onDone: (doneGenerationId, doneConversationId, messageId, usage) => {
+                callbacks.onDone?.(doneGenerationId, doneConversationId, messageId, usage);
                 queryClient.invalidateQueries({ queryKey: ["conversation"] });
               },
               onError: (message) => {
@@ -933,10 +888,7 @@ export function useGeneration() {
           }
 
           retries += 1;
-          const shouldContinue = await waitForRetry(
-            signal,
-            STREAM_RETRY_DELAY_MS,
-          );
+          const shouldContinue = await waitForRetry(signal, STREAM_RETRY_DELAY_MS);
           if (!shouldContinue) {
             return;
           }
@@ -945,9 +897,7 @@ export function useGeneration() {
         if (error instanceof Error && error.name === "AbortError") {
           return;
         }
-        callbacks.onError?.(
-          error instanceof Error ? error.message : "Unknown error",
-        );
+        callbacks.onError?.(error instanceof Error ? error.message : "Unknown error");
       } finally {
         abortControllerRef.current = null;
       }
@@ -965,8 +915,7 @@ export function useGeneration() {
 // Hook for canceling a generation
 export function useCancelGeneration() {
   return useMutation({
-    mutationFn: (generationId: string) =>
-      client.generation.cancelGeneration({ generationId }),
+    mutationFn: (generationId: string) => client.generation.cancelGeneration({ generationId }),
   });
 }
 
@@ -981,8 +930,7 @@ export function useSubmitApproval() {
       generationId: string;
       toolUseId: string;
       decision: "approve" | "deny";
-    }) =>
-      client.generation.submitApproval({ generationId, toolUseId, decision }),
+    }) => client.generation.submitApproval({ generationId, toolUseId, decision }),
   });
 }
 
@@ -1018,11 +966,7 @@ export function useActiveGeneration(conversationId: string | undefined) {
     refetchInterval: (query) => {
       // Poll while generating or awaiting auth
       const status = query.state.data?.status;
-      if (
-        status === "generating" ||
-        status === "awaiting_approval" ||
-        status === "awaiting_auth"
-      ) {
+      if (status === "generating" || status === "awaiting_approval" || status === "awaiting_auth") {
         return 2000;
       }
       return false;
@@ -1034,8 +978,7 @@ export function useActiveGeneration(conversationId: string | undefined) {
 export function useGenerationStatus(generationId: string | undefined) {
   return useQuery({
     queryKey: ["generation", "status", generationId],
-    queryFn: () =>
-      client.generation.getGenerationStatus({ generationId: generationId! }),
+    queryFn: () => client.generation.getGenerationStatus({ generationId: generationId! }),
     enabled: !!generationId,
   });
 }
@@ -1043,16 +986,14 @@ export function useGenerationStatus(generationId: string | undefined) {
 // Hook for downloading an attachment (returns presigned URL)
 export function useDownloadAttachment() {
   return useMutation({
-    mutationFn: (attachmentId: string) =>
-      client.conversation.downloadAttachment({ attachmentId }),
+    mutationFn: (attachmentId: string) => client.conversation.downloadAttachment({ attachmentId }),
   });
 }
 
 // Hook for downloading a sandbox file (returns presigned URL)
 export function useDownloadSandboxFile() {
   return useMutation({
-    mutationFn: (fileId: string) =>
-      client.conversation.downloadSandboxFile({ fileId }),
+    mutationFn: (fileId: string) => client.conversation.downloadSandboxFile({ fileId }),
   });
 }
 
@@ -1060,8 +1001,7 @@ export function useDownloadSandboxFile() {
 export function useSandboxFiles(conversationId: string | undefined) {
   return useQuery({
     queryKey: ["sandboxFiles", conversationId],
-    queryFn: () =>
-      client.conversation.getSandboxFiles({ conversationId: conversationId! }),
+    queryFn: () => client.conversation.getSandboxFiles({ conversationId: conversationId! }),
     enabled: !!conversationId,
   });
 }

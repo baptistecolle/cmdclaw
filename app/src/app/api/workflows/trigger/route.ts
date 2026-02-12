@@ -4,9 +4,7 @@ import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
 export async function POST(request: Request) {
   const auth = request.headers.get("authorization") ?? "";
-  const expected = env.BAP_SERVER_SECRET
-    ? `Bearer ${env.BAP_SERVER_SECRET}`
-    : "";
+  const expected = env.BAP_SERVER_SECRET ? `Bearer ${env.BAP_SERVER_SECRET}` : "";
 
   if (!expected || auth !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,10 +16,7 @@ export async function POST(request: Request) {
     const payload = body?.payload ?? {};
 
     if (!workflowId || typeof workflowId !== "string") {
-      return NextResponse.json(
-        { error: "workflowId is required" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "workflowId is required" }, { status: 400 });
     }
 
     const result = await triggerWorkflowRun({
@@ -32,9 +27,6 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Workflow trigger error:", error);
-    return NextResponse.json(
-      { error: "Failed to trigger workflow" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to trigger workflow" }, { status: 500 });
   }
 }

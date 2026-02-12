@@ -17,11 +17,7 @@ export function DocsPreview({ operation, args, positionalArgs }: PreviewProps) {
   }
 }
 
-function DocsCreatePreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function DocsCreatePreview({ args }: { args: Record<string, string | undefined> }) {
   const title = args.title;
   const content = args.content;
 
@@ -39,16 +35,10 @@ function DocsCreatePreview({
           </div>
 
           {content && (
-            <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-              {content}
-            </div>
+            <div className="text-sm text-muted-foreground whitespace-pre-wrap">{content}</div>
           )}
 
-          {!content && (
-            <div className="text-sm text-muted-foreground italic">
-              Empty document
-            </div>
-          )}
+          {!content && <div className="text-sm text-muted-foreground italic">Empty document</div>}
         </div>
       </PreviewSection>
     </div>

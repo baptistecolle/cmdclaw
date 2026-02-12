@@ -8,18 +8,12 @@ import {
   IntegrationLogo,
 } from "./preview-styles";
 
-export function CalendarPreview({
-  operation,
-  args,
-  positionalArgs,
-}: PreviewProps) {
+export function CalendarPreview({ operation, args, positionalArgs }: PreviewProps) {
   switch (operation) {
     case "create":
       return <CalendarCreatePreview args={args} />;
     case "update":
-      return (
-        <CalendarUpdatePreview args={args} positionalArgs={positionalArgs} />
-      );
+      return <CalendarUpdatePreview args={args} positionalArgs={positionalArgs} />;
     case "delete":
       return <CalendarDeletePreview positionalArgs={positionalArgs} />;
     default:
@@ -27,11 +21,7 @@ export function CalendarPreview({
   }
 }
 
-function CalendarCreatePreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function CalendarCreatePreview({ args }: { args: Record<string, string | undefined> }) {
   const summary = args.summary;
   const start = args.start;
   const end = args.end;
@@ -47,9 +37,7 @@ function CalendarCreatePreview({
 
       <PreviewSection>
         <div className="rounded border bg-muted/30 p-3">
-          <div className="font-medium text-base mb-2">
-            {summary || "Untitled Event"}
-          </div>
+          <div className="font-medium text-base mb-2">{summary || "Untitled Event"}</div>
 
           <div className="space-y-1 text-sm">
             {(start || end) && (
@@ -97,28 +85,16 @@ function CalendarUpdatePreview({
 
       <PreviewSection title="Changes">
         {args.summary && <PreviewField label="Title" value={args.summary} />}
-        {args.start && (
-          <PreviewField label="Start" value={formatDateTime(args.start)} />
-        )}
-        {args.end && (
-          <PreviewField label="End" value={formatDateTime(args.end)} />
-        )}
-        {args.description && (
-          <PreviewField label="Description" value={args.description} />
-        )}
-        {args.location && (
-          <PreviewField label="Location" value={args.location} />
-        )}
+        {args.start && <PreviewField label="Start" value={formatDateTime(args.start)} />}
+        {args.end && <PreviewField label="End" value={formatDateTime(args.end)} />}
+        {args.description && <PreviewField label="Description" value={args.description} />}
+        {args.location && <PreviewField label="Location" value={args.location} />}
       </PreviewSection>
     </div>
   );
 }
 
-function CalendarDeletePreview({
-  positionalArgs,
-}: {
-  positionalArgs: string[];
-}) {
+function CalendarDeletePreview({ positionalArgs }: { positionalArgs: string[] }) {
   const eventId = positionalArgs[0];
 
   return (

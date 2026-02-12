@@ -30,29 +30,21 @@ export function WorkflowRunsSidebar() {
 
   const workflows = useMemo(() => {
     const list = Array.isArray(data) ? (data as WorkflowListItem[]) : [];
-    return list.filter(
-      (wf) => Array.isArray(wf.recentRuns) && wf.recentRuns.length > 0,
-    );
+    return list.filter((wf) => Array.isArray(wf.recentRuns) && wf.recentRuns.length > 0);
   }, [data]);
 
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-r bg-muted/20">
       <div className="border-b px-4 py-3">
         <h2 className="text-sm font-semibold">Workflow runs</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Grouped by workflow
-        </p>
+        <p className="mt-1 text-xs text-muted-foreground">Grouped by workflow</p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
         {isLoading ? (
-          <div className="px-2 py-4 text-sm text-muted-foreground">
-            Loading runs...
-          </div>
+          <div className="px-2 py-4 text-sm text-muted-foreground">Loading runs...</div>
         ) : workflows.length === 0 ? (
-          <div className="px-2 py-4 text-sm text-muted-foreground">
-            No runs yet.
-          </div>
+          <div className="px-2 py-4 text-sm text-muted-foreground">No runs yet.</div>
         ) : (
           <div className="space-y-3">
             {workflows.map((wf) => (

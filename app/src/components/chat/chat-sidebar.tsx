@@ -75,13 +75,9 @@ export function ChatSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {isLoading ? (
-                <div className="px-2 py-4 text-sm text-muted-foreground">
-                  Loading...
-                </div>
+                <div className="px-2 py-4 text-sm text-muted-foreground">Loading...</div>
               ) : data?.conversations.length === 0 ? (
-                <div className="px-2 py-4 text-sm text-muted-foreground">
-                  No conversations yet
-                </div>
+                <div className="px-2 py-4 text-sm text-muted-foreground">No conversations yet</div>
               ) : (
                 data?.conversations.map((conv) => (
                   <SidebarMenuItem key={conv.id}>
@@ -96,9 +92,7 @@ export function ChatSidebar() {
                         href={`/chat/${conv.id}`}
                         className="flex min-w-0 flex-1 flex-col items-start gap-0.5"
                       >
-                        <span className="w-full truncate">
-                          {conv.title || "Untitled"}
-                        </span>
+                        <span className="w-full truncate">{conv.title || "Untitled"}</span>
                         <span className="w-full truncate text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(conv.updatedAt), {
                             addSuffix: true,

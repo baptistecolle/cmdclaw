@@ -97,11 +97,7 @@ type Props = {
   disabled?: boolean;
 };
 
-export function ModelSelector({
-  selectedModel,
-  onModelChange,
-  disabled,
-}: Props) {
+export function ModelSelector({ selectedModel, onModelChange, disabled }: Props) {
   const { data: authStatus } = useProviderAuthStatus();
   const { data: freeModelsData } = useOpencodeFreeModels();
   const connected = authStatus?.connected ?? {};
@@ -110,14 +106,12 @@ export function ModelSelector({
   const isGoogleConnected = "google" in connected;
   const isKimiConnected = "kimi" in connected;
 
-  const zenModels: ModelOption[] = (freeModelsData?.models ?? []).map(
-    (model) => ({
-      id: model.id,
-      name: model.name,
-      provider: "opencode",
-      providerLabel: "OpenCode Zen",
-    }),
-  );
+  const zenModels: ModelOption[] = (freeModelsData?.models ?? []).map((model) => ({
+    id: model.id,
+    name: model.name,
+    provider: "opencode",
+    providerLabel: "OpenCode Zen",
+  }));
 
   const allModels = [
     ...ANTHROPIC_MODELS,
@@ -153,9 +147,7 @@ export function ModelSelector({
             onClick={() => onModelChange(model.id)}
           >
             <span className="flex-1">{model.name}</span>
-            {selectedModel === model.id && (
-              <Check className="h-3.5 w-3.5 text-foreground" />
-            )}
+            {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
           </DropdownMenuItem>
         ))}
 
@@ -170,9 +162,7 @@ export function ModelSelector({
                 onClick={() => onModelChange(model.id)}
               >
                 <span className="flex-1">{model.name}</span>
-                {selectedModel === model.id && (
-                  <Check className="h-3.5 w-3.5 text-foreground" />
-                )}
+                {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
               </DropdownMenuItem>
             ))}
           </>
@@ -181,9 +171,7 @@ export function ModelSelector({
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="flex items-center gap-1.5">
           ChatGPT
-          {!isOpenAIConnected && (
-            <Lock className="h-3 w-3 text-muted-foreground" />
-          )}
+          {!isOpenAIConnected && <Lock className="h-3 w-3 text-muted-foreground" />}
         </DropdownMenuLabel>
         {isOpenAIConnected ? (
           OPENAI_MODELS.map((model) => (
@@ -193,9 +181,7 @@ export function ModelSelector({
               onClick={() => onModelChange(model.id)}
             >
               <span className="flex-1">{model.name}</span>
-              {selectedModel === model.id && (
-                <Check className="h-3.5 w-3.5 text-foreground" />
-              )}
+              {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
             </DropdownMenuItem>
           ))
         ) : (
@@ -212,9 +198,7 @@ export function ModelSelector({
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="flex items-center gap-1.5">
           Gemini
-          {!isGoogleConnected && (
-            <Lock className="h-3 w-3 text-muted-foreground" />
-          )}
+          {!isGoogleConnected && <Lock className="h-3 w-3 text-muted-foreground" />}
         </DropdownMenuLabel>
         {isGoogleConnected ? (
           GOOGLE_MODELS.map((model) => (
@@ -224,9 +208,7 @@ export function ModelSelector({
               onClick={() => onModelChange(model.id)}
             >
               <span className="flex-1">{model.name}</span>
-              {selectedModel === model.id && (
-                <Check className="h-3.5 w-3.5 text-foreground" />
-              )}
+              {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
             </DropdownMenuItem>
           ))
         ) : (
@@ -243,9 +225,7 @@ export function ModelSelector({
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="flex items-center gap-1.5">
           Kimi
-          {!isKimiConnected && (
-            <Lock className="h-3 w-3 text-muted-foreground" />
-          )}
+          {!isKimiConnected && <Lock className="h-3 w-3 text-muted-foreground" />}
         </DropdownMenuLabel>
         {isKimiConnected ? (
           KIMI_MODELS.map((model) => (
@@ -255,9 +235,7 @@ export function ModelSelector({
               onClick={() => onModelChange(model.id)}
             >
               <span className="flex-1">{model.name}</span>
-              {selectedModel === model.id && (
-                <Check className="h-3.5 w-3.5 text-foreground" />
-              )}
+              {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
             </DropdownMenuItem>
           ))
         ) : (

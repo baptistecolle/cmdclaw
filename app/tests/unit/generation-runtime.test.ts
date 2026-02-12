@@ -97,10 +97,7 @@ describe("GenerationRuntime", () => {
 
     const snapshot = runtime.snapshot;
     expect(snapshot.traceStatus).toBe("streaming");
-    expect(snapshot.segments[0]?.auth?.connectedIntegrations).toEqual([
-      "github",
-      "slack",
-    ]);
+    expect(snapshot.segments[0]?.auth?.connectedIntegrations).toEqual(["github", "slack"]);
     expect(snapshot.segments[0]?.auth?.status).toBe("completed");
   });
 
@@ -127,8 +124,7 @@ describe("GenerationRuntime", () => {
     expect(snapshot.segments[0]?.items[0]?.status).toBe("interrupted");
 
     const interruptionParts = snapshot.parts.filter(
-      (part) =>
-        part.type === "system" && part.content === "Interrupted by user",
+      (part) => part.type === "system" && part.content === "Interrupted by user",
     );
     expect(interruptionParts).toHaveLength(1);
   });

@@ -5,9 +5,7 @@ const UNIPILE_DSN = process.env.UNIPILE_DSN;
 const LINKEDIN_ACCOUNT_ID = process.env.LINKEDIN_ACCOUNT_ID;
 
 if (!UNIPILE_API_KEY || !LINKEDIN_ACCOUNT_ID) {
-  console.error(
-    "Error: UNIPILE_API_KEY and LINKEDIN_ACCOUNT_ID environment variables required",
-  );
+  console.error("Error: UNIPILE_API_KEY and LINKEDIN_ACCOUNT_ID environment variables required");
   process.exit(1);
 }
 
@@ -117,9 +115,7 @@ async function listMessages(chatId: string) {
       isFromMe: m.is_from_me,
     })) || [];
 
-  console.log(
-    JSON.stringify({ items: messages, cursor: data.cursor }, null, 2),
-  );
+  console.log(JSON.stringify({ items: messages, cursor: data.cursor }, null, 2));
 }
 
 async function sendMessage(chatId: string, text: string) {
@@ -130,9 +126,7 @@ async function sendMessage(chatId: string, text: string) {
       text,
     }),
   });
-  console.log(
-    JSON.stringify({ success: true, messageId: data.message_id }, null, 2),
-  );
+  console.log(JSON.stringify({ success: true, messageId: data.message_id }, null, 2));
 }
 
 async function startChat(attendeeId: string, message: string) {
@@ -247,19 +241,13 @@ async function sendInvitation(profileId: string, message?: string) {
     body: JSON.stringify(body),
   });
   console.log(
-    JSON.stringify(
-      { success: true, message: `Invitation sent to ${profileId}` },
-      null,
-      2,
-    ),
+    JSON.stringify({ success: true, message: `Invitation sent to ${profileId}` }, null, 2),
   );
 }
 
 async function listPendingInvitations() {
   const limit = parseInt(values.limit || "20");
-  const data = await api(
-    `/users/invitations?account_id=${LINKEDIN_ACCOUNT_ID}&limit=${limit}`,
-  );
+  const data = await api(`/users/invitations?account_id=${LINKEDIN_ACCOUNT_ID}&limit=${limit}`);
 
   const invitations =
     data.items?.map((i: Record<string, unknown>) => ({
@@ -270,9 +258,7 @@ async function listPendingInvitations() {
       direction: i.direction,
     })) || [];
 
-  console.log(
-    JSON.stringify({ items: invitations, cursor: data.cursor }, null, 2),
-  );
+  console.log(JSON.stringify({ items: invitations, cursor: data.cursor }, null, 2));
 }
 
 async function listConnections() {
@@ -293,9 +279,7 @@ async function listConnections() {
       connectedAt: c.connected_at,
     })) || [];
 
-  console.log(
-    JSON.stringify({ items: connections, cursor: data.cursor }, null, 2),
-  );
+  console.log(JSON.stringify({ items: connections, cursor: data.cursor }, null, 2));
 }
 
 async function removeConnection(profileId: string) {
@@ -303,11 +287,7 @@ async function removeConnection(profileId: string) {
     method: "DELETE",
   });
   console.log(
-    JSON.stringify(
-      { success: true, message: `Connection removed: ${profileId}` },
-      null,
-      2,
-    ),
+    JSON.stringify({ success: true, message: `Connection removed: ${profileId}` }, null, 2),
   );
 }
 
@@ -379,9 +359,7 @@ async function commentOnPost(postId: string, text: string) {
       text,
     }),
   });
-  console.log(
-    JSON.stringify({ success: true, commentId: data.comment_id }, null, 2),
-  );
+  console.log(JSON.stringify({ success: true, commentId: data.comment_id }, null, 2));
 }
 
 async function reactToPost(postId: string, reactionType: string) {
@@ -392,13 +370,7 @@ async function reactToPost(postId: string, reactionType: string) {
       reaction_type: reactionType.toUpperCase(),
     }),
   });
-  console.log(
-    JSON.stringify(
-      { success: true, message: `Reacted with ${reactionType}` },
-      null,
-      2,
-    ),
-  );
+  console.log(JSON.stringify({ success: true, message: `Reacted with ${reactionType}` }, null, 2));
 }
 
 // ========== COMPANY PAGES ==========

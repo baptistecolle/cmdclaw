@@ -17,8 +17,7 @@ const providerSchema = z.enum(["openai", "google", "kimi"]);
 
 // PKCE helpers — matches OpenCode's codex.ts implementation
 function generateCodeVerifier(): string {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
   const bytes = new Uint8Array(43);
   crypto.getRandomValues(bytes);
   return Array.from(bytes)
@@ -37,9 +36,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 
 function generateState(): string {
-  return btoa(
-    String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))),
-  )
+  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
@@ -141,10 +138,7 @@ const disconnect = protectedProcedure
     await context.db
       .delete(providerAuth)
       .where(
-        and(
-          eq(providerAuth.userId, context.user.id),
-          eq(providerAuth.provider, input.provider),
-        ),
+        and(eq(providerAuth.userId, context.user.id), eq(providerAuth.provider, input.provider)),
       );
 
     return { success: true };
@@ -208,10 +202,7 @@ export async function storeProviderTokens(params: {
 
   // Upsert: update if exists, insert if not
   const existing = await db.query.providerAuth.findFirst({
-    where: and(
-      eq(providerAuth.userId, params.userId),
-      eq(providerAuth.provider, params.provider),
-    ),
+    where: and(eq(providerAuth.userId, params.userId), eq(providerAuth.provider, params.provider)),
   });
 
   if (existing) {

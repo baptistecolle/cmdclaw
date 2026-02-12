@@ -2,21 +2,10 @@
 
 import { useState, useMemo } from "react";
 import Image from "next/image";
-import {
-  ChevronDown,
-  ChevronRight,
-  Check,
-  X,
-  Loader2,
-  ShieldAlert,
-  Code,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X, Loader2, ShieldAlert, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  getIntegrationLogo,
-  getIntegrationDisplayName,
-} from "@/lib/integration-icons";
+import { getIntegrationLogo, getIntegrationDisplayName } from "@/lib/integration-icons";
 import { parseCliCommand } from "@/lib/parse-cli-command";
 import { GenericPreview } from "./previews";
 import type { PreviewProps } from "./previews";
@@ -46,10 +35,7 @@ export interface ToolApprovalCardProps {
   readonly?: boolean;
 }
 
-function renderPreview(
-  integration: string,
-  previewProps: PreviewProps,
-) {
+function renderPreview(integration: string, previewProps: PreviewProps) {
   switch (integration) {
     case "slack":
       return <SlackPreview {...previewProps} />;
@@ -126,27 +112,15 @@ export function ToolApprovalCard({
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
       >
-        {expanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
+        {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         {logo ? (
-          <Image
-            src={logo}
-            alt={displayName}
-            width={16}
-            height={16}
-            className="h-4 w-4"
-          />
+          <Image src={logo} alt={displayName} width={16} height={16} className="h-4 w-4" />
         ) : (
           <ShieldAlert className="h-4 w-4 text-amber-500" />
         )}
         <span className="font-medium">{displayName}</span>
         <span className="text-muted-foreground">wants to</span>
-        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-          {operation}
-        </span>
+        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{operation}</span>
 
         <div className="flex-1" />
 
@@ -173,11 +147,7 @@ export function ToolApprovalCard({
       {expanded && (
         <div className="border-t px-3 py-3">
           {/* Formatted Preview */}
-          {previewProps && (
-            <div className="mb-3">
-              {renderPreview(integration, previewProps)}
-            </div>
-          )}
+          {previewProps && <div className="mb-3">{renderPreview(integration, previewProps)}</div>}
 
           {/* Collapsible Raw Command Section */}
           {command && (

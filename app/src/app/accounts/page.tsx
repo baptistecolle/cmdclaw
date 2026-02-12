@@ -27,9 +27,7 @@ function InfoRow({ label, value }: InfoRowProps) {
 
 export default function AccountsPage() {
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    "loading",
-  );
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
     authClient
@@ -69,8 +67,7 @@ export default function AccountsPage() {
 
           {status === "error" && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              Unable to load your session right now. Please try again in a
-              moment.
+              Unable to load your session right now. Please try again in a moment.
             </div>
           )}
 
@@ -83,23 +80,15 @@ export default function AccountsPage() {
                 <p className="text-lg font-semibold leading-tight">
                   {user.name || user.email || "Current user"}
                 </p>
-                {user.email && (
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
-                )}
+                {user.email && <p className="text-sm text-muted-foreground">{user.email}</p>}
               </div>
 
               <Separator />
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <InfoRow label="User ID" value={user.id ?? "Not available"} />
-                <InfoRow
-                  label="Session ID"
-                  value={activeSession?.id ?? "Not available"}
-                />
-                <InfoRow
-                  label="Session status"
-                  value={activeSession ? "Active" : "Missing"}
-                />
+                <InfoRow label="Session ID" value={activeSession?.id ?? "Not available"} />
+                <InfoRow label="Session status" value={activeSession ? "Active" : "Missing"} />
                 <InfoRow
                   label="Expires at"
                   value={
@@ -117,8 +106,7 @@ export default function AccountsPage() {
           {status === "ready" && !user && (
             <div className="space-y-3 rounded-lg border bg-muted/50 p-4">
               <p className="text-sm text-muted-foreground">
-                No user is currently signed in. Use the login link to start a
-                session.
+                No user is currently signed in. Use the login link to start a session.
               </p>
               <Button asChild size="sm">
                 <Link href="/login">Go to login</Link>

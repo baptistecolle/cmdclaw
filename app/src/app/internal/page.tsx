@@ -20,9 +20,7 @@ export default function InternalPage() {
           <Wrench className="h-8 w-8 text-muted-foreground" />
           <div>
             <h1 className="text-2xl font-bold">Internal Tools</h1>
-            <p className="text-muted-foreground">
-              Development and debugging utilities
-            </p>
+            <p className="text-muted-foreground">Development and debugging utilities</p>
           </div>
         </div>
 
@@ -36,9 +34,7 @@ export default function InternalPage() {
               <page.icon className="h-6 w-6 text-muted-foreground" />
               <div>
                 <h2 className="font-medium">{page.title}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {page.description}
-                </p>
+                <p className="text-sm text-muted-foreground">{page.description}</p>
               </div>
             </Link>
           ))}

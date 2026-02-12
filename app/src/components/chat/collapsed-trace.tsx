@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Check,
-  AlertCircle,
-  ChevronRight,
-  Eye,
-  StopCircle,
-} from "lucide-react";
+import { Check, AlertCircle, ChevronRight, Eye, StopCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { IntegrationBadges } from "./integration-badges";
@@ -49,10 +43,7 @@ export function CollapsedTrace({
 
   return (
     <div
-      className={cn(
-        "rounded-lg border border-border/50 bg-muted/20 overflow-hidden",
-        className,
-      )}
+      className={cn("rounded-lg border border-border/50 bg-muted/20 overflow-hidden", className)}
     >
       {/* Header - always visible */}
       <button

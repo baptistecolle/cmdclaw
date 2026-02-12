@@ -38,14 +38,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <PostHogClientProvider>
           <ORPCProvider>
-            <AutumnProvider betterAuthUrl={env.NEXT_PUBLIC_APP_URL}>
-              {children}
-            </AutumnProvider>
+            <AutumnProvider betterAuthUrl={env.NEXT_PUBLIC_APP_URL}>{children}</AutumnProvider>
           </ORPCProvider>
         </PostHogClientProvider>
       </body>

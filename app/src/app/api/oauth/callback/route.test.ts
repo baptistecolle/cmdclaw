@@ -105,15 +105,11 @@ describe("GET /api/oauth/callback", () => {
   });
 
   it("redirects with missing_params when code/state are missing", async () => {
-    const request = new NextRequest(
-      "https://app.example.com/api/oauth/callback",
-    );
+    const request = new NextRequest("https://app.example.com/api/oauth/callback");
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe(
-      "https://app.example.com/integrations?error=missing_params",
-    );
+    expect(getLocation(response)).toBe("https://app.example.com/integrations?error=missing_params");
   });
 
   it("redirects to login when session is unauthorized", async () => {
@@ -125,9 +121,7 @@ describe("GET /api/oauth/callback", () => {
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe(
-      "https://app.example.com/login?error=unauthorized",
-    );
+    expect(getLocation(response)).toBe("https://app.example.com/login?error=unauthorized");
   });
 
   it("redirects with invalid_state when state cannot be parsed", async () => {
@@ -137,9 +131,7 @@ describe("GET /api/oauth/callback", () => {
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe(
-      "https://app.example.com/integrations?error=invalid_state",
-    );
+    expect(getLocation(response)).toBe("https://app.example.com/integrations?error=invalid_state");
   });
 
   it("redirects with user_mismatch when callback state user does not match session", async () => {
@@ -155,9 +147,7 @@ describe("GET /api/oauth/callback", () => {
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe(
-      "https://app.example.com/integrations?error=user_mismatch",
-    );
+    expect(getLocation(response)).toBe("https://app.example.com/integrations?error=user_mismatch");
   });
 
   it("redirects with token_exchange_failed when token exchange fails", async () => {
@@ -226,8 +216,7 @@ describe("GET /api/oauth/callback", () => {
     );
 
     const tokenInsertCall = (insertValuesMock.mock.calls as unknown[]).find(
-      (call) =>
-        call[0] && typeof call[0] === "object" && "accessToken" in call[0],
+      (call) => call[0] && typeof call[0] === "object" && "accessToken" in call[0],
     );
     expect(tokenInsertCall?.[0]).toEqual(
       expect.objectContaining({
@@ -283,15 +272,10 @@ describe("GET /api/oauth/callback", () => {
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe(
-      "https://app.example.com/integrations?success=true",
-    );
+    expect(getLocation(response)).toBe("https://app.example.com/integrations?success=true");
 
     const integrationInsertCall = (insertValuesMock.mock.calls as unknown[]).find(
-      (call) =>
-        call[0] &&
-        typeof call[0] === "object" &&
-        "providerAccountId" in call[0],
+      (call) => call[0] && typeof call[0] === "object" && "providerAccountId" in call[0],
     );
 
     expect(integrationInsertCall?.[0]).toEqual(

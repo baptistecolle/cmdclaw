@@ -63,8 +63,8 @@ export default function DevicesPage() {
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Connected Devices</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage devices running the Bap daemon. Devices can execute commands
-          and proxy local LLM requests.
+          Manage devices running the Bap daemon. Devices can execute commands and proxy local LLM
+          requests.
         </p>
       </div>
 
@@ -73,8 +73,7 @@ export default function DevicesPage() {
           <Monitor className="mx-auto h-10 w-10 text-muted-foreground/50" />
           <h3 className="mt-3 text-sm font-medium">No devices connected</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Install the Bap daemon on your machine to connect it as a compute
-            backend.
+            Install the Bap daemon on your machine to connect it as a compute backend.
           </p>
           <pre className="mx-auto mt-4 w-fit rounded bg-muted px-4 py-2 text-sm font-mono">
             curl -fsSL https://heybap.com/i | sh
@@ -109,11 +108,7 @@ export default function DevicesPage() {
                   <div className="text-xs text-muted-foreground">
                     {device.platform}
                     {device.lastSeenAt && !device.isOnline && (
-                      <>
-                        {" "}
-                        &middot; Last seen{" "}
-                        {new Date(device.lastSeenAt).toLocaleDateString()}
-                      </>
+                      <> &middot; Last seen {new Date(device.lastSeenAt).toLocaleDateString()}</>
                     )}
                   </div>
                 </div>

@@ -2,9 +2,7 @@ import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_DOCS_ACCESS_TOKEN;
 if (!TOKEN) {
-  console.error(
-    "Error: GOOGLE_DOCS_ACCESS_TOKEN environment variable required",
-  );
+  console.error("Error: GOOGLE_DOCS_ACCESS_TOKEN environment variable required");
   process.exit(1);
 }
 
@@ -108,9 +106,7 @@ async function createDocument() {
     if (!updateRes.ok) throw new Error(await updateRes.text());
   }
 
-  console.log(
-    `Document created: https://docs.google.com/document/d/${doc.documentId}/edit`,
-  );
+  console.log(`Document created: https://docs.google.com/document/d/${doc.documentId}/edit`);
 }
 
 async function appendText(documentId: string) {

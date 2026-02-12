@@ -1,9 +1,5 @@
 import { db } from "@/server/db/client";
-import {
-  slackUserLink,
-  slackConversation,
-  conversation,
-} from "@/server/db/schema";
+import { slackUserLink, slackConversation, conversation } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { env } from "@/env";
 import { generationManager } from "@/server/services/generation-manager";
@@ -42,14 +38,8 @@ async function addReaction(channel: string, timestamp: string, name: string) {
   await slackApi("reactions.add", { channel, timestamp, name });
 }
 
-async function removeReaction(
-  channel: string,
-  timestamp: string,
-  name: string,
-) {
-  await slackApi("reactions.remove", { channel, timestamp, name }).catch(
-    () => {},
-  );
+async function removeReaction(channel: string, timestamp: string, name: string) {
+  await slackApi("reactions.remove", { channel, timestamp, name }).catch(() => {});
 }
 
 async function postMessage(channel: string, text: string, threadTs?: string) {
@@ -69,8 +59,7 @@ function formatSlackErrorMessage(err: unknown): string {
         : JSON.stringify(err);
 
   const compact = raw.replace(/\s+/g, " ").trim();
-  const clipped =
-    compact.length > 500 ? `${compact.slice(0, 497)}...` : compact;
+  const clipped = compact.length > 500 ? `${compact.slice(0, 497)}...` : compact;
 
   return [
     "There was an issue processing your message. Please contact heybap with this error so we can solve it.",
@@ -91,8 +80,7 @@ async function getSlackUserInfo(
     | undefined;
 
   if (res.ok) {
-    const displayName =
-      user?.profile?.display_name || user?.profile?.real_name || user?.name;
+    const displayName = user?.profile?.display_name || user?.profile?.real_name || user?.name;
     if (displayName) {
       return { displayName };
     }
@@ -183,18 +171,10 @@ export async function handleSlackEvent(payload: SlackEvent) {
     await addReaction(channel, event.ts, "hourglass_flowing_sand");
 
     // Get or create Bap conversation for this Slack thread
-    const convId = await getOrCreateConversation(
-      team_id,
-      channel,
-      threadTs,
-      link.userId,
-    );
+    const convId = await getOrCreateConversation(team_id, channel, threadTs, link.userId);
 
     // Get Slack user display name for context
-    const { displayName } = await getSlackUserInfo(
-      slackUserId,
-      link.user?.name,
-    );
+    const { displayName } = await getSlackUserInfo(slackUserId, link.user?.name);
 
     // Start generation via generation manager
     const { generationId } = await generationManager.startGeneration({
@@ -213,10 +193,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
     });
 
     // Wait for generation to complete and collect response
-    const responseText = await collectGenerationResponse(
-      generationId,
-      link.userId,
-    );
+    const responseText = await collectGenerationResponse(generationId, link.userId);
 
     // Send response to Slack
     if (responseText) {
@@ -224,11 +201,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
       // Split long messages (Slack limit ~4000 chars)
       const chunks = splitMessage(slackText, 3900);
       for (const chunk of chunks) {
-        await postMessage(
-          channel,
-          chunk,
-          isDirectMessage ? undefined : threadTs,
-        );
+        await postMessage(channel, chunk, isDirectMessage ? undefined : threadTs);
       }
     }
   } catch (err) {
@@ -301,23 +274,13 @@ async function getOrCreateConversation(
 
 // ─── Generation response collection ─────────────────────────
 
-async function collectGenerationResponse(
-  generationId: string,
-  userId: string,
-): Promise<string> {
+async function collectGenerationResponse(generationId: string, userId: string): Promise<string> {
   const parts: string[] = [];
 
-  for await (const event of generationManager.subscribeToGeneration(
-    generationId,
-    userId,
-  )) {
+  for await (const event of generationManager.subscribeToGeneration(generationId, userId)) {
     if (event.type === "text") {
       parts.push(event.content);
-    } else if (
-      event.type === "done" ||
-      event.type === "error" ||
-      event.type === "cancelled"
-    ) {
+    } else if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
       break;
     }
   }

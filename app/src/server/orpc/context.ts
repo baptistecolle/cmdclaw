@@ -9,9 +9,7 @@ export type ORPCContext = {
   user: User | null;
 };
 
-export async function createORPCContext(opts: {
-  headers: Headers;
-}): Promise<ORPCContext> {
+export async function createORPCContext(opts: { headers: Headers }): Promise<ORPCContext> {
   // Get session from Better-Auth
   const sessionData = await auth.api.getSession({
     headers: opts.headers,

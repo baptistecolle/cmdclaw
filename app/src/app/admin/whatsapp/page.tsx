@@ -106,14 +106,10 @@ export default function AdminWhatsAppPage() {
         <div className="mt-4 rounded-lg border bg-background p-4">
           <div className="text-sm text-muted-foreground">
             Status:{" "}
-            <span className="font-medium text-foreground">
-              {waStatus?.status ?? "unknown"}
-            </span>
+            <span className="font-medium text-foreground">{waStatus?.status ?? "unknown"}</span>
           </div>
           {waStatus?.lastError && (
-            <div className="mt-1 text-sm text-destructive">
-              {waStatus.lastError}
-            </div>
+            <div className="mt-1 text-sm text-destructive">{waStatus.lastError}</div>
           )}
           {waQrDataUrl ? (
             <div className="mt-4 flex flex-col items-start gap-2">

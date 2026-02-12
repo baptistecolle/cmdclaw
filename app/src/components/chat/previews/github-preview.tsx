@@ -1,9 +1,4 @@
-import {
-  PreviewProps,
-  PreviewSection,
-  PreviewContent,
-  IntegrationLogo,
-} from "./preview-styles";
+import { PreviewProps, PreviewSection, PreviewContent, IntegrationLogo } from "./preview-styles";
 
 export function GithubPreview({ operation, args }: PreviewProps) {
   switch (operation) {
@@ -14,11 +9,7 @@ export function GithubPreview({ operation, args }: PreviewProps) {
   }
 }
 
-function GithubCreateIssuePreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function GithubCreateIssuePreview({ args }: { args: Record<string, string | undefined> }) {
   const owner = args.o || args.owner;
   const repo = args.r || args.repo;
   const title = args.t || args.title;

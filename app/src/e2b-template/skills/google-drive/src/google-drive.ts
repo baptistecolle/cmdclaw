@@ -5,9 +5,7 @@ import { constants } from "fs";
 
 const TOKEN = process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
 if (!TOKEN) {
-  console.error(
-    "Error: GOOGLE_DRIVE_ACCESS_TOKEN environment variable required",
-  );
+  console.error("Error: GOOGLE_DRIVE_ACCESS_TOKEN environment variable required");
   process.exit(1);
 }
 
@@ -55,10 +53,7 @@ async function listFiles() {
   if (values.folder) {
     const existingQ = params.get("q");
     const folderQuery = `'${values.folder}' in parents`;
-    params.set(
-      "q",
-      existingQ ? `${existingQ} and ${folderQuery}` : folderQuery,
-    );
+    params.set("q", existingQ ? `${existingQ} and ${folderQuery}` : folderQuery);
   }
 
   const res = await fetch(`${DRIVE_URL}/files?${params}`, { headers });
@@ -107,10 +102,7 @@ async function getFile(fileId: string) {
 
 async function downloadFile(fileId: string) {
   // First get file metadata
-  const metaRes = await fetch(
-    `${DRIVE_URL}/files/${fileId}?fields=name,mimeType`,
-    { headers },
-  );
+  const metaRes = await fetch(`${DRIVE_URL}/files/${fileId}?fields=name,mimeType`, { headers });
   if (!metaRes.ok) throw new Error(await metaRes.text());
   const meta = await metaRes.json();
 
@@ -139,9 +131,7 @@ async function downloadFile(fileId: string) {
   await mkdir(dirname(fileName), { recursive: true }).catch(() => {});
   await writeFile(fileName, Buffer.from(buffer));
 
-  console.log(
-    `Downloaded: ${fileName} (${Math.round(buffer.byteLength / 1024)}KB)`,
-  );
+  console.log(`Downloaded: ${fileName} (${Math.round(buffer.byteLength / 1024)}KB)`);
 }
 
 async function searchFiles() {
@@ -212,17 +202,14 @@ async function uploadFile() {
     fileContent.toString("base64") +
     closeDelimiter;
 
-  const res = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-    {
-      method: "POST",
-      headers: {
-        ...headers,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-      },
-      body,
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": `multipart/related; boundary=${boundary}`,
     },
-  );
+    body,
+  });
 
   if (!res.ok) throw new Error(await res.text());
   const uploaded = await res.json();

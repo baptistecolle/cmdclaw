@@ -1,12 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import {
-  conversation,
-  message,
-  messageAttachment,
-  sandboxFile,
-} from "@/server/db/schema";
+import { conversation, message, messageAttachment, sandboxFile } from "@/server/db/schema";
 import { eq, desc, and, isNull, asc } from "drizzle-orm";
 import { writeSessionTranscriptFromConversation } from "@/server/services/memory-service";
 
@@ -54,10 +49,7 @@ const get = protectedProcedure
   .input(z.object({ id: z.string() }))
   .handler(async ({ input, context }) => {
     const conv = await context.db.query.conversation.findFirst({
-      where: and(
-        eq(conversation.id, input.id),
-        eq(conversation.userId, context.user.id),
-      ),
+      where: and(eq(conversation.id, input.id), eq(conversation.userId, context.user.id)),
       with: {
         messages: {
           orderBy: asc(message.createdAt),
@@ -176,10 +168,7 @@ const archive = protectedProcedure
         messageLimit: 15,
       });
     } catch (err) {
-      console.error(
-        "[Conversation] Failed to write session transcript on archive:",
-        err,
-      );
+      console.error("[Conversation] Failed to write session transcript on archive:", err);
     }
 
     const result = await context.db
@@ -213,10 +202,7 @@ const del = protectedProcedure
         messageLimit: 15,
       });
     } catch (err) {
-      console.error(
-        "[Conversation] Failed to write session transcript on delete:",
-        err,
-      );
+      console.error("[Conversation] Failed to write session transcript on delete:", err);
     }
 
     const result = await context.db
@@ -253,15 +239,11 @@ const downloadAttachment = protectedProcedure
       },
     });
 
-    if (
-      !attachment ||
-      attachment.message.conversation.userId !== context.user.id
-    ) {
+    if (!attachment || attachment.message.conversation.userId !== context.user.id) {
       throw new ORPCError("NOT_FOUND", { message: "Attachment not found" });
     }
 
-    const { getPresignedDownloadUrl } =
-      await import("@/server/storage/s3-client");
+    const { getPresignedDownloadUrl } = await import("@/server/storage/s3-client");
     const url = await getPresignedDownloadUrl(attachment.storageKey);
 
     return {
@@ -291,8 +273,7 @@ const downloadSandboxFile = protectedProcedure
       throw new ORPCError("NOT_FOUND", { message: "File not uploaded" });
     }
 
-    const { getPresignedDownloadUrl } =
-      await import("@/server/storage/s3-client");
+    const { getPresignedDownloadUrl } = await import("@/server/storage/s3-client");
     const url = await getPresignedDownloadUrl(file.storageKey);
 
     return {

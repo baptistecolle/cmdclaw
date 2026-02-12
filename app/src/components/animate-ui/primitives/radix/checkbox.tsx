@@ -12,8 +12,7 @@ type CheckboxContextType = {
   setIsChecked: (checked: boolean | "indeterminate") => void;
 };
 
-const [CheckboxProvider, useCheckbox] =
-  getStrictContext<CheckboxContextType>("CheckboxContext");
+const [CheckboxProvider, useCheckbox] = getStrictContext<CheckboxContextType>("CheckboxContext");
 
 type CheckboxProps = HTMLMotionProps<"button"> &
   Omit<React.ComponentProps<typeof CheckboxPrimitive.Root>, "asChild">;

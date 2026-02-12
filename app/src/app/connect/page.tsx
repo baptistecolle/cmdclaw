@@ -9,9 +9,7 @@ import { CheckCircle2, Loader2, Monitor, XCircle } from "lucide-react";
 
 function ConnectDevicePageContent() {
   const [code, setCode] = useState("");
-  const [status, setStatus] = useState<
-    "idle" | "submitting" | "success" | "error"
-  >("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,8 +62,7 @@ function ConnectDevicePageContent() {
             </div>
             <h1 className="text-2xl font-semibold">Connect Device</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Enter the code shown on your device to connect it as a compute
-              backend.
+              Enter the code shown on your device to connect it as a compute backend.
             </p>
           </div>
 
@@ -76,16 +73,13 @@ function ConnectDevicePageContent() {
                 Device connected
               </h2>
               <p className="mt-1 text-sm text-green-600 dark:text-green-400">
-                Your device is now connected. You can start using it as a
-                compute backend.
+                Your device is now connected. You can start using it as a compute backend.
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Device Code
-                </label>
+                <label className="mb-2 block text-sm font-medium">Device Code</label>
                 <Input
                   type="text"
                   value={code}

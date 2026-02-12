@@ -7,30 +7,17 @@ export const env = createEnv({
    * isn't built with invalid env vars.
    */
   server: {
-    BETTER_AUTH_SECRET:
-      process.env.NODE_ENV === "production"
-        ? z.string()
-        : z.string().optional(),
+    BETTER_AUTH_SECRET: process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
     APP_URL: z.string().url().optional(),
     DATABASE_URL: z.string().url(),
-    NODE_ENV: z
-      .enum(["development", "test", "production"])
-      .default("development"),
-    RESEND_API_KEY:
-      process.env.NODE_ENV === "production"
-        ? z.string()
-        : z.string().optional(),
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    RESEND_API_KEY: process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
     EMAIL_FROM:
-      process.env.NODE_ENV === "production"
-        ? z.string().email()
-        : z.string().email().optional(),
+      process.env.NODE_ENV === "production" ? z.string().email() : z.string().email().optional(),
     REDIS_URL: z.string().url().optional(),
     REDIS_HOST: z.string().default("localhost"),
     REDIS_PORT: z.string().default("6379"),
-    OPENAI_API_KEY:
-      process.env.NODE_ENV === "production"
-        ? z.string()
-        : z.string().optional(),
+    OPENAI_API_KEY: process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
     // Anthropic
@@ -111,9 +98,7 @@ export const env = createEnv({
     NEXT_PUBLIC_APP_URL: z.string().url(),
     NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
     NEXT_PUBLIC_POSTHOG_HOST: z.string().optional(),
-    NEXT_PUBLIC_NODE_ENV: z
-      .enum(["development", "test", "production"])
-      .default("development"),
+    NEXT_PUBLIC_NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   },
 
   /**
@@ -179,16 +164,14 @@ export const env = createEnv({
     SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET,
     SLACK_BOT_OWNER_USER_ID: process.env.SLACK_BOT_OWNER_USER_ID,
     SLACK_BOT_RELAY_SECRET: process.env.SLACK_BOT_RELAY_SECRET,
-    SLACK_BOT_RELAY_ALLOWED_CHANNELS:
-      process.env.SLACK_BOT_RELAY_ALLOWED_CHANNELS,
+    SLACK_BOT_RELAY_ALLOWED_CHANNELS: process.env.SLACK_BOT_RELAY_ALLOWED_CHANNELS,
     COMMUNITY_REPO_GITHUB_TOKEN: process.env.COMMUNITY_REPO_GITHUB_TOKEN,
     COMMUNITY_REPO_OWNER: process.env.COMMUNITY_REPO_OWNER,
     COMMUNITY_REPO_NAME: process.env.COMMUNITY_REPO_NAME,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-    NEXT_PUBLIC_NODE_ENV:
-      process.env.NEXT_PUBLIC_NODE_ENV ?? process.env.NODE_ENV,
+    NEXT_PUBLIC_NODE_ENV: process.env.NEXT_PUBLIC_NODE_ENV ?? process.env.NODE_ENV,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

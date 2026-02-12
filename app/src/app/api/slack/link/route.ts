@@ -10,10 +10,7 @@ export async function GET(request: Request) {
   const slackTeamId = url.searchParams.get("slackTeamId");
 
   if (!slackUserId || !slackTeamId) {
-    return NextResponse.json(
-      { error: "Missing slackUserId or slackTeamId" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Missing slackUserId or slackTeamId" }, { status: 400 });
   }
 
   // Require authenticated session

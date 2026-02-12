@@ -29,15 +29,7 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
 // Tool permissions: read operations auto-approve, write operations require approval
 const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
   slack: {
-    read: [
-      "channels",
-      "history",
-      "search",
-      "recent",
-      "users",
-      "user",
-      "thread",
-    ],
+    read: ["channels", "history", "search", "recent", "users", "user", "thread"],
     write: ["send", "react", "upload"],
   },
   gmail: {
@@ -223,9 +215,7 @@ function loadCustomPermissions() {
 /**
  * Parse a Bash command to extract integration and operation
  */
-function parseBashCommand(
-  command: string,
-): { integration: string; operation: string } | null {
+function parseBashCommand(command: string): { integration: string; operation: string } | null {
   const trimmed = command.trim();
   const parts = trimmed.split(/\s+/);
   if (parts.length === 0) return null;
@@ -414,27 +404,18 @@ export const IntegrationPermissionsPlugin = async () => {
         .filter(Boolean);
 
       if (allowedList.length > 0 && !allowedList.includes(integration)) {
-        throw new Error(
-          `Integration "${integration}" is not allowed for this workflow`,
-        );
+        throw new Error(`Integration "${integration}" is not allowed for this workflow`);
       }
 
-      console.log(
-        `[Plugin] Detected integration command: ${integration} ${operation}`,
-      );
+      console.log(`[Plugin] Detected integration command: ${integration} ${operation}`);
 
       // Check if integration token is available
       const tokenEnvVar = TOKEN_ENV_VARS[integration];
       // For custom integrations, check {SLUG}_ACCESS_TOKEN or {SLUG}_API_KEY
       let hasToken = tokenEnvVar ? !!process.env[tokenEnvVar] : false;
       if (!hasToken && integration.startsWith("custom-")) {
-        const slug = integration
-          .replace("custom-", "")
-          .toUpperCase()
-          .replace(/-/g, "_");
-        hasToken = !!(
-          process.env[`${slug}_ACCESS_TOKEN`] || process.env[`${slug}_API_KEY`]
-        );
+        const slug = integration.replace("custom-", "").toUpperCase().replace(/-/g, "_");
+        hasToken = !!(process.env[`${slug}_ACCESS_TOKEN`] || process.env[`${slug}_API_KEY`]);
       }
 
       // slack send --as bot can use relay without a Slack user token
@@ -447,9 +428,7 @@ export const IntegrationPermissionsPlugin = async () => {
         !!(process.env.SLACK_BOT_RELAY_URL || process.env.APP_URL)
       ) {
         hasToken = true;
-        console.log(
-          "[Plugin] Slack bot relay mode detected, skipping Slack user auth",
-        );
+        console.log("[Plugin] Slack bot relay mode detected, skipping Slack user auth");
       }
 
       if (!hasToken) {
@@ -479,9 +458,7 @@ export const IntegrationPermissionsPlugin = async () => {
 
       // Check if this is a write operation
       if (isWriteOperation(integration, operation)) {
-        console.log(
-          `[Plugin] Write operation detected, requesting approval...`,
-        );
+        console.log(`[Plugin] Write operation detected, requesting approval...`);
 
         const decision = await requestApproval({
           integration,
@@ -494,13 +471,9 @@ export const IntegrationPermissionsPlugin = async () => {
           throw new Error("User denied this action");
         }
 
-        console.log(
-          `[Plugin] Approval granted for ${integration} ${operation}`,
-        );
+        console.log(`[Plugin] Approval granted for ${integration} ${operation}`);
       } else {
-        console.log(
-          `[Plugin] Read operation auto-approved: ${integration} ${operation}`,
-        );
+        console.log(`[Plugin] Read operation auto-approved: ${integration} ${operation}`);
       }
     },
   };

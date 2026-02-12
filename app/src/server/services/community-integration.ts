@@ -6,9 +6,7 @@ import { env } from "@/env";
 /**
  * Submit a custom integration to the community repo via GitHub PR
  */
-export async function submitToCommunityRepo(
-  customIntegrationId: string,
-): Promise<string | null> {
+export async function submitToCommunityRepo(customIntegrationId: string): Promise<string | null> {
   const token = env.COMMUNITY_REPO_GITHUB_TOKEN;
   const owner = env.COMMUNITY_REPO_OWNER;
   const repo = env.COMMUNITY_REPO_NAME;

@@ -79,33 +79,21 @@ const approvalRequest = baseProcedure
     }
 
     // Find the active generation for this conversation
-    const genId = generationManager.getGenerationForConversation(
-      input.conversationId,
-    );
+    const genId = generationManager.getGenerationForConversation(input.conversationId);
     console.log("[Internal] Generation lookup:", {
       conversationId: input.conversationId,
       genId: genId ?? "NOT FOUND",
     });
     if (!genId) {
-      console.error(
-        "[Internal] No active generation for conversation:",
-        input.conversationId,
-      );
+      console.error("[Internal] No active generation for conversation:", input.conversationId);
       return { decision: "deny" as const };
     }
 
-    const allowedIntegrations =
-      generationManager.getAllowedIntegrationsForConversation(
-        input.conversationId,
-      );
-    if (
-      allowedIntegrations &&
-      !allowedIntegrations.includes(input.integration)
-    ) {
-      console.warn(
-        "[Internal] Integration not allowed for workflow:",
-        input.integration,
-      );
+    const allowedIntegrations = generationManager.getAllowedIntegrationsForConversation(
+      input.conversationId,
+    );
+    if (allowedIntegrations && !allowedIntegrations.includes(input.integration)) {
+      console.warn("[Internal] Integration not allowed for workflow:", input.integration);
       return { decision: "deny" as const };
     }
 
@@ -153,29 +141,17 @@ const authRequest = baseProcedure
     });
 
     // Find the active generation for this conversation
-    const genId = generationManager.getGenerationForConversation(
-      input.conversationId,
-    );
+    const genId = generationManager.getGenerationForConversation(input.conversationId);
     if (!genId) {
-      console.error(
-        "[Internal] No active generation for conversation:",
-        input.conversationId,
-      );
+      console.error("[Internal] No active generation for conversation:", input.conversationId);
       return { success: false };
     }
 
-    const allowedIntegrations =
-      generationManager.getAllowedIntegrationsForConversation(
-        input.conversationId,
-      );
-    if (
-      allowedIntegrations &&
-      !allowedIntegrations.includes(input.integration)
-    ) {
-      console.warn(
-        "[Internal] Integration not allowed for workflow:",
-        input.integration,
-      );
+    const allowedIntegrations = generationManager.getAllowedIntegrationsForConversation(
+      input.conversationId,
+    );
+    if (allowedIntegrations && !allowedIntegrations.includes(input.integration)) {
+      console.warn("[Internal] Integration not allowed for workflow:", input.integration);
       return { success: false };
     }
 
@@ -190,9 +166,7 @@ const authRequest = baseProcedure
     }
 
     // Fetch fresh tokens for the integration
-    const tokens = await getTokensForIntegrations(result.userId, [
-      input.integration,
-    ]);
+    const tokens = await getTokensForIntegrations(result.userId, [input.integration]);
 
     return { success: true, tokens };
   });

@@ -5,11 +5,7 @@ import { env } from "@/env";
  * Verify Slack request signature (HMAC-SHA256).
  * https://api.slack.com/authentication/verifying-requests-from-slack
  */
-export function verifySlackSignature(
-  body: string,
-  timestamp: string,
-  signature: string,
-): boolean {
+export function verifySlackSignature(body: string, timestamp: string, signature: string): boolean {
   const secret = env.SLACK_SIGNING_SECRET;
   if (!secret) return false;
 
@@ -19,8 +15,7 @@ export function verifySlackSignature(
 
   const sigBasestring = `v0:${timestamp}:${body}`;
   const mySignature =
-    "v0=" +
-    crypto.createHmac("sha256", secret).update(sigBasestring).digest("hex");
+    "v0=" + crypto.createHmac("sha256", secret).update(sigBasestring).digest("hex");
 
   const expectedBuffer = Buffer.from(mySignature);
   const actualBuffer = Buffer.from(signature);

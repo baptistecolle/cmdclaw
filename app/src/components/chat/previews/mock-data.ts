@@ -235,8 +235,7 @@ export const PREVIEW_MOCK_DATA: Record<string, PreviewMockData[]> = {
       args: {
         team: "PRODUCT",
         title: "Add dark mode support",
-        description:
-          "Implement dark mode theme across all pages to improve user experience.",
+        description: "Implement dark mode theme across all pages to improve user experience.",
         priority: "3",
       },
     },

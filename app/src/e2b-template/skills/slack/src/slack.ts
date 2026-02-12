@@ -12,9 +12,7 @@ const RELAY_SECRET = process.env.SLACK_BOT_RELAY_SECRET;
 function getUserToken(): string {
   const token = process.env.SLACK_ACCESS_TOKEN;
   if (!token) {
-    throw new Error(
-      "SLACK_ACCESS_TOKEN environment variable required for this command",
-    );
+    throw new Error("SLACK_ACCESS_TOKEN environment variable required for this command");
   }
   return token;
 }
@@ -30,8 +28,7 @@ async function api(method: string, body?: Record<string, unknown>) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json();
-  if (!data.ok)
-    throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
+  if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
   return data;
 }
 
@@ -69,8 +66,7 @@ async function apiFormData(method: string, formData: FormData) {
     body: formData,
   });
   const data = await res.json();
-  if (!data.ok)
-    throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
+  if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
   return data;
 }
 
@@ -102,9 +98,7 @@ async function postAsBot(
 
   const data = await res.json().catch(() => ({}) as Record<string, unknown>);
   if (!res.ok || !data.ok) {
-    throw new Error(
-      `Slack relay error: ${String(data.error ?? `HTTP ${res.status}`)}`,
-    );
+    throw new Error(`Slack relay error: ${String(data.error ?? `HTTP ${res.status}`)}`);
   }
 
   return {
@@ -258,9 +252,7 @@ async function searchMessages() {
     ts: m.ts,
   }));
 
-  console.log(
-    JSON.stringify({ total: data.messages.total, messages }, null, 2),
-  );
+  console.log(JSON.stringify({ total: data.messages.total, messages }, null, 2));
 }
 
 async function getRecentMessages() {
@@ -288,11 +280,7 @@ async function getRecentMessages() {
   }));
 
   console.log(
-    JSON.stringify(
-      { total: data.messages.total, returned: messages.length, messages },
-      null,
-      2,
-    ),
+    JSON.stringify({ total: data.messages.total, returned: messages.length, messages }, null, 2),
   );
 }
 
@@ -361,9 +349,7 @@ async function getThread() {
 
 async function addReaction() {
   if (!values.channel || !values.ts || !values.emoji) {
-    console.error(
-      "Required: --channel <channelId> --ts <messageTs> --emoji <name>",
-    );
+    console.error("Required: --channel <channelId> --ts <messageTs> --emoji <name>");
     process.exit(1);
   }
 
@@ -401,10 +387,7 @@ async function uploadFile() {
   const formData = new FormData();
   formData.append("filename", fileName);
   formData.append("length", fileContent.length.toString());
-  const uploadUrlData = await apiFormData(
-    "files.getUploadURLExternal",
-    formData,
-  );
+  const uploadUrlData = await apiFormData("files.getUploadURLExternal", formData);
 
   // Step 2: Upload file to the returned URL
   const uploadRes = await fetch(uploadUrlData.upload_url, {

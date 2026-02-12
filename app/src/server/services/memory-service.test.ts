@@ -112,9 +112,7 @@ import {
 
 describe("chunkMarkdown", () => {
   it("keeps chunk boundaries and overlap", () => {
-    const content = ["line-1", "line-2", "line-3", "line-4", "line-5"].join(
-      "\n",
-    );
+    const content = ["line-1", "line-2", "line-3", "line-4", "line-5"].join("\n");
 
     const chunks = chunkMarkdown(content, { tokens: 3, overlap: 1 });
 

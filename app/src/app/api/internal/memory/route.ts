@@ -64,10 +64,7 @@ export async function POST(request: Request) {
   try {
     const parsed = memoryRequestSchema.safeParse(await request.json());
     if (!parsed.success) {
-      return Response.json(
-        { success: false, error: "Invalid request body" },
-        { status: 400 },
-      );
+      return Response.json({ success: false, error: "Invalid request body" }, { status: 400 });
     }
     const input = parsed.data;
     const conversationId = input.conversationId;
@@ -78,10 +75,7 @@ export async function POST(request: Request) {
     }
 
     if (!conversationId) {
-      return Response.json(
-        { success: false, error: "Missing conversationId" },
-        { status: 400 },
-      );
+      return Response.json({ success: false, error: "Missing conversationId" }, { status: 400 });
     }
 
     const convo = await db.query.conversation.findFirst({
@@ -89,10 +83,7 @@ export async function POST(request: Request) {
     });
 
     if (!convo?.userId) {
-      return Response.json(
-        { success: false, error: "Conversation not found" },
-        { status: 404 },
-      );
+      return Response.json({ success: false, error: "Conversation not found" }, { status: 404 });
     }
 
     const userId = convo.userId;
@@ -116,10 +107,7 @@ export async function POST(request: Request) {
         (await readSessionTranscriptByPath({ userId, path })) ??
         (await readMemoryFile({ userId, path }));
       if (!result) {
-        return Response.json(
-          { success: false, error: "Not found" },
-          { status: 404 },
-        );
+        return Response.json({ success: false, error: "Not found" }, { status: 404 });
       }
       return Response.json({ success: true, ...result });
     }
@@ -152,10 +140,7 @@ export async function POST(request: Request) {
       return Response.json({ success: true, entryId: entry.id });
     }
 
-    return Response.json(
-      { success: false, error: "Unknown operation" },
-      { status: 400 },
-    );
+    return Response.json({ success: false, error: "Unknown operation" }, { status: 400 });
   } catch (error) {
     console.error("[Internal] memory request error:", error);
     return Response.json({ success: false }, { status: 500 });

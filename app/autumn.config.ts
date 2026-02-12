@@ -1,9 +1,4 @@
-import {
-  feature,
-  product,
-  featureItem,
-  priceItem,
-} from "atmn";
+import { feature, product, featureItem, priceItem } from "atmn";
 
 // Features
 export const messages = feature({

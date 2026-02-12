@@ -50,8 +50,7 @@ export const writeFileTool: ToolDefinition = {
 
 export const readFileTool: ToolDefinition = {
   name: "read_file",
-  description:
-    "Read the contents of a file. Returns the full file content as a string.",
+  description: "Read the contents of a file. Returns the full file content as a string.",
   input_schema: {
     type: "object",
     properties: {
@@ -66,8 +65,7 @@ export const readFileTool: ToolDefinition = {
 
 export const listFilesTool: ToolDefinition = {
   name: "list_files",
-  description:
-    "List files and directories at a given path. Returns a listing similar to 'ls -la'.",
+  description: "List files and directories at a given path. Returns a listing similar to 'ls -la'.",
   input_schema: {
     type: "object",
     properties: {
@@ -83,8 +81,7 @@ export const listFilesTool: ToolDefinition = {
 export const searchFilesTool: ToolDefinition = {
   name: "search_files",
   description:
-    "Search for files matching a pattern using glob syntax. " +
-    "Returns matching file paths.",
+    "Search for files matching a pattern using glob syntax. " + "Returns matching file paths.",
   input_schema: {
     type: "object",
     properties: {
@@ -115,8 +112,7 @@ export const searchContentTool: ToolDefinition = {
       },
       path: {
         type: "string",
-        description:
-          "File or directory to search in (default: current directory)",
+        description: "File or directory to search in (default: current directory)",
       },
       include: {
         type: "string",
@@ -189,8 +185,7 @@ export const memoryWriteTool: ToolDefinition = {
       },
       path: {
         type: "string",
-        description:
-          "Optional path override (MEMORY.md or memory/YYYY-MM-DD.md)",
+        description: "Optional path override (MEMORY.md or memory/YYYY-MM-DD.md)",
       },
     },
     required: ["content"],
@@ -208,8 +203,7 @@ export const sendFileTool: ToolDefinition = {
     properties: {
       path: {
         type: "string",
-        description:
-          "Absolute path to the file in the sandbox (e.g., /app/output.pdf)",
+        description: "Absolute path to the file in the sandbox (e.g., /app/output.pdf)",
       },
       description: {
         type: "string",

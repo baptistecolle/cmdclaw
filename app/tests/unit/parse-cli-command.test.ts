@@ -7,9 +7,7 @@ describe("parseCliCommand", () => {
   });
 
   test("parses quoted arguments and long/short flags", () => {
-    const parsed = parseCliCommand(
-      "slack send -c general --text='hello world' --thread=12345",
-    );
+    const parsed = parseCliCommand("slack send -c general --text='hello world' --thread=12345");
 
     expect(parsed).toEqual({
       integration: "slack",
@@ -25,9 +23,7 @@ describe("parseCliCommand", () => {
   });
 
   test("parses hubspot nested operations", () => {
-    const parsed = parseCliCommand(
-      "hubspot contacts update --id 42 --email user@example.com",
-    );
+    const parsed = parseCliCommand("hubspot contacts update --id 42 --email user@example.com");
     expect(parsed?.integration).toBe("hubspot");
     expect(parsed?.operation).toBe("contacts.update");
     expect(parsed?.args.id).toBe("42");

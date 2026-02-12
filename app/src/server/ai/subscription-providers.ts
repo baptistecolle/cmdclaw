@@ -1,9 +1,7 @@
 import { env } from "@/env";
 
 const getAppUrl = () =>
-  env.APP_URL ??
-  process.env.NEXT_PUBLIC_APP_URL ??
-  `http://localhost:${process.env.PORT ?? 3000}`;
+  env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 export type SubscriptionProviderID = "openai" | "google" | "kimi";
 
@@ -39,10 +37,7 @@ export type SubscriptionProviderConfig =
   | OAuthSubscriptionProviderConfig
   | ApiKeySubscriptionProviderConfig;
 
-export const SUBSCRIPTION_PROVIDERS: Record<
-  SubscriptionProviderID,
-  SubscriptionProviderConfig
-> = {
+export const SUBSCRIPTION_PROVIDERS: Record<SubscriptionProviderID, SubscriptionProviderConfig> = {
   openai: {
     authType: "oauth",
     name: "ChatGPT",
@@ -101,9 +96,7 @@ export function isOAuthProviderConfig(
 /**
  * Get all models for a given subscription provider.
  */
-export function getProviderModels(
-  provider: SubscriptionProviderID,
-): SubscriptionProviderModel[] {
+export function getProviderModels(provider: SubscriptionProviderID): SubscriptionProviderModel[] {
   return SUBSCRIPTION_PROVIDERS[provider].models;
 }
 

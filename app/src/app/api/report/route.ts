@@ -12,13 +12,9 @@ function normalizeSlackChannelName(value: string) {
   return value.trim().replace(/^#/, "").toLowerCase();
 }
 
-type SlackChannelLookupResult =
-  | { ok: true; channelId: string }
-  | { ok: false; error: string };
+type SlackChannelLookupResult = { ok: true; channelId: string } | { ok: false; error: string };
 
-async function lookupSlackChannelIdByName(
-  channelName: string,
-): Promise<SlackChannelLookupResult> {
+async function lookupSlackChannelIdByName(channelName: string): Promise<SlackChannelLookupResult> {
   const targetName = normalizeSlackChannelName(channelName);
   let cursor: string | undefined;
 
@@ -30,15 +26,12 @@ async function lookupSlackChannelIdByName(
     });
     if (cursor) params.set("cursor", cursor);
 
-    const response = await fetch(
-      `https://slack.com/api/conversations.list?${params.toString()}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`,
-        },
+    const response = await fetch(`https://slack.com/api/conversations.list?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`,
       },
-    );
+    });
 
     const result = (await response.json()) as {
       ok: boolean;
@@ -111,26 +104,15 @@ async function slackApiFormData(method: string, formData: FormData) {
   }>;
 }
 
-async function uploadAttachmentToSlack(
-  channelId: string,
-  file: File,
-  initialComment: string,
-) {
+async function uploadAttachmentToSlack(channelId: string, file: File, initialComment: string) {
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const getUploadData = new FormData();
   getUploadData.append("filename", file.name || "attachment");
   getUploadData.append("length", buffer.length.toString());
 
-  const uploadUrlResult = await slackApiFormData(
-    "files.getUploadURLExternal",
-    getUploadData,
-  );
-  if (
-    !uploadUrlResult.ok ||
-    !uploadUrlResult.upload_url ||
-    !uploadUrlResult.file_id
-  ) {
+  const uploadUrlResult = await slackApiFormData("files.getUploadURLExternal", getUploadData);
+  if (!uploadUrlResult.ok || !uploadUrlResult.upload_url || !uploadUrlResult.file_id) {
     return {
       ok: false,
       error: uploadUrlResult.error ?? "Could not get Slack upload URL",
@@ -146,23 +128,18 @@ async function uploadAttachmentToSlack(
     return { ok: false, error: "Could not upload attachment bytes to Slack" };
   }
 
-  const completeResponse = await fetch(
-    "https://slack.com/api/files.completeUploadExternal",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        files: [
-          { id: uploadUrlResult.file_id, title: file.name || "attachment" },
-        ],
-        channel_id: channelId,
-        initial_comment: initialComment,
-      }),
+  const completeResponse = await fetch("https://slack.com/api/files.completeUploadExternal", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      files: [{ id: uploadUrlResult.file_id, title: file.name || "attachment" }],
+      channel_id: channelId,
+      initial_comment: initialComment,
+    }),
+  });
 
   return completeResponse.json() as Promise<{ ok: boolean; error?: string }>;
 }
@@ -174,10 +151,7 @@ export async function POST(request: Request) {
   }
 
   if (!env.SLACK_BOT_TOKEN) {
-    return Response.json(
-      { error: "Slack reporting is not configured" },
-      { status: 500 },
-    );
+    return Response.json({ error: "Slack reporting is not configured" }, { status: 500 });
   }
 
   const channelResult = await resolveReportSlackChannelId();
@@ -219,11 +193,7 @@ export async function POST(request: Request) {
   ].join("\n");
 
   const slackResult = attachment
-    ? await uploadAttachmentToSlack(
-        channelResult.channelId,
-        attachment,
-        reportText,
-      )
+    ? await uploadAttachmentToSlack(channelResult.channelId, attachment, reportText)
     : await postSlackMessage(channelResult.channelId, reportText);
 
   if (!slackResult.ok) {

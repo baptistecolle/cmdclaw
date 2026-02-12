@@ -95,11 +95,7 @@ const commands = {
   },
 
   // Update existing record
-  async update(
-    objectType: string,
-    recordId: string,
-    data: Record<string, unknown>,
-  ) {
+  async update(objectType: string, recordId: string, data: Record<string, unknown>) {
     await sfFetch(`/sobjects/${objectType}/${recordId}`, {
       method: "PATCH",
       body: JSON.stringify(data),
@@ -161,35 +157,26 @@ const commands = {
       "Campaign",
     ];
     const sobjects = result.sobjects
-      .filter(
-        (o: { queryable: boolean; createable: boolean }) =>
-          o.queryable && o.createable,
-      )
+      .filter((o: { queryable: boolean; createable: boolean }) => o.queryable && o.createable)
       .map((o: { name: string; label: string; custom: boolean }) => ({
         name: o.name,
         label: o.label,
         custom: o.custom,
       }))
-      .sort(
-        (
-          a: { name: string; custom: boolean },
-          b: { name: string; custom: boolean },
-        ) => {
-          const aCommon = commonObjects.indexOf(a.name);
-          const bCommon = commonObjects.indexOf(b.name);
-          if (aCommon !== -1 && bCommon !== -1) return aCommon - bCommon;
-          if (aCommon !== -1) return -1;
-          if (bCommon !== -1) return 1;
-          if (a.custom !== b.custom) return a.custom ? 1 : -1;
-          return a.name.localeCompare(b.name);
-        },
-      );
+      .sort((a: { name: string; custom: boolean }, b: { name: string; custom: boolean }) => {
+        const aCommon = commonObjects.indexOf(a.name);
+        const bCommon = commonObjects.indexOf(b.name);
+        if (aCommon !== -1 && bCommon !== -1) return aCommon - bCommon;
+        if (aCommon !== -1) return -1;
+        if (bCommon !== -1) return 1;
+        if (a.custom !== b.custom) return a.custom ? 1 : -1;
+        return a.name.localeCompare(b.name);
+      });
 
     return {
       totalSize: sobjects.length,
       commonObjects: sobjects.filter(
-        (o: { name: string }) =>
-          commonObjects.includes(o.name) || o.name.endsWith("__c"),
+        (o: { name: string }) => commonObjects.includes(o.name) || o.name.endsWith("__c"),
       ),
       allObjects: sobjects,
     };
@@ -221,9 +208,7 @@ async function main() {
       case "get": {
         const [, objectType, recordId, ...fieldArgs] = args;
         if (!objectType || !recordId) {
-          throw new Error(
-            "Usage: salesforce get <ObjectType> <RecordId> [field1,field2,...]",
-          );
+          throw new Error("Usage: salesforce get <ObjectType> <RecordId> [field1,field2,...]");
         }
         const fields = fieldArgs[0]?.split(",");
         result = await commands.get(objectType, recordId, fields);
@@ -233,9 +218,7 @@ async function main() {
       case "create": {
         const [, objectType, jsonData] = args;
         if (!objectType || !jsonData) {
-          throw new Error(
-            'Usage: salesforce create <ObjectType> \'{"Field": "Value"}\'',
-          );
+          throw new Error('Usage: salesforce create <ObjectType> \'{"Field": "Value"}\'');
         }
         result = await commands.create(objectType, JSON.parse(jsonData));
         break;
@@ -248,18 +231,13 @@ async function main() {
             'Usage: salesforce update <ObjectType> <RecordId> \'{"Field": "Value"}\'',
           );
         }
-        result = await commands.update(
-          objectType,
-          recordId,
-          JSON.parse(jsonData),
-        );
+        result = await commands.update(objectType, recordId, JSON.parse(jsonData));
         break;
       }
 
       case "describe": {
         const [, objectType] = args;
-        if (!objectType)
-          throw new Error("Usage: salesforce describe <ObjectType>");
+        if (!objectType) throw new Error("Usage: salesforce describe <ObjectType>");
         result = await commands.describe(objectType);
         break;
       }

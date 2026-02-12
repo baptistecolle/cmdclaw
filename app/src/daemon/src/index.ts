@@ -123,9 +123,7 @@ async function startDaemon(serverUrlOverride?: string): Promise<void> {
   let wsServerUrl = config.serverUrl;
 
   // If connecting to localhost Next.js, use WS port 4097
-  const localhostMatch = wsServerUrl.match(
-    /localhost:(\d+)|127\.0\.0\.1:(\d+)/,
-  );
+  const localhostMatch = wsServerUrl.match(/localhost:(\d+)|127\.0\.0\.1:(\d+)/);
   if (localhostMatch) {
     const port = localhostMatch[1] || localhostMatch[2];
     wsServerUrl = wsServerUrl.replace(`:${port}`, ":4097");

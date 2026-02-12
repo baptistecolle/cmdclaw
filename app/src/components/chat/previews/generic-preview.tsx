@@ -1,11 +1,7 @@
 import { getFlagLabel } from "@/lib/parse-cli-command";
 import { PreviewProps, PreviewField, PreviewSection } from "./preview-styles";
 
-export function GenericPreview({
-  operation,
-  args,
-  positionalArgs,
-}: PreviewProps) {
+export function GenericPreview({ operation, args, positionalArgs }: PreviewProps) {
   const hasArgs = Object.keys(args).length > 0;
   const hasPositional = positionalArgs.length > 0;
 

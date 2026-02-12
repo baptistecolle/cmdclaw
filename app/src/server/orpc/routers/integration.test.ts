@@ -109,9 +109,7 @@ describe("integrationRouter", () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    generateLinkedInAuthUrlMock.mockResolvedValue(
-      "https://linkedin.example.com/auth",
-    );
+    generateLinkedInAuthUrlMock.mockResolvedValue("https://linkedin.example.com/auth");
     deleteUnipileAccountMock.mockResolvedValue(undefined);
     getUnipileAccountMock.mockResolvedValue({
       name: "LinkedIn Profile",
@@ -173,9 +171,7 @@ describe("integrationRouter", () => {
       context,
     });
     const slackUrl = new URL(slack.authUrl);
-    expect(slackUrl.searchParams.get("user_scope")).toBe(
-      "scope:read scope:write",
-    );
+    expect(slackUrl.searchParams.get("user_scope")).toBe("scope:read scope:write");
     expect(slackUrl.searchParams.get("scope")).toBeNull();
 
     const reddit = await integrationRouterAny.getAuthUrl({
@@ -294,9 +290,7 @@ describe("integrationRouter", () => {
       context,
     });
 
-    const requestInit = (fetchMock.mock.calls as unknown[][])[0]?.[1] as
-      | RequestInit
-      | undefined;
+    const requestInit = (fetchMock.mock.calls as unknown[][])[0]?.[1] as RequestInit | undefined;
     expect(requestInit).toBeDefined();
     const headers = requestInit?.headers as Record<string, string>;
     const body = requestInit?.body as URLSearchParams;
@@ -369,9 +363,7 @@ describe("integrationRouter", () => {
   it("handles slack callback using authed_user access token", async () => {
     const context = createContext();
     context.db.query.integration.findFirst.mockResolvedValue(null);
-    context.mocks.insertReturningMock.mockResolvedValue([
-      { id: "integration-slack" },
-    ]);
+    context.mocks.insertReturningMock.mockResolvedValue([{ id: "integration-slack" }]);
 
     vi.stubGlobal(
       "fetch",
@@ -449,9 +441,7 @@ describe("integrationRouter", () => {
   it("inserts a new integration when one does not exist", async () => {
     const context = createContext();
     context.db.query.integration.findFirst.mockResolvedValue(null);
-    context.mocks.insertReturningMock.mockResolvedValue([
-      { id: "integration-new" },
-    ]);
+    context.mocks.insertReturningMock.mockResolvedValue([{ id: "integration-new" }]);
 
     vi.stubGlobal(
       "fetch",
@@ -487,9 +477,7 @@ describe("integrationRouter", () => {
 
   it("toggles integration enabled state", async () => {
     const context = createContext();
-    context.mocks.updateReturningMock.mockResolvedValueOnce([
-      { id: "integration-1" },
-    ]);
+    context.mocks.updateReturningMock.mockResolvedValueOnce([{ id: "integration-1" }]);
 
     const result = await integrationRouterAny.toggle({
       input: { id: "integration-1", enabled: false },
@@ -602,9 +590,7 @@ describe("integrationRouter", () => {
   it("creates custom integration and stores encrypted credentials", async () => {
     const context = createContext();
     context.db.query.customIntegration.findFirst.mockResolvedValue(null);
-    context.mocks.insertReturningMock.mockResolvedValue([
-      { id: "custom-1", slug: "custom-api" },
-    ]);
+    context.mocks.insertReturningMock.mockResolvedValue([{ id: "custom-1", slug: "custom-api" }]);
 
     const result = await integrationRouterAny.createCustomIntegration({
       input: {
@@ -947,9 +933,7 @@ describe("integrationRouter", () => {
 
   it("deletes a custom integration owned by the user", async () => {
     const context = createContext();
-    context.mocks.deleteReturningMock.mockResolvedValueOnce([
-      { id: "custom-1" },
-    ]);
+    context.mocks.deleteReturningMock.mockResolvedValueOnce([{ id: "custom-1" }]);
 
     const result = await integrationRouterAny.deleteCustomIntegration({
       input: { id: "custom-1" },
@@ -1172,9 +1156,7 @@ describe("integrationRouter", () => {
       context,
     });
 
-    const requestInit = (fetchMock.mock.calls as unknown[][])[0]?.[1] as
-      | RequestInit
-      | undefined;
+    const requestInit = (fetchMock.mock.calls as unknown[][])[0]?.[1] as RequestInit | undefined;
     expect(requestInit).toBeDefined();
     const headers = requestInit?.headers as Record<string, string>;
     const body = requestInit?.body as URLSearchParams;

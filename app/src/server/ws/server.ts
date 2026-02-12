@@ -13,10 +13,7 @@ import { db } from "@/server/db/client";
 import { device } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyDeviceToken } from "@/server/services/device-auth";
-import type {
-  DaemonMessage,
-  DaemonResponse,
-} from "@/server/sandbox/types";
+import type { DaemonMessage, DaemonResponse } from "@/server/sandbox/types";
 
 interface DeviceConnection {
   ws: ServerWebSocket<WebSocketData>;
@@ -52,10 +49,7 @@ const REQUEST_TIMEOUT_MS = 120_000; // 2 minutes for command execution
 /**
  * Send a message to a connected device.
  */
-export function sendToDevice(
-  deviceId: string,
-  message: DaemonMessage,
-): boolean {
+export function sendToDevice(deviceId: string, message: DaemonMessage): boolean {
   const conn = connections.get(deviceId);
   if (!conn) return false;
 
@@ -101,9 +95,7 @@ export function isDeviceOnline(deviceId: string): boolean {
 /**
  * Get the WebSocket for a connected device.
  */
-export function getDeviceSocket(
-  deviceId: string,
-): ServerWebSocket<WebSocketData> | undefined {
+export function getDeviceSocket(deviceId: string): ServerWebSocket<WebSocketData> | undefined {
   return connections.get(deviceId)?.ws;
 }
 
@@ -150,15 +142,11 @@ async function handleAuthentication(
     .where(eq(device.id, result.deviceId));
 
   ws.send(JSON.stringify({ type: "authenticated", deviceId: result.deviceId }));
-  console.log(
-    `[WS] Device ${result.deviceId} connected (user: ${result.userId})`,
-  );
+  console.log(`[WS] Device ${result.deviceId} connected (user: ${result.userId})`);
   return true;
 }
 
-async function handleDisconnect(
-  ws: ServerWebSocket<WebSocketData>,
-): Promise<void> {
+async function handleDisconnect(ws: ServerWebSocket<WebSocketData>): Promise<void> {
   const { deviceId } = ws.data;
   if (!deviceId) return;
 
@@ -285,16 +273,12 @@ export function startWebSocketServer(port: number = 4097): void {
 
       message(ws, message) {
         if (!ws.data.authenticated) {
-          ws.send(
-            JSON.stringify({ type: "error", error: "Not authenticated" }),
-          );
+          ws.send(JSON.stringify({ type: "error", error: "Not authenticated" }));
           return;
         }
         handleMessage(
           ws,
-          typeof message === "string"
-            ? message
-            : new TextDecoder().decode(message),
+          typeof message === "string" ? message : new TextDecoder().decode(message),
         );
       },
 

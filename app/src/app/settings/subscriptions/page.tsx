@@ -77,10 +77,7 @@ const PROVIDERS: {
 function SearchParamsHandler({
   onNotification,
 }: {
-  onNotification: (notification: {
-    type: "success" | "error";
-    message: string;
-  }) => void;
+  onNotification: (notification: { type: "success" | "error"; message: string }) => void;
 }) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -113,8 +110,7 @@ export default function SubscriptionsPage() {
   const connectProvider = useConnectProvider();
   const disconnectProvider = useDisconnectProvider();
   const setProviderApiKey = useSetProviderApiKey();
-  const [connectingProvider, setConnectingProvider] =
-    useState<ProviderID | null>(null);
+  const [connectingProvider, setConnectingProvider] = useState<ProviderID | null>(null);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
@@ -158,8 +154,7 @@ export default function SubscriptionsPage() {
         console.error("Failed to save Kimi API key:", error);
         setNotification({
           type: "error",
-          message:
-            "Failed to connect Kimi. Please verify your API key and try again.",
+          message: "Failed to connect Kimi. Please verify your API key and try again.",
         });
       } finally {
         setConnectingProvider(null);
@@ -215,8 +210,7 @@ export default function SubscriptionsPage() {
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Subscriptions</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect your existing AI subscriptions to use additional models in
-          Bap.
+          Connect your existing AI subscriptions to use additional models in Bap.
         </p>
       </div>
 
@@ -254,10 +248,7 @@ export default function SubscriptionsPage() {
                       alt={provider.logoAlt}
                       width={20}
                       height={20}
-                      className={cn(
-                        "h-5 w-auto shrink-0",
-                        provider.logoClassName,
-                      )}
+                      className={cn("h-5 w-auto shrink-0", provider.logoClassName)}
                     />
                     <h3 className="font-medium">{provider.name}</h3>
                     {isConnected && (
@@ -267,13 +258,9 @@ export default function SubscriptionsPage() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {provider.description}
-                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">{provider.description}</p>
                   {provider.authType === "api_key" && provider.apiKeyHelp ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {provider.apiKeyHelp}
-                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">{provider.apiKeyHelp}</p>
                   ) : null}
                 </div>
 
@@ -285,9 +272,7 @@ export default function SubscriptionsPage() {
                       onClick={() => handleDisconnect(provider.id)}
                       disabled={isDisconnecting}
                     >
-                      {isDisconnecting ? (
-                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                      ) : null}
+                      {isDisconnecting ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
                       Disconnect
                     </Button>
                   ) : (
@@ -321,9 +306,8 @@ export default function SubscriptionsPage() {
             className="mt-0.5 h-4 w-auto shrink-0 dark:invert"
           />
           <p className="text-xs text-muted-foreground">
-            Anthropic models (Claude) are always available through Bap&apos;s
-            platform. Connecting a subscription gives you access to additional
-            models from that provider.
+            Anthropic models (Claude) are always available through Bap&apos;s platform. Connecting a
+            subscription gives you access to additional models from that provider.
           </p>
         </div>
       </div>

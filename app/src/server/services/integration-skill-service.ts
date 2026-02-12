@@ -63,9 +63,7 @@ export function validateIntegrationSkillFilePath(filePath: string): boolean {
 
 export async function isKnownIntegrationSlug(slug: string): Promise<boolean> {
   const builtInSlugs = new Set(integrationTypeEnum.enumValues);
-  if (
-    builtInSlugs.has(slug as (typeof integrationTypeEnum.enumValues)[number])
-  ) {
+  if (builtInSlugs.has(slug as (typeof integrationTypeEnum.enumValues)[number])) {
     return true;
   }
 
@@ -83,11 +81,7 @@ export type CreateCommunityIntegrationSkillInput = {
   setAsPreferred?: boolean;
 };
 
-function buildSkillMd(
-  slug: string,
-  title: string,
-  description: string,
-): string {
+function buildSkillMd(slug: string, title: string, description: string): string {
   return `---
 name: ${slug}
 description: ${description}
@@ -166,10 +160,7 @@ export async function createCommunityIntegrationSkill(
         preferredSkillId: created.id,
       })
       .onConflictDoUpdate({
-        target: [
-          integrationSkillPreference.userId,
-          integrationSkillPreference.slug,
-        ],
+        target: [integrationSkillPreference.userId, integrationSkillPreference.slug],
         set: {
           preferredSource: "community",
           preferredSkillId: created.id,
@@ -185,10 +176,7 @@ export async function getOfficialIntegrationSkillIndex(): Promise<
   Map<string, OfficialIntegrationSkill>
 > {
   const now = Date.now();
-  if (
-    cachedOfficialSkills &&
-    now - cacheTimeMs < OFFICIAL_SKILLS_CACHE_TTL_MS
-  ) {
+  if (cachedOfficialSkills && now - cacheTimeMs < OFFICIAL_SKILLS_CACHE_TTL_MS) {
     return cachedOfficialSkills;
   }
 
@@ -341,9 +329,7 @@ export async function resolvePreferredCommunitySkillsForUser(
     eq(integrationSkillPreference.preferredSource, "community" as SkillSource),
   ];
   if (allowedSlugs && allowedSlugs.length > 0) {
-    const normalized = allowedSlugs
-      .map(normalizeIntegrationSkillSlug)
-      .filter(Boolean);
+    const normalized = allowedSlugs.map(normalizeIntegrationSkillSlug).filter(Boolean);
     if (normalized.length === 0) return [];
     whereClauses.push(inArray(integrationSkillPreference.slug, normalized));
   }
@@ -354,8 +340,7 @@ export async function resolvePreferredCommunitySkillsForUser(
     .where(and(...whereClauses))
     .orderBy(desc(integrationSkillPreference.updatedAt));
 
-  const out: Array<Extract<ResolvedIntegrationSkill, { source: "community" }>> =
-    [];
+  const out: Array<Extract<ResolvedIntegrationSkill, { source: "community" }>> = [];
   for (const pref of prefs) {
     const resolved = await resolveIntegrationSkillForUser(userId, pref.slug);
     if (resolved?.source === "community") {

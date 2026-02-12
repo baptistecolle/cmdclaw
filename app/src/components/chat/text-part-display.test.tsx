@@ -13,9 +13,7 @@ describe("TextPartDisplay", () => {
   });
 
   it("shows the streaming cursor when isStreaming is true", () => {
-    const { container } = render(
-      <TextPartDisplay content="Streaming output" isStreaming />,
-    );
+    const { container } = render(<TextPartDisplay content="Streaming output" isStreaming />);
 
     expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
   });

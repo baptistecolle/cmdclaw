@@ -2,12 +2,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { expect, test } from "./live-fixtures";
 import { closePool, db } from "../../src/server/db/client";
-import {
-  conversation,
-  slackConversation,
-  slackUserLink,
-  user,
-} from "../../src/server/db/schema";
+import { conversation, slackConversation, slackUserLink, user } from "../../src/server/db/schema";
 
 type SlackApiResponse = {
   ok?: boolean;
@@ -21,9 +16,7 @@ type SlackApiResponse = {
 
 const liveEnabled = process.env.E2E_LIVE === "1";
 const slackLiveEnabled = process.env.E2E_SLACK_LIVE === "1";
-const responseTimeoutMs = Number(
-  process.env.E2E_SLACK_RESPONSE_TIMEOUT_MS ?? "120000",
-);
+const responseTimeoutMs = Number(process.env.E2E_SLACK_RESPONSE_TIMEOUT_MS ?? "120000");
 const pollIntervalMs = Number(process.env.E2E_SLACK_POLL_INTERVAL_MS ?? "2500");
 
 function requireEnv(name: string): string {
@@ -114,11 +107,7 @@ async function ensureLiveUserId(): Promise<string> {
   return userId;
 }
 
-function createSlackSignature(
-  body: string,
-  timestamp: string,
-  signingSecret: string,
-): string {
+function createSlackSignature(body: string, timestamp: string, signingSecret: string): string {
   const digest = createHmac("sha256", signingSecret)
     .update(`v0:${timestamp}:${body}`)
     .digest("hex");
@@ -202,11 +191,7 @@ test.describe("@live slack bridge", () => {
         userId,
       })
       .onConflictDoUpdate({
-        target: [
-          slackConversation.teamId,
-          slackConversation.channelId,
-          slackConversation.threadTs,
-        ],
+        target: [slackConversation.teamId, slackConversation.channelId, slackConversation.threadTs],
         set: {
           conversationId: seedConversation.id,
           userId,

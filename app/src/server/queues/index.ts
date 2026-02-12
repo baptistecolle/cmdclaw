@@ -1,10 +1,4 @@
-import {
-  Queue,
-  QueueEvents,
-  Worker,
-  type ConnectionOptions,
-  type Processor,
-} from "bullmq";
+import { Queue, QueueEvents, Worker, type ConnectionOptions, type Processor } from "bullmq";
 import IORedis from "ioredis";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
@@ -48,9 +42,7 @@ const handlers: Record<string, JobHandler> = {
     }
 
     const scheduleType =
-      typeof job.data?.scheduleType === "string"
-        ? job.data.scheduleType
-        : "unknown";
+      typeof job.data?.scheduleType === "string" ? job.data.scheduleType : "unknown";
 
     return triggerWorkflowRun({
       workflowId,

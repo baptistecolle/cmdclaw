@@ -9,43 +9,39 @@ function createProcedureStub() {
   return stub;
 }
 
-const {
-  generationFindFirstMock,
-  conversationFindFirstMock,
-  dbMock,
-  generationManagerMock,
-} = vi.hoisted(() => {
-  const generationFindFirstMock = vi.fn();
-  const conversationFindFirstMock = vi.fn();
+const { generationFindFirstMock, conversationFindFirstMock, dbMock, generationManagerMock } =
+  vi.hoisted(() => {
+    const generationFindFirstMock = vi.fn();
+    const conversationFindFirstMock = vi.fn();
 
-  const dbMock = {
-    query: {
-      generation: {
-        findFirst: generationFindFirstMock,
+    const dbMock = {
+      query: {
+        generation: {
+          findFirst: generationFindFirstMock,
+        },
+        conversation: {
+          findFirst: conversationFindFirstMock,
+        },
       },
-      conversation: {
-        findFirst: conversationFindFirstMock,
-      },
-    },
-  };
+    };
 
-  const generationManagerMock = {
-    startGeneration: vi.fn(),
-    subscribeToGeneration: vi.fn(),
-    cancelGeneration: vi.fn(),
-    submitApproval: vi.fn(),
-    submitAuthResult: vi.fn(),
-    getGenerationStatus: vi.fn(),
-    getGenerationForConversation: vi.fn(),
-  };
+    const generationManagerMock = {
+      startGeneration: vi.fn(),
+      subscribeToGeneration: vi.fn(),
+      cancelGeneration: vi.fn(),
+      submitApproval: vi.fn(),
+      submitAuthResult: vi.fn(),
+      getGenerationStatus: vi.fn(),
+      getGenerationForConversation: vi.fn(),
+    };
 
-  return {
-    generationFindFirstMock,
-    conversationFindFirstMock,
-    dbMock,
-    generationManagerMock,
-  };
-});
+    return {
+      generationFindFirstMock,
+      conversationFindFirstMock,
+      dbMock,
+      generationManagerMock,
+    };
+  });
 
 vi.mock("../middleware", () => ({
   protectedProcedure: createProcedureStub(),
@@ -119,9 +115,7 @@ describe("generationRouter", () => {
       generationStatus: "idle",
       currentGenerationId: null,
     });
-    generationManagerMock.getGenerationForConversation.mockReturnValue(
-      "gen-active",
-    );
+    generationManagerMock.getGenerationForConversation.mockReturnValue("gen-active");
     generationManagerMock.getGenerationStatus.mockResolvedValue({
       status: "running",
       contentParts: [],
@@ -162,10 +156,7 @@ describe("generationRouter", () => {
     expect(approvalResult).toEqual({ success: true });
     expect(authResult).toEqual({ success: true });
 
-    expect(generationManagerMock.cancelGeneration).toHaveBeenCalledWith(
-      "gen-1",
-      "user-1",
-    );
+    expect(generationManagerMock.cancelGeneration).toHaveBeenCalledWith("gen-1", "user-1");
     expect(generationManagerMock.submitApproval).toHaveBeenCalledWith(
       "gen-1",
       "tool-1",

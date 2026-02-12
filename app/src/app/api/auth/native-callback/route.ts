@@ -25,10 +25,7 @@ export async function GET(request: NextRequest) {
       headers: request.headers,
     });
 
-    console.log(
-      "[native-callback] Session result:",
-      JSON.stringify(session, null, 2),
-    );
+    console.log("[native-callback] Session result:", JSON.stringify(session, null, 2));
 
     if (!session?.session?.token) {
       console.error("[native-callback] No session token found");

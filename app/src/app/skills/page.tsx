@@ -3,22 +3,9 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  useSkillList,
-  useCreateSkill,
-  useUpdateSkill,
-  useDeleteSkill,
-} from "@/orpc/hooks";
+import { useSkillList, useCreateSkill, useUpdateSkill, useDeleteSkill } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
-import {
-  Plus,
-  Loader2,
-  FileText,
-  Pencil,
-  Trash2,
-  CheckCircle2,
-  XCircle,
-} from "lucide-react";
+import { Plus, Loader2, FileText, Pencil, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconDisplay } from "@/components/ui/icon-picker";
@@ -148,22 +135,15 @@ function SkillsPageContent() {
       ) : (
         <div className="space-y-4">
           {skillsList.map((skill) => (
-            <div
-              key={skill.id}
-              className="flex items-center justify-between rounded-lg border p-4"
-            >
+            <div key={skill.id} className="flex items-center justify-between rounded-lg border p-4">
               <div className="flex items-center gap-4">
                 <div className="flex h-10 w-10 items-center justify-center">
                   <IconDisplay icon={skill.icon} />
                 </div>
                 <div>
                   <h3 className="font-medium">{skill.displayName}</h3>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {skill.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground line-clamp-1">
-                    {skill.description}
-                  </p>
+                  <p className="text-xs text-muted-foreground font-mono">{skill.name}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-1">{skill.description}</p>
                 </div>
               </div>
 
@@ -171,9 +151,7 @@ function SkillsPageContent() {
                 <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={skill.enabled}
-                    onCheckedChange={(checked) =>
-                      handleToggle(skill.id, checked === true)
-                    }
+                    onCheckedChange={(checked) => handleToggle(skill.id, checked === true)}
                   />
                   <span className="text-sm">Enabled</span>
                 </label>

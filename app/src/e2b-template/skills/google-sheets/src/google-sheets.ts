@@ -2,9 +2,7 @@ import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_SHEETS_ACCESS_TOKEN;
 if (!TOKEN) {
-  console.error(
-    "Error: GOOGLE_SHEETS_ACCESS_TOKEN environment variable required",
-  );
+  console.error("Error: GOOGLE_SHEETS_ACCESS_TOKEN environment variable required");
   process.exit(1);
 }
 
@@ -99,9 +97,7 @@ async function appendRows(spreadsheetId: string) {
   try {
     rowValues = JSON.parse(values.values);
   } catch {
-    console.error(
-      'Invalid JSON for --values. Use format: \'[["val1","val2"],["val3","val4"]]\'',
-    );
+    console.error('Invalid JSON for --values. Use format: \'[["val1","val2"],["val3","val4"]]\'');
     process.exit(1);
   }
 
@@ -123,9 +119,7 @@ async function appendRows(spreadsheetId: string) {
 
 async function updateCells(spreadsheetId: string) {
   if (!values.range || !values.values) {
-    console.error(
-      'Required: --range <A1:B2> --values \'[["value1","value2"]]\'',
-    );
+    console.error('Required: --range <A1:B2> --values \'[["value1","value2"]]\'');
     process.exit(1);
   }
 
@@ -133,9 +127,7 @@ async function updateCells(spreadsheetId: string) {
   try {
     cellValues = JSON.parse(values.values);
   } catch {
-    console.error(
-      'Invalid JSON for --values. Use format: \'[["val1","val2"],["val3","val4"]]\'',
-    );
+    console.error('Invalid JSON for --values. Use format: \'[["val1","val2"],["val3","val4"]]\'');
     process.exit(1);
   }
 
@@ -150,9 +142,7 @@ async function updateCells(spreadsheetId: string) {
 
   if (!res.ok) throw new Error(await res.text());
   const result = await res.json();
-  console.log(
-    `Updated ${result.updatedCells || 0} cells in ${result.updatedRange}`,
-  );
+  console.log(`Updated ${result.updatedCells || 0} cells in ${result.updatedRange}`);
 }
 
 async function clearRange(spreadsheetId: string) {

@@ -6,8 +6,7 @@ import { Loader2, CheckCircle2, CreditCard, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function BillingPage() {
-  const { customer, attach, cancel, openBillingPortal, isLoading } =
-    useCustomer();
+  const { customer, attach, cancel, openBillingPortal, isLoading } = useCustomer();
 
   const isPro = customer?.products?.some((p) => p.id === "pro");
 
@@ -77,19 +76,12 @@ export default function BillingPage() {
         {/* Plan Details */}
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Free Plan Card */}
-          <div
-            className={cn(
-              "rounded-lg border p-5",
-              !isPro && "ring-2 ring-foreground",
-            )}
-          >
+          <div className={cn("rounded-lg border p-5", !isPro && "ring-2 ring-foreground")}>
             <div className="mb-4">
               <h3 className="font-medium">Free</h3>
               <div className="mt-1 text-2xl font-bold">
                 $0
-                <span className="text-sm font-normal text-muted-foreground">
-                  /month
-                </span>
+                <span className="text-sm font-normal text-muted-foreground">/month</span>
               </div>
             </div>
             <ul className="space-y-2 text-sm text-muted-foreground">
@@ -104,20 +96,13 @@ export default function BillingPage() {
             </ul>
             {!isPro && (
               <div className="mt-4 pt-4 border-t">
-                <span className="text-xs text-muted-foreground">
-                  Current plan
-                </span>
+                <span className="text-xs text-muted-foreground">Current plan</span>
               </div>
             )}
           </div>
 
           {/* Pro Plan Card */}
-          <div
-            className={cn(
-              "rounded-lg border p-5",
-              isPro && "ring-2 ring-purple-500",
-            )}
-          >
+          <div className={cn("rounded-lg border p-5", isPro && "ring-2 ring-purple-500")}>
             <div className="mb-4">
               <div className="flex items-center gap-2">
                 <h3 className="font-medium">Pro</h3>
@@ -125,9 +110,7 @@ export default function BillingPage() {
               </div>
               <div className="mt-1 text-2xl font-bold">
                 €30
-                <span className="text-sm font-normal text-muted-foreground">
-                  /month
-                </span>
+                <span className="text-sm font-normal text-muted-foreground">/month</span>
               </div>
             </div>
             <ul className="space-y-2 text-sm text-muted-foreground">
@@ -146,9 +129,7 @@ export default function BillingPage() {
             </ul>
             <div className="mt-4 pt-4 border-t">
               {isPro ? (
-                <span className="text-xs text-purple-600 dark:text-purple-400">
-                  Current plan
-                </span>
+                <span className="text-xs text-purple-600 dark:text-purple-400">Current plan</span>
               ) : (
                 <Button size="sm" onClick={handleUpgrade} className="w-full">
                   Upgrade to Pro
@@ -182,9 +163,8 @@ export default function BillingPage() {
 
       <div className="mt-6 rounded-lg border border-muted bg-muted/30 p-4">
         <p className="text-xs text-muted-foreground">
-          Billing is handled securely through Stripe. You can manage your
-          payment methods, view invoices, and update your subscription at any
-          time.
+          Billing is handled securely through Stripe. You can manage your payment methods, view
+          invoices, and update your subscription at any time.
         </p>
       </div>
     </div>

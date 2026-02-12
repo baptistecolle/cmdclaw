@@ -19,11 +19,7 @@ export function AirtablePreview({ operation, args }: PreviewProps) {
   }
 }
 
-function AirtableCreatePreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function AirtableCreatePreview({ args }: { args: Record<string, string | undefined> }) {
   const baseId = args.b || args.base;
   const table = args.t || args.table;
   const fields = args.fields;
@@ -53,11 +49,7 @@ function AirtableCreatePreview({
   );
 }
 
-function AirtableUpdatePreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function AirtableUpdatePreview({ args }: { args: Record<string, string | undefined> }) {
   const baseId = args.b || args.base;
   const table = args.t || args.table;
   const recordId = args.r || args.record;
@@ -89,11 +81,7 @@ function AirtableUpdatePreview({
   );
 }
 
-function AirtableDeletePreview({
-  args,
-}: {
-  args: Record<string, string | undefined>;
-}) {
+function AirtableDeletePreview({ args }: { args: Record<string, string | undefined> }) {
   const baseId = args.b || args.base;
   const table = args.t || args.table;
   const recordId = args.r || args.record;
@@ -132,9 +120,7 @@ function FieldsPreview({ fields }: { fields: string }) {
       <div className="rounded border bg-muted/30 divide-y">
         {Object.entries(parsed).map(([key, value]) => (
           <div key={key} className="flex px-3 py-2 text-sm">
-            <span className="font-medium text-muted-foreground w-32 shrink-0">
-              {key}
-            </span>
+            <span className="font-medium text-muted-foreground w-32 shrink-0">{key}</span>
             <span className="break-words">{String(value)}</span>
           </div>
         ))}
@@ -142,7 +128,5 @@ function FieldsPreview({ fields }: { fields: string }) {
     );
   }
 
-  return (
-    <pre className="rounded bg-muted p-2 text-xs overflow-x-auto">{fields}</pre>
-  );
+  return <pre className="rounded bg-muted p-2 text-xs overflow-x-auto">{fields}</pre>;
 }

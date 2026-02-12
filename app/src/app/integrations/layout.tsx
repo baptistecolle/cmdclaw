@@ -2,11 +2,7 @@
 
 import { AppShell } from "@/components/app-shell";
 
-export default function IntegrationsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function IntegrationsLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShell>
       <div className="min-h-screen bg-background">

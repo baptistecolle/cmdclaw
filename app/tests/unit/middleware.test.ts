@@ -34,9 +34,7 @@ describe("middleware", () => {
   });
 
   test("skips auth checks for rpc routes", () => {
-    const request = new NextRequest(
-      "http://localhost:3000/api/rpc/conversation.list",
-    );
+    const request = new NextRequest("http://localhost:3000/api/rpc/conversation.list");
     const response = middleware(request);
 
     expect(response.status).toBe(200);
