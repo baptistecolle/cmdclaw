@@ -47,9 +47,9 @@ async function listEmails() {
     }),
   );
 
-  const emails = details.filter(Boolean).map((e: any) => {
+  const emails = details.filter(Boolean).map((e: unknown) => {
     const getHeader = (name: string) =>
-      e.payload?.headers?.find((h: any) => h.name === name)?.value || "";
+      e.payload?.headers?.find((h: unknown) => h.name === name)?.value || "";
     return {
       id: e.id,
       subject: getHeader("Subject"),
@@ -71,9 +71,9 @@ async function getEmail(messageId: string) {
 
   const email = await res.json();
   const getHeader = (name: string) =>
-    email.payload?.headers?.find((h: any) => h.name === name)?.value || "";
+    email.payload?.headers?.find((h: unknown) => h.name === name)?.value || "";
 
-  const extractBody = (part: any): string => {
+  const extractBody = (part: unknown): string => {
     if (part.body?.data)
       return Buffer.from(part.body.data, "base64").toString("utf-8");
     if (part.parts) {

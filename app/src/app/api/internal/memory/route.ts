@@ -58,7 +58,7 @@ export async function POST(request: Request) {
         userId,
         query: String(payload.query || ""),
         limit: payload.limit ? Number(payload.limit) : undefined,
-        type: payload.type as any,
+        type: payload.type as unknown,
         date: payload.date as string | undefined,
       });
       return Response.json({ success: true, results });
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
       const entry = await writeMemoryEntry({
         userId,
         path: payload.path as string | undefined,
-        type: payload.type as any,
+        type: payload.type as unknown,
         date: payload.date as string | undefined,
         title: payload.title as string | undefined,
         tags: payload.tags as string[] | undefined,

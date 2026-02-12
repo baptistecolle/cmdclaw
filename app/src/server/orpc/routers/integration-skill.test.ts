@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 function createProcedureStub() {
-  const stub: any = {
+  const stub: unknown = {
     input: vi.fn(() => stub),
     output: vi.fn(() => stub),
-    handler: vi.fn((fn: any) => fn),
+    handler: vi.fn((fn: unknown) => fn),
   };
   return stub;
 }
@@ -58,7 +58,7 @@ vi.mock("@/server/services/integration-skill-service", () => ({
 }));
 
 import { integrationSkillRouter } from "./integration-skill";
-const integrationSkillRouterAny = integrationSkillRouter as any;
+const integrationSkillRouterAny = integrationSkillRouter as unknown;
 
 function createContext() {
   const insertOnConflictDoUpdateMock = vi.fn().mockResolvedValue(undefined);
@@ -74,7 +74,7 @@ function createContext() {
   const deleteWhereMock = vi.fn().mockResolvedValue(undefined);
   const deleteMock = vi.fn(() => ({ where: deleteWhereMock }));
 
-  const context: any = {
+  const context: unknown = {
     user: { id: "user-1" },
     db: {
       query: {

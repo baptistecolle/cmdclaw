@@ -42,9 +42,9 @@ export async function detectLocalProviders(): Promise<LocalProvider[]> {
       let models: string[] = [];
 
       if (provider.name === "ollama" && data.models) {
-        models = data.models.map((m: any) => m.name);
+        models = data.models.map((m: unknown) => m.name);
       } else if (provider.name === "lm-studio" && data.data) {
-        models = data.data.map((m: any) => m.id);
+        models = data.data.map((m: unknown) => m.id);
       }
 
       found.push({
@@ -101,20 +101,20 @@ export async function proxyChatRequest(
 
   try {
     // Build messages array with system message
-    const messages: any[] = [];
+    const messages: unknown[] = [];
     if (request.system) {
       messages.push({ role: "system", content: request.system });
     }
-    messages.push(...(request.messages as any[]));
+    messages.push(...(request.messages as unknown[]));
 
-    const body: any = {
+    const body: unknown = {
       model: model || targetProvider.models[0] || "default",
       messages,
       stream: true,
     };
 
-    if (request.tools && (request.tools as any[]).length > 0) {
-      body.tools = (request.tools as any[]).map((t: any) => ({
+    if (request.tools && (request.tools as unknown[]).length > 0) {
+      body.tools = (request.tools as unknown[]).map((t: unknown) => ({
         type: "function",
         function: {
           name: t.name,

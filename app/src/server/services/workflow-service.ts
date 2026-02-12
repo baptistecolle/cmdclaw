@@ -222,7 +222,7 @@ export async function triggerWorkflowRun(params: {
       userId: wf.ownerId,
       autoApprove: wf.autoApprove,
       allowedIntegrations,
-      allowedCustomIntegrations: (wf as any).allowedCustomIntegrations ?? [],
+      allowedCustomIntegrations: (wf as unknown).allowedCustomIntegrations ?? [],
       workflowPrompt: wf.prompt,
       workflowPromptDo: wf.promptDo,
       workflowPromptDont: wf.promptDont,

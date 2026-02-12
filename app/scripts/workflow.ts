@@ -132,14 +132,14 @@ async function createWorkflow(
     triggerType: string;
     prompt: string;
     integrations?: string[];
-    schedule?: any;
+    schedule?: unknown;
   },
 ): Promise<void> {
   const result = await client.workflow.create({
     name: opts.name,
     triggerType: opts.triggerType,
     prompt: opts.prompt,
-    allowedIntegrations: (opts.integrations ?? []) as any[],
+    allowedIntegrations: (opts.integrations ?? []) as unknown[],
     schedule: opts.schedule,
   });
 
@@ -428,7 +428,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   return result;
 }
 
-function buildSchedule(parsed: ParsedArgs): any {
+function buildSchedule(parsed: ParsedArgs): unknown {
   if (!parsed.scheduleType) return undefined;
   switch (parsed.scheduleType) {
     case "interval":

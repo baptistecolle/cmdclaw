@@ -130,12 +130,12 @@ function convertContentBlocks(
           type: "thinking",
           thinking: block.thinking,
           signature: block.signature,
-        } as any;
+        } as unknown;
       case "image":
         return {
           type: "image",
           source: block.source,
-        } as any;
+        } as unknown;
       default:
         return { type: "text", text: "" };
     }
@@ -178,7 +178,7 @@ function mapAnthropicEvent(event: Anthropic.MessageStreamEvent): StreamEvent[] {
         events.push({
           type: "thinking",
           thinkingId: `thinking-${event.index}`,
-          text: (delta as any).thinking || "",
+          text: (delta as unknown).thinking || "",
         });
       }
       break;
@@ -191,10 +191,10 @@ function mapAnthropicEvent(event: Anthropic.MessageStreamEvent): StreamEvent[] {
     }
 
     case "message_delta": {
-      if ((event.delta as any).stop_reason) {
+      if ((event.delta as unknown).stop_reason) {
         events.push({
           type: "done",
-          stopReason: (event.delta as any).stop_reason,
+          stopReason: (event.delta as unknown).stop_reason,
         });
       }
       if (event.usage) {

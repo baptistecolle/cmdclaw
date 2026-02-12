@@ -115,14 +115,14 @@ let queueConnection: IORedis | null = null;
 
 function createRedisConnection(): IORedis {
   // Cast to any due to ioredis version mismatch with bullmq's bundled version
-  return new IORedis(redisUrl, redisOptions) as any;
+  return new IORedis(redisUrl, redisOptions) as unknown;
 }
 
 export const getQueue = (): Queue<JobPayload, unknown, string> => {
   if (!queue) {
     queueConnection = createRedisConnection();
     queue = new Queue<JobPayload, unknown, string>(queueName, {
-      connection: queueConnection as any,
+      connection: queueConnection as unknown,
     });
   }
 
@@ -134,12 +134,12 @@ export const startQueues = () => {
   const queueEventsConnection = createRedisConnection();
 
   const worker = new Worker(queueName, processor, {
-    connection: workerConnection as any,
+    connection: workerConnection as unknown,
     concurrency: Number(process.env.BULLMQ_CONCURRENCY ?? "5"),
   });
 
   const queueEvents = new QueueEvents(queueName, {
-    connection: queueEventsConnection as any,
+    connection: queueEventsConnection as unknown,
   });
 
   queueEvents.on("completed", ({ jobId }) => {

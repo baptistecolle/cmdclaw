@@ -59,7 +59,7 @@ function createRow(overrides: Record<string, unknown> = {}) {
     status: "on",
     schedule: { type: "interval", intervalMinutes: 10 },
     ...overrides,
-  } as any;
+  } as unknown;
 }
 
 describe("workflow-scheduler", () => {

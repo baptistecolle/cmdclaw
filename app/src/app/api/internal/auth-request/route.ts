@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       );
     if (
       allowedIntegrations &&
-      !allowedIntegrations.includes(input.integration as any)
+      !allowedIntegrations.includes(input.integration as unknown)
     ) {
       console.warn(
         "[Internal] Integration not allowed for workflow:",

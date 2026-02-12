@@ -146,7 +146,7 @@ async function listChannels() {
     exclude_archived: true,
   });
 
-  const channels = data.channels.map((ch: any) => ({
+  const channels = data.channels.map((ch: unknown) => ({
     id: ch.id,
     name: ch.name,
     private: ch.is_private,
@@ -168,7 +168,7 @@ async function getHistory() {
     limit: parseInt(values.limit || "20"),
   });
 
-  const messages = data.messages.map((m: any) => ({
+  const messages = data.messages.map((m: unknown) => ({
     ts: m.ts,
     user: m.user,
     text: m.text,
@@ -250,7 +250,7 @@ async function searchMessages() {
     sort_dir: "desc",
   });
 
-  const messages = data.messages.matches.map((m: any) => ({
+  const messages = data.messages.matches.map((m: unknown) => ({
     text: m.text,
     user: m.user,
     channel: m.channel?.name,
@@ -277,7 +277,7 @@ async function getRecentMessages() {
     sort_dir: "desc",
   });
 
-  const messages = data.messages.matches.map((m: any) => ({
+  const messages = data.messages.matches.map((m: unknown) => ({
     ts: m.ts,
     user: m.user,
     username: m.username,
@@ -302,8 +302,8 @@ async function listUsers() {
   });
 
   const users = data.members
-    .filter((u: any) => !u.deleted && !u.is_bot)
-    .map((u: any) => ({
+    .filter((u: unknown) => !u.deleted && !u.is_bot)
+    .map((u: unknown) => ({
       id: u.id,
       name: u.name,
       realName: u.real_name,
@@ -350,7 +350,7 @@ async function getThread() {
     ts: values.thread,
   });
 
-  const messages = data.messages.map((m: any) => ({
+  const messages = data.messages.map((m: unknown) => ({
     ts: m.ts,
     user: m.user,
     text: m.text,

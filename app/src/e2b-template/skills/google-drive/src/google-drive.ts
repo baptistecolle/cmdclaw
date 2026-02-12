@@ -65,7 +65,7 @@ async function listFiles() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const items = files.map((f: any) => ({
+  const items = files.map((f: unknown) => ({
     id: f.id,
     name: f.name,
     mimeType: f.mimeType,
@@ -161,7 +161,7 @@ async function searchFiles() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const items = files.map((f: any) => ({
+  const items = files.map((f: unknown) => ({
     id: f.id,
     name: f.name,
     mimeType: f.mimeType,
@@ -190,7 +190,7 @@ async function uploadFile() {
   const fileName = values.name || values.file.split("/").pop();
   const mimeType = values.mime || "application/octet-stream";
 
-  const metadata: any = { name: fileName };
+  const metadata: unknown = { name: fileName };
   if (values.folder) {
     metadata.parents = [values.folder];
   }
@@ -235,7 +235,7 @@ async function createFolder() {
     process.exit(1);
   }
 
-  const metadata: any = {
+  const metadata: unknown = {
     name: values.name,
     mimeType: "application/vnd.google-apps.folder",
   };
@@ -277,7 +277,7 @@ async function listFolders() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const folders = files.map((f: any) => ({
+  const folders = files.map((f: unknown) => ({
     id: f.id,
     name: f.name,
     modifiedTime: f.modifiedTime,

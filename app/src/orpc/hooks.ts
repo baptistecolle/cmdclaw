@@ -887,7 +887,7 @@ export function useGeneration() {
     async (generationId: string, callbacks: GenerationCallbacks) => {
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
-      let currentGenerationId: string | undefined = generationId;
+      const currentGenerationId: string | undefined = generationId;
       let retries = 0;
 
       try {

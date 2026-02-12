@@ -108,7 +108,7 @@ export class WSClient {
   }
 
   private handleMessage(raw: string): void {
-    let msg: any;
+    let msg: unknown;
     try {
       msg = JSON.parse(raw);
     } catch {
@@ -158,7 +158,7 @@ export class WSClient {
     }
   }
 
-  private handleSandboxSetup(msg: any): void {
+  private handleSandboxSetup(msg: unknown): void {
     try {
       setupSandbox(msg.conversationId, msg.workDir);
       this.send({
@@ -176,7 +176,7 @@ export class WSClient {
     }
   }
 
-  private async handleSandboxExecute(msg: any): Promise<void> {
+  private async handleSandboxExecute(msg: unknown): Promise<void> {
     try {
       const result = await executeCommand(msg.command, {
         conversationId: msg.conversationId,
@@ -203,7 +203,7 @@ export class WSClient {
     }
   }
 
-  private handleSandboxWriteFile(msg: any): void {
+  private handleSandboxWriteFile(msg: unknown): void {
     try {
       writeFile(msg.path, msg.content);
       this.send({
@@ -221,7 +221,7 @@ export class WSClient {
     }
   }
 
-  private handleSandboxReadFile(msg: any): void {
+  private handleSandboxReadFile(msg: unknown): void {
     try {
       const content = readFile(msg.path);
       this.send({
@@ -239,7 +239,7 @@ export class WSClient {
     }
   }
 
-  private handleSandboxTeardown(msg: any): void {
+  private handleSandboxTeardown(msg: unknown): void {
     try {
       if (msg.conversationId) {
         teardownSandbox(msg.conversationId);
@@ -259,7 +259,7 @@ export class WSClient {
     }
   }
 
-  private handleLLMChat(msg: any): void {
+  private handleLLMChat(msg: unknown): void {
     proxyChatRequest(
       {
         messages: msg.messages,

@@ -108,9 +108,9 @@ async function getTimeline() {
     },
   });
 
-  const users = new Map(data.includes?.users?.map((u: any) => [u.id, u]) || []);
+  const users = new Map(data.includes?.users?.map((u: unknown) => [u.id, u]) || []);
   const tweets =
-    data.data?.map((t: any) => ({
+    data.data?.map((t: unknown) => ({
       id: t.id,
       text: t.text,
       author: users.get(t.author_id),
@@ -135,9 +135,9 @@ async function getMentions() {
     },
   });
 
-  const users = new Map(data.includes?.users?.map((u: any) => [u.id, u]) || []);
+  const users = new Map(data.includes?.users?.map((u: unknown) => [u.id, u]) || []);
   const tweets =
-    data.data?.map((t: any) => ({
+    data.data?.map((t: unknown) => ({
       id: t.id,
       text: t.text,
       author: users.get(t.author_id),
@@ -165,9 +165,9 @@ async function searchTweets() {
     },
   });
 
-  const users = new Map(data.includes?.users?.map((u: any) => [u.id, u]) || []);
+  const users = new Map(data.includes?.users?.map((u: unknown) => [u.id, u]) || []);
   const tweets =
-    data.data?.map((t: any) => ({
+    data.data?.map((t: unknown) => ({
       id: t.id,
       text: t.text,
       author: users.get(t.author_id),
@@ -192,9 +192,9 @@ async function getLikes() {
     },
   });
 
-  const users = new Map(data.includes?.users?.map((u: any) => [u.id, u]) || []);
+  const users = new Map(data.includes?.users?.map((u: unknown) => [u.id, u]) || []);
   const tweets =
-    data.data?.map((t: any) => ({
+    data.data?.map((t: unknown) => ({
       id: t.id,
       text: t.text,
       author: users.get(t.author_id),

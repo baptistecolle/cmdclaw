@@ -559,7 +559,7 @@ async function main(): Promise<void> {
     const attachments = args.files.map((f) => fileToAttachment(f));
     const result = await runGeneration(
       client,
-      null as any,
+      null as unknown,
       args.message,
       args.conversationId,
       args,

@@ -185,7 +185,7 @@ describe("writeSessionTranscriptFromConversation", () => {
 
     generateConversationTitleMock.mockResolvedValue("Session Summary");
 
-    insertValuesFn = vi.fn((values: any) => {
+    insertValuesFn = vi.fn((values: unknown) => {
       if (Array.isArray(values)) {
         return Promise.resolve(undefined);
       }

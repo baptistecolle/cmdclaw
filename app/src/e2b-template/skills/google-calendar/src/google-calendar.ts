@@ -50,7 +50,7 @@ async function listEvents() {
   if (!res.ok) throw new Error(await res.text());
 
   const { items = [] } = await res.json();
-  const events = items.map((event: any) => ({
+  const events = items.map((event: unknown) => ({
     id: event.id,
     summary: event.summary || "(No title)",
     start: event.start?.dateTime || event.start?.date,
@@ -81,7 +81,7 @@ async function getEvent(eventId: string) {
         end: event.end?.dateTime || event.end?.date,
         location: event.location,
         status: event.status,
-        attendees: event.attendees?.map((a: any) => ({
+        attendees: event.attendees?.map((a: unknown) => ({
           email: a.email,
           responseStatus: a.responseStatus,
         })),
@@ -107,7 +107,7 @@ async function createEvent() {
   }
 
   const isAllDay = !values.start.includes("T");
-  const event: any = {
+  const event: unknown = {
     summary: values.summary,
     description: values.description,
     location: values.location,
@@ -217,7 +217,7 @@ async function listCalendars() {
   if (!res.ok) throw new Error(await res.text());
 
   const { items = [] } = await res.json();
-  const calendars = items.map((cal: any) => ({
+  const calendars = items.map((cal: unknown) => ({
     id: cal.id,
     summary: cal.summary,
     description: cal.description,
@@ -253,7 +253,7 @@ async function todayEvents() {
   if (!res.ok) throw new Error(await res.text());
 
   const { items = [] } = await res.json();
-  const events = items.map((event: any) => ({
+  const events = items.map((event: unknown) => ({
     id: event.id,
     summary: event.summary || "(No title)",
     start: event.start?.dateTime || event.start?.date,

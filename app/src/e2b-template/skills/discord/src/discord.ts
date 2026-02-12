@@ -59,7 +59,7 @@ const [command, ...args] = positionals;
 
 async function getGuilds() {
   const data = await api("/users/@me/guilds");
-  const guilds = data.map((g: any) => ({
+  const guilds = data.map((g: unknown) => ({
     id: g.id,
     name: g.name,
     icon: g.icon,
@@ -72,8 +72,8 @@ async function getGuilds() {
 async function getChannels(guildId: string) {
   const data = await api(`/guilds/${guildId}/channels`);
   const channels = data
-    .filter((c: any) => c.type === 0 || c.type === 2 || c.type === 5)
-    .map((c: any) => ({
+    .filter((c: unknown) => c.type === 0 || c.type === 2 || c.type === 5)
+    .map((c: unknown) => ({
       id: c.id,
       name: c.name,
       type: c.type === 0 ? "text" : c.type === 2 ? "voice" : "announcement",
@@ -81,7 +81,7 @@ async function getChannels(guildId: string) {
       position: c.position,
       parentId: c.parent_id,
     }))
-    .sort((a: any, b: any) => a.position - b.position);
+    .sort((a: unknown, b: unknown) => a.position - b.position);
   console.log(JSON.stringify(channels, null, 2));
 }
 
@@ -90,7 +90,7 @@ async function getMessages(channelId: string) {
   const data = await api(`/channels/${channelId}/messages`, {
     params: { limit },
   });
-  const messages = data.map((m: any) => ({
+  const messages = data.map((m: unknown) => ({
     id: m.id,
     author: {
       id: m.author.id,

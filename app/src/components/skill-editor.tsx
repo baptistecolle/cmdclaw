@@ -45,7 +45,7 @@ const suggestionItems = [
     description: "Just start writing with plain text",
     searchTerms: ["p", "paragraph"],
     icon: <Text className="h-4 w-4" />,
-    command: ({ editor, range }: any) => {
+    command: ({ editor, range }: unknown) => {
       editor.chain().focus().deleteRange(range).setParagraph().run();
     },
   },
@@ -54,7 +54,7 @@ const suggestionItems = [
     description: "Large section heading",
     searchTerms: ["title", "big", "large", "h1"],
     icon: <Heading1 className="h-4 w-4" />,
-    command: ({ editor, range }: any) => {
+    command: ({ editor, range }: unknown) => {
       editor
         .chain()
         .focus()
@@ -68,7 +68,7 @@ const suggestionItems = [
     description: "Medium section heading",
     searchTerms: ["subtitle", "medium", "h2"],
     icon: <Heading2 className="h-4 w-4" />,
-    command: ({ editor, range }: any) => {
+    command: ({ editor, range }: unknown) => {
       editor
         .chain()
         .focus()
@@ -82,7 +82,7 @@ const suggestionItems = [
     description: "Small section heading",
     searchTerms: ["small", "h3"],
     icon: <Heading3 className="h-4 w-4" />,
-    command: ({ editor, range }: any) => {
+    command: ({ editor, range }: unknown) => {
       editor
         .chain()
         .focus()
@@ -96,7 +96,7 @@ const suggestionItems = [
     description: "Create a bulleted list",
     searchTerms: ["unordered", "point", "ul"],
     icon: <List className="h-4 w-4" />,
-    command: ({ editor, range }: any) => {
+    command: ({ editor, range }: unknown) => {
       editor.chain().focus().deleteRange(range).toggleBulletList().run();
     },
   },
@@ -105,7 +105,7 @@ const suggestionItems = [
     description: "Create a numbered list",
     searchTerms: ["ordered", "ol"],
     icon: <ListOrdered className="h-4 w-4" />,
-    command: ({ editor, range }: any) => {
+    command: ({ editor, range }: unknown) => {
       editor.chain().focus().deleteRange(range).toggleOrderedList().run();
     },
   },
@@ -114,7 +114,7 @@ const suggestionItems = [
     description: "Add a block quote",
     searchTerms: ["blockquote"],
     icon: <Quote className="h-4 w-4" />,
-    command: ({ editor, range }: any) => {
+    command: ({ editor, range }: unknown) => {
       editor.chain().focus().deleteRange(range).toggleBlockquote().run();
     },
   },
@@ -123,7 +123,7 @@ const suggestionItems = [
     description: "Add a code block",
     searchTerms: ["codeblock", "pre"],
     icon: <CodeSquare className="h-4 w-4" />,
-    command: ({ editor, range }: any) => {
+    command: ({ editor, range }: unknown) => {
       editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
     },
   },
@@ -476,7 +476,7 @@ function parseInlineContent(text: string): JSONContent[] {
 }
 
 // Convert editor content to markdown
-function editorToMarkdown(editor: any): string {
+function editorToMarkdown(editor: unknown): string {
   if (!editor) return "";
 
   const json = editor.getJSON();
@@ -488,7 +488,7 @@ export function jsonToMarkdown(json: JSONContent): string {
   if (!json.content) return "";
 
   return json.content
-    .map((node: any) => {
+    .map((node: unknown) => {
       switch (node.type) {
         case "heading":
           const level = node.attrs?.level || 1;
@@ -498,11 +498,11 @@ export function jsonToMarkdown(json: JSONContent): string {
           return getTextContent(node);
         case "bulletList":
           return node.content
-            ?.map((item: any) => "- " + getTextContent(item))
+            ?.map((item: unknown) => "- " + getTextContent(item))
             .join("\n");
         case "orderedList":
           return node.content
-            ?.map((item: any, i: number) => `${i + 1}. ` + getTextContent(item))
+            ?.map((item: unknown, i: number) => `${i + 1}. ` + getTextContent(item))
             .join("\n");
         case "blockquote":
           const quoteText = getTextContent(node);
@@ -517,7 +517,7 @@ export function jsonToMarkdown(json: JSONContent): string {
           return "---";
         case "taskList":
           return node.content
-            ?.map((item: any) => {
+            ?.map((item: unknown) => {
               const checked = item.attrs?.checked ? "x" : " ";
               return `- [${checked}] ` + getTextContent(item);
             })
@@ -530,7 +530,7 @@ export function jsonToMarkdown(json: JSONContent): string {
     .join("\n\n");
 }
 
-function getTextContent(node: any): string {
+function getTextContent(node: unknown): string {
   if (!node) return "";
   if (node.text) {
     let text = node.text;

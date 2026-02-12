@@ -42,7 +42,7 @@ const { positionals, values } = parseArgs({
 const [command, ...args] = positionals;
 
 // Helper to format post data
-function formatPost(post: any) {
+function formatPost(post: unknown) {
   const data = post.data || post;
   return {
     id: data.name || `t3_${data.id}`,
@@ -62,7 +62,7 @@ function formatPost(post: any) {
 }
 
 // Helper to format comment data
-function formatComment(comment: any): any {
+function formatComment(comment: unknown): unknown {
   const data = comment.data || comment;
   if (data.kind === "more" || !data.body) return null;
   return {
@@ -137,7 +137,7 @@ async function getUser(username: string) {
         },
         created: new Date(userData.created_utc * 1000).toISOString(),
         recentPosts: posts.data.children.map(formatPost),
-        recentComments: comments.data.children.map((c: any) => ({
+        recentComments: comments.data.children.map((c: unknown) => ({
           id: c.data.name,
           body: c.data.body?.substring(0, 200),
           subreddit: c.data.subreddit,
@@ -371,7 +371,7 @@ async function inbox() {
   const limit = values.limit || "25";
   const data = await api(`/message/inbox?limit=${limit}`);
 
-  const messages = data.data.children.map((m: any) => ({
+  const messages = data.data.children.map((m: unknown) => ({
     id: m.data.name,
     author: m.data.author,
     subject: m.data.subject,
@@ -418,7 +418,7 @@ async function subscriptions() {
   const limit = values.limit || "100";
   const data = await api(`/subreddits/mine/subscriber?limit=${limit}`);
 
-  const subs = data.data.children.map((s: any) => ({
+  const subs = data.data.children.map((s: unknown) => ({
     name: s.data.display_name,
     title: s.data.title,
     subscribers: s.data.subscribers,

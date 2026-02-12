@@ -41,7 +41,7 @@ const [command, ...args] = positionals;
 
 async function listBases() {
   const data = await api("/meta/bases");
-  const bases = data.bases.map((b: any) => ({
+  const bases = data.bases.map((b: unknown) => ({
     id: b.id,
     name: b.name,
     permission: b.permissionLevel,
@@ -56,10 +56,10 @@ async function getSchema() {
   }
 
   const data = await api(`/meta/bases/${values.base}/tables`);
-  const tables = data.tables.map((t: any) => ({
+  const tables = data.tables.map((t: unknown) => ({
     id: t.id,
     name: t.name,
-    fields: t.fields.map((f: any) => ({ name: f.name, type: f.type })),
+    fields: t.fields.map((f: unknown) => ({ name: f.name, type: f.type })),
   }));
 
   console.log(JSON.stringify(tables, null, 2));
@@ -78,7 +78,7 @@ async function listRecords() {
   const data = await api(
     `/${values.base}/${encodeURIComponent(values.table)}?${params}`,
   );
-  const records = data.records.map((r: any) => ({ id: r.id, ...r.fields }));
+  const records = data.records.map((r: unknown) => ({ id: r.id, ...r.fields }));
   console.log(JSON.stringify(records, null, 2));
 }
 
@@ -175,7 +175,7 @@ async function searchRecords() {
   const data = await api(
     `/${values.base}/${encodeURIComponent(values.table)}?${params}`,
   );
-  const records = data.records.map((r: any) => ({ id: r.id, ...r.fields }));
+  const records = data.records.map((r: unknown) => ({ id: r.id, ...r.fields }));
   console.log(JSON.stringify(records, null, 2));
 }
 

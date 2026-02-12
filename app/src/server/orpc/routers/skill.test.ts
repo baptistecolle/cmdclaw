@@ -2,10 +2,10 @@ import { ORPCError } from "@orpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 function createProcedureStub() {
-  const stub: any = {
+  const stub: unknown = {
     input: vi.fn(() => stub),
     output: vi.fn(() => stub),
-    handler: vi.fn((fn: any) => fn),
+    handler: vi.fn((fn: unknown) => fn),
   };
   return stub;
 }
@@ -44,7 +44,7 @@ vi.mock("@/server/storage/validation", () => ({
 
 import { skillRouter } from "./skill";
 
-const skillRouterAny = skillRouter as any;
+const skillRouterAny = skillRouter as unknown;
 
 function createContext() {
   const insertReturningMock = vi.fn();
@@ -64,7 +64,7 @@ function createContext() {
   const selectFromMock = vi.fn(() => ({ where: selectWhereMock }));
   const selectMock = vi.fn(() => ({ from: selectFromMock }));
 
-  const context: any = {
+  const context: unknown = {
     user: { id: "user-1" },
     db: {
       query: {

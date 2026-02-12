@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 function createProcedureStub() {
-  const stub: any = {
+  const stub: unknown = {
     input: vi.fn(() => stub),
     output: vi.fn(() => stub),
-    handler: vi.fn((fn: any) => fn),
+    handler: vi.fn((fn: unknown) => fn),
   };
   return stub;
 }
@@ -39,7 +39,7 @@ vi.mock("@/server/utils/generate-workflow-name", () => ({
 }));
 
 import { workflowRouter } from "./workflow";
-const workflowRouterAny = workflowRouter as any;
+const workflowRouterAny = workflowRouter as unknown;
 
 function createContext() {
   const insertReturningMock = vi.fn();
@@ -55,7 +55,7 @@ function createContext() {
   const deleteWhereMock = vi.fn(() => ({ returning: deleteReturningMock }));
   const deleteMock = vi.fn(() => ({ where: deleteWhereMock }));
 
-  const context: any = {
+  const context: unknown = {
     user: { id: "user-1" },
     db: {
       query: {

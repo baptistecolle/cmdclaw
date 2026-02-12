@@ -82,7 +82,7 @@ const approvalRequest = baseProcedure
       );
     if (
       allowedIntegrations &&
-      !allowedIntegrations.includes(input.integration as any)
+      !allowedIntegrations.includes(input.integration as unknown)
     ) {
       console.warn(
         "[Internal] Integration not allowed for workflow:",
@@ -152,7 +152,7 @@ const authRequest = baseProcedure
       );
     if (
       allowedIntegrations &&
-      !allowedIntegrations.includes(input.integration as any)
+      !allowedIntegrations.includes(input.integration as unknown)
     ) {
       console.warn(
         "[Internal] Integration not allowed for workflow:",

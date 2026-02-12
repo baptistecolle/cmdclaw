@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 function createProcedureStub() {
-  const stub: any = {
+  const stub: unknown = {
     input: vi.fn(() => stub),
     output: vi.fn(() => stub),
-    handler: vi.fn((fn: any) => fn),
+    handler: vi.fn((fn: unknown) => fn),
   };
   return stub;
 }
@@ -45,7 +45,7 @@ vi.mock("@/server/lib/encryption", () => ({
 }));
 
 import { integrationRouter } from "./integration";
-const integrationRouterAny = integrationRouter as any;
+const integrationRouterAny = integrationRouter as unknown;
 
 function encodeState(state: Record<string, unknown>) {
   return Buffer.from(JSON.stringify(state)).toString("base64url");
@@ -99,7 +99,7 @@ function createContext() {
       deleteWhereMock,
       deleteReturningMock,
     },
-  } as any;
+  } as unknown;
 }
 
 describe("integrationRouter", () => {
@@ -294,7 +294,7 @@ describe("integrationRouter", () => {
       context,
     });
 
-    const requestInit = (fetchMock.mock.calls as any[][])[0]?.[1] as
+    const requestInit = (fetchMock.mock.calls as unknown[][])[0]?.[1] as
       | RequestInit
       | undefined;
     expect(requestInit).toBeDefined();
@@ -1172,7 +1172,7 @@ describe("integrationRouter", () => {
       context,
     });
 
-    const requestInit = (fetchMock.mock.calls as any[][])[0]?.[1] as
+    const requestInit = (fetchMock.mock.calls as unknown[][])[0]?.[1] as
       | RequestInit
       | undefined;
     expect(requestInit).toBeDefined();

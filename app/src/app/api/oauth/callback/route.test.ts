@@ -233,7 +233,7 @@ describe("GET /api/oauth/callback", () => {
       "https://app.example.com/settings/integrations?success=true",
     );
 
-    const tokenInsertCall = (insertValuesMock.mock.calls as any[]).find(
+    const tokenInsertCall = (insertValuesMock.mock.calls as unknown[]).find(
       (call) =>
         call[0] && typeof call[0] === "object" && "accessToken" in call[0],
     );
@@ -295,7 +295,7 @@ describe("GET /api/oauth/callback", () => {
       "https://app.example.com/integrations?success=true",
     );
 
-    const integrationInsertCall = (insertValuesMock.mock.calls as any[]).find(
+    const integrationInsertCall = (insertValuesMock.mock.calls as unknown[]).find(
       (call) =>
         call[0] &&
         typeof call[0] === "object" &&

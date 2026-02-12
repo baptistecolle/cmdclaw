@@ -55,7 +55,7 @@ async function getSpreadsheet(spreadsheetId: string) {
         {
           spreadsheetId: data.spreadsheetId,
           title: data.properties?.title,
-          sheets: data.sheets?.map((s: any) => ({
+          sheets: data.sheets?.map((s: unknown) => ({
             sheetId: s.properties?.sheetId,
             title: s.properties?.title,
             rowCount: s.properties?.gridProperties?.rowCount,
@@ -95,7 +95,7 @@ async function appendRows(spreadsheetId: string) {
     process.exit(1);
   }
 
-  let rowValues: any[][];
+  let rowValues: unknown[][];
   try {
     rowValues = JSON.parse(values.values);
   } catch {
@@ -129,7 +129,7 @@ async function updateCells(spreadsheetId: string) {
     process.exit(1);
   }
 
-  let cellValues: any[][];
+  let cellValues: unknown[][];
   try {
     cellValues = JSON.parse(values.values);
   } catch {
@@ -211,7 +211,7 @@ async function listSpreadsheets() {
   if (!res.ok) throw new Error(await res.text());
 
   const { files = [] } = await res.json();
-  const sheets = files.map((f: any) => ({
+  const sheets = files.map((f: unknown) => ({
     id: f.id,
     name: f.name,
     modifiedTime: f.modifiedTime,

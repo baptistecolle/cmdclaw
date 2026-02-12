@@ -787,7 +787,7 @@ function IntegrationsPageContent() {
                   onChange={(e) =>
                     setCustomForm({
                       ...customForm,
-                      authType: e.target.value as any,
+                      authType: e.target.value as unknown,
                     })
                   }
                 >
@@ -951,7 +951,7 @@ function IntegrationsPageContent() {
                       type: "success",
                       message: "Custom integration created!",
                     });
-                  } catch (error: any) {
+                  } catch (error: unknown) {
                     setNotification({
                       type: "error",
                       message: error?.message || "Failed to create integration",

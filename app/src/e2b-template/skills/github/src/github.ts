@@ -48,7 +48,7 @@ async function listRepos() {
   });
   const repos = await api(`/user/repos?${params}`);
 
-  const list = repos.map((r: any) => ({
+  const list = repos.map((r: unknown) => ({
     name: r.full_name,
     private: r.private,
     language: r.language,
@@ -73,7 +73,7 @@ async function listPRs() {
     `/repos/${values.owner}/${values.repo}/pulls?${params}`,
   );
 
-  const list = prs.map((pr: any) => ({
+  const list = prs.map((pr: unknown) => ({
     number: pr.number,
     title: pr.title,
     author: pr.user?.login,
@@ -111,7 +111,7 @@ async function getPR(prNumber: string) {
         deletions: pr.deletions,
         files: pr.changed_files,
         url: pr.html_url,
-        reviews: reviews.map((r: any) => ({
+        reviews: reviews.map((r: unknown) => ({
           author: r.user?.login,
           state: r.state,
         })),
@@ -135,7 +135,7 @@ async function myPRs() {
     `/search/issues?q=${encodeURIComponent(q)}&per_page=30`,
   );
 
-  const prs = result.items.map((pr: any) => ({
+  const prs = result.items.map((pr: unknown) => ({
     title: pr.title,
     repo: pr.repository_url?.split("/").slice(-2).join("/"),
     number: pr.number,
@@ -184,13 +184,13 @@ async function listIssues() {
   const issues = await api(
     `/repos/${values.owner}/${values.repo}/issues?${params}`,
   );
-  const filtered = issues.filter((i: any) => !i.pull_request);
+  const filtered = issues.filter((i: unknown) => !i.pull_request);
 
-  const list = filtered.map((i: any) => ({
+  const list = filtered.map((i: unknown) => ({
     number: i.number,
     title: i.title,
     author: i.user?.login,
-    labels: i.labels?.map((l: any) => l.name),
+    labels: i.labels?.map((l: unknown) => l.name),
     url: i.html_url,
   }));
 
@@ -207,7 +207,7 @@ async function searchCode() {
     `/search/code?q=${encodeURIComponent(values.query)}&per_page=${values.limit || "10"}`,
   );
 
-  const results = result.items.map((item: any) => ({
+  const results = result.items.map((item: unknown) => ({
     name: item.name,
     path: item.path,
     repo: item.repository?.full_name,
