@@ -61,7 +61,7 @@ export function MessageItem({
   const handleViewAttachment = async (attachment: AttachmentData) => {
     try {
       const url = await getAttachmentUrl(attachment);
-      if (!url) return;
+      if (!url) {return;}
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (err) {
       console.error("Failed to open attachment:", err);
@@ -71,7 +71,7 @@ export function MessageItem({
   const handleDownload = async (attachment: AttachmentData) => {
     try {
       const url = await getAttachmentUrl(attachment);
-      if (!url) return;
+      if (!url) {return;}
 
       const link = document.createElement("a");
       link.href = url;
@@ -107,7 +107,7 @@ export function MessageItem({
 
   // Parse message parts into segments based on approval parts
   const segments = useMemo((): DisplaySegment[] => {
-    if (!parts) return [];
+    if (!parts) {return [];}
 
     const result: DisplaySegment[] = [];
     let currentSegment: DisplaySegment = {
@@ -419,7 +419,7 @@ export function MessageItem({
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024) {return `${bytes} B`;}
+  if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

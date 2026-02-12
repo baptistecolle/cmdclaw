@@ -4,18 +4,25 @@
     "oxc",
     "unicorn",
     "react",
+    "react_perf",
     "import",
     "vitest",
     "nextjs"
   ],
   "categories": {
-    "correctness": "error"
+    "correctness": "error",
+    "perf": "error",
+    "suspicious": "error"
   },
   "rules": {
+    "curly": "error",
     "jest/no-conditional-expect": "off",
     "no-empty-pattern": "off",
     "no-useless-escape": "off",
-    "typescript/no-explicit-any": "error"
+    "react/rules-of-hooks": "warn",
+    "react/exhaustive-deps": "warn",
+    "typescript/no-explicit-any": "error",
+    "react/react-in-jsx-scope": "off"
   },
   "ignorePatterns": [
     ".next/**",

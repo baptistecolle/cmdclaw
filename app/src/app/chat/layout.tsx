@@ -65,7 +65,7 @@ function CopyButton() {
   const { data: conversation } = useConversation(conversationId);
   const [copied, setCopied] = useState(false);
 
-  if (!conversationId || !conversation) return null;
+  if (!conversationId || !conversation) {return null;}
 
   const conv = conversation as {
     title?: string;
@@ -73,7 +73,7 @@ function CopyButton() {
   };
 
   const handleCopy = async () => {
-    if (!conv.messages) return;
+    if (!conv.messages) {return;}
 
     const markdown = formatChatToMarkdown(conv.messages, conv.title);
     await navigator.clipboard.writeText(markdown);

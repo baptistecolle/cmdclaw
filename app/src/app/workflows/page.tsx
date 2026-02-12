@@ -17,7 +17,7 @@ import { INTEGRATION_DISPLAY_NAMES, type IntegrationType } from "@/lib/integrati
 import { Loader2, Plus, Pencil, Trash2, Play, CheckCircle2, XCircle } from "lucide-react";
 
 function formatDate(value?: Date | string | null) {
-  if (!value) return "—";
+  if (!value) {return "—";}
   const date = typeof value === "string" ? new Date(value) : value;
   return date.toLocaleString();
 }
@@ -41,7 +41,7 @@ export default function WorkflowsPage() {
   const [expandedRunsByWorkflow, setExpandedRunsByWorkflow] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!notification) return;
+    if (!notification) {return;}
     const timer = setTimeout(() => setNotification(null), 5000);
     return () => clearTimeout(timer);
   }, [notification]);
@@ -76,7 +76,7 @@ export default function WorkflowsPage() {
   };
 
   const handleDelete = async () => {
-    if (!workflowToDelete) return;
+    if (!workflowToDelete) {return;}
     try {
       await deleteWorkflow.mutateAsync(workflowToDelete.id);
       setNotification({

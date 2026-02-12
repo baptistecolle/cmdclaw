@@ -144,7 +144,7 @@ function ensureBapDir(): void {
 
 function loadConfig(): ChatConfig | null {
   try {
-    if (!existsSync(CONFIG_PATH)) return null;
+    if (!existsSync(CONFIG_PATH)) {return null;}
     const raw = readFileSync(CONFIG_PATH, "utf-8");
     return JSON.parse(raw) as ChatConfig;
   } catch {
@@ -443,7 +443,7 @@ async function runGeneration(
             conversationId: doneConversationId,
             messageId,
           });
-          if (outputStarted) process.stdout.write("\n");
+          if (outputStarted) {process.stdout.write("\n");}
           if (options.validatePersistence) {
             await validatePersistedAssistantMessage(
               client,

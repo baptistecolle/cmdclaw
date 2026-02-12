@@ -24,7 +24,7 @@ function ensureBapDir(): void {
 
 function loadConfig(): ChatConfig | null {
   try {
-    if (!existsSync(CONFIG_PATH)) return null;
+    if (!existsSync(CONFIG_PATH)) {return null;}
     const raw = readFileSync(CONFIG_PATH, "utf-8");
     return JSON.parse(raw) as ChatConfig;
   } catch {
@@ -48,7 +48,7 @@ function isLocalServerUrl(serverUrl: string): boolean {
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  if (!Number.isFinite(parsed) || parsed <= 0) {return fallback;}
   return parsed;
 }
 

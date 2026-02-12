@@ -21,7 +21,7 @@ interface IntegrationLogoProps {
 export function IntegrationLogo({ integration, size = 16, className }: IntegrationLogoProps) {
   const logo = getIntegrationLogo(integration);
 
-  if (!logo) return null;
+  if (!logo) {return null;}
 
   return (
     <Image
@@ -71,7 +71,7 @@ interface PreviewFieldProps {
 }
 
 export function PreviewField({ label, value, mono, className }: PreviewFieldProps) {
-  if (!value) return null;
+  if (!value) {return null;}
 
   return (
     <div className={cn("mb-2", className)}>

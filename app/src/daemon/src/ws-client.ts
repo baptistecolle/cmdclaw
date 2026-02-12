@@ -59,7 +59,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function toBaseMessage(value: unknown): WSBaseMessage | null {
   const record = asRecord(value);
-  if (!record || typeof record.type !== "string") return null;
+  if (!record || typeof record.type !== "string") {return null;}
   return {
     type: record.type,
     id: typeof record.id === "string" ? record.id : undefined,
@@ -140,7 +140,7 @@ export class WSClient {
   }
 
   private send(data: unknown): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {return;}
     this.ws.send(JSON.stringify(data));
   }
 

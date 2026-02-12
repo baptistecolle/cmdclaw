@@ -391,7 +391,7 @@ export function parseMarkdownToJSON(markdown: string): JSONContent | undefined {
 
 // Parse inline markdown (bold, italic, code, strikethrough)
 function parseInlineContent(text: string): JSONContent[] {
-  if (!text) return [];
+  if (!text) {return [];}
 
   const result: JSONContent[] = [];
   let remaining = text;
@@ -469,7 +469,7 @@ function parseInlineContent(text: string): JSONContent[] {
 
 // Convert editor content to markdown
 function editorToMarkdown(editor: { getJSON: () => JSONContent } | null): string {
-  if (!editor) return "";
+  if (!editor) {return "";}
 
   const json = editor.getJSON();
   return jsonToMarkdown(json);
@@ -477,7 +477,7 @@ function editorToMarkdown(editor: { getJSON: () => JSONContent } | null): string
 
 // Convert JSON content to markdown
 export function jsonToMarkdown(json: JSONContent): string {
-  if (!json.content) return "";
+  if (!json.content) {return "";}
 
   return json.content
     .map((node) => {
@@ -522,7 +522,7 @@ export function jsonToMarkdown(json: JSONContent): string {
 }
 
 function getTextContent(node: MarkdownNode): string {
-  if (!node) return "";
+  if (!node) {return "";}
   if (node.text) {
     let text = node.text;
     if (node.marks) {

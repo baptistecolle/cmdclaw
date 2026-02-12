@@ -20,7 +20,7 @@ const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 const appUrl =
   env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
-const ADMIN_EMAILS = ["baptiste@heybap.com"];
+const ADMIN_EMAILS = new Set(["baptiste@heybap.com"]);
 
 export const auth = betterAuth({
   appName: "Bap",
@@ -125,7 +125,7 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          if (ADMIN_EMAILS.includes(user.email)) {
+          if (ADMIN_EMAILS.has(user.email)) {
             return { data: { ...user, role: "admin" } };
           }
           return { data: user };

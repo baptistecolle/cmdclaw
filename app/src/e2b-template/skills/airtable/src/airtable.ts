@@ -16,7 +16,7 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: { ...headers, ...options?.headers },
   });
-  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  if (!res.ok) {throw new Error(`${res.status} ${await res.text()}`);}
   return (await res.json()) as T;
 }
 
@@ -80,13 +80,13 @@ async function listRecords() {
   }
 
   const params = new URLSearchParams({ maxRecords: values.limit || "20" });
-  if (values.view) params.set("view", values.view);
-  if (values.filter) params.set("filterByFormula", values.filter);
+  if (values.view) {params.set("view", values.view);}
+  if (values.filter) {params.set("filterByFormula", values.filter);}
 
   const data = await api<{
     records: Array<{ id: string; fields: Record<string, unknown> }>;
   }>(`/${values.base}/${encodeURIComponent(values.table)}?${params}`);
-  const records = data.records.map((r) => ({ id: r.id, ...r.fields }));
+  const records = data.records.map((r) => (Object.assign({id:r.id}, r.fields)));
   console.log(JSON.stringify(records, null, 2));
 }
 
@@ -172,7 +172,7 @@ async function searchRecords() {
   const data = await api<{
     records: Array<{ id: string; fields: Record<string, unknown> }>;
   }>(`/${values.base}/${encodeURIComponent(values.table)}?${params}`);
-  const records = data.records.map((r) => ({ id: r.id, ...r.fields }));
+  const records = data.records.map((r) => (Object.assign({id:r.id}, r.fields)));
   console.log(JSON.stringify(records, null, 2));
 }
 

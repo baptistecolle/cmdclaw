@@ -15,7 +15,7 @@ type Props = {
 };
 
 export function IntegrationBadges({ integrations, size = "sm", className }: Props) {
-  if (integrations.length === 0) return null;
+  if (integrations.length === 0) {return null;}
 
   return (
     <div className={cn("flex items-center gap-1 flex-wrap", className)}>

@@ -36,7 +36,7 @@ const createFromChat = protectedProcedure
   )
   .handler(async ({ input, context }) => {
     const slug = normalizeIntegrationSkillSlug(input.slug);
-    if (!slug) throw new ORPCError("BAD_REQUEST", { message: "Invalid slug" });
+    if (!slug) {throw new ORPCError("BAD_REQUEST", { message: "Invalid slug" });}
     try {
       const created = await createCommunityIntegrationSkill(context.user.id, {
         slug,

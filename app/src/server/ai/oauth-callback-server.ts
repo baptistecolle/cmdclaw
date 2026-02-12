@@ -33,7 +33,7 @@ function getAppUrl() {
 let server: Server | null = null;
 
 export function ensureOAuthCallbackServer(): void {
-  if (server) return;
+  if (server) {return;}
 
   server = createServer(async (req, res) => {
     const url = new URL(req.url!, `http://localhost:${OAUTH_PORT}`);

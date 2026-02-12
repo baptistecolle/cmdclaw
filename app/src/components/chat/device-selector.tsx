@@ -61,7 +61,7 @@ export function DeviceSelector({ selectedDeviceId, onSelect }: Props) {
   }, []);
 
   // Don't render if no devices are available
-  if (devices.length === 0) return null;
+  if (devices.length === 0) {return null;}
 
   const selected = selectedDeviceId ? devices.find((d) => d.id === selectedDeviceId) : null;
 

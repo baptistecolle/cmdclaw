@@ -58,7 +58,7 @@ function extractTextFromContent(content: DocContentElement[]): string {
 
 async function getDocument(documentId: string) {
   const res = await fetch(`${DOCS_URL}/${documentId}`, { headers });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
 
   const doc = (await res.json()) as {
     documentId?: string;
@@ -94,7 +94,7 @@ async function createDocument() {
     body: JSON.stringify({ title: values.title }),
   });
 
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
   const doc = (await res.json()) as { documentId?: string };
 
   // If content provided, add it
@@ -113,7 +113,7 @@ async function createDocument() {
         ],
       }),
     });
-    if (!updateRes.ok) throw new Error(await updateRes.text());
+    if (!updateRes.ok) {throw new Error(await updateRes.text());}
   }
 
   console.log(`Document created: https://docs.google.com/document/d/${doc.documentId}/edit`);
@@ -127,7 +127,7 @@ async function appendText(documentId: string) {
 
   // Get document to find end index
   const getRes = await fetch(`${DOCS_URL}/${documentId}`, { headers });
-  if (!getRes.ok) throw new Error(await getRes.text());
+  if (!getRes.ok) {throw new Error(await getRes.text());}
   const doc = (await getRes.json()) as { body?: { content?: DocContentElement[] } };
 
   const endIndex = doc.body?.content?.slice(-1)?.[0]?.endIndex || 1;
@@ -148,7 +148,7 @@ async function appendText(documentId: string) {
     }),
   });
 
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
   console.log("Text appended successfully.");
 }
 
@@ -161,7 +161,7 @@ async function listDocuments() {
   });
 
   const res = await fetch(`${DRIVE_URL}/files?${params}`, { headers });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
 
   const { files = [] } = (await res.json()) as {
     files?: Array<{ id?: string; name?: string; modifiedTime?: string; webViewLink?: string }>;
@@ -191,7 +191,7 @@ async function searchDocuments() {
   });
 
   const res = await fetch(`${DRIVE_URL}/files?${params}`, { headers });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
 
   const { files = [] } = (await res.json()) as {
     files?: Array<{ id?: string; name?: string; modifiedTime?: string; webViewLink?: string }>;

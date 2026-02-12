@@ -1218,7 +1218,7 @@ describe("generationManager transitions", () => {
     vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
     vi.mocked(parseBashCommand).mockImplementation((command) => {
       if (command === "slack forbidden")
-        return { integration: "slack" } as ReturnType<typeof parseBashCommand>;
+        {return { integration: "slack" } as ReturnType<typeof parseBashCommand>;}
       return null;
     });
     vi.mocked(checkToolPermissions).mockImplementation((toolName) => {
@@ -1256,8 +1256,8 @@ describe("generationManager transitions", () => {
       storageKey: "k/report.txt",
     });
     vi.mocked(toolCallToCommand).mockImplementation((toolName) => {
-      if (toolName === "bash_exec") return { command: "run-ok", isWrite: false };
-      if (toolName === "bash_fail") return { command: "run-fail", isWrite: false };
+      if (toolName === "bash_exec") {return { command: "run-ok", isWrite: false };}
+      if (toolName === "bash_fail") {return { command: "run-fail", isWrite: false };}
       return null;
     });
 

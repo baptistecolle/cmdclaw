@@ -24,7 +24,7 @@ function ensureBapDir(): void {
 
 export function loadConfig(): DaemonConfig | null {
   try {
-    if (!existsSync(CONFIG_PATH)) return null;
+    if (!existsSync(CONFIG_PATH)) {return null;}
     const raw = readFileSync(CONFIG_PATH, "utf-8");
     return JSON.parse(raw) as DaemonConfig;
   } catch {

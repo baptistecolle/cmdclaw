@@ -28,12 +28,12 @@ export default function AdminWhatsAppPage() {
           throw new Error(await res.text());
         }
         const data = (await res.json()) as WhatsAppStatus;
-        if (!active) return;
+        if (!active) {return;}
         setWaStatus(data);
       } catch (err) {
         console.error("Failed to load WhatsApp status:", err);
       } finally {
-        if (active) setWaLoading(false);
+        if (active) {setWaLoading(false);}
       }
     };
 

@@ -66,7 +66,7 @@ type SessionInitLifecycleCallback = (
 ) => void;
 
 function formatErrorMessage(error: unknown): string {
-  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  if (error instanceof Error) {return `${error.name}: ${error.message}`;}
   return String(error);
 }
 
@@ -81,7 +81,7 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
     attempts += 1;
     try {
       const res = await fetch(`${url}/doc`, { method: "GET" });
-      if (res.ok) return;
+      if (res.ok) {return;}
       lastError = `status_${res.status}`;
     } catch {
       // Server not ready yet
@@ -266,8 +266,8 @@ export async function getOrCreateSandbox(
         background: true,
         onStderr: (data) => {
           const line = data.trim();
-          if (!line) return;
-          if (stderrBuffer.length >= 20) stderrBuffer.shift();
+          if (!line) {return;}
+          if (stderrBuffer.length >= 20) {stderrBuffer.shift();}
           stderrBuffer.push(line);
           logServerEvent(
             "warn",
@@ -547,7 +547,7 @@ async function replayConversationHistory(
     orderBy: asc(message.createdAt),
   });
 
-  if (messages.length === 0) return;
+  if (messages.length === 0) {return;}
 
   const boundaryIndex = messages
     .map((m, idx) =>
@@ -584,9 +584,9 @@ async function replayConversationHistory(
         if (m.contentParts) {
           const parts = m.contentParts
             .map((p) => {
-              if (p.type === "text") return p.text;
-              if (p.type === "tool_use") return `[Used ${p.name}]`;
-              if (p.type === "tool_result") return `[Result received]`;
+              if (p.type === "text") {return p.text;}
+              if (p.type === "tool_use") {return `[Used ${p.name}]`;}
+              if (p.type === "tool_result") {return `[Result received]`;}
               return "";
             })
             .filter(Boolean)

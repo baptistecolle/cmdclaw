@@ -44,7 +44,7 @@ async function search() {
     headers,
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
 
   const { results = [] } = (await res.json()) as { results?: Record<string, JsonValue>[] };
   const items = results.map((item: Record<string, JsonValue>) => ({
@@ -70,7 +70,7 @@ async function getPage(pageId: string) {
     }),
   ]);
 
-  if (!pageRes.ok) throw new Error(await pageRes.text());
+  if (!pageRes.ok) {throw new Error(await pageRes.text());}
   const page = (await pageRes.json()) as Record<string, JsonValue>;
   const blocks = blocksRes.ok
     ? (((await blocksRes.json()) as { results?: Record<string, JsonValue>[] }).results ?? [])
@@ -118,7 +118,7 @@ async function createPage() {
     }),
   });
 
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
   const page = (await res.json()) as { url?: string };
   console.log(`Page created: ${page.url}`);
 }
@@ -141,7 +141,7 @@ async function appendContent(pageId: string) {
     body: JSON.stringify({ children }),
   });
 
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
   console.log("Content appended successfully.");
 }
 
@@ -155,7 +155,7 @@ async function listDatabases() {
     }),
   });
 
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
   const { results = [] } = (await res.json()) as { results?: Record<string, JsonValue>[] };
 
   const dbs = results.map((db: Record<string, JsonValue>) => ({
@@ -175,7 +175,7 @@ async function queryDatabase(databaseId: string) {
     body: JSON.stringify({ page_size: parseInt(values.limit || "10") }),
   });
 
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {throw new Error(await res.text());}
   const { results = [] } = (await res.json()) as { results?: Record<string, JsonValue>[] };
 
   const entries = results.map((page: Record<string, JsonValue>) => {
@@ -184,15 +184,15 @@ async function queryDatabase(databaseId: string) {
       (page.properties ?? {}) as Record<string, JsonValue>,
     )) {
       const p = value as Record<string, JsonValue>;
-      if (p.title) props[key] = p.title?.[0]?.plain_text || "";
-      else if (p.rich_text) props[key] = p.rich_text?.[0]?.plain_text || "";
-      else if (p.number !== undefined) props[key] = p.number;
-      else if (p.select) props[key] = p.select?.name || "";
-      else if (p.date) props[key] = p.date?.start || "";
-      else if (p.checkbox !== undefined) props[key] = p.checkbox;
-      else props[key] = "[complex]";
+      if (p.title) {props[key] = p.title?.[0]?.plain_text || "";}
+      else if (p.rich_text) {props[key] = p.rich_text?.[0]?.plain_text || "";}
+      else if (p.number !== undefined) {props[key] = p.number;}
+      else if (p.select) {props[key] = p.select?.name || "";}
+      else if (p.date) {props[key] = p.date?.start || "";}
+      else if (p.checkbox !== undefined) {props[key] = p.checkbox;}
+      else {props[key] = "[complex]";}
     }
-    return { id: page.id, url: page.url, ...props };
+    return Object.assign({id:page.id,url:page.url}, props);
   });
 
   console.log(JSON.stringify(entries, null, 2));

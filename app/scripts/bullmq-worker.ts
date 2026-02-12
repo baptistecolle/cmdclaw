@@ -11,7 +11,7 @@ const stopXDmWatcher = startXDmWorkflowWatcher();
 let shutdownPromise: Promise<void> | null = null;
 
 const shutdown = async () => {
-  if (shutdownPromise) return shutdownPromise;
+  if (shutdownPromise) {return shutdownPromise;}
 
   shutdownPromise = (async () => {
     console.log("[worker] shutting down...");

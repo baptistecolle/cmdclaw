@@ -67,8 +67,8 @@ test.describe("@live chat", () => {
       .poll(
         async () => {
           const text = (await assistantBubble.textContent())?.trim() ?? "";
-          if (!text) return "empty";
-          if (text.startsWith("Error:")) return "error";
+          if (!text) {return "empty";}
+          if (text.startsWith("Error:")) {return "error";}
           return "ok";
         },
         {

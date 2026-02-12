@@ -242,7 +242,7 @@ const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
 const AGENT_PREPARING_TIMEOUT_MS = (() => {
   const seconds = Number(process.env.AGENT_PREPARING_TIMEOUT_SECONDS ?? "300");
-  if (!Number.isFinite(seconds) || seconds <= 0) return 5 * 60 * 1000;
+  if (!Number.isFinite(seconds) || seconds <= 0) {return 5 * 60 * 1000;}
   return Math.floor(seconds * 1000);
 })();
 // Save debounce interval for text chunks
@@ -277,16 +277,16 @@ function shouldAutoApproveOpenCodePermission(
   permissionType: string,
   patterns: string[] | undefined,
 ): boolean {
-  if (!patterns?.length) return false;
+  if (!patterns?.length) {return false;}
 
   return patterns.every((pattern) => {
     const normalized = normalizePermissionPattern(pattern);
 
     // Always allow access to staged uploads directory.
-    if (normalized.startsWith("/home/user/uploads")) return true;
+    if (normalized.startsWith("/home/user/uploads")) {return true;}
 
     // OpenCode may ask external_directory for user files directly in /home/user.
-    if (permissionType === "external_directory" && normalized.startsWith("/home/user")) return true;
+    if (permissionType === "external_directory" && normalized.startsWith("/home/user")) {return true;}
 
     return false;
   });
@@ -352,12 +352,12 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
       }),
     ]);
   } finally {
-    if (timeoutId) clearTimeout(timeoutId);
+    if (timeoutId) {clearTimeout(timeoutId);}
   }
 }
 
 function estimateTokensFromContentParts(parts: ContentPart[] | null | undefined): number {
-  if (!parts || parts.length === 0) return 0;
+  if (!parts || parts.length === 0) {return 0;}
   let total = 0;
   for (const part of parts) {
     switch (part.type) {
@@ -387,7 +387,7 @@ function estimateTokensForMessageRow(m: MessageRow): number {
 }
 
 function formatErrorMessage(error: unknown): string {
-  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  if (error instanceof Error) {return `${error.name}: ${error.message}`;}
   return String(error);
 }
 
@@ -1091,7 +1091,7 @@ class GenerationManager {
           }
         }
 
-        if (isUnsubscribed) break;
+        if (isUnsubscribed) {break;}
 
         // Check if generation is complete
         if (ctx.status === "completed" || ctx.status === "cancelled" || ctx.status === "error") {
@@ -1252,9 +1252,9 @@ class GenerationManager {
    */
   getAllowedIntegrationsForConversation(conversationId: string): IntegrationType[] | null {
     const genId = this.conversationToGeneration.get(conversationId);
-    if (!genId) return null;
+    if (!genId) {return null;}
     const ctx = this.activeGenerations.get(genId);
-    if (!ctx || ctx.allowedIntegrations === undefined) return null;
+    if (!ctx || ctx.allowedIntegrations === undefined) {return null;}
     return ctx.allowedIntegrations;
   }
 
@@ -2030,7 +2030,7 @@ class GenerationManager {
         });
 
         for await (const event of stream) {
-          if (ctx.abortController.signal.aborted) break;
+          if (ctx.abortController.signal.aborted) {break;}
 
           switch (event.type) {
             case "text_delta": {
@@ -2144,7 +2144,7 @@ class GenerationManager {
           const toolResults: ContentBlock[] = [];
 
           for (const block of assistantContentBlocks) {
-            if (block.type !== "tool_use") continue;
+            if (block.type !== "tool_use") {continue;}
 
             if (block.name.startsWith("memory_")) {
               const memoryResult = await this.executeMemoryTool(ctx, sandbox!, block);
@@ -2852,14 +2852,14 @@ class GenerationManager {
         }
       }
 
-      if (!hasToolCalls) break;
+      if (!hasToolCalls) {break;}
 
       loopMessages.push({ role: "assistant", content: assistantBlocks });
 
       const toolResults: ContentBlock[] = [];
       for (const block of assistantBlocks) {
-        if (block.type !== "tool_use") continue;
-        if (!block.name.startsWith("memory_")) continue;
+        if (block.type !== "tool_use") {continue;}
+        if (!block.name.startsWith("memory_")) {continue;}
 
         const memoryResult = await this.executeMemoryTool(ctx, sandbox, block);
         toolResults.push({
@@ -2870,7 +2870,7 @@ class GenerationManager {
         });
       }
 
-      if (toolResults.length === 0) break;
+      if (toolResults.length === 0) {break;}
 
       loopMessages.push({ role: "user", content: toolResults });
     }
@@ -3041,7 +3041,7 @@ class GenerationManager {
           .where(eq(conversation.id, ctx.conversationId)),
       )
       .then(() => {
-        if (!ctx.workflowRunId) return;
+        if (!ctx.workflowRunId) {return;}
         return db
           .update(workflowRun)
           .set({ status: "awaiting_approval" })
@@ -3280,7 +3280,7 @@ class GenerationManager {
         case "pending":
           return;
         case "running": {
-          if (existingToolUse) return;
+          if (existingToolUse) {return;}
 
           this.broadcast(ctx, {
             type: "tool_use",
@@ -3299,7 +3299,7 @@ class GenerationManager {
           return;
         }
         case "completed": {
-          if (!existingToolUse) return;
+          if (!existingToolUse) {return;}
           const result = part.state.output;
           this.broadcast(ctx, {
             type: "tool_result",
@@ -3315,7 +3315,7 @@ class GenerationManager {
           return;
         }
         case "error": {
-          if (!existingToolUse) return;
+          if (!existingToolUse) {return;}
           const result = { error: part.state.error };
           this.broadcast(ctx, {
             type: "tool_result",
@@ -3426,19 +3426,19 @@ class GenerationManager {
     let createdCount = 0;
 
     for (const draft of drafts) {
-      if (!draft || typeof draft !== "object") continue;
+      if (!draft || typeof draft !== "object") {continue;}
       const rec = draft as Record<string, unknown>;
       const slug = typeof rec.slug === "string" ? rec.slug : "";
       const title = typeof rec.title === "string" ? rec.title : "";
       const description = typeof rec.description === "string" ? rec.description : "";
-      if (!slug || !title || !description) continue;
+      if (!slug || !title || !description) {continue;}
 
       const files = Array.isArray(rec.files)
         ? rec.files
             .map((entry) => {
-              if (!entry || typeof entry !== "object") return null;
+              if (!entry || typeof entry !== "object") {return null;}
               const e = entry as Record<string, unknown>;
-              if (typeof e.path !== "string" || typeof e.content !== "string") return null;
+              if (typeof e.path !== "string" || typeof e.content !== "string") {return null;}
               return { path: e.path, content: e.content };
             })
             .filter((entry): entry is { path: string; content: string } => !!entry)
@@ -3654,7 +3654,7 @@ class GenerationManager {
             .where(eq(conversation.id, ctx.conversationId));
         })
         .then(() => {
-          if (!ctx.workflowRunId) return;
+          if (!ctx.workflowRunId) {return;}
           return db
             .update(workflowRun)
             .set({ status: "awaiting_approval" })
@@ -3727,7 +3727,7 @@ class GenerationManager {
             .where(eq(conversation.id, ctx.conversationId));
         })
         .then(() => {
-          if (!ctx.workflowRunId) return;
+          if (!ctx.workflowRunId) {return;}
           return db
             .update(workflowRun)
             .set({ status: "awaiting_auth" })
@@ -3998,7 +3998,7 @@ class GenerationManager {
   }
 
   private buildWorkflowPrompt(ctx: GenerationContext): string | null {
-    if (!ctx.workflowPrompt && ctx.triggerPayload === undefined) return null;
+    if (!ctx.workflowPrompt && ctx.triggerPayload === undefined) {return null;}
 
     const sections = [
       ctx.workflowPrompt ? `## Workflow Instructions\n${ctx.workflowPrompt}` : null,
@@ -4009,7 +4009,7 @@ class GenerationManager {
         : null,
     ].filter(Boolean);
 
-    if (sections.length === 0) return null;
+    if (sections.length === 0) {return null;}
     return sections.join("\n\n");
   }
 
@@ -4031,7 +4031,7 @@ class GenerationManager {
       "status_change",
     ]);
 
-    if (!loggableEvents.has(event.type)) return;
+    if (!loggableEvents.has(event.type)) {return;}
 
     await db.insert(workflowRunEvent).values({
       workflowRunId,
@@ -4045,8 +4045,8 @@ class GenerationManager {
  * Map a model ID to its provider ID.
  */
 async function resolveProviderID(modelID: string): Promise<string> {
-  if (await isOpencodeFreeModel(modelID)) return "opencode";
-  if (modelID.startsWith("claude")) return "anthropic";
+  if (await isOpencodeFreeModel(modelID)) {return "opencode";}
+  if (modelID.startsWith("claude")) {return "anthropic";}
   if (
     modelID.startsWith("gpt") ||
     modelID.startsWith("o3") ||
@@ -4055,8 +4055,8 @@ async function resolveProviderID(modelID: string): Promise<string> {
   ) {
     return "openai";
   }
-  if (modelID.startsWith("gemini")) return "google";
-  if (modelID === "k2p5" || modelID === "kimi-k2-thinking") return "kimi-for-coding";
+  if (modelID.startsWith("gemini")) {return "google";}
+  if (modelID === "k2p5" || modelID === "kimi-k2-thinking") {return "kimi-for-coding";}
   return "anthropic"; // default
 }
 

@@ -23,7 +23,7 @@ function isStreamNotReadyError(message: string | undefined): boolean {
 }
 
 async function waitForRetry(signal: AbortSignal, delayMs: number): Promise<boolean> {
-  if (signal.aborted) return false;
+  if (signal.aborted) {return false;}
   return await new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => {
       signal.removeEventListener("abort", onAbort);

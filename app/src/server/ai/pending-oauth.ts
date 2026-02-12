@@ -31,8 +31,8 @@ export function storePending(state: string, data: PendingOAuth) {
 
 export function consumePending(state: string): PendingOAuth | undefined {
   const data = pending.get(state);
-  if (!data) return undefined;
+  if (!data) {return undefined;}
   pending.delete(state);
-  if (Date.now() - data.createdAt > EXPIRY_MS) return undefined;
+  if (Date.now() - data.createdAt > EXPIRY_MS) {return undefined;}
   return data;
 }

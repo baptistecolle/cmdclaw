@@ -55,7 +55,7 @@ function getPollIntervalMs(): number {
 }
 
 function hasRequiredScopes(scopes: string[] | null): boolean {
-  if (!scopes || scopes.length === 0) return false;
+  if (!scopes || scopes.length === 0) {return false;}
   return scopes.includes("dm.read") && scopes.includes("users.read");
 }
 
@@ -100,7 +100,7 @@ async function listWatchableWorkflows(): Promise<WatchableWorkflow[]> {
 
   const watchable: WatchableWorkflow[] = [];
   for (const row of rows) {
-    if (typeof row.accountId !== "string" || row.accountId.length === 0) continue;
+    if (typeof row.accountId !== "string" || row.accountId.length === 0) {continue;}
     watchable.push({
       workflowId: row.workflowId,
       integrationId: row.integrationId,
@@ -179,7 +179,7 @@ async function listRecentXDmEvents(accessToken: string): Promise<XDmSummary[]> {
 
   const events: XDmSummary[] = [];
   for (const item of data.data ?? []) {
-    if (!item.id || !item.sender_id || typeof item.text !== "string") continue;
+    if (!item.id || !item.sender_id || typeof item.text !== "string") {continue;}
     const sender = usersById.get(item.sender_id);
     events.push({
       id: item.id,
@@ -198,7 +198,7 @@ function compareEventId(a: string, b: string): number {
   try {
     const aValue = BigInt(a);
     const bValue = BigInt(b);
-    if (aValue === bValue) return 0;
+    if (aValue === bValue) {return 0;}
     return aValue > bValue ? 1 : -1;
   } catch {
     return a.localeCompare(b);
@@ -240,7 +240,7 @@ export async function pollXDmWorkflowTriggers(): Promise<{
   enqueued: number;
 }> {
   const watchable = await listWatchableWorkflows();
-  if (watchable.length === 0) return { checked: 0, enqueued: 0 };
+  if (watchable.length === 0) {return { checked: 0, enqueued: 0 };}
 
   const tokenCache = new Map<string, string>();
   let checked = 0;
@@ -271,18 +271,18 @@ export async function pollXDmWorkflowTriggers(): Promise<{
 
       const lastProcessedEventId = await getWorkflowLastProcessedEventId(item.workflowId);
       const events = await listRecentXDmEvents(accessToken);
-      if (events.length === 0) continue;
+      if (events.length === 0) {continue;}
 
       const incoming = events
         .filter((event) => event.senderId !== item.accountId)
         .filter((event) =>
           lastProcessedEventId ? compareEventId(event.id, lastProcessedEventId) > 0 : true,
         )
-        .sort((a, b) => compareEventId(a.id, b.id));
+        .toSorted((a, b) => compareEventId(a.id, b.id));
 
       for (const event of incoming) {
         const alreadyHandled = await hasRunForXDmEvent(item.workflowId, event.id);
-        if (alreadyHandled) continue;
+        if (alreadyHandled) {continue;}
 
         try {
           await triggerWorkflowFromXDm(item.workflowId, event);
@@ -312,7 +312,7 @@ export function startXDmWorkflowWatcher(): () => void {
   let isRunning = false;
 
   const run = async () => {
-    if (isRunning) return;
+    if (isRunning) {return;}
     isRunning = true;
 
     try {

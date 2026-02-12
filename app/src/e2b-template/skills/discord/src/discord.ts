@@ -100,7 +100,7 @@ async function getChannels(guildId: string) {
       position: c.position,
       parentId: c.parent_id,
     }))
-    .sort((a, b) => a.position - b.position);
+    .toSorted((a, b) => a.position - b.position);
   console.log(JSON.stringify(channels, null, 2));
 }
 

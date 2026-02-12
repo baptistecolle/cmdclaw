@@ -361,7 +361,7 @@ export function getOperationLabel(integration: string, operation: string): strin
  */
 export function getIntegrationActions(integration: string): { key: string; label: string }[] {
   const labels = INTEGRATION_OPERATION_LABELS[integration as IntegrationType];
-  if (!labels) return [];
+  if (!labels) {return [];}
 
   const verbMap: Record<string, string> = {
     Listing: "List",
@@ -389,7 +389,7 @@ export function getIntegrationActions(integration: string): { key: string; label
       const match = label.match(
         /^(Listing|Getting|Reading|Searching|Creating|Updating|Deleting|Sending|Adding|Uploading|Appending|Completing|Removing|Commenting|Reacting|Starting)\b(?:\s+(?:on|to))?/,
       );
-      if (!match) return label;
+      if (!match) {return label;}
       const verb = match[1];
       const replacement = verbMap[verb] || verb;
       return `${replacement}${label.slice(match[0].length)}`.trim();

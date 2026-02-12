@@ -375,7 +375,7 @@ const getActiveGeneration = protectedProcedure
       | "complete"
       | "error"
       | null => {
-      if (!genStatus) return null;
+      if (!genStatus) {return null;}
       switch (genStatus) {
         case "running":
           return "generating";

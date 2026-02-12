@@ -27,7 +27,7 @@ export default function WhatsAppIntegrationPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!notification) return;
+    if (!notification) {return;}
     const timer = setTimeout(() => setNotification(null), 4000);
     return () => clearTimeout(timer);
   }, [notification]);
@@ -47,13 +47,13 @@ export default function WhatsAppIntegrationPage() {
           return;
         }
         const data = (await res.json()) as WhatsAppStatus;
-        if (!active) return;
+        if (!active) {return;}
         setForbidden(false);
         setWaStatus(data);
       } catch (err) {
         console.error("Failed to load WhatsApp status:", err);
       } finally {
-        if (active) setWaLoading(false);
+        if (active) {setWaLoading(false);}
       }
     };
 

@@ -51,7 +51,7 @@ function SkillsPageContent() {
   };
 
   const handleDelete = async (id: string, displayName: string) => {
-    if (!confirm(`Are you sure you want to delete "${displayName}"?`)) return;
+    if (!confirm(`Are you sure you want to delete "${displayName}"?`)) {return;}
 
     try {
       await deleteSkill.mutateAsync(id);

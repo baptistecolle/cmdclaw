@@ -25,7 +25,7 @@ function isAuthorized(request: Request): boolean {
 
 function getAllowedChannels(): Set<string> {
   const raw = env.SLACK_BOT_RELAY_ALLOWED_CHANNELS;
-  if (!raw) return new Set();
+  if (!raw) {return new Set();}
   return new Set(
     raw
       .split(",")

@@ -32,7 +32,7 @@ function parseTime(time: string): { hour: number; minute: number } {
 }
 
 function parseWorkflowSchedule(schedule: unknown): WorkflowSchedule | null {
-  if (!schedule || typeof schedule !== "object") return null;
+  if (!schedule || typeof schedule !== "object") {return null;}
   const value = schedule as Record<string, unknown>;
 
   if (value.type === "interval" && typeof value.intervalMinutes === "number") {
@@ -104,7 +104,7 @@ function buildRepeatOptions(schedule: WorkflowSchedule): Omit<RepeatOptions, "ke
   }
 
   if (schedule.type === "weekly") {
-    const days = [...new Set(schedule.daysOfWeek)].sort((a, b) => a - b).join(",");
+    const days = [...new Set(schedule.daysOfWeek)].toSorted((a, b) => a - b).join(",");
     return { pattern: `${minute} ${hour} * * ${days}`, tz };
   }
 

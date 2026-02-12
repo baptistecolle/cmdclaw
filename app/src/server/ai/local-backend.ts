@@ -65,7 +65,7 @@ export class LocalLLMBackend implements LLMBackend {
     // Simplified: collect chunks until llm.done
     // Register a streaming listener
     const streamListener = (msg: DaemonResponse) => {
-      if (!("id" in msg) || msg.id !== requestId) return;
+      if (!("id" in msg) || msg.id !== requestId) {return;}
 
       if (msg.type === "llm.chunk") {
         const chunk = msg.chunk as StreamEvent;
@@ -101,7 +101,7 @@ export class LocalLLMBackend implements LLMBackend {
       while (!done || queue.length > 0) {
         while (queue.length > 0) {
           const event = queue.shift()!;
-          if (event === null) return;
+          if (event === null) {return;}
           yield event;
         }
 
@@ -147,7 +147,7 @@ export function unregisterStreamListener(requestId: string): void {
  * Route a streaming message to its listener (called from WS server).
  */
 export function routeStreamMessage(msg: DaemonResponse): boolean {
-  if (!("id" in msg) || !msg.id) return false;
+  if (!("id" in msg) || !msg.id) {return false;}
   const listener = streamListeners.get(msg.id);
   if (listener) {
     listener(msg);

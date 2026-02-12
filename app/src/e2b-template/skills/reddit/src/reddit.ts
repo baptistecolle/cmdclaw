@@ -20,7 +20,7 @@ async function api<T = JsonValue>(path: string, options?: RequestInit): Promise<
     ...options,
     headers: { ...headers, ...options?.headers },
   });
-  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  if (!res.ok) {throw new Error(`${res.status} ${await res.text()}`);}
   return (await res.json()) as T;
 }
 
@@ -66,7 +66,7 @@ function formatPost(post: Record<string, JsonValue>) {
 // Helper to format comment data
 function formatComment(comment: Record<string, JsonValue>): unknown {
   const data = comment.data || comment;
-  if (data.kind === "more" || !data.body) return null;
+  if (data.kind === "more" || !data.body) {return null;}
   return {
     id: data.name || `t1_${data.id}`,
     author: data.author,
@@ -83,7 +83,7 @@ async function getFeed() {
   const sort = values.sort || "hot";
   const limit = values.limit || "25";
   const params = new URLSearchParams({ limit });
-  if (sort === "top") params.set("t", values.time || "day");
+  if (sort === "top") {params.set("t", values.time || "day");}
 
   const data = await api(`/${sort}?${params}`);
   const posts = data.data.children.map(formatPost);
@@ -94,7 +94,7 @@ async function getSubreddit(name: string) {
   const sort = values.sort || "hot";
   const limit = values.limit || "25";
   const params = new URLSearchParams({ limit });
-  if (sort === "top") params.set("t", values.time || "day");
+  if (sort === "top") {params.set("t", values.time || "day");}
 
   const data = await api(`/r/${name}/${sort}?${params}`);
   const posts = data.data.children.map(formatPost);

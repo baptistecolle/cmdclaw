@@ -17,7 +17,7 @@ async function graphql<T = JsonValue>(query: string, variables?: Record<string, 
     body: JSON.stringify({ query, variables }),
   });
   const data = (await res.json()) as { errors?: unknown; data: T };
-  if (data.errors) throw new Error(JSON.stringify(data.errors));
+  if (data.errors) {throw new Error(JSON.stringify(data.errors));}
   return data.data;
 }
 
@@ -40,8 +40,8 @@ const [command, ...args] = positionals;
 
 async function listIssues() {
   const filters: string[] = [];
-  if (values.team) filters.push(`team: { key: { eq: "${values.team}" } }`);
-  if (values.state) filters.push(`state: { name: { eq: "${values.state}" } }`);
+  if (values.team) {filters.push(`team: { key: { eq: "${values.team}" } }`);}
+  if (values.state) {filters.push(`state: { name: { eq: "${values.state}" } }`);}
   const filterStr = filters.length ? `filter: { ${filters.join(", ")} }` : "";
 
   const data = await graphql<{
@@ -87,7 +87,7 @@ async function getIssue(identifier: string) {
     }
   }`);
 
-  if (!data.issues.nodes.length) throw new Error(`Issue ${identifier} not found`);
+  if (!data.issues.nodes.length) {throw new Error(`Issue ${identifier} not found`);}
   console.log(JSON.stringify(data.issues.nodes[0], null, 2));
 }
 
@@ -102,20 +102,20 @@ async function createIssue() {
   const teamData = await graphql(
     `query { teams(filter: { key: { eq: "${values.team}" } }) { nodes { id } } }`,
   );
-  if (!teamData.teams.nodes.length) throw new Error(`Team ${values.team} not found`);
+  if (!teamData.teams.nodes.length) {throw new Error(`Team ${values.team} not found`);}
 
   const input: Record<string, JsonValue> = {
     teamId: teamData.teams.nodes[0].id,
     title: values.title,
   };
-  if (values.description) input.description = values.description;
-  if (values.priority) input.priority = parseInt(values.priority);
+  if (values.description) {input.description = values.description;}
+  if (values.priority) {input.priority = parseInt(values.priority);}
 
   if (values.assignee) {
     const userData = await graphql(
       `query { users(filter: { email: { eq: "${values.assignee}" } }) { nodes { id } } }`,
     );
-    if (userData.users.nodes.length) input.assigneeId = userData.users.nodes[0].id;
+    if (userData.users.nodes.length) {input.assigneeId = userData.users.nodes[0].id;}
   }
 
   const data = await graphql(
@@ -134,7 +134,7 @@ async function createIssue() {
     { input },
   );
 
-  if (!data.issueCreate.success) throw new Error("Failed to create issue");
+  if (!data.issueCreate.success) {throw new Error("Failed to create issue");}
   console.log(
     `Created: ${data.issueCreate.issue.identifier} - ${data.issueCreate.issue.title}\n${data.issueCreate.issue.url}`,
   );
@@ -144,19 +144,19 @@ async function updateIssue(identifier: string) {
   const issueData = await graphql(`query {
     issues(filter: { identifier: { eq: "${identifier}" } }) { nodes { id team { id } } }
   }`);
-  if (!issueData.issues.nodes.length) throw new Error(`Issue ${identifier} not found`);
+  if (!issueData.issues.nodes.length) {throw new Error(`Issue ${identifier} not found`);}
 
   const input: Record<string, JsonValue> = {};
-  if (values.title) input.title = values.title;
-  if (values.description) input.description = values.description;
-  if (values.priority) input.priority = parseInt(values.priority);
+  if (values.title) {input.title = values.title;}
+  if (values.description) {input.description = values.description;}
+  if (values.priority) {input.priority = parseInt(values.priority);}
 
   if (values.state) {
     const teamId = issueData.issues.nodes[0].team.id;
     const stateData = await graphql(`query {
       workflowStates(filter: { team: { id: { eq: "${teamId}" } }, name: { eq: "${values.state}" } }) { nodes { id } }
     }`);
-    if (stateData.workflowStates.nodes.length) input.stateId = stateData.workflowStates.nodes[0].id;
+    if (stateData.workflowStates.nodes.length) {input.stateId = stateData.workflowStates.nodes[0].id;}
   }
 
   const data = await graphql(
@@ -177,7 +177,7 @@ async function updateIssue(identifier: string) {
     { id: issueData.issues.nodes[0].id, input },
   );
 
-  if (!data.issueUpdate.success) throw new Error("Failed to update");
+  if (!data.issueUpdate.success) {throw new Error("Failed to update");}
   console.log(
     `Updated: ${data.issueUpdate.issue.identifier} (${data.issueUpdate.issue.state?.name})`,
   );

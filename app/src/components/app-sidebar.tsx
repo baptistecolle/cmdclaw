@@ -53,12 +53,12 @@ export function AppSidebar() {
     authClient
       .getSession()
       .then((res) => {
-        if (!mounted) return;
+        if (!mounted) {return;}
         const hasSession = res?.data?.session && res?.data?.user;
         setSession(hasSession ? res.data : null);
       })
       .catch(() => {
-        if (mounted) setSession(null);
+        if (mounted) {setSession(null);}
       });
     return () => {
       mounted = false;
@@ -151,7 +151,7 @@ export function AppSidebar() {
               value={reportMessage}
               onChange={(e) => {
                 setReportMessage(e.target.value);
-                if (reportError) setReportError("");
+                if (reportError) {setReportError("");}
               }}
               placeholder="Describe the issue..."
               className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[160px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"

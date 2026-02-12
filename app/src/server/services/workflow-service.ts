@@ -16,15 +16,15 @@ const TERMINAL_GENERATION_STATUSES = ["completed", "cancelled", "error"] as cons
 const ORPHAN_RUN_GRACE_MS = 2 * 60 * 1000;
 const WORKFLOW_PREPARING_TIMEOUT_MS = (() => {
   const seconds = Number(process.env.WORKFLOW_PREPARING_TIMEOUT_SECONDS ?? "300");
-  if (!Number.isFinite(seconds) || seconds <= 0) return 5 * 60 * 1000;
+  if (!Number.isFinite(seconds) || seconds <= 0) {return 5 * 60 * 1000;}
   return Math.floor(seconds * 1000);
 })();
 
 function mapGenerationStatusToWorkflowRunStatus(
   status: (typeof TERMINAL_GENERATION_STATUSES)[number],
 ): "completed" | "cancelled" | "error" {
-  if (status === "completed") return "completed";
-  if (status === "cancelled") return "cancelled";
+  if (status === "completed") {return "completed";}
+  if (status === "cancelled") {return "cancelled";}
   return "error";
 }
 
@@ -57,7 +57,7 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
     if (!gen) {
       const isLikelyOrphan =
         run.status === "running" && Date.now() - run.startedAt.getTime() > ORPHAN_RUN_GRACE_MS;
-      if (!isLikelyOrphan) continue;
+      if (!isLikelyOrphan) {continue;}
 
       await db
         .update(workflowRun)

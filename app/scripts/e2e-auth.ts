@@ -40,7 +40,7 @@ function getAuthSecret(): string {
 
 function getBaseUrl(): string {
   const fromEnv = process.env.PLAYWRIGHT_BASE_URL;
-  if (fromEnv) return fromEnv;
+  if (fromEnv) {return fromEnv;}
 
   const port = process.env.PLAYWRIGHT_PORT ?? "4173";
   return `http://127.0.0.1:${port}`;

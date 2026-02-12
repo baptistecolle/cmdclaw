@@ -309,7 +309,7 @@ export class GenerationRuntime {
     for (let i = this.segments.length - 1; i >= 0; i -= 1) {
       const seg = this.segments[i];
       const toolItem = [...seg.items]
-        .reverse()
+        .toReversed()
         .find(
           (item) =>
             item.type === "tool_call" && item.content === toolName && item.status === "running",

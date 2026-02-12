@@ -127,7 +127,7 @@ async function getWorkflowLastProcessedInternalDate(workflowId: string): Promise
     );
 
   const value = result[0]?.maxInternalDate;
-  if (!value) return null;
+  if (!value) {return null;}
 
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : null;
@@ -194,7 +194,7 @@ async function getGmailMessageSummary(
 
   const data = (await response.json()) as GmailMessageResponse;
   const internalDateMs = Number.parseInt(data.internalDate ?? "", 10);
-  if (!Number.isFinite(internalDateMs)) return null;
+  if (!Number.isFinite(internalDateMs)) {return null;}
 
   return {
     id: data.id,
@@ -246,7 +246,7 @@ export async function pollGmailWorkflowTriggers(): Promise<{
   enqueued: number;
 }> {
   const watchable = await listWatchableWorkflows();
-  if (watchable.length === 0) return { checked: 0, enqueued: 0 };
+  if (watchable.length === 0) {return { checked: 0, enqueued: 0 };}
 
   const tokenCache = new Map<string, string>();
   let checked = 0;
@@ -276,13 +276,13 @@ export async function pollGmailWorkflowTriggers(): Promise<{
       );
 
       const messageIds = await listRecentGmailMessages(accessToken, afterSeconds);
-      if (messageIds.length === 0) continue;
+      if (messageIds.length === 0) {continue;}
 
       const messages: GmailMessageSummary[] = [];
       for (const messageId of messageIds) {
         try {
           const summary = await getGmailMessageSummary(accessToken, messageId);
-          if (summary) messages.push(summary);
+          if (summary) {messages.push(summary);}
         } catch (error) {
           console.error(
             `[workflow-gmail-watcher] failed to fetch message ${messageId} for workflow ${item.workflowId}`,
@@ -299,7 +299,7 @@ export async function pollGmailWorkflowTriggers(): Promise<{
         }
 
         const alreadyHandled = await hasRunForGmailMessage(item.workflowId, message.id);
-        if (alreadyHandled) continue;
+        if (alreadyHandled) {continue;}
 
         try {
           await triggerWorkflowFromGmailMessage(item.workflowId, message);
@@ -337,7 +337,7 @@ export function startGmailWorkflowWatcher(): () => void {
   let isRunning = false;
 
   const run = async () => {
-    if (isRunning) return;
+    if (isRunning) {return;}
     isRunning = true;
 
     try {

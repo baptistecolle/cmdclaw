@@ -18,7 +18,7 @@ type JobPayload = Record<string, unknown> & { workflowId?: string };
 type JobHandler = Processor<JobPayload, unknown, string>;
 
 function isActiveWorkflowRunConflict(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
+  if (!error || typeof error !== "object") {return false;}
 
   const maybeError = error as {
     code?: unknown;

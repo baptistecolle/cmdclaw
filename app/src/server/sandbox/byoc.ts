@@ -93,7 +93,7 @@ export class BYOCSandboxBackend implements SandboxBackend {
   }
 
   async teardown(): Promise<void> {
-    if (!this.conversationId) return;
+    if (!this.conversationId) {return;}
 
     try {
       await waitForResponse(this.deviceId, {

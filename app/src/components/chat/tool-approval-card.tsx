@@ -83,13 +83,13 @@ export function ToolApprovalCard({
 
   // Parse the command to extract structured data
   const parsedCommand = useMemo(() => {
-    if (!command) return null;
+    if (!command) {return null;}
     return parseCliCommand(command);
   }, [command]);
 
   // Build preview props
   const previewProps = useMemo(() => {
-    if (!parsedCommand) return null;
+    if (!parsedCommand) {return null;}
     return {
       integration: parsedCommand.integration,
       operation: parsedCommand.operation,

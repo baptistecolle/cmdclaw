@@ -282,12 +282,12 @@ const update = protectedProcedure
         }
       }
     }
-    if (input.status !== undefined) updates.status = input.status;
-    if (input.triggerType !== undefined) updates.triggerType = input.triggerType;
-    if (input.prompt !== undefined) updates.prompt = input.prompt;
-    if (input.promptDo !== undefined) updates.promptDo = input.promptDo ?? null;
-    if (input.promptDont !== undefined) updates.promptDont = input.promptDont ?? null;
-    if (input.autoApprove !== undefined) updates.autoApprove = input.autoApprove;
+    if (input.status !== undefined) {updates.status = input.status;}
+    if (input.triggerType !== undefined) {updates.triggerType = input.triggerType;}
+    if (input.prompt !== undefined) {updates.prompt = input.prompt;}
+    if (input.promptDo !== undefined) {updates.promptDo = input.promptDo ?? null;}
+    if (input.promptDont !== undefined) {updates.promptDont = input.promptDont ?? null;}
+    if (input.autoApprove !== undefined) {updates.autoApprove = input.autoApprove;}
     if (input.allowedIntegrations !== undefined) {
       updates.allowedIntegrations = input.allowedIntegrations;
     }

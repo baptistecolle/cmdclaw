@@ -15,7 +15,7 @@ function ConnectDevicePageContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!code.trim()) return;
+    if (!code.trim()) {return;}
 
     setStatus("submitting");
     setErrorMsg("");

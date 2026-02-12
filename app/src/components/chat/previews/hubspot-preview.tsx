@@ -15,7 +15,7 @@ export function HubspotPreview({ operation, args }: PreviewProps) {
   // Parse operation: "contacts.create" -> { object: "contacts", action: "create" }
   const [objectType, action] = operation.split(".") as [HubSpotObjectType, string];
 
-  if (!objectType || !action) return null;
+  if (!objectType || !action) {return null;}
 
   const objectLabel = OBJECT_LABELS[objectType] || objectType;
 

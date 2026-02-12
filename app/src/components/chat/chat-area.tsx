@@ -651,7 +651,7 @@ export function ChatArea({ conversationId }: Props) {
   // Track if user is near bottom of scroll
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
-    if (!container) return;
+    if (!container) {return;}
 
     const threshold = 100; // pixels from bottom
     const distanceFromBottom =
@@ -667,7 +667,7 @@ export function ChatArea({ conversationId }: Props) {
   // Detect user-initiated scroll up via wheel/touch
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container) return;
+    if (!container) {return;}
 
     const handleUserScroll = () => {
       // Check after a tick so the scroll position has updated
@@ -935,7 +935,7 @@ export function ChatArea({ conversationId }: Props) {
   const handleApprove = useCallback(
     async (toolUseId: string) => {
       const genId = currentGenerationIdRef.current;
-      if (!genId) return;
+      if (!genId) {return;}
 
       try {
         await submitApproval({
@@ -957,7 +957,7 @@ export function ChatArea({ conversationId }: Props) {
   const handleDeny = useCallback(
     async (toolUseId: string) => {
       const genId = currentGenerationIdRef.current;
-      if (!genId) return;
+      if (!genId) {return;}
 
       try {
         await submitApproval({
@@ -981,7 +981,7 @@ export function ChatArea({ conversationId }: Props) {
     async (integration: string) => {
       const genId = currentGenerationIdRef.current;
       const convId = currentConversationIdRef.current;
-      if (!genId || !convId) return;
+      if (!genId || !convId) {return;}
 
       if (runtimeRef.current) {
         runtimeRef.current.setAuthConnecting();
@@ -1021,12 +1021,12 @@ export function ChatArea({ conversationId }: Props) {
   // Handle auth cancel
   const handleAuthCancel = useCallback(async () => {
     const genId = currentGenerationIdRef.current;
-    if (!genId) return;
+    if (!genId) {return;}
 
     // Find first pending integration
     const seg = segments.find((s) => s.auth?.status === "pending");
     const integration = seg?.auth?.integrations[0];
-    if (!integration) return;
+    if (!integration) {return;}
 
     try {
       await submitAuthResult({
@@ -1046,11 +1046,11 @@ export function ChatArea({ conversationId }: Props) {
 
   // Voice recording: stop and transcribe
   const stopRecordingAndTranscribe = useCallback(async () => {
-    if (!isRecordingRef.current) return;
+    if (!isRecordingRef.current) {return;}
     isRecordingRef.current = false;
 
     const audioBlob = await stopRecording();
-    if (!audioBlob || audioBlob.size === 0) return;
+    if (!audioBlob || audioBlob.size === 0) {return;}
 
     setIsProcessingVoice(true);
     try {
@@ -1096,7 +1096,7 @@ export function ChatArea({ conversationId }: Props) {
   // so we also stop when Meta/Ctrl is released
   useEffect(() => {
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (!isRecordingRef.current) return;
+      if (!isRecordingRef.current) {return;}
 
       const isHotkeyRelease =
         e.key === "k" ||

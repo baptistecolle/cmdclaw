@@ -48,7 +48,7 @@ function findFirstHttpUrl(value: unknown): string | null {
   if (Array.isArray(value)) {
     for (const item of value) {
       const found = findFirstHttpUrl(item);
-      if (found) return found;
+      if (found) {return found;}
     }
     return null;
   }
@@ -56,7 +56,7 @@ function findFirstHttpUrl(value: unknown): string | null {
   if (value && typeof value === "object") {
     for (const objectValue of Object.values(value)) {
       const found = findFirstHttpUrl(objectValue);
-      if (found) return found;
+      if (found) {return found;}
     }
   }
 
@@ -153,14 +153,14 @@ test.describe("@live chat fill-pdf", () => {
       .poll(
         async () => {
           const currentCount = await assistantMessages.count();
-          if (currentCount > initialAssistantCount) return "assistant";
+          if (currentCount > initialAssistantCount) {return "assistant";}
 
           const waitingForApproval = await page
             .getByText("Waiting for approval")
             .first()
             .isVisible()
             .catch(() => false);
-          if (waitingForApproval) return "approval_blocked";
+          if (waitingForApproval) {return "approval_blocked";}
 
           return "waiting";
         },
@@ -183,8 +183,8 @@ test.describe("@live chat fill-pdf", () => {
       .poll(
         async () => {
           const text = (await assistantBubble.textContent())?.trim() ?? "";
-          if (!text) return "empty";
-          if (text.startsWith("Error:")) return "error";
+          if (!text) {return "empty";}
+          if (text.startsWith("Error:")) {return "error";}
           return "ok";
         },
         {

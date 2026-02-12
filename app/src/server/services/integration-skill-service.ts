@@ -42,7 +42,7 @@ const OFFICIAL_SKILLS_CACHE_TTL_MS = 30_000;
 
 function extractFrontmatterValue(markdown: string, key: string): string | null {
   const match = markdown.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
-  if (!match?.[1]) return null;
+  if (!match?.[1]) {return null;}
   return match[1].trim().replace(/^['"]|['"]$/g, "");
 }
 
@@ -56,8 +56,8 @@ export function normalizeIntegrationSkillSlug(value: string): string {
 }
 
 export function validateIntegrationSkillFilePath(filePath: string): boolean {
-  if (!filePath || filePath.length > 256) return false;
-  if (filePath.startsWith("/") || filePath.includes("..")) return false;
+  if (!filePath || filePath.length > 256) {return false;}
+  if (filePath.startsWith("/") || filePath.includes("..")) {return false;}
   return true;
 }
 
@@ -193,14 +193,14 @@ export async function getOfficialIntegrationSkillIndex(): Promise<
   }
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory()) {continue;}
     const skillMdPath = path.join(skillsRoot, entry.name, "SKILL.md");
     try {
       const content = await fs.readFile(skillMdPath, "utf8");
       const frontmatterName = extractFrontmatterValue(content, "name");
       const description = extractFrontmatterValue(content, "description") ?? "";
       const slug = normalizeIntegrationSkillSlug(frontmatterName ?? entry.name);
-      if (!slug) continue;
+      if (!slug) {continue;}
       result.set(slug, {
         slug,
         description,
@@ -250,7 +250,7 @@ export async function resolveIntegrationSkillForUser(
   slug: string,
 ): Promise<ResolvedIntegrationSkill | null> {
   const normalizedSlug = normalizeIntegrationSkillSlug(slug);
-  if (!normalizedSlug) return null;
+  if (!normalizedSlug) {return null;}
 
   const officialSkills = await getOfficialIntegrationSkillIndex();
   const official = officialSkills.get(normalizedSlug);
@@ -274,9 +274,9 @@ export async function resolveIntegrationSkillForUser(
 
   if (!pref) {
     const defaultOfficial = buildOfficial();
-    if (defaultOfficial) return defaultOfficial;
+    if (defaultOfficial) {return defaultOfficial;}
     const latestCommunity = await getLatestCommunitySkillBySlug(normalizedSlug);
-    if (!latestCommunity) return null;
+    if (!latestCommunity) {return null;}
     return {
       source: "community",
       slug: latestCommunity.slug,
@@ -330,7 +330,7 @@ export async function resolvePreferredCommunitySkillsForUser(
   ];
   if (allowedSlugs && allowedSlugs.length > 0) {
     const normalized = allowedSlugs.map(normalizeIntegrationSkillSlug).filter(Boolean);
-    if (normalized.length === 0) return [];
+    if (normalized.length === 0) {return [];}
     whereClauses.push(inArray(integrationSkillPreference.slug, normalized));
   }
 

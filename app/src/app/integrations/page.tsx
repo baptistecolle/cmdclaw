@@ -334,10 +334,10 @@ function IntegrationsPageContent() {
       config.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       config.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-    if (!matchesSearch) return false;
+    if (!matchesSearch) {return false;}
 
-    if (activeTab === "connected") return !!integration || isWhatsAppConnected;
-    if (activeTab === "not_connected") return !integration && !isWhatsAppConnected;
+    if (activeTab === "connected") {return !!integration || isWhatsAppConnected;}
+    if (activeTab === "not_connected") {return !integration && !isWhatsAppConnected;}
     return true;
   });
 

@@ -259,7 +259,7 @@ export async function getValidCustomTokens(userId: string): Promise<Map<string, 
       .map(async (c) => {
         const oauth = c.customIntegration.oauthConfig;
         if (!oauth || !c.refreshToken || !c.clientId || !c.clientSecret) {
-          if (c.accessToken) tokens.set(c.id, c.accessToken);
+          if (c.accessToken) {tokens.set(c.id, c.accessToken);}
           return;
         }
 
@@ -276,7 +276,7 @@ export async function getValidCustomTokens(userId: string): Promise<Map<string, 
             );
             tokens.set(c.id, newToken);
           } catch {
-            if (c.accessToken) tokens.set(c.id, c.accessToken);
+            if (c.accessToken) {tokens.set(c.id, c.accessToken);}
           }
         } else if (c.accessToken) {
           tokens.set(c.id, c.accessToken);

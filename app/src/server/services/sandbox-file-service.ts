@@ -141,7 +141,7 @@ export async function collectNewSandboxFiles(
     return [];
   }
 
-  if (!result.stdout?.trim()) return [];
+  if (!result.stdout?.trim()) {return [];}
 
   const paths = result.stdout
     .trim()
@@ -199,7 +199,7 @@ export async function collectNewE2BFiles(
     return [];
   }
 
-  if (!result.stdout?.trim()) return [];
+  if (!result.stdout?.trim()) {return [];}
 
   const paths = result.stdout
     .trim()
