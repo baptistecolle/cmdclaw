@@ -3,6 +3,13 @@ import { defineConfig, devices } from "@playwright/test";
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
+const videoMode =
+  process.env.PLAYWRIGHT_VIDEO === "off" ||
+  process.env.PLAYWRIGHT_VIDEO === "on" ||
+  process.env.PLAYWRIGHT_VIDEO === "retain-on-failure" ||
+  process.env.PLAYWRIGHT_VIDEO === "on-first-retry"
+    ? process.env.PLAYWRIGHT_VIDEO
+    : "retain-on-failure";
 
 export default defineConfig({
   testDir: ".",
@@ -18,7 +25,7 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: videoMode,
   },
   projects: [
     {
