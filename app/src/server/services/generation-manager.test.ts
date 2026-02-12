@@ -1031,7 +1031,7 @@ describe("generationManager transitions", () => {
     vi.mocked(getSkillsSystemPrompt).mockReturnValue("skills prompt");
     vi.mocked(writeResolvedIntegrationSkillsToSandbox).mockResolvedValue(["github"]);
     vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("integration skills prompt");
-    vi.mocked(syncMemoryToSandbox).mockResolvedValue(undefined);
+    vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
     vi.mocked(buildMemorySystemPrompt).mockReturnValue("memory prompt");
     vi.mocked(collectNewE2BFiles).mockResolvedValue([
       { path: "/app/out/report.txt", content: Buffer.from("report") },
@@ -1115,7 +1115,7 @@ describe("generationManager transitions", () => {
     vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("integration skills prompt");
     vi.mocked(buildMemorySystemPrompt).mockReturnValue("memory prompt");
     vi.mocked(getDirectModeTools).mockReturnValue([{ name: "bash" }] as any);
-    vi.mocked(syncMemoryToSandbox).mockResolvedValue(undefined);
+    vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
     vi.mocked(parseBashCommand).mockImplementation((command) => {
       if (command === "slack forbidden") return { integration: "slack" } as any;
       return null;

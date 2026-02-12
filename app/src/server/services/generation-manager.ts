@@ -388,6 +388,7 @@ class GenerationManager {
     model?: string;
     userId: string;
     autoApprove?: boolean;
+    allowedIntegrations?: IntegrationType[];
     deviceId?: string;
     attachments?: { name: string; mimeType: string; dataUrl: string }[];
   }): Promise<{ generationId: string; conversationId: string }> {
@@ -406,6 +407,7 @@ class GenerationManager {
       {
         hasConversationId: Boolean(params.conversationId),
         hasDeviceId: Boolean(params.deviceId),
+        hasAllowedIntegrations: params.allowedIntegrations !== undefined,
         attachmentsCount: params.attachments?.length ?? 0,
       },
       logContext
@@ -596,6 +598,7 @@ class GenerationManager {
       pendingMessageParts: new Map(),
       backendType,
       deviceId: params.deviceId,
+      allowedIntegrations: params.allowedIntegrations,
       autoApprove: conv.autoApprove,
       attachments: params.attachments,
       uploadedSandboxFileIds: new Set(),

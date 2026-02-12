@@ -38,3 +38,6 @@ test-results/
 playwright/.auth/
 
 src/daemon/dist
+
+
+tests/e2e/fixtures/*.pdf

@@ -45,10 +45,10 @@ async function addReaction(channel: string, timestamp: string, name: string) {
 async function removeReaction(
   channel: string,
   timestamp: string,
-  name: string
+  name: string,
 ) {
   await slackApi("reactions.remove", { channel, timestamp, name }).catch(
-    () => {}
+    () => {},
   );
 }
 
@@ -83,7 +83,7 @@ function formatSlackErrorMessage(err: unknown): string {
 
 async function getSlackUserInfo(
   userId: string,
-  fallbackName?: string | null
+  fallbackName?: string | null,
 ): Promise<{ displayName: string }> {
   const res = await slackApi("users.info", { user: userId });
   const user = res.user as
@@ -100,7 +100,7 @@ async function getSlackUserInfo(
 
   if (!res.ok) {
     console.warn(
-      `[slack-bot] users.info failed for ${userId}: ${String(res.error ?? "unknown error")}`
+      `[slack-bot] users.info failed for ${userId}: ${String(res.error ?? "unknown error")}`,
     );
   }
 
@@ -174,7 +174,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
       await postMessage(
         channel,
         `To use @bap, connect your account first: ${linkUrl}`,
-        isDirectMessage ? undefined : threadTs
+        isDirectMessage ? undefined : threadTs,
       );
       return;
     }
@@ -187,11 +187,14 @@ export async function handleSlackEvent(payload: SlackEvent) {
       team_id,
       channel,
       threadTs,
-      link.userId
+      link.userId,
     );
 
     // Get Slack user display name for context
-    const { displayName } = await getSlackUserInfo(slackUserId, link.user?.name);
+    const { displayName } = await getSlackUserInfo(
+      slackUserId,
+      link.user?.name,
+    );
 
     // Start generation via generation manager
     const { generationId } = await generationManager.startGeneration({
@@ -201,7 +204,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
         `channel_id: ${channel}`,
         `thread_ts: ${threadTs}`,
         `message_ts: ${event.ts}`,
-        `context: You are already replying in this same Slack conversation via the bot bridge. Do not ask for channel ID or thread timestamp. Reply normally to the user's message.`,
+        `context: You are already replying in this exact Slack thread via the bot bridge. For simple text requests (for example "repeat <text>"), answer directly in plain text without using tools. If you do use Slack tools, use channel_id and thread_ts from this prompt and do not ask the user for them.`,
         "",
         messageText,
       ].join("\n"),
@@ -212,7 +215,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
     // Wait for generation to complete and collect response
     const responseText = await collectGenerationResponse(
       generationId,
-      link.userId
+      link.userId,
     );
 
     // Send response to Slack
@@ -221,7 +224,11 @@ export async function handleSlackEvent(payload: SlackEvent) {
       // Split long messages (Slack limit ~4000 chars)
       const chunks = splitMessage(slackText, 3900);
       for (const chunk of chunks) {
-        await postMessage(channel, chunk, isDirectMessage ? undefined : threadTs);
+        await postMessage(
+          channel,
+          chunk,
+          isDirectMessage ? undefined : threadTs,
+        );
       }
     }
   } catch (err) {
@@ -229,7 +236,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
     await postMessage(
       channel,
       formatSlackErrorMessage(err),
-      isDirectMessage ? undefined : threadTs
+      isDirectMessage ? undefined : threadTs,
     );
   } finally {
     // Remove typing indicator
@@ -243,7 +250,7 @@ async function resolveUser(slackTeamId: string, slackUserId: string) {
   return db.query.slackUserLink.findFirst({
     where: and(
       eq(slackUserLink.slackTeamId, slackTeamId),
-      eq(slackUserLink.slackUserId, slackUserId)
+      eq(slackUserLink.slackUserId, slackUserId),
     ),
     with: {
       user: true,
@@ -257,14 +264,14 @@ async function getOrCreateConversation(
   teamId: string,
   channelId: string,
   threadTs: string,
-  userId: string
+  userId: string,
 ): Promise<string> {
   // Look up existing mapping
   const existing = await db.query.slackConversation.findFirst({
     where: and(
       eq(slackConversation.teamId, teamId),
       eq(slackConversation.channelId, channelId),
-      eq(slackConversation.threadTs, threadTs)
+      eq(slackConversation.threadTs, threadTs),
     ),
   });
 
@@ -296,17 +303,21 @@ async function getOrCreateConversation(
 
 async function collectGenerationResponse(
   generationId: string,
-  userId: string
+  userId: string,
 ): Promise<string> {
   const parts: string[] = [];
 
   for await (const event of generationManager.subscribeToGeneration(
     generationId,
-    userId
+    userId,
   )) {
     if (event.type === "text") {
       parts.push(event.content);
-    } else if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
+    } else if (
+      event.type === "done" ||
+      event.type === "error" ||
+      event.type === "cancelled"
+    ) {
       break;
     }
   }

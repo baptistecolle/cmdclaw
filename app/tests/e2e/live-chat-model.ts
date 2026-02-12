@@ -1,6 +1,4 @@
-import { fetchOpencodeFreeModels } from "../../src/lib/zen-models";
-
-export const PREFERRED_ZEN_FREE_MODEL = "kimi-k2.5-free";
+import { resolveDefaultOpencodeFreeModel } from "../../src/lib/zen-models";
 
 let cachedDefaultModelPromise: Promise<string> | undefined;
 
@@ -19,13 +17,7 @@ export function resolveLiveE2EModel(): Promise<string> {
   }
 
   if (!cachedDefaultModelPromise) {
-    cachedDefaultModelPromise = fetchOpencodeFreeModels()
-      .then((freeModels) => {
-        const ids = freeModels.map((model) => model.id);
-        if (ids.includes(PREFERRED_ZEN_FREE_MODEL)) return PREFERRED_ZEN_FREE_MODEL;
-        return ids[0] ?? PREFERRED_ZEN_FREE_MODEL;
-      })
-      .catch(() => PREFERRED_ZEN_FREE_MODEL);
+    cachedDefaultModelPromise = resolveDefaultOpencodeFreeModel();
   }
 
   return cachedDefaultModelPromise;

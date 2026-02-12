@@ -8,6 +8,7 @@ import type { RouterClient } from "@orpc/server";
 import type { AppRouter } from "../src/server/orpc";
 import { createGenerationRuntime } from "../src/lib/generation-runtime";
 import { runGenerationStream } from "../src/lib/generation-stream";
+import { fetchOpencodeFreeModels, resolveDefaultOpencodeFreeModel } from "../src/lib/zen-models";
 
 type ChatConfig = {
   serverUrl: string;
@@ -18,6 +19,7 @@ type Args = {
   serverUrl?: string;
   conversationId?: string;
   message?: string;
+  model?: string;
   token?: string;
   files: string[];
   autoApprove: boolean;
@@ -25,6 +27,7 @@ type Args = {
   validatePersistence: boolean;
   authOnly: boolean;
   resetAuth: boolean;
+  listModels: boolean;
 };
 
 const DEFAULT_SERVER_URL = "http://localhost:3000";
@@ -40,6 +43,7 @@ function parseArgs(argv: string[]): Args {
     validatePersistence: true,
     authOnly: false,
     resetAuth: false,
+    listModels: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -59,6 +63,14 @@ function parseArgs(argv: string[]): Args {
       case "-m":
         args.message = argv[i + 1];
         i += 1;
+        break;
+      case "--model":
+      case "-M":
+        args.model = argv[i + 1];
+        i += 1;
+        break;
+      case "--list-models":
+        args.listModels = true;
         break;
       case "--auto-approve":
         args.autoApprove = true;
@@ -106,14 +118,22 @@ function printHelp(): void {
   console.log("Options:");
   console.log("  -s, --server <url>        Server URL (default http://localhost:3000)");
   console.log("  -c, --conversation <id>   Continue an existing conversation");
+  console.log("  -m, --message <text>      Send one message and exit");
+  console.log("  -M, --model <id>          Model id to use (default resolves to a free model)");
+  console.log("  --list-models             List free model ids and exit");
   console.log("  --auto-approve            Auto-approve tool calls");
   console.log("  --show-thinking           Print thinking events");
   console.log("  --no-validate             Skip persisted message validation");
   console.log("  --auth                    Run auth flow and exit");
-  console.log("  --token <token>            Use provided auth token directly");
+  console.log("  --token <token>           Use provided auth token directly");
   console.log("  --reset-auth              Clear saved token and re-auth");
   console.log("  -f, --file <path>         Attach file (can be used multiple times)");
   console.log("  -h, --help                Show help\n");
+  console.log("Interactive commands:");
+  console.log("  /file <path>              Attach file before sending");
+  console.log("  /model                    Show current model");
+  console.log("  /model <id>               Switch model for next prompts");
+  console.log("  /models                   List free model ids\n");
 }
 
 function ensureBapDir(): void {
@@ -298,6 +318,27 @@ async function runChatLoop(
       continue;
     }
 
+    if (input === "/model") {
+      console.log(`Current model: ${options.model ?? "auto"}`);
+      continue;
+    }
+
+    if (input.startsWith("/model ")) {
+      const model = input.slice(7).trim();
+      if (!model) {
+        console.log("Usage: /model <id>");
+        continue;
+      }
+      options.model = model;
+      console.log(`Switched model to: ${options.model}`);
+      continue;
+    }
+
+    if (input === "/models") {
+      await printFreeModels();
+      continue;
+    }
+
     const attachments = pendingFiles.length ? pendingFiles : undefined;
     pendingFiles = [];
 
@@ -327,6 +368,7 @@ async function runGeneration(
       input: {
         conversationId,
         content,
+        model: options.model,
         autoApprove: options.autoApprove,
         attachments: attachments?.length ? attachments : undefined,
       },
@@ -437,6 +479,11 @@ async function runGeneration(
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
+  if (args.listModels) {
+    await printFreeModels();
+    process.exit(0);
+  }
+
   if (args.resetAuth) {
     clearConfig();
   }
@@ -457,6 +504,9 @@ async function main(): Promise<void> {
       process.exit(0);
     }
   }
+
+  args.model = await resolveDefaultOpencodeFreeModel(args.model ?? process.env.BAP_CHAT_MODEL);
+  console.log(`[model] ${args.model}`);
 
   const client = createClient(serverUrl, config.token);
 
@@ -480,6 +530,25 @@ async function main(): Promise<void> {
 
   await runChatLoop(client, rl, args);
   rl.close();
+}
+
+async function printFreeModels(): Promise<void> {
+  try {
+    const models = await fetchOpencodeFreeModels();
+    if (models.length === 0) {
+      console.log("No free OpenCode models found.");
+      return;
+    }
+
+    console.log(`Free OpenCode models (${models.length}):`);
+    for (const model of models) {
+      console.log(`- ${model.name} (${model.id})`);
+    }
+  } catch (error) {
+    console.error(
+      `Failed to fetch free models: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 function sleep(ms: number): Promise<void> {
