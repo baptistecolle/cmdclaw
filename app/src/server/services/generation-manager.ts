@@ -2421,7 +2421,10 @@ class GenerationManager {
         const { providerAuth } = await import("@/server/db/schema");
         const { decrypt } = await import("@/server/utils/encryption");
         const auth = await db.query.providerAuth.findFirst({
-          where: eq(providerAuth.userId, ctx.userId),
+          where: and(
+            eq(providerAuth.userId, ctx.userId),
+            eq(providerAuth.provider, "openai")
+          ),
         });
         if (auth) {
           return new OpenAIBackend(decrypt(auth.accessToken));
@@ -2431,6 +2434,24 @@ class GenerationManager {
           return new OpenAIBackend(env.OPENAI_API_KEY);
         }
         throw new Error("No OpenAI API key or subscription available");
+      }
+
+      case "kimi-for-coding": {
+        const { providerAuth } = await import("@/server/db/schema");
+        const { decrypt } = await import("@/server/utils/encryption");
+        const auth = await db.query.providerAuth.findFirst({
+          where: and(
+            eq(providerAuth.userId, ctx.userId),
+            eq(providerAuth.provider, "kimi")
+          ),
+        });
+        if (auth) {
+          return new AnthropicBackend(
+            decrypt(auth.accessToken),
+            "https://api.kimi.com/coding/v1"
+          );
+        }
+        throw new Error("No Kimi API key available");
       }
 
       default:
@@ -3901,6 +3922,7 @@ function resolveProviderID(modelID: string): string {
     return "openai";
   }
   if (modelID.startsWith("gemini")) return "google";
+  if (modelID === "k2p5" || modelID === "kimi-k2-thinking") return "kimi-for-coding";
   return "anthropic"; // default
 }
 

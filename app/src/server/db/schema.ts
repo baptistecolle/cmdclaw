@@ -894,7 +894,7 @@ export const sessionTranscriptChunkRelations = relations(sessionTranscriptChunk,
 }));
 
 // ========== PROVIDER AUTH SCHEMA ==========
-// Stores encrypted OAuth tokens for subscription providers (ChatGPT, Gemini)
+// Stores encrypted provider credentials for subscription providers (ChatGPT, Gemini, Kimi)
 
 export const providerAuth = pgTable(
   "provider_auth",
@@ -905,7 +905,7 @@ export const providerAuth = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    provider: text("provider").notNull(), // "openai" | "google"
+    provider: text("provider").notNull(), // "openai" | "google" | "kimi"
     accessToken: text("access_token").notNull(), // encrypted
     refreshToken: text("refresh_token").notNull(), // encrypted
     expiresAt: timestamp("expires_at").notNull(),

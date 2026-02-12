@@ -2,16 +2,21 @@ import { env } from "@/env";
 
 const getAppUrl = () => env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
-export type SubscriptionProviderID = "openai" | "google";
+export type SubscriptionProviderID = "openai" | "google" | "kimi";
 
 export interface SubscriptionProviderModel {
   id: string;
   name: string;
 }
 
-export interface SubscriptionProviderConfig {
+interface SubscriptionProviderBaseConfig {
   name: string;
   description: string;
+  models: SubscriptionProviderModel[];
+}
+
+export interface OAuthSubscriptionProviderConfig extends SubscriptionProviderBaseConfig {
+  authType: "oauth";
   clientId: string;
   clientSecret?: string;
   authUrl: string;
@@ -19,11 +24,21 @@ export interface SubscriptionProviderConfig {
   redirectUri: string;
   scopes?: string[];
   usePKCE: boolean;
-  models: SubscriptionProviderModel[];
 }
+
+export interface ApiKeySubscriptionProviderConfig extends SubscriptionProviderBaseConfig {
+  authType: "api_key";
+  docsUrl?: string;
+  apiKeyLabel?: string;
+}
+
+export type SubscriptionProviderConfig =
+  | OAuthSubscriptionProviderConfig
+  | ApiKeySubscriptionProviderConfig;
 
 export const SUBSCRIPTION_PROVIDERS: Record<SubscriptionProviderID, SubscriptionProviderConfig> = {
   openai: {
+    authType: "oauth",
     name: "ChatGPT",
     description: "Use your ChatGPT Plus/Pro/Max subscription",
     // OpenAI Codex public PKCE client — no secret needed
@@ -43,6 +58,7 @@ export const SUBSCRIPTION_PROVIDERS: Record<SubscriptionProviderID, Subscription
     ],
   },
   google: {
+    authType: "oauth",
     name: "Gemini",
     description: "Use your Google AI Pro/Ultra subscription",
     clientId: env.GOOGLE_CLIENT_ID ?? "",
@@ -57,7 +73,24 @@ export const SUBSCRIPTION_PROVIDERS: Record<SubscriptionProviderID, Subscription
       { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
     ],
   },
+  kimi: {
+    authType: "api_key",
+    name: "Kimi",
+    description: "Use your Kimi for Coding subscription",
+    docsUrl: "https://www.kimi.com/coding/docs/en/third-party-agents.html",
+    apiKeyLabel: "KIMI_API_KEY",
+    models: [
+      { id: "k2p5", name: "Kimi K2.5" },
+      { id: "kimi-k2-thinking", name: "Kimi K2 Thinking" },
+    ],
+  },
 };
+
+export function isOAuthProviderConfig(
+  config: SubscriptionProviderConfig
+): config is OAuthSubscriptionProviderConfig {
+  return config.authType === "oauth";
+}
 
 /**
  * Get all models for a given subscription provider.

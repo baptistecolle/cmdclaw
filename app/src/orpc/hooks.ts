@@ -657,6 +657,9 @@ export function useCompleteOnboarding() {
 
 // ========== PROVIDER AUTH HOOKS ==========
 
+type SubscriptionProvider = "openai" | "google" | "kimi";
+type OAuthSubscriptionProvider = "openai" | "google";
+
 // Hook for getting connected subscription providers status
 export function useProviderAuthStatus() {
   return useQuery({
@@ -668,7 +671,7 @@ export function useProviderAuthStatus() {
 // Hook for initiating subscription provider OAuth connection
 export function useConnectProvider() {
   return useMutation({
-    mutationFn: (provider: "openai" | "google") =>
+    mutationFn: (provider: OAuthSubscriptionProvider) =>
       client.providerAuth.connect({ provider }),
   });
 }
@@ -678,8 +681,21 @@ export function useDisconnectProvider() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (provider: "openai" | "google") =>
+    mutationFn: (provider: SubscriptionProvider) =>
       client.providerAuth.disconnect({ provider }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["providerAuth"] });
+    },
+  });
+}
+
+// Hook for storing an API key-based subscription provider
+export function useSetProviderApiKey() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ provider, apiKey }: { provider: "kimi"; apiKey: string }) =>
+      client.providerAuth.setApiKey({ provider, apiKey }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["providerAuth"] });
     },

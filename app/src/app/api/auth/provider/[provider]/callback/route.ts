@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   SUBSCRIPTION_PROVIDERS,
+  isOAuthProviderConfig,
   type SubscriptionProviderID,
 } from "@/server/ai/subscription-providers";
 import { storeProviderTokens } from "@/server/orpc/routers/provider-auth";
@@ -41,6 +42,10 @@ export async function GET(
   }
 
   const providerConfig = SUBSCRIPTION_PROVIDERS[provider as SubscriptionProviderID];
+  if (!isOAuthProviderConfig(providerConfig)) {
+    settingsUrl.searchParams.set("provider_error", "invalid_provider");
+    return NextResponse.redirect(settingsUrl);
+  }
 
   // Retrieve pending OAuth data from in-memory store (PKCE verifier stored server-side)
   const pending = consumePending(state);

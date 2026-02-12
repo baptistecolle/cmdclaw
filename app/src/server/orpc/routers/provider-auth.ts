@@ -4,13 +4,15 @@ import { protectedProcedure } from "../middleware";
 import { providerAuth } from "@/server/db/schema";
 import {
   SUBSCRIPTION_PROVIDERS,
+  isOAuthProviderConfig,
   type SubscriptionProviderID,
 } from "@/server/ai/subscription-providers";
 import { encrypt } from "@/server/utils/encryption";
 import { storePending } from "@/server/ai/pending-oauth";
 import { ensureOAuthCallbackServer } from "@/server/ai/oauth-callback-server";
 
-const providerSchema = z.enum(["openai", "google"]);
+const oauthProviderSchema = z.enum(["openai", "google"]);
+const providerSchema = z.enum(["openai", "google", "kimi"]);
 
 // PKCE helpers — matches OpenCode's codex.ts implementation
 function generateCodeVerifier(): string {
@@ -46,9 +48,12 @@ function generateState(): string {
  * For Google, uses standard OAuth with client secret.
  */
 const connect = protectedProcedure
-  .input(z.object({ provider: providerSchema }))
+  .input(z.object({ provider: oauthProviderSchema }))
   .handler(async ({ input, context }) => {
     const config = SUBSCRIPTION_PROVIDERS[input.provider];
+    if (!isOAuthProviderConfig(config)) {
+      throw new Error(`Provider "${input.provider}" does not support OAuth`);
+    }
 
     // Start the OAuth callback server for providers that use localhost:1455
     if (input.provider === "openai") {
@@ -142,6 +147,37 @@ const disconnect = protectedProcedure
   });
 
 /**
+ * PUT /provider-auth/api-key/:provider
+ * Store API key for a subscription provider.
+ */
+const setApiKey = protectedProcedure
+  .input(
+    z.object({
+      provider: z.literal("kimi"),
+      apiKey: z.string().min(1),
+    })
+  )
+  .handler(async ({ input, context }) => {
+    const apiKey = input.apiKey.trim();
+    if (!apiKey) {
+      throw new Error("API key cannot be empty");
+    }
+
+    // Keep API-key credentials effectively non-expiring in the current schema.
+    const expiresAt = new Date("2999-01-01T00:00:00.000Z");
+
+    await storeProviderTokens({
+      userId: context.user.id,
+      provider: input.provider,
+      accessToken: apiKey,
+      refreshToken: "",
+      expiresAt,
+    });
+
+    return { success: true };
+  });
+
+/**
  * Internal: Store tokens after OAuth callback.
  * Called from the API callback route, not directly from the client.
  */
@@ -189,4 +225,5 @@ export const providerAuthRouter = {
   connect,
   status,
   disconnect,
+  setApiKey,
 };

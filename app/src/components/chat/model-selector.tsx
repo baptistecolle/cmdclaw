@@ -37,7 +37,12 @@ const GOOGLE_MODELS: ModelOption[] = [
   { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", provider: "google", providerLabel: "Gemini" },
 ];
 
-const ALL_MODELS = [...ANTHROPIC_MODELS, ...OPENAI_MODELS, ...GOOGLE_MODELS];
+const KIMI_MODELS: ModelOption[] = [
+  { id: "k2p5", name: "Kimi K2.5", provider: "kimi-for-coding", providerLabel: "Kimi" },
+  { id: "kimi-k2-thinking", name: "Kimi K2 Thinking", provider: "kimi-for-coding", providerLabel: "Kimi" },
+];
+
+const ALL_MODELS = [...ANTHROPIC_MODELS, ...OPENAI_MODELS, ...GOOGLE_MODELS, ...KIMI_MODELS];
 
 type Props = {
   selectedModel: string;
@@ -51,6 +56,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
 
   const isOpenAIConnected = "openai" in connected;
   const isGoogleConnected = "google" in connected;
+  const isKimiConnected = "kimi" in connected;
 
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
   const displayName = currentModel?.name ?? selectedModel;
@@ -124,6 +130,37 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         </DropdownMenuLabel>
         {isGoogleConnected ? (
           GOOGLE_MODELS.map((model) => (
+            <DropdownMenuItem
+              key={model.id}
+              data-testid={`chat-model-option-${model.id}`}
+              onClick={() => onModelChange(model.id)}
+            >
+              <span className="flex-1">{model.name}</span>
+              {selectedModel === model.id && (
+                <Check className="h-3.5 w-3.5 text-foreground" />
+              )}
+            </DropdownMenuItem>
+          ))
+        ) : (
+          <DropdownMenuItem
+            className="text-xs text-muted-foreground"
+            onClick={() => {
+              window.location.href = "/settings/subscriptions";
+            }}
+          >
+            Connect in Settings to unlock
+          </DropdownMenuItem>
+        )}
+
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="flex items-center gap-1.5">
+          Kimi
+          {!isKimiConnected && (
+            <Lock className="h-3 w-3 text-muted-foreground" />
+          )}
+        </DropdownMenuLabel>
+        {isKimiConnected ? (
+          KIMI_MODELS.map((model) => (
             <DropdownMenuItem
               key={model.id}
               data-testid={`chat-model-option-${model.id}`}

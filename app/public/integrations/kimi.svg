@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="48" viewBox="0 0 160 48" role="img" aria-label="Kimi logo">
+  <rect width="160" height="48" rx="10" fill="#111827"/>
+  <path d="M24 12h6v9l8-9h7l-9 10 10 14h-7l-7-10-2 2v8h-6z" fill="#fff"/>
+  <text x="54" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#fff">Kimi</text>
+</svg>

@@ -15,10 +15,13 @@ import type {
 
 export class AnthropicBackend implements LLMBackend {
   private client: Anthropic;
+  private apiKey: string;
 
-  constructor(apiKey?: string) {
+  constructor(apiKey?: string, baseURL?: string) {
+    this.apiKey = apiKey || env.ANTHROPIC_API_KEY || "";
     this.client = new Anthropic({
-      apiKey: apiKey || env.ANTHROPIC_API_KEY || "",
+      apiKey: this.apiKey,
+      baseURL: baseURL || undefined,
     });
   }
 
@@ -91,7 +94,7 @@ export class AnthropicBackend implements LLMBackend {
   }
 
   isAvailable(): boolean {
-    return !!env.ANTHROPIC_API_KEY;
+    return !!this.apiKey;
   }
 }
 

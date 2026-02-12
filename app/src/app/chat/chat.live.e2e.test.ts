@@ -16,6 +16,8 @@ const MODEL_LABELS: Record<string, string> = {
   "gpt-5.1-codex": "GPT-5.1 Codex",
   "gemini-2.5-pro": "Gemini 2.5 Pro",
   "gemini-2.5-flash": "Gemini 2.5 Flash",
+  k2p5: "Kimi K2.5",
+  "kimi-k2-thinking": "Kimi K2 Thinking",
 };
 
 async function selectModel(page: Page, modelId: string): Promise<void> {

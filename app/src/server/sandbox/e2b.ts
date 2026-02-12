@@ -529,7 +529,7 @@ async function replayConversationHistory(
 /**
  * Inject stored subscription provider OAuth tokens into an OpenCode server.
  * Called after sandbox creation to give OpenCode access to the user's
- * ChatGPT/Gemini subscriptions.
+ * ChatGPT/Gemini/Kimi subscriptions.
  */
 export async function injectProviderAuth(
   client: OpencodeClient,
@@ -542,11 +542,25 @@ export async function injectProviderAuth(
 
     for (const auth of auths) {
       try {
+        const access = decrypt(auth.accessToken);
+
+        if (auth.provider === "kimi") {
+          await client.auth.set({
+            providerID: "kimi-for-coding",
+            auth: {
+              type: "api",
+              key: access,
+            },
+          });
+          console.log(`[E2B] Injected kimi-for-coding auth for user ${userId}`);
+          continue;
+        }
+
         await client.auth.set({
           providerID: auth.provider,
           auth: {
             type: "oauth",
-            access: decrypt(auth.accessToken),
+            access,
             refresh: decrypt(auth.refreshToken),
             expires: auth.expiresAt.getTime(),
           },

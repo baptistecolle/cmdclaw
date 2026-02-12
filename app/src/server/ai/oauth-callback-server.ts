@@ -16,6 +16,7 @@ import { createServer, type Server } from "node:http";
 import { consumePending } from "./pending-oauth";
 import {
   SUBSCRIPTION_PROVIDERS,
+  isOAuthProviderConfig,
   type SubscriptionProviderID,
 } from "./subscription-providers";
 import { storeProviderTokens } from "../orpc/routers/provider-auth";
@@ -75,6 +76,12 @@ export function ensureOAuthCallbackServer(): void {
 
     const provider = pending.provider as SubscriptionProviderID;
     const config = SUBSCRIPTION_PROVIDERS[provider];
+    if (!isOAuthProviderConfig(config)) {
+      settingsUrl.searchParams.set("provider_error", "invalid_provider");
+      res.writeHead(302, { Location: settingsUrl.toString() });
+      res.end();
+      return;
+    }
 
     try {
       const tokenBody = new URLSearchParams({

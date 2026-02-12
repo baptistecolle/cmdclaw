@@ -9,22 +9,36 @@ import {
   useProviderAuthStatus,
   useConnectProvider,
   useDisconnectProvider,
+  useSetProviderApiKey,
 } from "@/orpc/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 
-type ProviderID = "openai" | "google";
+type ProviderID = "openai" | "google" | "kimi";
+type ProviderAuthType = "oauth" | "api_key";
+
+const PROVIDER_LABELS: Record<ProviderID, string> = {
+  openai: "ChatGPT",
+  google: "Gemini",
+  kimi: "Kimi",
+};
+
+const getProviderLabel = (provider: ProviderID | string) =>
+  PROVIDER_LABELS[provider as ProviderID] ?? provider;
 
 const PROVIDERS: {
   id: ProviderID;
+  authType: ProviderAuthType;
   name: string;
   description: string;
   logoUrl: string;
   logoAlt: string;
   logoClassName?: string;
   models: string[];
+  apiKeyHelp?: string;
 }[] = [
   {
     id: "openai",
+    authType: "oauth",
     name: "ChatGPT",
     description: "Use your ChatGPT Plus/Pro/Max subscription",
     logoUrl: "/integrations/openai.svg",
@@ -34,11 +48,22 @@ const PROVIDERS: {
   },
   {
     id: "google",
+    authType: "oauth",
     name: "Gemini",
     description: "Use your Google AI Pro/Ultra subscription",
     logoUrl: "/integrations/gemini.svg",
     logoAlt: "Google Gemini logo",
     models: ["Gemini 2.5 Pro", "Gemini 2.5 Flash"],
+  },
+  {
+    id: "kimi",
+    authType: "api_key",
+    name: "Kimi",
+    description: "Use your Kimi for Coding subscription",
+    logoUrl: "/integrations/kimi.svg",
+    logoAlt: "Kimi logo",
+    models: ["Kimi K2.5", "Kimi K2 Thinking"],
+    apiKeyHelp: "Paste your KIMI_API_KEY from Kimi for Coding.",
   },
 ];
 
@@ -57,7 +82,7 @@ function SearchParamsHandler({
     if (connected) {
       onNotification({
         type: "success",
-        message: `${connected === "openai" ? "ChatGPT" : "Gemini"} connected successfully!`,
+        message: `${getProviderLabel(connected)} connected successfully!`,
       });
       queryClient.invalidateQueries({ queryKey: ["providerAuth"] });
       window.history.replaceState({}, "", "/settings/subscriptions");
@@ -77,6 +102,7 @@ export default function SubscriptionsPage() {
   const { data, isLoading } = useProviderAuthStatus();
   const connectProvider = useConnectProvider();
   const disconnectProvider = useDisconnectProvider();
+  const setProviderApiKey = useSetProviderApiKey();
   const [connectingProvider, setConnectingProvider] = useState<ProviderID | null>(null);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
@@ -100,6 +126,32 @@ export default function SubscriptionsPage() {
 
   const handleConnect = async (provider: ProviderID) => {
     setConnectingProvider(provider);
+
+    if (provider === "kimi") {
+      const apiKey = window.prompt("Paste your KIMI_API_KEY");
+      if (!apiKey?.trim()) {
+        setConnectingProvider(null);
+        return;
+      }
+
+      try {
+        await setProviderApiKey.mutateAsync({ provider: "kimi", apiKey: apiKey.trim() });
+        setNotification({
+          type: "success",
+          message: "Kimi connected successfully!",
+        });
+      } catch (error) {
+        console.error("Failed to save Kimi API key:", error);
+        setNotification({
+          type: "error",
+          message: "Failed to connect Kimi. Please verify your API key and try again.",
+        });
+      } finally {
+        setConnectingProvider(null);
+      }
+      return;
+    }
+
     try {
       const result = await connectProvider.mutateAsync(provider);
       // Open the OAuth URL in the same window
@@ -119,7 +171,7 @@ export default function SubscriptionsPage() {
       await disconnectProvider.mutateAsync(provider);
       setNotification({
         type: "success",
-        message: `${provider === "openai" ? "ChatGPT" : "Gemini"} disconnected.`,
+        message: `${getProviderLabel(provider)} disconnected.`,
       });
     } catch (error) {
       console.error("Failed to disconnect:", error);
@@ -202,6 +254,9 @@ export default function SubscriptionsPage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {provider.description}
                   </p>
+                  {provider.authType === "api_key" && provider.apiKeyHelp ? (
+                    <p className="mt-1 text-xs text-muted-foreground">{provider.apiKeyHelp}</p>
+                  ) : null}
                 </div>
 
                 <div className="shrink-0">
