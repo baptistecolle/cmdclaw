@@ -1,20 +1,21 @@
-use bun and not npm
+# App Agent Instructions
 
-use bun db:push for migration and not db:generate
+## Package manager and scripts
+- Use `bun`, not `npm`.
+- Use `bun db:push` for migrations, not `db:generate`.
+- When editing a Better Auth plugin, run `bun auth:generate` to regenerate the schema.
+- Run `bun run check` to validate types and lint.
 
-when editing plugin of better-auth, use bun auth:generate to generate the schema again
+## Testing workflow
+- After implementing a feature, test it with `bun run chat` when possible.
+- If `bun run chat` is not sufficient to validate the change, clearly report that limitation.
 
-only commit when i ask you to do so
-
-you can do bun run typecheck     to check type
-
-after implementing a feature, ideally test it through bun run chat
-if bun run chat is not good enough to test the feature, report that clearly so the user knows
+## Commit policy
+- Do not commit unless the user explicitly asks.
 
 ## Chat CLI auth
+If `bun run chat` shows `You must be logged in`, the saved token has expired.
 
-If `bun run chat` says "You must be logged in", the saved token has expired. To re-authenticate:
-
-1. Check if a valid token exists: `cat ~/.bap/chat-config.json`
-2. If token is expired/missing, ask the user to run `bun run chat --auth` in their terminal and approve the device code in the browser. The token is saved to `~/.bap/chat-config.json`.
-3. Alternatively, if the user provides a token, use: `bun run chat --token <token>`
+1. Check whether a valid token exists in `chat-config.json`.
+2. If the token is missing or expired, ask the user to run `bun run chat --auth` in their terminal and approve the device code in the browser. The token is saved to `chat-config.json`.
+3. If the user provides a token directly, use `bun run chat --token <token>`.

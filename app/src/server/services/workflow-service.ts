@@ -212,6 +212,13 @@ export async function triggerWorkflowRun(params: {
 
   const allowedIntegrations = (wf.allowedIntegrations ??
     []) as IntegrationType[];
+  const allowedCustomIntegrations = Array.isArray(
+    wf.allowedCustomIntegrations,
+  )
+    ? wf.allowedCustomIntegrations.filter(
+        (value): value is string => typeof value === "string",
+      )
+    : [];
 
   let generationId: string;
   let conversationId: string;
@@ -222,7 +229,7 @@ export async function triggerWorkflowRun(params: {
       userId: wf.ownerId,
       autoApprove: wf.autoApprove,
       allowedIntegrations,
-      allowedCustomIntegrations: (wf as unknown).allowedCustomIntegrations ?? [],
+      allowedCustomIntegrations,
       workflowPrompt: wf.prompt,
       workflowPromptDo: wf.promptDo,
       workflowPromptDont: wf.promptDont,

@@ -1904,10 +1904,24 @@ class GenerationManager {
               ? (event.properties as Record<string, unknown>)
               : {};
           const error = eventProps.error ?? "Unknown error";
+          const errorObj =
+            typeof error === "object" && error !== null
+              ? (error as Record<string, unknown>)
+              : null;
+          const nestedData =
+            errorObj &&
+            typeof errorObj.data === "object" &&
+            errorObj.data !== null
+              ? (errorObj.data as Record<string, unknown>)
+              : null;
           const errorMessage =
             typeof error === "string"
               ? error
-              : error?.data?.message || error?.message || JSON.stringify(error);
+              : (typeof nestedData?.message === "string"
+                  ? nestedData.message
+                  : typeof errorObj?.message === "string"
+                    ? errorObj.message
+                    : JSON.stringify(error));
           throw new Error(errorMessage);
         }
       }

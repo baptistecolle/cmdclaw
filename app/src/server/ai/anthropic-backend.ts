@@ -196,12 +196,19 @@ function mapAnthropicEvent(event: Anthropic.MessageStreamEvent): StreamEvent[] {
     }
 
     case "message_delta": {
-      const stopReason =
+      const rawStopReason =
         typeof event.delta === "object" &&
         event.delta !== null &&
         "stop_reason" in event.delta &&
         typeof event.delta.stop_reason === "string"
           ? event.delta.stop_reason
+          : null;
+      const stopReason =
+        rawStopReason === "end_turn" ||
+        rawStopReason === "tool_use" ||
+        rawStopReason === "max_tokens" ||
+        rawStopReason === "stop_sequence"
+          ? rawStopReason
           : null;
       if (stopReason) {
         events.push({
