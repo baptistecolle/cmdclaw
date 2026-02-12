@@ -471,7 +471,7 @@ function IntegrationsPageContent() {
           slug,
           redirectUrl: window.location.href,
         });
-        window.location.href = result.authUrl;
+        window.location.assign(result.authUrl);
       } catch {
         setNotification({
           type: "error",
@@ -594,7 +594,7 @@ function IntegrationsPageContent() {
   const handleOpenWhatsAppIntegration = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
-      window.location.href = "/integrations/whatsapp";
+      window.location.assign("/integrations/whatsapp");
     },
     [],
   );
