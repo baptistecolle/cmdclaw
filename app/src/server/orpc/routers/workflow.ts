@@ -8,7 +8,7 @@ import {
   workflowRun,
   workflowRunEvent,
 } from "@/server/db/schema";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
 import {
   removeWorkflowScheduleJob,
@@ -39,7 +39,6 @@ const triggerTypeSchema = z.string().min(1).max(128);
 
 function buildFallbackWorkflowName(
   agentDescription: string,
-  triggerType: string,
 ): string {
   const firstSentence = agentDescription
     .split(/[\n.!?]/)[0]
@@ -208,7 +207,7 @@ const create = protectedProcedure
         ? providedName
         : hasAgentDescription
           ? (generatedName ??
-            buildFallbackWorkflowName(input.prompt, input.triggerType))
+            buildFallbackWorkflowName(input.prompt))
           : "";
 
     const [created] = await context.db
@@ -312,10 +311,7 @@ const update = protectedProcedure
           });
           updates.name =
             generatedName ??
-            buildFallbackWorkflowName(
-              nextPrompt,
-              input.triggerType ?? existing.triggerType,
-            );
+            buildFallbackWorkflowName(nextPrompt);
         }
       }
     }

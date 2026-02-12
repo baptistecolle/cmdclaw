@@ -8,9 +8,7 @@ import type {
   LLMBackend,
   ChatParams,
   StreamEvent,
-  ChatMessage,
   ContentBlock,
-  ToolDefinition,
 } from "./llm-backend";
 
 export class AnthropicBackend implements LLMBackend {

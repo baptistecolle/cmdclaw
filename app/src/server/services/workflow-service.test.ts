@@ -5,10 +5,8 @@ const {
   workflowRunFindManyMock,
   workflowRunFindFirstMock,
   insertValuesMock,
-  insertMock,
   updateWhereMock,
   updateSetMock,
-  updateMock,
   dbMock,
   startWorkflowGenerationMock,
 } = vi.hoisted(() => {
@@ -44,10 +42,8 @@ const {
     workflowRunFindManyMock,
     workflowRunFindFirstMock,
     insertValuesMock,
-    insertMock,
     updateWhereMock,
     updateSetMock,
-    updateMock,
     dbMock,
     startWorkflowGenerationMock,
   };

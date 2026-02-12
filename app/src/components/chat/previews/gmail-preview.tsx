@@ -1,7 +1,5 @@
 import {
   PreviewProps,
-  PreviewSection,
-  PreviewContent,
   IntegrationLogo,
 } from "./preview-styles";
 

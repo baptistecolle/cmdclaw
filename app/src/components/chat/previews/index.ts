@@ -11,7 +11,6 @@ import { LinearPreview } from "./linear-preview";
 import { GithubPreview } from "./github-preview";
 import { AirtablePreview } from "./airtable-preview";
 import { HubspotPreview } from "./hubspot-preview";
-import { GenericPreview } from "./generic-preview";
 
 export type { PreviewProps } from "./preview-styles";
 export { GenericPreview } from "./generic-preview";

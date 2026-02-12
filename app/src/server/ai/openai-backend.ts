@@ -9,7 +9,6 @@ import type {
   ChatParams,
   StreamEvent,
   ChatMessage,
-  ContentBlock,
 } from "./llm-backend";
 
 export class OpenAIBackend implements LLMBackend {

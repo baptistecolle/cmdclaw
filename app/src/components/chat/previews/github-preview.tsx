@@ -1,6 +1,5 @@
 import {
   PreviewProps,
-  PreviewField,
   PreviewSection,
   PreviewContent,
   IntegrationLogo,

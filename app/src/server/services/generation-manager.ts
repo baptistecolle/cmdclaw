@@ -26,7 +26,6 @@ import {
   getEnabledIntegrationTypes,
 } from "@/server/integrations/cli-env";
 import {
-  customIntegration,
   customIntegrationCredential,
 } from "@/server/db/schema";
 import { and } from "drizzle-orm";
@@ -41,7 +40,6 @@ import type {
   LLMBackend,
   ChatMessage,
   ContentBlock,
-  StreamEvent,
 } from "@/server/ai/llm-backend";
 import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
 import {

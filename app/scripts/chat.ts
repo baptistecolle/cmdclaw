@@ -1,5 +1,5 @@
 import readline from "node:readline";
-import { homedir, hostname, platform, arch } from "node:os";
+import { homedir } from "node:os";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, basename, resolve, extname } from "node:path";
 import { createORPCClient } from "@orpc/client";

@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { protectedProcedure } from "../middleware";
 import { user } from "@/server/db/schema";
 import { eq } from "drizzle-orm";

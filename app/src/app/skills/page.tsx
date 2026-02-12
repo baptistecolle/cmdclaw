@@ -45,7 +45,7 @@ function SkillsPageContent() {
       });
       // Navigate to the editor page
       router.push(`/skills/${result.id}`);
-    } catch (error) {
+    } catch {
       setNotification({
         type: "error",
         message: "Failed to create skill. Please try again.",
@@ -73,7 +73,7 @@ function SkillsPageContent() {
         message: `Skill "${displayName}" deleted.`,
       });
       refetch();
-    } catch (error) {
+    } catch {
       setNotification({
         type: "error",
         message: "Failed to delete skill.",

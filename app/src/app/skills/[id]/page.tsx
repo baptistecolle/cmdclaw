@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -46,7 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { IconPicker, IconDisplay } from "@/components/ui/icon-picker";
+import { IconPicker } from "@/components/ui/icon-picker";
 
 type EditorMode = "rich" | "markdown";
 
@@ -196,7 +196,7 @@ function SkillEditorPageContent() {
       try {
         const { url } = await getDocumentUrl.mutateAsync(docId);
         setDocumentUrl(url);
-      } catch (error) {
+      } catch {
         setNotification({ type: "error", message: "Failed to load document" });
       } finally {
         setIsLoadingDocumentUrl(false);
@@ -258,7 +258,7 @@ function SkillEditorPageContent() {
 
       setNotification({ type: "success", message: "Saved" });
       refetch();
-    } catch (error) {
+    } catch {
       setNotification({ type: "error", message: "Failed to save" });
     } finally {
       setIsSaving(false);
@@ -278,7 +278,7 @@ function SkillEditorPageContent() {
       setNewFilePath("");
       setNotification({ type: "success", message: "File added" });
       refetch();
-    } catch (error) {
+    } catch {
       setNotification({ type: "error", message: "Failed to add file" });
     }
   };
@@ -299,7 +299,7 @@ function SkillEditorPageContent() {
       setNotification({ type: "success", message: "File deleted" });
       setFileToDelete(null);
       refetch();
-    } catch (error) {
+    } catch {
       setNotification({ type: "error", message: "Failed to delete file" });
     }
   };
@@ -311,7 +311,7 @@ function SkillEditorPageContent() {
     try {
       await deleteSkill.mutateAsync(skillId);
       router.push("/skills");
-    } catch (error) {
+    } catch {
       setNotification({ type: "error", message: "Failed to delete skill" });
     }
   };
@@ -358,7 +358,7 @@ function SkillEditorPageContent() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (error) {
+    } catch {
       setNotification({ type: "error", message: "Failed to get download URL" });
     }
   };
@@ -382,7 +382,7 @@ function SkillEditorPageContent() {
       setNotification({ type: "success", message: "Document deleted" });
       setDocumentToDelete(null);
       refetch();
-    } catch (error) {
+    } catch {
       setNotification({ type: "error", message: "Failed to delete document" });
     }
   };

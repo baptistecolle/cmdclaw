@@ -48,7 +48,7 @@ function ConnectDevicePageContent() {
       }
 
       setStatus("success");
-    } catch (err) {
+    } catch {
       setStatus("error");
       setErrorMsg("An error occurred. Please try again.");
     }

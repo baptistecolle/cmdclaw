@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
 import {

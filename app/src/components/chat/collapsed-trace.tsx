@@ -25,7 +25,6 @@ type Props = {
 };
 
 export function CollapsedTrace({
-  messageId,
   integrationsUsed,
   hasError,
   activityItems = [],

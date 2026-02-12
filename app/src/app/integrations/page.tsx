@@ -12,7 +12,6 @@ import {
   useLinkLinkedIn,
   useCustomIntegrationList,
   useCreateCustomIntegration,
-  useSetCustomCredentials,
   useDisconnectCustomIntegration,
   useToggleCustomIntegration,
   useDeleteCustomIntegration,
@@ -149,7 +148,6 @@ function IntegrationsPageContent() {
   const disconnectIntegration = useDisconnectIntegration();
   const linkLinkedIn = useLinkLinkedIn();
   const createCustom = useCreateCustomIntegration();
-  const setCustomCreds = useSetCustomCredentials();
   const disconnectCustom = useDisconnectCustomIntegration();
   const toggleCustom = useToggleCustomIntegration();
   const deleteCustom = useDeleteCustomIntegration();

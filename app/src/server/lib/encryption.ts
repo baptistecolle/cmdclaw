@@ -3,7 +3,6 @@ import { env } from "@/env";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
-const TAG_LENGTH = 16;
 
 function getKey(): Buffer {
   const key = env.ENCRYPTION_KEY;

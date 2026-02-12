@@ -6,13 +6,9 @@ const {
   getOAuthConfigMock,
   integrationFindFirstMock,
   updateWhereMock,
-  updateSetMock,
-  updateMock,
   deleteWhereMock,
-  deleteMock,
   insertReturningMock,
   insertValuesMock,
-  insertMock,
   dbMock,
 } = vi.hoisted(() => {
   const getSessionMock = vi.fn();
@@ -47,13 +43,9 @@ const {
     getOAuthConfigMock,
     integrationFindFirstMock,
     updateWhereMock,
-    updateSetMock,
-    updateMock,
     deleteWhereMock,
-    deleteMock,
     insertReturningMock,
     insertValuesMock,
-    insertMock,
     dbMock,
   };
 });

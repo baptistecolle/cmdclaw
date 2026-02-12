@@ -5,7 +5,7 @@ import {
 } from "@opencode-ai/sdk/v2/client";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
-import { skill, message, conversation, providerAuth } from "@/server/db/schema";
+import { skill, message, providerAuth } from "@/server/db/schema";
 import {
   COMPACTION_SUMMARY_PREFIX,
   SESSION_BOUNDARY_PREFIX,
@@ -414,11 +414,7 @@ export async function getOrCreateSession(
   );
 
   // Ensure sandbox exists
-  const sandbox = await getOrCreateSandbox(
-    config,
-    options?.onLifecycle,
-    telemetryContext,
-  );
+  await getOrCreateSandbox(config, options?.onLifecycle, telemetryContext);
   const state = activeSandboxes.get(config.conversationId);
 
   if (!state) {

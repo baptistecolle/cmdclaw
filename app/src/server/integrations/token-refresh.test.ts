@@ -2,12 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   updateWhereMock,
-  updateSetMock,
-  updateMock,
   selectWhereMock,
-  selectInnerJoinMock,
-  selectFromMock,
-  selectMock,
   findManyMock,
   dbMock,
   getOAuthConfigMock,
@@ -38,12 +33,7 @@ const {
 
   return {
     updateWhereMock,
-    updateSetMock,
-    updateMock,
     selectWhereMock,
-    selectInnerJoinMock,
-    selectFromMock,
-    selectMock,
     findManyMock,
     dbMock,
     getOAuthConfigMock,

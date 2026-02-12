@@ -11,7 +11,6 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { useOpencodeFreeModels, useProviderAuthStatus } from "@/orpc/hooks";
-import { cn } from "@/lib/utils";
 
 type ModelOption = {
   id: string;

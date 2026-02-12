@@ -126,14 +126,14 @@ export function ChatArea({ conversationId }: Props) {
 
   // Segmented activity feed state
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
-  const [integrationsUsed, setIntegrationsUsed] = useState<
+  const [, setIntegrationsUsed] = useState<
     Set<IntegrationType>
   >(new Set());
-  const [traceStatus, setTraceStatus] = useState<TraceStatus>("complete");
+  const [, setTraceStatus] = useState<TraceStatus>("complete");
   const [agentInitStatus, setAgentInitStatus] = useState<string | null>(null);
 
   // Sandbox files collected during streaming
-  const [streamingSandboxFiles, setStreamingSandboxFiles] = useState<
+  const [, setStreamingSandboxFiles] = useState<
     SandboxFileData[]
   >([]);
 
@@ -621,7 +621,7 @@ export function ChatArea({ conversationId }: Props) {
         onStatusChange: (status) => {
           handleInitStatusChange(status);
         },
-        onDone: (generationId, newConversationId, messageId, usage) => {
+        onDone: (generationId, newConversationId, messageId) => {
           markInitSignal("done");
           runtime.handleDone({
             generationId,
@@ -808,7 +808,7 @@ export function ChatArea({ conversationId }: Props) {
 
       const effectiveConversationId =
         currentConversationIdRef.current ?? conversationId;
-      const result = await startGeneration(
+      await startGeneration(
         {
           conversationId: effectiveConversationId,
           content,

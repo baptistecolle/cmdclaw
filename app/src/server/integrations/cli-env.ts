@@ -1,7 +1,6 @@
 import { db } from "@/server/db/client";
 import {
   integration,
-  customIntegration,
   customIntegrationCredential,
 } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";

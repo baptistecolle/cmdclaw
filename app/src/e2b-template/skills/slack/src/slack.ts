@@ -137,7 +137,7 @@ const { positionals, values } = parseArgs({
   },
 });
 
-const [command, ...args] = positionals;
+const [command] = positionals;
 
 async function listChannels() {
   const data = await api("conversations.list", {

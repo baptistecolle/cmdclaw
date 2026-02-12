@@ -16,7 +16,6 @@ import { verifyDeviceToken } from "@/server/services/device-auth";
 import type {
   DaemonMessage,
   DaemonResponse,
-  DeviceCapabilities,
 } from "@/server/sandbox/types";
 
 interface DeviceConnection {

@@ -4,7 +4,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { join, resolve, dirname } from "path";
+import { resolve, dirname } from "path";
 import { logger } from "./logger";
 import { getSandboxDir } from "./config";
 

@@ -3,12 +3,8 @@
  * daemon device via WebSocket.
  */
 
-import type { SandboxBackend, ExecuteResult, DaemonResponse } from "./types";
-import {
-  sendToDevice,
-  waitForResponse,
-  isDeviceOnline,
-} from "@/server/ws/server";
+import type { SandboxBackend, ExecuteResult } from "./types";
+import { waitForResponse, isDeviceOnline } from "@/server/ws/server";
 
 export class BYOCSandboxBackend implements SandboxBackend {
   private deviceId: string;

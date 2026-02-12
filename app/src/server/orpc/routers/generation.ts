@@ -1,10 +1,7 @@
 import { eventIterator } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import {
-  generationManager,
-  type GenerationEvent,
-} from "@/server/services/generation-manager";
+import { generationManager } from "@/server/services/generation-manager";
 import { db } from "@/server/db/client";
 import { generation, conversation } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -238,7 +235,7 @@ const resumeGeneration = protectedProcedure
     }),
   )
   .output(z.object({ success: z.boolean() }))
-  .handler(async ({ input, context }) => {
+  .handler(async () => {
     // For now, resume is handled by submitApproval
     // Future: implement sandbox resume when E2B pause/resume is stable
     return { success: false };

@@ -63,8 +63,6 @@ export class LocalLLMBackend implements LLMBackend {
     // with a streaming adapter. The daemon sends llm.chunk events that get routed here.
 
     // Simplified: collect chunks until llm.done
-    const chunkCollector = new Map<string, (msg: DaemonResponse) => void>();
-
     // Register a streaming listener
     const streamListener = (msg: DaemonResponse) => {
       if (!("id" in msg) || msg.id !== requestId) return;

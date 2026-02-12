@@ -37,7 +37,7 @@ const { positionals, values } = parseArgs({
   },
 });
 
-const [command, ...args] = positionals;
+const [command] = positionals;
 
 async function listBases() {
   const data = await api("/meta/bases");

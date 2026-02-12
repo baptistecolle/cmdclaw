@@ -2,7 +2,6 @@ import {
   feature,
   product,
   featureItem,
-  pricedFeatureItem,
   priceItem,
 } from "atmn";
 

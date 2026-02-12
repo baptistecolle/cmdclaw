@@ -74,7 +74,7 @@ export class WSClient {
       }
     };
 
-    this.ws.onerror = (event) => {
+    this.ws.onerror = () => {
       logger.error("ws", "WebSocket error");
     };
   }

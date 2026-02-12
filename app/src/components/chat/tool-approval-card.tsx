@@ -36,9 +36,6 @@ export interface ToolApprovalCardProps {
 }
 
 export function ToolApprovalCard({
-  toolUseId,
-  toolName,
-  toolInput,
   integration,
   operation,
   command,

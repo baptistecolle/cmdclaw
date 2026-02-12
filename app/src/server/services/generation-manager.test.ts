@@ -3,10 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   updateWhereMock,
   updateSetMock,
-  updateMock,
   insertReturningMock,
   insertValuesMock,
-  insertMock,
   generationFindFirstMock,
   conversationFindFirstMock,
   dbMock,
@@ -34,10 +32,8 @@ const {
   return {
     updateWhereMock,
     updateSetMock,
-    updateMock,
     insertReturningMock,
     insertValuesMock,
-    insertMock,
     generationFindFirstMock,
     conversationFindFirstMock,
     dbMock,
@@ -144,7 +140,6 @@ import {
 } from "@/server/integrations/cli-env";
 import {
   uploadSandboxFile,
-  collectNewSandboxFiles,
   collectNewE2BFiles,
   readSandboxFileAsBuffer,
 } from "@/server/services/sandbox-file-service";
