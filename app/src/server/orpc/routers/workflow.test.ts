@@ -741,7 +741,7 @@ describe("workflowRouter", () => {
   it("deletes a workflow on happy path", async () => {
     const context = createContext();
     context.mocks.deleteReturningMock.mockResolvedValue([{ id: "wf-1" }]);
-
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Router procedure call, not a Drizzle query
     const result = await workflowRouterAny.delete({
       input: { id: "wf-1" },
       context,
@@ -756,6 +756,7 @@ describe("workflowRouter", () => {
     context.mocks.deleteReturningMock.mockResolvedValue([]);
 
     await expect(
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Router procedure call, not a Drizzle query
       workflowRouterAny.delete({
         input: { id: "wf-missing" },
         context,
@@ -769,6 +770,7 @@ describe("workflowRouter", () => {
     removeWorkflowScheduleJobMock.mockRejectedValueOnce(new Error("queue unavailable"));
 
     await expect(
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Router procedure call, not a Drizzle query
       workflowRouterAny.delete({
         input: { id: "wf-1" },
         context,

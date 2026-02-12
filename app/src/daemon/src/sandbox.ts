@@ -128,6 +128,7 @@ export function readFile(path: string): string {
  * Tear down a sandbox.
  */
 export function teardownSandbox(conversationId: string): void {
+  // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
   sandboxes.delete(conversationId);
   logger.info("sandbox", `Torn down sandbox for ${conversationId}`);
 }

@@ -14,6 +14,7 @@ function isDuplicate(eventId: string): boolean {
   // Cleanup old entries
   for (const [id, ts] of processedEvents) {
     if (now - ts > DEDUP_TTL_MS) {
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
       processedEvents.delete(id);
     }
   }

@@ -79,6 +79,7 @@ export function waitForResponse(
     }
 
     const timeout = setTimeout(() => {
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
       pendingRequests.delete(message.id);
       reject(new Error("Request timed out"));
     }, timeoutMs);
@@ -153,7 +154,7 @@ async function handleDisconnect(ws: ServerWebSocket<WebSocketData>): Promise<voi
   if (!deviceId) {
     return;
   }
-
+  // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
   connections.delete(deviceId);
 
   // Update device offline status
@@ -192,6 +193,7 @@ function handleMessage(ws: ServerWebSocket<WebSocketData>, raw: string): void {
     const pending = pendingRequests.get(msg.id);
     if (pending) {
       clearTimeout(pending.timeout);
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
       pendingRequests.delete(msg.id);
       pending.resolve(msg);
       return;

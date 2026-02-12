@@ -57,7 +57,9 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
     headers["Authorization"] = `Basic ${Buffer.from(
       `${config.clientId}:${config.clientSecret}`,
     ).toString("base64")}`;
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- URLSearchParams.delete, not a Drizzle query
     tokenBody.delete("client_id");
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- URLSearchParams.delete, not a Drizzle query
     tokenBody.delete("client_secret");
   }
 

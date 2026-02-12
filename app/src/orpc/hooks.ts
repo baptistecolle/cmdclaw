@@ -73,6 +73,7 @@ export function useDeleteConversation() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- ORPC client delete, not a Drizzle query
     mutationFn: (id: string) => client.conversation.delete({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conversation"] });
@@ -428,6 +429,7 @@ export function useDeleteSkill() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- ORPC client delete, not a Drizzle query
     mutationFn: (id: string) => client.skill.delete({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["skill"] });
@@ -561,6 +563,7 @@ export function useDeleteWorkflow() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- ORPC client delete, not a Drizzle query
     mutationFn: (id: string) => client.workflow.delete({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workflow"] });

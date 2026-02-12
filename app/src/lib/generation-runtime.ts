@@ -580,6 +580,7 @@ export class GenerationRuntime {
         const approval = approvalMap.get(part.id);
         if (approval) {
           partsWithApprovals.push(approval);
+          // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
           approvalMap.delete(part.id);
         }
       }

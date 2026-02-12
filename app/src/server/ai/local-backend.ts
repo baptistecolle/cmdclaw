@@ -144,6 +144,7 @@ export function registerStreamListener(
 }
 
 export function unregisterStreamListener(requestId: string): void {
+  // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
   streamListeners.delete(requestId);
 }
 

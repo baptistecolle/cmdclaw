@@ -23,6 +23,7 @@ export function storePending(state: string, data: PendingOAuth) {
   const now = Date.now();
   for (const [key, value] of pending) {
     if (now - value.createdAt > EXPIRY_MS) {
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
       pending.delete(key);
     }
   }
@@ -34,6 +35,7 @@ export function consumePending(state: string): PendingOAuth | undefined {
   if (!data) {
     return undefined;
   }
+  // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
   pending.delete(state);
   if (Date.now() - data.createdAt > EXPIRY_MS) {
     return undefined;

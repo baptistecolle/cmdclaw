@@ -160,6 +160,7 @@ export async function getOrCreateSandbox(
         { ...telemetryContext, sandboxId: state.sandbox.sandboxId },
       );
       await state.sandbox.kill().catch(() => {});
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
       activeSandboxes.delete(config.conversationId);
     }
   }
@@ -697,6 +698,7 @@ export async function killSandbox(conversationId: string): Promise<void> {
     } catch (error) {
       console.error("[E2B] Failed to kill sandbox:", error);
     }
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
     activeSandboxes.delete(conversationId);
   }
 }

@@ -41,6 +41,7 @@ async function withCors(request: NextRequest, handler: (req: NextRequest) => Pro
   const setCookies = response.headers.getSetCookie();
   if (setCookies.length > 0) {
     // Clear any partially-copied cookies first
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Headers.delete, not a Drizzle query
     newResponse.headers.delete("set-cookie");
     for (const cookie of setCookies) {
       newResponse.headers.append("set-cookie", cookie);

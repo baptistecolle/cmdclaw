@@ -233,6 +233,7 @@ export function MessageItem({
     setExpandedSegments((prev) => {
       const next = new Set(prev);
       if (next.has(segmentId)) {
+        // eslint-disable-next-line drizzle/enforce-delete-with-where -- Set.delete, not a Drizzle query
         next.delete(segmentId);
       } else {
         next.add(segmentId);

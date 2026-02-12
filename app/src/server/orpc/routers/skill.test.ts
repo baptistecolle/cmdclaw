@@ -336,7 +336,7 @@ describe("skillRouter", () => {
   it("deletes an existing skill", async () => {
     const context = createContext();
     context.mocks.deleteReturningMock.mockResolvedValue([{ id: "skill-1" }]);
-
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Router procedure call, not a Drizzle query
     const result = await skillRouterAny.delete({
       input: { id: "skill-1" },
       context,
@@ -350,6 +350,7 @@ describe("skillRouter", () => {
     context.mocks.deleteReturningMock.mockResolvedValue([]);
 
     await expect(
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Router procedure call, not a Drizzle query
       skillRouterAny.delete({
         input: { id: "skill-missing" },
         context,

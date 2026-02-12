@@ -150,6 +150,7 @@ async function createWorkflow(
 }
 
 async function deleteWorkflow(client: RouterClient<AppRouter>, id: string): Promise<void> {
+  // eslint-disable-next-line drizzle/enforce-delete-with-where -- ORPC client delete, not a Drizzle query
   await client.workflow.delete({ id });
   console.log(`\n  Deleted workflow ${id}\n`);
 }

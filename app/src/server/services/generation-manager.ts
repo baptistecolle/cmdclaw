@@ -1121,6 +1121,7 @@ class GenerationManager {
         });
       }
     } finally {
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
       ctx.subscribers.delete(subscriberId);
     }
   }
@@ -3159,6 +3160,7 @@ class GenerationManager {
           ctx.assistantMessageIds.add(messageId);
           const pendingParts = ctx.pendingMessageParts.get(messageId);
           if (pendingParts && pendingParts.length > 0) {
+            // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
             ctx.pendingMessageParts.delete(messageId);
             let replayTextPart = currentTextPart;
             let replayTextPartId = currentTextPartId;
@@ -4008,7 +4010,9 @@ class GenerationManager {
     ctx.status = status;
 
     // Cleanup
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
     this.activeGenerations.delete(ctx.id);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
     this.conversationToGeneration.delete(ctx.conversationId);
   }
 
