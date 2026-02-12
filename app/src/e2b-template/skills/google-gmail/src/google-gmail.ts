@@ -100,7 +100,9 @@ async function getEmail(messageId: string) {
     }
     if (part.parts) {
       for (const p of part.parts) {
-        if (p.mimeType === "text/plain") return extractBody(p);
+        if (p.mimeType === "text/plain") {
+          return extractBody(p);
+        }
       }
       for (const p of part.parts) {
         const r = extractBody(p);
