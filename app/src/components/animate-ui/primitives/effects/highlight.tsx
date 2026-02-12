@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, type Transition } from "motion/react";
+import { AnimatePresence, motion, type MotionStyle, type Transition } from "motion/react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -304,8 +304,8 @@ function Highlight<T extends React.ElementType = "div">({ ref, ...props }: Highl
     }),
     [transition, exitDelay],
   );
-  const parentHighlightStyle = React.useMemo(
-    () => ({ position: "absolute", zIndex: 0, ...style }),
+  const parentHighlightStyle = React.useMemo<MotionStyle>(
+    () => ({ position: "absolute", zIndex: 0, ...(style as MotionStyle) }),
     [style],
   );
 

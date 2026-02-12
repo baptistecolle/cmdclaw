@@ -9,6 +9,7 @@ import {
   type HTMLMotionProps,
   type MotionValue,
   type SpringOptions,
+  type Transition,
 } from "motion/react";
 import * as React from "react";
 import { useControlledState } from "@/hooks/use-controlled-state";
@@ -25,7 +26,11 @@ type TooltipContextType = {
 
 const [LocalTooltipProvider, useTooltip] = getStrictContext<TooltipContextType>("TooltipContext");
 const TOOLTIP_DEFAULT_SPRING_OPTIONS = { stiffness: 200, damping: 17 };
-const TOOLTIP_POPUP_DEFAULT_TRANSITION = { type: "spring", stiffness: 300, damping: 25 };
+const TOOLTIP_POPUP_DEFAULT_TRANSITION: Transition = {
+  type: "spring",
+  stiffness: 300,
+  damping: 25,
+};
 const TOOLTIP_POPUP_INITIAL = { opacity: 0, scale: 0.5 };
 const TOOLTIP_POPUP_ANIMATE = { opacity: 1, scale: 1 };
 const TOOLTIP_POPUP_EXIT = { opacity: 0, scale: 0.5 };

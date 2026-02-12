@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, AlertCircle, ChevronRight, Eye, StopCircle } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, type Transition } from "motion/react";
 import { useCallback, useState } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,10 @@ import { IntegrationBadges } from "./integration-badges";
 const COLLAPSED_TRACE_EXPANDED_INITIAL = { height: 0, opacity: 0 };
 const COLLAPSED_TRACE_EXPANDED_ANIMATE = { height: "auto", opacity: 1 };
 const COLLAPSED_TRACE_EXPANDED_EXIT = { height: 0, opacity: 0 };
-const COLLAPSED_TRACE_EXPANDED_TRANSITION = { duration: 0.2, ease: "easeInOut" };
+const COLLAPSED_TRACE_EXPANDED_TRANSITION: Transition = {
+  duration: 0.2,
+  ease: "easeInOut",
+};
 
 type Props = {
   messageId: string;

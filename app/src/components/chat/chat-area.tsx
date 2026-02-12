@@ -1260,7 +1260,7 @@ export function ChatArea({ conversationId }: Props) {
                               !segment.auth
                             }
                             isExpanded={segment.isExpanded}
-                            onToggleExpand={segmentToggleHandlers.get(segment.id)}
+                            onToggleExpand={segmentToggleHandlers.get(segment.id)!}
                             integrationsUsed={segmentIntegrations}
                           />
                         )}

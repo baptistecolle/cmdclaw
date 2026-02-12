@@ -1,7 +1,7 @@
 "use client";
 
 import { Download } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { Children, useCallback, useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import type { SandboxFileData } from "./message-list";
@@ -61,7 +61,7 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
         return text;
       }
 
-      const parts: (string | React.ReactNode)[] = [];
+      const parts: (string | ReactNode)[] = [];
       let lastIndex = 0;
       let match;
       const regex = new RegExp(FILE_PATH_REGEX.source, "g");
@@ -103,10 +103,10 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
   const markdownComponents = useMemo(
     () => ({
       // Override text rendering to handle file paths
-      p: ({ children }: { children: React.ReactNode }) => (
+      p: ({ children }: { children?: ReactNode }) => (
         <p>
           {Array.isArray(children)
-            ? React.Children.map(children, (child) =>
+            ? Children.map(children, (child) =>
                 typeof child === "string" ? <span>{renderTextWithPaths(child)}</span> : child,
               )
             : typeof children === "string"
@@ -118,7 +118,7 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
         children,
         className: codeClassName,
       }: {
-        children: React.ReactNode;
+        children?: ReactNode;
         className?: string;
       }) => {
         const isInline = !codeClassName;

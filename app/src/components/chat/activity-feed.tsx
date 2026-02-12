@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronUp, Activity } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, type Transition } from "motion/react";
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
@@ -21,11 +21,11 @@ type Props = {
 // Line height is ~18px (text-xs with line-height), 5 lines = ~90px + padding
 const COLLAPSED_HEIGHT = 100;
 const MAX_EXPANDED_HEIGHT = 400;
-const ACTIVITY_FEED_EXPAND_TRANSITION = { duration: 0.2, ease: "easeInOut" };
+const ACTIVITY_FEED_EXPAND_TRANSITION: Transition = { duration: 0.2, ease: "easeInOut" };
 const ACTIVITY_ITEM_INITIAL = { opacity: 0, y: 5 };
 const ACTIVITY_ITEM_ANIMATE = { opacity: 1, y: 0 };
 const ACTIVITY_ITEM_EXIT = { opacity: 0 };
-const ACTIVITY_ITEM_TRANSITION = { duration: 0.15 };
+const ACTIVITY_ITEM_TRANSITION: Transition = { duration: 0.15 };
 
 export function ActivityFeed({
   items,

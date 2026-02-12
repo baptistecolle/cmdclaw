@@ -171,8 +171,8 @@ export async function reconcileScheduledWorkflowJobs(): Promise<{
       }
     }),
   );
-  synced = results.reduce((sum, result) => sum + result.synced, 0);
-  failed = results.reduce((sum, result) => sum + result.failed, 0);
+  synced = results.reduce<number>((sum, result) => sum + result.synced, 0);
+  failed = results.reduce<number>((sum, result) => sum + result.failed, 0);
 
   return { synced, failed };
 }

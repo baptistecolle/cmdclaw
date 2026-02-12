@@ -328,7 +328,7 @@ export async function pollGmailWorkflowTriggers(): Promise<{
         }),
       );
 
-      enqueued += enqueuedCount.reduce((sum, count) => sum + count, 0);
+      enqueued += enqueuedCount.reduce<number>((sum, count) => sum + count, 0);
     } catch (error) {
       if (isGmailAuthError(error)) {
         try {

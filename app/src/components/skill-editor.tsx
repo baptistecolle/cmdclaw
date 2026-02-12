@@ -157,15 +157,6 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
     },
     [onChange],
   );
-  const suggestionCommandHandlers = useMemo(() => {
-    const handlers = new Map<string, (val: string) => void>();
-    for (const item of suggestionItems) {
-      handlers.set(item.title, (val: string) => {
-        item.command(val as SuggestionCommandArgs);
-      });
-    }
-    return handlers;
-  }, []);
   const slotAfter = useMemo(
     () => (
       <EditorCommand className="z-50 h-auto max-h-[330px] overflow-y-auto rounded-md border bg-background px-1 py-2 shadow-md">
@@ -177,7 +168,7 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
             <EditorCommandItem
               key={item.title}
               value={item.title}
-              onCommand={suggestionCommandHandlers.get(item.title)}
+              onCommand={item.command}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer aria-selected:bg-accent"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
@@ -192,7 +183,7 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
         </EditorCommandList>
       </EditorCommand>
     ),
-    [suggestionCommandHandlers],
+    [],
   );
   const handleSelectBold = useCallback((editor: Editor) => {
     editor.chain().focus().toggleBold().run();

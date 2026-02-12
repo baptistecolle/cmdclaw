@@ -1,6 +1,12 @@
 "use client";
 
-import { AnimatePresence, motion, type HTMLMotionProps } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  type HTMLMotionProps,
+  type MotionStyle,
+  type Transition,
+} from "motion/react";
 import { Dialog as SheetPrimitive } from "radix-ui";
 import * as React from "react";
 import { useControlledState } from "@/hooks/use-controlled-state";
@@ -14,8 +20,12 @@ type SheetContextType = {
 type Side = "top" | "bottom" | "left" | "right";
 
 const [SheetProvider, useSheet] = getStrictContext<SheetContextType>("SheetContext");
-const SHEET_OVERLAY_DEFAULT_TRANSITION = { duration: 0.2, ease: "easeInOut" };
-const SHEET_CONTENT_DEFAULT_TRANSITION = { type: "spring", stiffness: 150, damping: 22 };
+const SHEET_OVERLAY_DEFAULT_TRANSITION: Transition = { duration: 0.2, ease: "easeInOut" };
+const SHEET_CONTENT_DEFAULT_TRANSITION: Transition = {
+  type: "spring",
+  stiffness: 150,
+  damping: 22,
+};
 const SHEET_OVERLAY_INITIAL = { opacity: 0, filter: "blur(4px)" };
 const SHEET_OVERLAY_ANIMATE = { opacity: 1, filter: "blur(0px)" };
 const SHEET_OVERLAY_EXIT = { opacity: 0, filter: "blur(4px)" };
@@ -113,11 +123,11 @@ function SheetContent({
 }: SheetContentProps) {
   const axis = side === "left" || side === "right" ? "x" : "y";
   const animate = React.useMemo(() => ({ [axis]: 0, opacity: 1 }), [axis]);
-  const resolvedStyle = React.useMemo(
+  const resolvedStyle = React.useMemo<MotionStyle>(
     () => ({
       position: "fixed",
       ...SHEET_POSITION_STYLE[side],
-      ...style,
+      ...(style as MotionStyle),
     }),
     [side, style],
   );

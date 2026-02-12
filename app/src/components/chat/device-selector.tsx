@@ -72,9 +72,8 @@ export function DeviceSelector({ selectedDeviceId, onSelect }: Props) {
     onSelect(undefined);
   }, [onSelect]);
   const handleSelectDevice = useCallback(
-    (event: Event) => {
-      const target = event.currentTarget as HTMLElement;
-      const deviceId = target.dataset.deviceId;
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const deviceId = event.currentTarget.dataset.deviceId;
       if (!deviceId) {
         return;
       }

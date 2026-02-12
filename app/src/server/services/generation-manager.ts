@@ -944,7 +944,7 @@ class GenerationManager {
         yield { type: "status_change", status: genRecord.status };
 
         const pollForTerminal = async function* (): AsyncGenerator<
-          GenerationStreamEvent,
+          GenerationEvent,
           void,
           unknown
         > {
@@ -1113,7 +1113,7 @@ class GenerationManager {
         });
 
       const streamEvents = async function* (): AsyncGenerator<
-        GenerationStreamEvent,
+        GenerationEvent,
         void,
         unknown
       > {
@@ -2010,19 +2010,19 @@ class GenerationManager {
         allowedIntegrations,
       );
       if (resolvedCommunityIntegrationSkills.length > 0) {
-        await sandbox.execute('mkdir -p "/app/.opencode/integration-skills"');
+        await sandbox!.execute('mkdir -p "/app/.opencode/integration-skills"');
         await Promise.all(
           resolvedCommunityIntegrationSkills.map(async (skill) => {
             const skillDir = `/app/.opencode/integration-skills/${skill.slug}`;
-            await sandbox.execute(`mkdir -p "${skillDir}"`);
+            await sandbox!.execute(`mkdir -p "${skillDir}"`);
             await Promise.all(
               skill.files.map(async (file) => {
                 const filePath = `${skillDir}/${file.path}`;
                 const idx = filePath.lastIndexOf("/");
                 if (idx > 0) {
-                  await sandbox.execute(`mkdir -p "${filePath.slice(0, idx)}"`);
+                  await sandbox!.execute(`mkdir -p "${filePath.slice(0, idx)}"`);
                 }
-                await sandbox.writeFile(filePath, file.content);
+                await sandbox!.writeFile(filePath, file.content);
               }),
             );
           }),
@@ -3506,7 +3506,7 @@ class GenerationManager {
         }
       }),
     );
-    createdCount = creationResults.reduce((sum, value) => sum + value, 0);
+    createdCount = creationResults.reduce<number>((sum, value) => sum + value, 0);
 
     return createdCount;
   }

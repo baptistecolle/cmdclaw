@@ -62,13 +62,12 @@ export function ChatSidebar() {
   }, [router]);
 
   const handleDeleteMenuClick = useCallback(
-    (event: Event) => {
-      const target = event.currentTarget as HTMLElement;
-      const id = target.dataset.conversationId;
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const id = event.currentTarget.dataset.conversationId;
       if (!id) {
         return;
       }
-      void handleDelete(id, event as unknown as React.MouseEvent);
+      void handleDelete(id, event);
     },
     [handleDelete],
   );

@@ -125,9 +125,8 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
   const currentModel = allModels.find((m) => m.id === selectedModel);
   const displayName = currentModel?.name ?? selectedModel;
   const handleModelSelect = useCallback(
-    (event: Event) => {
-      const target = event.currentTarget as HTMLElement;
-      const modelId = target.dataset.modelId;
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const modelId = event.currentTarget.dataset.modelId;
       if (modelId) {
         onModelChange(modelId);
       }

@@ -22,7 +22,7 @@ const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
-const SIDEBAR_DEFAULT_TRANSITION = { type: "spring", stiffness: 350, damping: 35 };
+const SIDEBAR_DEFAULT_TRANSITION: Transition = { type: "spring", stiffness: 350, damping: 35 };
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed";

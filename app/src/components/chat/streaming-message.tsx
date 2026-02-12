@@ -31,14 +31,24 @@ export function StreamingMessage({ parts }: Props) {
         )}
 
         {parts.map((part, index) => {
-          const baseKey =
-            part.type === "text"
-              ? `text:${part.content}`
-              : part.type === "thinking"
-                ? `thinking:${part.id}`
-                : part.type === "tool_call"
-                  ? `tool:${part.id}`
-                  : `system:${part.content}`;
+          let baseKey: string;
+          switch (part.type) {
+            case "text":
+              baseKey = `text:${part.content}`;
+              break;
+            case "thinking":
+              baseKey = `thinking:${part.id}`;
+              break;
+            case "tool_call":
+              baseKey = `tool:${part.id}`;
+              break;
+            case "system":
+              baseKey = `system:${part.content}`;
+              break;
+            case "approval":
+              baseKey = `approval:${part.toolUseId}`;
+              break;
+          }
           const occurrence = (partKeyCounts.get(baseKey) ?? 0) + 1;
           partKeyCounts.set(baseKey, occurrence);
           const partKey = `${baseKey}:${occurrence}`;
