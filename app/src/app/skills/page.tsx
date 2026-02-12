@@ -41,34 +41,40 @@ function SkillsPageContent() {
     }
   }, [createSkill, router]);
 
-  const handleToggle = useCallback(async (id: string, enabled: boolean) => {
-    try {
-      await updateSkill.mutateAsync({ id, enabled });
-      refetch();
-    } catch (error) {
-      console.error("Failed to toggle skill:", error);
-    }
-  }, [refetch, updateSkill]);
+  const handleToggle = useCallback(
+    async (id: string, enabled: boolean) => {
+      try {
+        await updateSkill.mutateAsync({ id, enabled });
+        refetch();
+      } catch (error) {
+        console.error("Failed to toggle skill:", error);
+      }
+    },
+    [refetch, updateSkill],
+  );
 
-  const handleDelete = useCallback(async (id: string, displayName: string) => {
-    if (!confirm(`Are you sure you want to delete "${displayName}"?`)) {
-      return;
-    }
+  const handleDelete = useCallback(
+    async (id: string, displayName: string) => {
+      if (!confirm(`Are you sure you want to delete "${displayName}"?`)) {
+        return;
+      }
 
-    try {
-      await deleteSkill.mutateAsync(id);
-      setNotification({
-        type: "success",
-        message: `Skill "${displayName}" deleted.`,
-      });
-      refetch();
-    } catch {
-      setNotification({
-        type: "error",
-        message: "Failed to delete skill.",
-      });
-    }
-  }, [deleteSkill, refetch]);
+      try {
+        await deleteSkill.mutateAsync(id);
+        setNotification({
+          type: "success",
+          message: `Skill "${displayName}" deleted.`,
+        });
+        refetch();
+      } catch {
+        setNotification({
+          type: "error",
+          message: "Failed to delete skill.",
+        });
+      }
+    },
+    [deleteSkill, refetch],
+  );
 
   useEffect(() => {
     if (!notification) {
@@ -181,7 +187,11 @@ function SkillsPageContent() {
 }
 
 export default function SkillsPage() {
-  return <Suspense fallback={skillsPageFallbackNode}><SkillsPageContent /></Suspense>;
+  return (
+    <Suspense fallback={skillsPageFallbackNode}>
+      <SkillsPageContent />
+    </Suspense>
+  );
 }
 
 function SkillEnabledCheckbox({

@@ -382,19 +382,13 @@ export default function WorkflowEditorPage() {
             <span className="text-sm text-muted-foreground">
               {status === "on" ? "Workflow is on" : "Workflow is off"}
             </span>
-            <Switch
-              checked={status === "on"}
-              onCheckedChange={handleStatusChange}
-            />
+            <Switch checked={status === "on"} onCheckedChange={handleStatusChange} />
           </div>
           <div className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5">
             <span className="text-sm text-muted-foreground">
               {autoApprove ? "Auto-approve on" : "Auto-approve off"}
             </span>
-            <Switch
-              checked={autoApprove}
-              onCheckedChange={handleAutoApproveChange}
-            />
+            <Switch checked={autoApprove} onCheckedChange={handleAutoApproveChange} />
           </div>
           <Button variant="secondary" onClick={handleRun} disabled={status !== "on"}>
             <Play className="mr-2 h-4 w-4" />
@@ -464,10 +458,7 @@ export default function WorkflowEditorPage() {
                   >
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Frequency</label>
-                      <Select
-                        value={scheduleType}
-                        onValueChange={handleScheduleTypeChange}
-                      >
+                      <Select value={scheduleType} onValueChange={handleScheduleTypeChange}>
                         <SelectTrigger className="h-10 w-full bg-background">
                           <SelectValue placeholder="Select frequency" />
                         </SelectTrigger>
@@ -575,10 +566,7 @@ export default function WorkflowEditorPage() {
                 <label className="text-sm font-medium">Allowed tools</label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">All tools allowed</span>
-                  <Switch
-                    checked={!restrictTools}
-                    onCheckedChange={handleRestrictToolsChange}
-                  />
+                  <Switch checked={!restrictTools} onCheckedChange={handleRestrictToolsChange} />
                 </div>
               </div>
               {!restrictTools ? (
@@ -702,11 +690,7 @@ export default function WorkflowEditorPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep on</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDisableAutoApprove}
-            >
-              Turn off
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDisableAutoApprove}>Turn off</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

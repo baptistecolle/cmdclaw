@@ -180,66 +180,72 @@ export default function SubscriptionsPage() {
     }
   }, [notification]);
 
-  const handleConnect = useCallback(async (provider: ProviderID) => {
-    setConnectingProvider(provider);
+  const handleConnect = useCallback(
+    async (provider: ProviderID) => {
+      setConnectingProvider(provider);
 
-    if (provider === "kimi") {
-      const apiKey = window.prompt("Paste your KIMI_API_KEY");
-      if (!apiKey?.trim()) {
-        setConnectingProvider(null);
+      if (provider === "kimi") {
+        const apiKey = window.prompt("Paste your KIMI_API_KEY");
+        if (!apiKey?.trim()) {
+          setConnectingProvider(null);
+          return;
+        }
+
+        try {
+          await setProviderApiKey.mutateAsync({
+            provider: "kimi",
+            apiKey: apiKey.trim(),
+          });
+          setNotification({
+            type: "success",
+            message: "Kimi connected successfully!",
+          });
+        } catch (error) {
+          console.error("Failed to save Kimi API key:", error);
+          setNotification({
+            type: "error",
+            message: "Failed to connect Kimi. Please verify your API key and try again.",
+          });
+        } finally {
+          setConnectingProvider(null);
+        }
         return;
       }
 
       try {
-        await setProviderApiKey.mutateAsync({
-          provider: "kimi",
-          apiKey: apiKey.trim(),
-        });
-        setNotification({
-          type: "success",
-          message: "Kimi connected successfully!",
-        });
+        const result = await connectProvider.mutateAsync(provider);
+        // Open the OAuth URL in the same window
+        window.location.href = result.authUrl;
       } catch (error) {
-        console.error("Failed to save Kimi API key:", error);
+        console.error("Failed to start OAuth flow:", error);
         setNotification({
           type: "error",
-          message: "Failed to connect Kimi. Please verify your API key and try again.",
+          message: "Failed to start connection. Please try again.",
         });
-      } finally {
         setConnectingProvider(null);
       }
-      return;
-    }
+    },
+    [connectProvider, setProviderApiKey],
+  );
 
-    try {
-      const result = await connectProvider.mutateAsync(provider);
-      // Open the OAuth URL in the same window
-      window.location.href = result.authUrl;
-    } catch (error) {
-      console.error("Failed to start OAuth flow:", error);
-      setNotification({
-        type: "error",
-        message: "Failed to start connection. Please try again.",
-      });
-      setConnectingProvider(null);
-    }
-  }, [connectProvider, setProviderApiKey]);
-
-  const handleDisconnect = useCallback(async (provider: ProviderID) => {
-    try {
-      await disconnectProvider.mutateAsync(provider);
-      setNotification({
-        type: "success",
-        message: `${getProviderLabel(provider)} disconnected.`,
-      });
-    } catch (error) {
-      console.error("Failed to disconnect:", error);
-      setNotification({
-        type: "error",
-        message: "Failed to disconnect. Please try again.",
-      });
-    }
-  }, [disconnectProvider]);
+  const handleDisconnect = useCallback(
+    async (provider: ProviderID) => {
+      try {
+        await disconnectProvider.mutateAsync(provider);
+        setNotification({
+          type: "success",
+          message: `${getProviderLabel(provider)} disconnected.`,
+        });
+      } catch (error) {
+        console.error("Failed to disconnect:", error);
+        setNotification({
+          type: "error",
+          message: "Failed to disconnect. Please try again.",
+        });
+      }
+    },
+    [disconnectProvider],
+  );
 
   if (isLoading) {
     return (

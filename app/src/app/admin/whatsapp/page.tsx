@@ -94,10 +94,7 @@ export default function AdminWhatsAppPage() {
               Reconnect and monitor the WhatsApp bridge status.
             </p>
           </div>
-          <Button
-            onClick={handleReconnect}
-            disabled={waLoading}
-          >
+          <Button onClick={handleReconnect} disabled={waLoading}>
             {waLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

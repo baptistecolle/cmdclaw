@@ -173,14 +173,17 @@ export default function WorkflowsPage() {
     }
   }, [createWorkflow]);
 
-  const handleToggle = useCallback(async (id: string, status: "on" | "off") => {
-    try {
-      await updateWorkflow.mutateAsync({ id, status });
-      refetch();
-    } catch (error) {
-      console.error("Failed to toggle workflow:", error);
-    }
-  }, [refetch, updateWorkflow]);
+  const handleToggle = useCallback(
+    async (id: string, status: "on" | "off") => {
+      try {
+        await updateWorkflow.mutateAsync({ id, status });
+        refetch();
+      } catch (error) {
+        console.error("Failed to toggle workflow:", error);
+      }
+    },
+    [refetch, updateWorkflow],
+  );
 
   const handleDelete = useCallback(async () => {
     if (!workflowToDelete) {
@@ -203,22 +206,25 @@ export default function WorkflowsPage() {
     }
   }, [deleteWorkflow, refetch, workflowToDelete]);
 
-  const handleRun = useCallback(async (id: string) => {
-    try {
-      await triggerWorkflow.mutateAsync({ id, payload: {} });
-      setNotification({
-        type: "success",
-        message: "Workflow run started.",
-      });
-      refetch();
-    } catch (error) {
-      console.error("Failed to run workflow:", error);
-      setNotification({
-        type: "error",
-        message: "Failed to run workflow. Check rate limit or status.",
-      });
-    }
-  }, [refetch, triggerWorkflow]);
+  const handleRun = useCallback(
+    async (id: string) => {
+      try {
+        await triggerWorkflow.mutateAsync({ id, payload: {} });
+        setNotification({
+          type: "success",
+          message: "Workflow run started.",
+        });
+        refetch();
+      } catch (error) {
+        console.error("Failed to run workflow:", error);
+        setNotification({
+          type: "error",
+          message: "Failed to run workflow. Check rate limit or status.",
+        });
+      }
+    },
+    [refetch, triggerWorkflow],
+  );
 
   const handleSetWorkflowToDelete = useCallback((item: { id: string; name: string } | null) => {
     setWorkflowToDelete(item);

@@ -12,47 +12,50 @@ function ConnectDevicePageContent() {
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    if (!code.trim()) {
-      return;
-    }
-
-    setStatus("submitting");
-    setErrorMsg("");
-
-    try {
-      const formattedCode = code.trim().replace(/-/g, "").toUpperCase();
-
-      // Verify the code is valid
-      const verifyResponse = await authClient.device({
-        query: { user_code: formattedCode },
-      });
-
-      if (!verifyResponse.data) {
-        setStatus("error");
-        setErrorMsg("Invalid or expired code");
+      if (!code.trim()) {
         return;
       }
 
-      // Approve the device
-      const approveResponse = await authClient.device.approve({
-        userCode: formattedCode,
-      });
+      setStatus("submitting");
+      setErrorMsg("");
 
-      if (approveResponse.error) {
+      try {
+        const formattedCode = code.trim().replace(/-/g, "").toUpperCase();
+
+        // Verify the code is valid
+        const verifyResponse = await authClient.device({
+          query: { user_code: formattedCode },
+        });
+
+        if (!verifyResponse.data) {
+          setStatus("error");
+          setErrorMsg("Invalid or expired code");
+          return;
+        }
+
+        // Approve the device
+        const approveResponse = await authClient.device.approve({
+          userCode: formattedCode,
+        });
+
+        if (approveResponse.error) {
+          setStatus("error");
+          setErrorMsg("Failed to approve device");
+          return;
+        }
+
+        setStatus("success");
+      } catch {
         setStatus("error");
-        setErrorMsg("Failed to approve device");
-        return;
+        setErrorMsg("An error occurred. Please try again.");
       }
-
-      setStatus("success");
-    } catch {
-      setStatus("error");
-      setErrorMsg("An error occurred. Please try again.");
-    }
-  }, [code]);
+    },
+    [code],
+  );
 
   const handleCodeChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setCode(event.target.value.toUpperCase());

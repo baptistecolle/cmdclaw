@@ -167,55 +167,64 @@ function SkillEditorPageContent() {
     }
   }, [skill, selectedFileId, selectedDocumentId]);
 
-  const handleDisplayNameChange = useCallback((value: string) => {
-    setSkillDisplayName(value);
-    // Auto-generate slug if user hasn't manually edited it
-    if (!isEditingSlug) {
-      setSkillSlug(generateSlug(value));
-    }
-  }, [isEditingSlug]);
+  const handleDisplayNameChange = useCallback(
+    (value: string) => {
+      setSkillDisplayName(value);
+      // Auto-generate slug if user hasn't manually edited it
+      if (!isEditingSlug) {
+        setSkillSlug(generateSlug(value));
+      }
+    },
+    [isEditingSlug],
+  );
 
-  const handleSelectFile = useCallback((fileId: string) => {
-    if (selectedFileId) {
-      // Auto-save current file before switching
-      void handleSaveFile();
-    }
-    const file = skill?.files.find((f) => f.id === fileId);
-    if (file) {
-      setSelectedFileId(fileId);
-      setSelectedDocumentId(null);
+  const handleSelectFile = useCallback(
+    (fileId: string) => {
+      if (selectedFileId) {
+        // Auto-save current file before switching
+        void handleSaveFile();
+      }
+      const file = skill?.files.find((f) => f.id === fileId);
+      if (file) {
+        setSelectedFileId(fileId);
+        setSelectedDocumentId(null);
+        setDocumentUrl(null);
+        if (file.path === "SKILL.md") {
+          const parsed = parseSkillContent(file.content);
+          setSkillBody(parsed.body);
+        } else {
+          setEditedContent(file.content);
+        }
+      }
+    },
+    [handleSaveFile, selectedFileId, skill?.files],
+  );
+
+  const handleSelectDocument = useCallback(
+    async (docId: string) => {
+      if (selectedFileId) {
+        // Auto-save current file before switching
+        await handleSaveFile();
+      }
+      setSelectedFileId(null);
+      setSelectedDocumentId(docId);
       setDocumentUrl(null);
-      if (file.path === "SKILL.md") {
-        const parsed = parseSkillContent(file.content);
-        setSkillBody(parsed.body);
-      } else {
-        setEditedContent(file.content);
-      }
-    }
-  }, [handleSaveFile, selectedFileId, skill?.files]);
 
-  const handleSelectDocument = useCallback(async (docId: string) => {
-    if (selectedFileId) {
-      // Auto-save current file before switching
-      await handleSaveFile();
-    }
-    setSelectedFileId(null);
-    setSelectedDocumentId(docId);
-    setDocumentUrl(null);
-
-    const doc = skill?.documents?.find((d) => d.id === docId);
-    if (doc && isViewableDocument(doc.mimeType)) {
-      setIsLoadingDocumentUrl(true);
-      try {
-        const { url } = await getDocumentUrl.mutateAsync(docId);
-        setDocumentUrl(url);
-      } catch {
-        setNotification({ type: "error", message: "Failed to load document" });
-      } finally {
-        setIsLoadingDocumentUrl(false);
+      const doc = skill?.documents?.find((d) => d.id === docId);
+      if (doc && isViewableDocument(doc.mimeType)) {
+        setIsLoadingDocumentUrl(true);
+        try {
+          const { url } = await getDocumentUrl.mutateAsync(docId);
+          setDocumentUrl(url);
+        } catch {
+          setNotification({ type: "error", message: "Failed to load document" });
+        } finally {
+          setIsLoadingDocumentUrl(false);
+        }
       }
-    }
-  }, [getDocumentUrl, handleSaveFile, selectedFileId, skill?.documents]);
+    },
+    [getDocumentUrl, handleSaveFile, selectedFileId, skill?.documents],
+  );
 
   const handleSaveFile = useCallback(
     async (showNotificationIfNoChanges = false) => {
@@ -354,53 +363,59 @@ function SkillEditorPageContent() {
   }, [deleteSkill, router, skillDisplayName, skillId]);
 
   // Document handlers
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const buffer = await file.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString("base64");
-
-      await uploadDocument.mutateAsync({
-        skillId,
-        filename: file.name,
-        mimeType: file.type,
-        content: base64,
-      });
-
-      setNotification({ type: "success", message: "Document uploaded" });
-      refetch();
-    } catch (error) {
-      setNotification({
-        type: "error",
-        message: error instanceof Error ? error.message : "Upload failed",
-      });
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) {
+        return;
       }
-    }
-  }, [refetch, skillId, uploadDocument]);
 
-  const handleDownloadDocument = useCallback(async (docId: string) => {
-    try {
-      const { url, filename } = await getDocumentUrl.mutateAsync(docId);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      link.target = "_blank";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch {
-      setNotification({ type: "error", message: "Failed to get download URL" });
-    }
-  }, [getDocumentUrl]);
+      setIsUploading(true);
+      try {
+        const buffer = await file.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString("base64");
+
+        await uploadDocument.mutateAsync({
+          skillId,
+          filename: file.name,
+          mimeType: file.type,
+          content: base64,
+        });
+
+        setNotification({ type: "success", message: "Document uploaded" });
+        refetch();
+      } catch (error) {
+        setNotification({
+          type: "error",
+          message: error instanceof Error ? error.message : "Upload failed",
+        });
+      } finally {
+        setIsUploading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    },
+    [refetch, skillId, uploadDocument],
+  );
+
+  const handleDownloadDocument = useCallback(
+    async (docId: string) => {
+      try {
+        const { url, filename } = await getDocumentUrl.mutateAsync(docId);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch {
+        setNotification({ type: "error", message: "Failed to get download URL" });
+      }
+    },
+    [getDocumentUrl],
+  );
 
   const handleDeleteDocument = useCallback(async () => {
     if (!documentToDelete) {
@@ -511,7 +526,10 @@ function SkillEditorPageContent() {
 
   const handleSlugInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setSkillSlug(
-      event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"),
+      event.target.value
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-"),
     );
   }, []);
 
@@ -879,10 +897,7 @@ function SkillEditorPageContent() {
                 <FileText className="h-4 w-4" />
                 Text file
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleTriggerDocumentUpload}
-                disabled={isUploading}
-              >
+              <DropdownMenuItem onClick={handleTriggerDocumentUpload} disabled={isUploading}>
                 {isUploading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -1097,5 +1112,9 @@ Add your skill instructions here..."
 }
 
 export default function SkillEditorPage() {
-  return <Suspense fallback={skillEditorPageFallbackNode}><SkillEditorPageContent /></Suspense>;
+  return (
+    <Suspense fallback={skillEditorPageFallbackNode}>
+      <SkillEditorPageContent />
+    </Suspense>
+  );
 }

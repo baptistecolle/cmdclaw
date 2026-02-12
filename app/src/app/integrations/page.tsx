@@ -403,41 +403,50 @@ function IntegrationsPageContent() {
     }
   }, [notification]);
 
-  const handleConnect = useCallback(async (type: OAuthIntegrationType) => {
-    setConnectingType(type);
-    try {
-      const result = await getAuthUrl.mutateAsync({
-        type,
-        redirectUrl: window.location.href,
-      });
-      window.location.assign(result.authUrl);
-    } catch (error) {
-      console.error("Failed to get auth URL:", error);
-      setConnectingType(null);
-      setNotification({
-        type: "error",
-        message: "Failed to start connection. Please try again.",
-      });
-    }
-  }, [getAuthUrl]);
+  const handleConnect = useCallback(
+    async (type: OAuthIntegrationType) => {
+      setConnectingType(type);
+      try {
+        const result = await getAuthUrl.mutateAsync({
+          type,
+          redirectUrl: window.location.href,
+        });
+        window.location.assign(result.authUrl);
+      } catch (error) {
+        console.error("Failed to get auth URL:", error);
+        setConnectingType(null);
+        setNotification({
+          type: "error",
+          message: "Failed to start connection. Please try again.",
+        });
+      }
+    },
+    [getAuthUrl],
+  );
 
-  const handleToggle = useCallback(async (id: string, enabled: boolean) => {
-    try {
-      await toggleIntegration.mutateAsync({ id, enabled });
-      refetch();
-    } catch (error) {
-      console.error("Failed to toggle integration:", error);
-    }
-  }, [refetch, toggleIntegration]);
+  const handleToggle = useCallback(
+    async (id: string, enabled: boolean) => {
+      try {
+        await toggleIntegration.mutateAsync({ id, enabled });
+        refetch();
+      } catch (error) {
+        console.error("Failed to toggle integration:", error);
+      }
+    },
+    [refetch, toggleIntegration],
+  );
 
-  const handleDisconnect = useCallback(async (id: string) => {
-    try {
-      await disconnectIntegration.mutateAsync(id);
-      refetch();
-    } catch (error) {
-      console.error("Failed to disconnect integration:", error);
-    }
-  }, [disconnectIntegration, refetch]);
+  const handleDisconnect = useCallback(
+    async (id: string) => {
+      try {
+        await disconnectIntegration.mutateAsync(id);
+        refetch();
+      } catch (error) {
+        console.error("Failed to disconnect integration:", error);
+      }
+    },
+    [disconnectIntegration, refetch],
+  );
 
   const handleToggleCustom = useCallback(
     async (customIntegrationId: string, enabled: boolean) => {
@@ -573,22 +582,22 @@ function IntegrationsPageContent() {
     event.stopPropagation();
   }, []);
 
-  const handleToggleExpandedCard = useCallback(
+  const handleToggleExpandedCard = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const type = event.currentTarget.dataset.integrationType;
+    if (!type) {
+      return;
+    }
+    setExpandedCard((current) => (current === type ? null : type));
+  }, []);
+
+  const handleOpenWhatsAppIntegration = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
-      const type = event.currentTarget.dataset.integrationType;
-      if (!type) {
-        return;
-      }
-      setExpandedCard((current) => (current === type ? null : type));
+      window.location.href = "/integrations/whatsapp";
     },
     [],
   );
-
-  const handleOpenWhatsAppIntegration = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    window.location.href = "/integrations/whatsapp";
-  }, []);
 
   const handleShowAddCustom = useCallback(() => {
     setShowAddCustom(true);
@@ -611,20 +620,20 @@ function IntegrationsPageContent() {
     setCustomForm((prev) => ({ ...prev, name: event.target.value }));
   }, []);
 
-  const handleCustomDescriptionChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomForm((prev) => ({ ...prev, description: event.target.value }));
-  }, []);
+  const handleCustomDescriptionChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setCustomForm((prev) => ({ ...prev, description: event.target.value }));
+    },
+    [],
+  );
 
   const handleCustomBaseUrlChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setCustomForm((prev) => ({ ...prev, baseUrl: event.target.value }));
   }, []);
 
-  const handleCustomAuthTypeChange = useCallback(
-    (event: React.ChangeEvent<HTMLSelectElement>) => {
-      setCustomForm((prev) => ({ ...prev, authType: event.target.value as CustomAuthType }));
-    },
-    [],
-  );
+  const handleCustomAuthTypeChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    setCustomForm((prev) => ({ ...prev, authType: event.target.value as CustomAuthType }));
+  }, []);
 
   const handleCustomApiKeyChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setCustomForm((prev) => ({ ...prev, apiKey: event.target.value }));
@@ -838,7 +847,10 @@ function IntegrationsPageContent() {
                       </Button>
                     ) : integration ? (
                       <>
-                        <label className="flex cursor-pointer items-center gap-2" onClick={handleStopPropagation}>
+                        <label
+                          className="flex cursor-pointer items-center gap-2"
+                          onClick={handleStopPropagation}
+                        >
                           <IntegrationEnabledCheckbox
                             checked={integration.enabled}
                             integrationId={integration.id}
@@ -1076,10 +1088,7 @@ function IntegrationsPageContent() {
                 <>
                   <div>
                     <label className="text-sm font-medium">Client ID</label>
-                    <Input
-                      value={customForm.clientId}
-                      onChange={handleCustomClientIdChange}
-                    />
+                    <Input value={customForm.clientId} onChange={handleCustomClientIdChange} />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Client Secret</label>
@@ -1136,5 +1145,9 @@ function IntegrationsPageContent() {
 }
 
 export default function IntegrationsPage() {
-  return <Suspense fallback={integrationsPageFallbackNode}><IntegrationsPageContent /></Suspense>;
+  return (
+    <Suspense fallback={integrationsPageFallbackNode}>
+      <IntegrationsPageContent />
+    </Suspense>
+  );
 }

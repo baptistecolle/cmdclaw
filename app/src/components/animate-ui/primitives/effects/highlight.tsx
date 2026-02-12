@@ -41,9 +41,7 @@ type HighlightContextType<T extends string> = {
   forceUpdateBounds?: boolean;
 };
 
-const HighlightContext = React.createContext<
-  HighlightContextType<any> | undefined
->(undefined);
+const HighlightContext = React.createContext<HighlightContextType<any> | undefined>(undefined);
 
 function useHighlight<T extends string>(): HighlightContextType<T> {
   const context = React.useContext(HighlightContext);

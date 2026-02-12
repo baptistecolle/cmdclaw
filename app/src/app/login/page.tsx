@@ -109,26 +109,29 @@ function LoginContent() {
     };
   }, [router, callbackUrl]);
 
-  const requestMagicLink = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setStatus("sending");
-    setError(null);
+  const requestMagicLink = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setStatus("sending");
+      setError(null);
 
-    const { error: signInError } = await authClient.signIn.magicLink({
-      email,
-      callbackURL: callbackUrl,
-      newUserCallbackURL: callbackUrl,
-      errorCallbackURL: "/login?error=magic-link",
-    });
+      const { error: signInError } = await authClient.signIn.magicLink({
+        email,
+        callbackURL: callbackUrl,
+        newUserCallbackURL: callbackUrl,
+        errorCallbackURL: "/login?error=magic-link",
+      });
 
-    if (signInError) {
-      setStatus("error");
-      setError(signInError?.message || "Unable to send the magic link right now.");
-      return;
-    }
+      if (signInError) {
+        setStatus("error");
+        setError(signInError?.message || "Unable to send the magic link right now.");
+        return;
+      }
 
-    setStatus("sent");
-  }, [callbackUrl, email]);
+      setStatus("sent");
+    },
+    [callbackUrl, email],
+  );
 
   const handleGoogleSignIn = useCallback(async () => {
     await authClient.signIn.social({

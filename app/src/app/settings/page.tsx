@@ -63,24 +63,27 @@ export default function SettingsPage() {
     }
   }, [notification]);
 
-  const handleSave = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
+  const handleSave = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setSaving(true);
 
-    try {
-      const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
-      await authClient.updateUser({
-        name: fullName,
-        phoneNumber: phoneNumber || undefined,
-      });
-      setNotification({ type: "success", message: "Settings saved" });
-    } catch (error) {
-      console.error("Failed to update user:", error);
-      setNotification({ type: "error", message: "Failed to save settings" });
-    } finally {
-      setSaving(false);
-    }
-  }, [firstName, lastName, phoneNumber]);
+      try {
+        const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+        await authClient.updateUser({
+          name: fullName,
+          phoneNumber: phoneNumber || undefined,
+        });
+        setNotification({ type: "success", message: "Settings saved" });
+      } catch (error) {
+        console.error("Failed to update user:", error);
+        setNotification({ type: "error", message: "Failed to save settings" });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [firstName, lastName, phoneNumber],
+  );
 
   const handleGenerateLinkCode = useCallback(async () => {
     setLinkLoading(true);
@@ -140,19 +143,13 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const handleFirstNameChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setFirstName(event.target.value);
-    },
-    [],
-  );
+  const handleFirstNameChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setFirstName(event.target.value);
+  }, []);
 
-  const handleLastNameChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setLastName(event.target.value);
-    },
-    [],
-  );
+  const handleLastNameChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setLastName(event.target.value);
+  }, []);
 
   const handlePhoneNumberChange = useCallback((value?: string) => {
     setPhoneNumber(value ?? "");
