@@ -13,14 +13,14 @@
  *  5. Redirects browser back to Bap's settings page
  */
 import { createServer, type Server } from "node:http";
+import { env } from "@/env";
+import { storeProviderTokens } from "../orpc/routers/provider-auth";
 import { consumePending } from "./pending-oauth";
 import {
   SUBSCRIPTION_PROVIDERS,
   isOAuthProviderConfig,
   type SubscriptionProviderID,
 } from "./subscription-providers";
-import { storeProviderTokens } from "../orpc/routers/provider-auth";
-import { env } from "@/env";
 
 const OAUTH_PORT = 1455;
 
@@ -33,7 +33,9 @@ function getAppUrl() {
 let server: Server | null = null;
 
 export function ensureOAuthCallbackServer(): void {
-  if (server) {return;}
+  if (server) {
+    return;
+  }
 
   server = createServer(async (req, res) => {
     const url = new URL(req.url!, `http://localhost:${OAUTH_PORT}`);

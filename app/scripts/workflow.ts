@@ -1,10 +1,10 @@
-import readline from "node:readline";
-import { homedir } from "node:os";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import type { RouterClient } from "@orpc/server";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import type { RouterClient } from "@orpc/server";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import readline from "node:readline";
 import type { AppRouter } from "../src/server/orpc";
 
 type ChatConfig = {
@@ -18,7 +18,9 @@ const DEFAULT_SERVER_URL = "http://localhost:3000";
 
 function loadConfig(): ChatConfig | null {
   try {
-    if (!existsSync(CONFIG_PATH)) {return null;}
+    if (!existsSync(CONFIG_PATH)) {
+      return null;
+    }
     const raw = readFileSync(CONFIG_PATH, "utf-8");
     return JSON.parse(raw) as ChatConfig;
   } catch {
@@ -48,7 +50,9 @@ function ask(rl: readline.Interface, query: string): Promise<string> {
 // ── Helpers ──
 
 function formatDate(d: Date | string | null | undefined): string {
-  if (!d) {return "—";}
+  if (!d) {
+    return "—";
+  }
   const date = typeof d === "string" ? new Date(d) : d;
   return date.toLocaleString();
 }
@@ -92,17 +96,24 @@ async function getWorkflow(client: RouterClient<AppRouter>, id: string): Promise
   console.log(`  ID:      ${wf.id}`);
   console.log(`  Status:  ${statusBadge(wf.status)}`);
   console.log(`  Trigger: ${wf.triggerType}`);
-  if (wf.schedule) {console.log(`  Schedule: ${JSON.stringify(wf.schedule)}`);}
+  if (wf.schedule) {
+    console.log(`  Schedule: ${JSON.stringify(wf.schedule)}`);
+  }
   console.log(
     `  Integrations: ${wf.allowedIntegrations.length > 0 ? wf.allowedIntegrations.join(", ") : "none"}`,
   );
-  if (wf.allowedCustomIntegrations.length > 0)
-    {console.log(`  Custom Integrations: ${wf.allowedCustomIntegrations.join(", ")}`);}
+  if (wf.allowedCustomIntegrations.length > 0) {
+    console.log(`  Custom Integrations: ${wf.allowedCustomIntegrations.join(", ")}`);
+  }
   console.log(`  Created: ${formatDate(wf.createdAt)}`);
   console.log(`  Updated: ${formatDate(wf.updatedAt)}`);
   console.log(`\n  Prompt:\n    ${wf.prompt.replace(/\n/g, "\n    ")}`);
-  if (wf.promptDo) {console.log(`\n  Do:\n    ${wf.promptDo.replace(/\n/g, "\n    ")}`);}
-  if (wf.promptDont) {console.log(`\n  Don't:\n    ${wf.promptDont.replace(/\n/g, "\n    ")}`);}
+  if (wf.promptDo) {
+    console.log(`\n  Do:\n    ${wf.promptDo.replace(/\n/g, "\n    ")}`);
+  }
+  if (wf.promptDont) {
+    console.log(`\n  Don't:\n    ${wf.promptDont.replace(/\n/g, "\n    ")}`);
+  }
 
   if (wf.runs.length > 0) {
     console.log(`\n  Recent runs (${wf.runs.length}):`);
@@ -181,10 +192,15 @@ async function viewRun(client: RouterClient<AppRouter>, id: string): Promise<voi
   console.log(`  Status:   ${statusBadge(run.status)}`);
   console.log(`  Started:  ${formatDate(run.startedAt)}`);
   console.log(`  Finished: ${formatDate(run.finishedAt)}`);
-  if (run.generationId) {console.log(`  Generation: ${run.generationId}`);}
-  if (run.errorMessage) {console.log(`  Error: ${run.errorMessage}`);}
-  if (run.triggerPayload)
-    {console.log(`  Trigger payload: ${JSON.stringify(run.triggerPayload, null, 2)}`);}
+  if (run.generationId) {
+    console.log(`  Generation: ${run.generationId}`);
+  }
+  if (run.errorMessage) {
+    console.log(`  Error: ${run.errorMessage}`);
+  }
+  if (run.triggerPayload) {
+    console.log(`  Trigger payload: ${JSON.stringify(run.triggerPayload, null, 2)}`);
+  }
 
   if (run.events.length > 0) {
     console.log(`\n  Events (${run.events.length}):`);
@@ -243,7 +259,9 @@ async function interactiveLoop(client: RouterClient<AppRouter>): Promise<void> {
 
   while (true) {
     const line = (await ask(rl, "workflow> ")).trim();
-    if (!line) {continue;}
+    if (!line) {
+      continue;
+    }
 
     const [cmd, ...rest] = line.split(/\s+/);
     const arg1 = rest[0];
@@ -435,7 +453,9 @@ function parseArgs(argv: string[]): ParsedArgs {
 }
 
 function buildSchedule(parsed: ParsedArgs): WorkflowSchedule | undefined {
-  if (!parsed.scheduleType) {return undefined;}
+  if (!parsed.scheduleType) {
+    return undefined;
+  }
   switch (parsed.scheduleType) {
     case "interval":
       return {

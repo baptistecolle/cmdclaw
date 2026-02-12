@@ -1,10 +1,8 @@
+import { serializeSignedCookie } from "better-call";
+import { eq } from "drizzle-orm";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-
-import { serializeSignedCookie } from "better-call";
-import { eq } from "drizzle-orm";
-
 import { auth } from "../src/lib/auth";
 import { db, closePool } from "../src/server/db/client";
 import { session, user } from "../src/server/db/schema";
@@ -40,7 +38,9 @@ function getAuthSecret(): string {
 
 function getBaseUrl(): string {
   const fromEnv = process.env.PLAYWRIGHT_BASE_URL;
-  if (fromEnv) {return fromEnv;}
+  if (fromEnv) {
+    return fromEnv;
+  }
 
   const port = process.env.PLAYWRIGHT_PORT ?? "4173";
   return `http://127.0.0.1:${port}`;

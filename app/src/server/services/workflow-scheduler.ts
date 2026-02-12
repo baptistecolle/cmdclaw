@@ -32,7 +32,9 @@ function parseTime(time: string): { hour: number; minute: number } {
 }
 
 function parseWorkflowSchedule(schedule: unknown): WorkflowSchedule | null {
-  if (!schedule || typeof schedule !== "object") {return null;}
+  if (!schedule || typeof schedule !== "object") {
+    return null;
+  }
   const value = schedule as Record<string, unknown>;
 
   if (value.type === "interval" && typeof value.intervalMinutes === "number") {

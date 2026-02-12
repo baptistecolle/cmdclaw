@@ -3,8 +3,8 @@
  * Produces standalone executables using `bun build --compile`.
  */
 
-import { platform, arch } from "os";
 import { mkdirSync, existsSync } from "fs";
+import { platform, arch } from "os";
 
 const targets: { os: string; arch: string; bunTarget: string }[] = [
   { os: "darwin", arch: "arm64", bunTarget: "bun-darwin-arm64" },

@@ -4,10 +4,10 @@
  * This module provides token verification for WebSocket connections.
  */
 
+import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { device } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
 
 /**
  * Verify a Better Auth bearer token and resolve the device.

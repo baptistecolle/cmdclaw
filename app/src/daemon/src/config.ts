@@ -4,8 +4,8 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { join } from "path";
 import { homedir } from "os";
+import { join } from "path";
 
 export interface DaemonConfig {
   serverUrl: string;
@@ -24,7 +24,9 @@ function ensureBapDir(): void {
 
 export function loadConfig(): DaemonConfig | null {
   try {
-    if (!existsSync(CONFIG_PATH)) {return null;}
+    if (!existsSync(CONFIG_PATH)) {
+      return null;
+    }
     const raw = readFileSync(CONFIG_PATH, "utf-8");
     return JSON.parse(raw) as DaemonConfig;
   } catch {

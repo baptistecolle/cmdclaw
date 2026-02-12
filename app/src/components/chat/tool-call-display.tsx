@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronDown, ChevronRight, Wrench, Check, Loader2 } from "lucide-react";
+import { useState } from "react";
 
 type Props = {
   name: string;

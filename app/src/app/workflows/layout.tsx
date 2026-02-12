@@ -1,7 +1,7 @@
 "use client";
 
-import { AppShell } from "@/components/app-shell";
 import { usePathname } from "next/navigation";
+import { AppShell } from "@/components/app-shell";
 
 export default function WorkflowsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
 import { ChevronDown, ChevronUp, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useRef, useEffect, useState, useCallback } from "react";
+import type { IntegrationType } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import { ActivityItem, type ActivityItemData } from "./activity-item";
 import { IntegrationBadges } from "./integration-badges";
-import type { IntegrationType } from "@/lib/integration-icons";
 
 export type { ActivityItemData };
 
@@ -36,7 +36,9 @@ export function ActivityFeed({
   // Auto-scroll to bottom when new items arrive (unless user has scrolled up)
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || shouldAutoScroll) {return;}
+    if (!container || shouldAutoScroll) {
+      return;
+    }
 
     container.scrollTop = container.scrollHeight;
   }, [items, shouldAutoScroll]);
@@ -44,7 +46,9 @@ export function ActivityFeed({
   // Track user scroll
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
-    if (!container) {return;}
+    if (!container) {
+      return;
+    }
 
     const threshold = 20;
     const isAtBottom =

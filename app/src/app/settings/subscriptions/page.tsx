@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import Image from "next/image";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   useProviderAuthStatus,
@@ -12,7 +13,6 @@ import {
   useDisconnectProvider,
   useSetProviderApiKey,
 } from "@/orpc/hooks";
-import { useQueryClient } from "@tanstack/react-query";
 
 type ProviderID = "openai" | "google" | "kimi";
 type ProviderAuthType = "oauth" | "api_key";

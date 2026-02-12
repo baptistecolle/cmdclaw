@@ -37,16 +37,22 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
  */
 export function parseCliCommand(command: string): ParsedCommand | null {
   const trimmed = command.trim();
-  if (!trimmed) {return null;}
+  if (!trimmed) {
+    return null;
+  }
 
   // Tokenize the command, handling quoted strings
   const tokens = tokenize(trimmed);
-  if (tokens.length === 0) {return null;}
+  if (tokens.length === 0) {
+    return null;
+  }
 
   const cliName = tokens[0];
   const integration = CLI_TO_INTEGRATION[cliName];
 
-  if (!integration) {return null;}
+  if (!integration) {
+    return null;
+  }
 
   // Extract operation (second token for most CLIs)
   let operation = tokens[1] || "";

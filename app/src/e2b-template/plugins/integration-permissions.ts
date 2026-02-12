@@ -218,7 +218,9 @@ function loadCustomPermissions() {
 function parseBashCommand(command: string): { integration: string; operation: string } | null {
   const trimmed = command.trim();
   const parts = trimmed.split(/\s+/);
-  if (parts.length === 0) {return null;}
+  if (parts.length === 0) {
+    return null;
+  }
 
   const cliName = parts[0];
   let integration = CLI_TO_INTEGRATION[cliName];
@@ -228,10 +230,14 @@ function parseBashCommand(command: string): { integration: string; operation: st
     integration = cliName; // Use full name as integration identifier
   }
 
-  if (!integration) {return null;}
+  if (!integration) {
+    return null;
+  }
 
   const operation = parts[1];
-  if (!operation) {return null;}
+  if (!operation) {
+    return null;
+  }
 
   // HubSpot has nested pattern: hubspot <resource> <action>
   if (integration === "hubspot" && parts.length >= 3) {
@@ -258,8 +264,12 @@ function parseBashCommand(command: string): { integration: string; operation: st
 
 function commandUsesSlackBotRelay(command: string): boolean {
   const trimmed = command.trim();
-  if (!trimmed.startsWith("slack ")) {return false;}
-  if (!/\bsend\b/.test(trimmed)) {return false;}
+  if (!trimmed.startsWith("slack ")) {
+    return false;
+  }
+  if (!/\bsend\b/.test(trimmed)) {
+    return false;
+  }
   return /\s--as\s+bot(?:\s|$)/.test(trimmed);
 }
 
@@ -269,11 +279,15 @@ function commandUsesSlackBotRelay(command: string): boolean {
 function isWriteOperation(integration: string, operation: string): boolean {
   // Check built-in permissions
   const permissions = TOOL_PERMISSIONS[integration];
-  if (permissions) {return permissions.write.includes(operation);}
+  if (permissions) {
+    return permissions.write.includes(operation);
+  }
 
   // Check custom integration permissions
   const customPerms = customPermissions[integration];
-  if (customPerms) {return customPerms.write.includes(operation);}
+  if (customPerms) {
+    return customPerms.write.includes(operation);
+  }
 
   return false;
 }

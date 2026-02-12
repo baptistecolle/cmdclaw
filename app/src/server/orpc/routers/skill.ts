@@ -1,8 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import { z } from "zod";
-import { protectedProcedure } from "../middleware";
-import { skill, skillFile, skillDocument } from "@/server/db/schema";
 import { eq, and, count } from "drizzle-orm";
+import { z } from "zod";
+import { skill, skillFile, skillDocument } from "@/server/db/schema";
 import {
   uploadToS3,
   deleteFromS3,
@@ -11,6 +10,7 @@ import {
   ensureBucket,
 } from "@/server/storage/s3-client";
 import { validateFileUpload } from "@/server/storage/validation";
+import { protectedProcedure } from "../middleware";
 
 // Helper to generate a valid skill slug (lowercase, numbers, hyphens only)
 function toSkillSlug(name: string): string {

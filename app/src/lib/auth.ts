@@ -1,3 +1,4 @@
+import { autumn } from "autumn-js/better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -8,9 +9,7 @@ import {
   lastLoginMethod,
   magicLink,
 } from "better-auth/plugins";
-import { autumn } from "autumn-js/better-auth";
 import { Resend } from "resend";
-
 import { env } from "@/env";
 import { db } from "@/server/db/client";
 import { authSchema } from "@/server/db/schema";

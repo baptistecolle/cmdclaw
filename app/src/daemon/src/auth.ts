@@ -7,9 +7,9 @@
  * 4. Register the device via oRPC
  */
 
+import { hostname, platform, arch } from "os";
 import { saveConfig, type DaemonConfig } from "./config";
 import { logger } from "./logger";
-import { hostname, platform, arch } from "os";
 
 const CLIENT_ID = "bap-daemon";
 

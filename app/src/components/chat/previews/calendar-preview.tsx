@@ -113,7 +113,9 @@ function CalendarDeletePreview({ positionalArgs }: { positionalArgs: string[] })
 }
 
 function formatDateTime(datetime: string | undefined): string {
-  if (!datetime) {return "";}
+  if (!datetime) {
+    return "";
+  }
   try {
     const date = new Date(datetime);
     return date.toLocaleString();

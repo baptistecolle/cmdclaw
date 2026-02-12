@@ -1,7 +1,7 @@
-import { db } from "@/server/db/client";
-import { customIntegration } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { env } from "@/env";
+import { db } from "@/server/db/client";
+import { customIntegration } from "@/server/db/schema";
 
 /**
  * Submit a custom integration to the community repo via GitHub PR

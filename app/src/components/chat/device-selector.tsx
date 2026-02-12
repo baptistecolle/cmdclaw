@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Monitor, Cloud, Wifi } from "lucide-react";
-import { client } from "@/orpc/client";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,8 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { client } from "@/orpc/client";
 
 interface Device {
   id: string;
@@ -61,7 +61,9 @@ export function DeviceSelector({ selectedDeviceId, onSelect }: Props) {
   }, []);
 
   // Don't render if no devices are available
-  if (devices.length === 0) {return null;}
+  if (devices.length === 0) {
+    return null;
+  }
 
   const selected = selectedDeviceId ? devices.find((d) => d.id === selectedDeviceId) : null;
 

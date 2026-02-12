@@ -1,11 +1,11 @@
 import { eventIterator } from "@orpc/server";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { protectedProcedure } from "../middleware";
-import { generationManager } from "@/server/services/generation-manager";
 import { db } from "@/server/db/client";
 import { generation, conversation } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { generationManager } from "@/server/services/generation-manager";
 import { logServerEvent } from "@/server/utils/observability";
+import { protectedProcedure } from "../middleware";
 
 // Schema for generation events (same structure as GenerationEvent type)
 const generationEventSchema = z.discriminatedUnion("type", [
@@ -375,7 +375,9 @@ const getActiveGeneration = protectedProcedure
       | "complete"
       | "error"
       | null => {
-      if (!genStatus) {return null;}
+      if (!genStatus) {
+        return null;
+      }
       switch (genStatus) {
         case "running":
           return "generating";

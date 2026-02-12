@@ -65,7 +65,9 @@ export async function detectLocalProviders(): Promise<LocalProvider[]> {
         signal: AbortSignal.timeout(2000),
       });
 
-      if (!res.ok) {continue;}
+      if (!res.ok) {
+        continue;
+      }
 
       const data = await res.json();
       const dataObj = asRecord(data);
@@ -191,14 +193,18 @@ export async function proxyChatRequest(
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) {break;}
+      if (done) {
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (!line.startsWith("data: ")) {continue;}
+        if (!line.startsWith("data: ")) {
+          continue;
+        }
         const data = line.slice(6).trim();
         if (data === "[DONE]") {
           onDone();
@@ -208,7 +214,9 @@ export async function proxyChatRequest(
         try {
           const parsed = JSON.parse(data) as OpenAIStreamChunk;
           const choice = parsed.choices?.[0];
-          if (!choice) {continue;}
+          if (!choice) {
+            continue;
+          }
 
           const delta = choice.delta;
 

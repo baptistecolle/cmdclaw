@@ -202,14 +202,20 @@ export interface ParsedCommand {
 export function parseBashCommand(command: string): ParsedCommand | null {
   const trimmed = command.trim();
   const parts = trimmed.split(/\s+/);
-  if (parts.length === 0) {return null;}
+  if (parts.length === 0) {
+    return null;
+  }
 
   const cliName = parts[0];
   const integration = CLI_TO_INTEGRATION[cliName];
-  if (!integration) {return null;}
+  if (!integration) {
+    return null;
+  }
 
   const operation = parts[1];
-  if (!operation) {return null;}
+  if (!operation) {
+    return null;
+  }
 
   let finalOperation = operation;
 

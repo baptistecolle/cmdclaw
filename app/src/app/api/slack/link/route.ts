@@ -1,6 +1,6 @@
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { db } from "@/server/db/client";
 import { slackUserLink } from "@/server/db/schema";
 

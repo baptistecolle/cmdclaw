@@ -1,5 +1,5 @@
-import { SignJWT, importPKCS8 } from "jose";
 import * as fs from "fs";
+import { SignJWT, importPKCS8 } from "jose";
 
 // Apple Sign In Configuration
 const TEAM_ID = "H4LAG3Q6BJ";

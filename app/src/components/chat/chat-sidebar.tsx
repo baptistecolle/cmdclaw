@@ -1,8 +1,9 @@
 "use client";
 
+import { formatDistanceToNow } from "date-fns";
+import { Plus, Trash2, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, Trash2, MoreHorizontal } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,15 +17,14 @@ import {
   SidebarMenuAction,
   SidebarRail,
 } from "@/components/animate-ui/components/radix/sidebar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import { useConversationList, useDeleteConversation } from "@/orpc/hooks";
-import { formatDistanceToNow } from "date-fns";
 
 type ConversationListData = {
   conversations: Array<{

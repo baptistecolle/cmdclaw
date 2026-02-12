@@ -8,13 +8,12 @@
  * Automatically loads integration tokens from the database for the configured user.
  */
 
-import { Sandbox } from "e2b";
-import { createInterface } from "readline";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
 import { eq, and } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Sandbox } from "e2b";
+import { Pool } from "pg";
+import { createInterface } from "readline";
 import * as schema from "../src/server/db/schema";
-
 // Load env
 import "dotenv/config";
 
@@ -115,7 +114,9 @@ async function runInteractiveCommandWithPty(sandbox: Sandbox, cmd: string): Prom
             continue;
           }
 
-          for (let k = i; k <= end; k += 1) {out.push(merged[k]);}
+          for (let k = i; k <= end; k += 1) {
+            out.push(merged[k]);
+          }
           i = end + 1;
           continue;
         }
@@ -139,7 +140,9 @@ async function runInteractiveCommandWithPty(sandbox: Sandbox, cmd: string): Prom
             continue;
           }
 
-          for (let k = i; k <= j; k += 1) {out.push(merged[k]);}
+          for (let k = i; k <= j; k += 1) {
+            out.push(merged[k]);
+          }
           i = j + 1;
           continue;
         }
@@ -164,7 +167,9 @@ async function runInteractiveCommandWithPty(sandbox: Sandbox, cmd: string): Prom
 
     const rawInput = typeof chunk === "string" ? encoder.encode(chunk) : new Uint8Array(chunk);
     const filteredInput = filterProbeResponses(rawInput);
-    if (filteredInput.length === 0) {return;}
+    if (filteredInput.length === 0) {
+      return;
+    }
     sandbox.pty.sendInput(ptyHandle.pid, filteredInput).catch(() => {});
   };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { Placeholder } from "@tiptap/extension-placeholder";
 import {
   StarterKit,
   TiptapLink,
@@ -11,7 +12,6 @@ import {
   Command,
   renderItems,
 } from "novel";
-import { Placeholder } from "@tiptap/extension-placeholder";
 
 export const defaultExtensions = [
   StarterKit.configure({

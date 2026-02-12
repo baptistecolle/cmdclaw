@@ -1,7 +1,7 @@
-import { z } from "zod";
-import { protectedProcedure } from "../middleware";
-import { env } from "@/env";
 import { fal } from "@fal-ai/client";
+import { z } from "zod";
+import { env } from "@/env";
+import { protectedProcedure } from "../middleware";
 
 const transcribeInputSchema = z.object({
   audio: z.string(), // Base64 encoded audio data

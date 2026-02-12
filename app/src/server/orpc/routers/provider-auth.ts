@@ -1,16 +1,16 @@
-import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { protectedProcedure } from "../middleware";
-import { providerAuth } from "@/server/db/schema";
+import { z } from "zod";
+import { ensureOAuthCallbackServer } from "@/server/ai/oauth-callback-server";
+import { listOpencodeFreeModels } from "@/server/ai/opencode-models";
+import { storePending } from "@/server/ai/pending-oauth";
 import {
   SUBSCRIPTION_PROVIDERS,
   isOAuthProviderConfig,
   type SubscriptionProviderID,
 } from "@/server/ai/subscription-providers";
-import { listOpencodeFreeModels } from "@/server/ai/opencode-models";
+import { providerAuth } from "@/server/db/schema";
 import { encrypt } from "@/server/utils/encryption";
-import { storePending } from "@/server/ai/pending-oauth";
-import { ensureOAuthCallbackServer } from "@/server/ai/oauth-callback-server";
+import { protectedProcedure } from "../middleware";
 
 const oauthProviderSchema = z.enum(["openai", "google"]);
 const providerSchema = z.enum(["openai", "google", "kimi"]);

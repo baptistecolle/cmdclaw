@@ -1,13 +1,12 @@
 import { ORPCError } from "@orpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { protectedProcedure } from "../middleware";
+import { db } from "@/server/db/client";
 import {
   integrationSkill,
   integrationSkillFile,
   integrationSkillPreference,
 } from "@/server/db/schema";
-import { db } from "@/server/db/client";
 import {
   createCommunityIntegrationSkill,
   getOfficialIntegrationSkillIndex,
@@ -15,6 +14,7 @@ import {
   resolveIntegrationSkillForUser,
   validateIntegrationSkillFilePath,
 } from "@/server/services/integration-skill-service";
+import { protectedProcedure } from "../middleware";
 
 const createFromChat = protectedProcedure
   .input(
@@ -36,7 +36,9 @@ const createFromChat = protectedProcedure
   )
   .handler(async ({ input, context }) => {
     const slug = normalizeIntegrationSkillSlug(input.slug);
-    if (!slug) {throw new ORPCError("BAD_REQUEST", { message: "Invalid slug" });}
+    if (!slug) {
+      throw new ORPCError("BAD_REQUEST", { message: "Invalid slug" });
+    }
     try {
       const created = await createCommunityIntegrationSkill(context.user.id, {
         slug,

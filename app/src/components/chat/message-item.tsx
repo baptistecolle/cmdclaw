@@ -1,15 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Image from "next/image";
 import { Paperclip, Download, FileIcon, Eye } from "lucide-react";
-import { MessageBubble } from "./message-bubble";
-import { CollapsedTrace } from "./collapsed-trace";
-import { ToolApprovalCard } from "./tool-approval-card";
-import type { MessagePart, AttachmentData, SandboxFileData } from "./message-list";
+import Image from "next/image";
+import { useMemo, useState } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
-import type { ActivityItemData } from "./activity-item";
 import { useDownloadAttachment, useDownloadSandboxFile } from "@/orpc/hooks";
+import type { ActivityItemData } from "./activity-item";
+import type { MessagePart, AttachmentData, SandboxFileData } from "./message-list";
+import { CollapsedTrace } from "./collapsed-trace";
+import { MessageBubble } from "./message-bubble";
+import { ToolApprovalCard } from "./tool-approval-card";
 
 // Display segment for saved messages
 type DisplaySegment = {
@@ -61,7 +61,9 @@ export function MessageItem({
   const handleViewAttachment = async (attachment: AttachmentData) => {
     try {
       const url = await getAttachmentUrl(attachment);
-      if (!url) {return;}
+      if (!url) {
+        return;
+      }
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (err) {
       console.error("Failed to open attachment:", err);
@@ -71,7 +73,9 @@ export function MessageItem({
   const handleDownload = async (attachment: AttachmentData) => {
     try {
       const url = await getAttachmentUrl(attachment);
-      if (!url) {return;}
+      if (!url) {
+        return;
+      }
 
       const link = document.createElement("a");
       link.href = url;
@@ -107,7 +111,9 @@ export function MessageItem({
 
   // Parse message parts into segments based on approval parts
   const segments = useMemo((): DisplaySegment[] => {
-    if (!parts) {return [];}
+    if (!parts) {
+      return [];
+    }
 
     const result: DisplaySegment[] = [];
     let currentSegment: DisplaySegment = {
@@ -419,7 +425,11 @@ export function MessageItem({
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {return `${bytes} B`;}
-  if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useState } from "react";
-import QRCode from "qrcode";
-import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import Image from "next/image";
+import QRCode from "qrcode";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type WhatsAppStatus = {
@@ -27,7 +27,9 @@ export default function WhatsAppIntegrationPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!notification) {return;}
+    if (!notification) {
+      return;
+    }
     const timer = setTimeout(() => setNotification(null), 4000);
     return () => clearTimeout(timer);
   }, [notification]);
@@ -47,13 +49,17 @@ export default function WhatsAppIntegrationPage() {
           return;
         }
         const data = (await res.json()) as WhatsAppStatus;
-        if (!active) {return;}
+        if (!active) {
+          return;
+        }
         setForbidden(false);
         setWaStatus(data);
       } catch (err) {
         console.error("Failed to load WhatsApp status:", err);
       } finally {
-        if (active) {setWaLoading(false);}
+        if (active) {
+          setWaLoading(false);
+        }
       }
     };
 

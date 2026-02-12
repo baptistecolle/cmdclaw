@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageList, type Message, type MessagePart, type AttachmentData } from "./message-list";
-import { ChatInput } from "./chat-input";
-import { ModelSelector } from "./model-selector";
-import { DeviceSelector } from "./device-selector";
-import { VoiceIndicator, VoiceHint } from "./voice-indicator";
-import { ToolApprovalCard } from "./tool-approval-card";
-import { AuthRequestCard } from "./auth-request-card";
-import { ActivityFeed, type ActivityItemData } from "./activity-feed";
+import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react";
+import { usePostHog } from "posthog-js/react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
+import type { IntegrationType } from "@/lib/integration-icons";
+import { Switch } from "@/components/ui/switch";
+import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
+import {
+  createGenerationRuntime,
+  type GenerationRuntime,
+  type RuntimeActivitySegment,
+  type RuntimeSnapshot,
+} from "@/lib/generation-runtime";
+import { PREFERRED_ZEN_FREE_MODEL } from "@/lib/zen-models";
 import {
   useConversation,
   useTranscribe,
@@ -22,19 +27,14 @@ import {
   useUpdateAutoApprove,
   type SandboxFileData,
 } from "@/orpc/hooks";
-import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
-import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { useHotkeys } from "react-hotkeys-hook";
-import { usePostHog } from "posthog-js/react";
-import type { IntegrationType } from "@/lib/integration-icons";
-import {
-  createGenerationRuntime,
-  type GenerationRuntime,
-  type RuntimeActivitySegment,
-  type RuntimeSnapshot,
-} from "@/lib/generation-runtime";
-import { PREFERRED_ZEN_FREE_MODEL } from "@/lib/zen-models";
+import { ActivityFeed, type ActivityItemData } from "./activity-feed";
+import { AuthRequestCard } from "./auth-request-card";
+import { ChatInput } from "./chat-input";
+import { DeviceSelector } from "./device-selector";
+import { MessageList, type Message, type MessagePart, type AttachmentData } from "./message-list";
+import { ModelSelector } from "./model-selector";
+import { ToolApprovalCard } from "./tool-approval-card";
+import { VoiceIndicator, VoiceHint } from "./voice-indicator";
 
 type TraceStatus = RuntimeSnapshot["traceStatus"];
 type ActivitySegment = Omit<RuntimeActivitySegment, "items"> & {
@@ -651,7 +651,9 @@ export function ChatArea({ conversationId }: Props) {
   // Track if user is near bottom of scroll
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
-    if (!container) {return;}
+    if (!container) {
+      return;
+    }
 
     const threshold = 100; // pixels from bottom
     const distanceFromBottom =
@@ -667,7 +669,9 @@ export function ChatArea({ conversationId }: Props) {
   // Detect user-initiated scroll up via wheel/touch
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container) {return;}
+    if (!container) {
+      return;
+    }
 
     const handleUserScroll = () => {
       // Check after a tick so the scroll position has updated
@@ -935,7 +939,9 @@ export function ChatArea({ conversationId }: Props) {
   const handleApprove = useCallback(
     async (toolUseId: string) => {
       const genId = currentGenerationIdRef.current;
-      if (!genId) {return;}
+      if (!genId) {
+        return;
+      }
 
       try {
         await submitApproval({
@@ -957,7 +963,9 @@ export function ChatArea({ conversationId }: Props) {
   const handleDeny = useCallback(
     async (toolUseId: string) => {
       const genId = currentGenerationIdRef.current;
-      if (!genId) {return;}
+      if (!genId) {
+        return;
+      }
 
       try {
         await submitApproval({
@@ -981,7 +989,9 @@ export function ChatArea({ conversationId }: Props) {
     async (integration: string) => {
       const genId = currentGenerationIdRef.current;
       const convId = currentConversationIdRef.current;
-      if (!genId || !convId) {return;}
+      if (!genId || !convId) {
+        return;
+      }
 
       if (runtimeRef.current) {
         runtimeRef.current.setAuthConnecting();
@@ -1021,12 +1031,16 @@ export function ChatArea({ conversationId }: Props) {
   // Handle auth cancel
   const handleAuthCancel = useCallback(async () => {
     const genId = currentGenerationIdRef.current;
-    if (!genId) {return;}
+    if (!genId) {
+      return;
+    }
 
     // Find first pending integration
     const seg = segments.find((s) => s.auth?.status === "pending");
     const integration = seg?.auth?.integrations[0];
-    if (!integration) {return;}
+    if (!integration) {
+      return;
+    }
 
     try {
       await submitAuthResult({
@@ -1046,11 +1060,15 @@ export function ChatArea({ conversationId }: Props) {
 
   // Voice recording: stop and transcribe
   const stopRecordingAndTranscribe = useCallback(async () => {
-    if (!isRecordingRef.current) {return;}
+    if (!isRecordingRef.current) {
+      return;
+    }
     isRecordingRef.current = false;
 
     const audioBlob = await stopRecording();
-    if (!audioBlob || audioBlob.size === 0) {return;}
+    if (!audioBlob || audioBlob.size === 0) {
+      return;
+    }
 
     setIsProcessingVoice(true);
     try {
@@ -1096,7 +1114,9 @@ export function ChatArea({ conversationId }: Props) {
   // so we also stop when Meta/Ctrl is released
   useEffect(() => {
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (!isRecordingRef.current) {return;}
+      if (!isRecordingRef.current) {
+        return;
+      }
 
       const isHotkeyRelease =
         e.key === "k" ||

@@ -1,11 +1,11 @@
 "use client";
 
+import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useWorkflowRun } from "@/orpc/hooks";
 import { ChatArea } from "@/components/chat/chat-area";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { useWorkflowRun } from "@/orpc/hooks";
 
 export default function WorkflowRunPage() {
   const params = useParams<{ id: string }>();

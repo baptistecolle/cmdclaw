@@ -39,15 +39,21 @@ type GmailMessage = {
 
 async function listEmails() {
   const params = new URLSearchParams({ maxResults: values.limit || "10" });
-  if (values.query) {params.set("q", values.query);}
+  if (values.query) {
+    params.set("q", values.query);
+  }
 
   const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`, {
     headers,
   });
-  if (!listRes.ok) {throw new Error(await listRes.text());}
+  if (!listRes.ok) {
+    throw new Error(await listRes.text());
+  }
 
   const { messages = [] } = (await listRes.json()) as { messages?: Array<{ id: string }> };
-  if (messages.length === 0) {return console.log("No emails found.");}
+  if (messages.length === 0) {
+    return console.log("No emails found.");
+  }
 
   const details = await Promise.all(
     messages.slice(0, 20).map(async (msg: { id: string }) => {
@@ -80,19 +86,27 @@ async function getEmail(messageId: string) {
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
     { headers },
   );
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const email = (await res.json()) as GmailMessage;
   const getHeader = (name: string) =>
     email.payload?.headers?.find((h) => h.name === name)?.value || "";
 
   const extractBody = (part: GmailPart): string => {
-    if (part.body?.data) {return Buffer.from(part.body.data, "base64").toString("utf-8");}
+    if (part.body?.data) {
+      return Buffer.from(part.body.data, "base64").toString("utf-8");
+    }
     if (part.parts) {
-      for (const p of part.parts) {if (p.mimeType === "text/plain") return extractBody(p);}
+      for (const p of part.parts) {
+        if (p.mimeType === "text/plain") return extractBody(p);
+      }
       for (const p of part.parts) {
         const r = extractBody(p);
-        if (r) {return r;}
+        if (r) {
+          return r;
+        }
       }
     }
     return "";
@@ -119,7 +133,9 @@ async function countUnread() {
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=1`,
     { headers },
   );
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
   const { resultSizeEstimate = 0 } = (await res.json()) as { resultSizeEstimate?: number };
   console.log(`Unread emails: ${resultSizeEstimate}`);
 }
@@ -148,7 +164,9 @@ async function sendEmail() {
     body: JSON.stringify({ raw }),
   });
 
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
   const { id } = (await res.json()) as { id?: string };
   console.log(`Email sent. Message ID: ${id}`);
 }

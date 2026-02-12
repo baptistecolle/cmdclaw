@@ -1,14 +1,14 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Plus, Loader2, FileText, Pencil, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSkillList, useCreateSkill, useUpdateSkill, useDeleteSkill } from "@/orpc/hooks";
+import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, FileText, Pencil, Trash2, CheckCircle2, XCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconDisplay } from "@/components/ui/icon-picker";
+import { cn } from "@/lib/utils";
+import { useSkillList, useCreateSkill, useUpdateSkill, useDeleteSkill } from "@/orpc/hooks";
 
 function SkillsPageContent() {
   const router = useRouter();
@@ -51,7 +51,9 @@ function SkillsPageContent() {
   };
 
   const handleDelete = async (id: string, displayName: string) => {
-    if (!confirm(`Are you sure you want to delete "${displayName}"?`)) {return;}
+    if (!confirm(`Are you sure you want to delete "${displayName}"?`)) {
+      return;
+    }
 
     try {
       await deleteSkill.mutateAsync(id);

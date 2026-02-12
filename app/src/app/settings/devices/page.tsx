@@ -1,9 +1,9 @@
 "use client";
 
+import { Loader2, Monitor, Trash2, Wifi, WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { client } from "@/orpc/client";
-import { Loader2, Monitor, Trash2, Wifi, WifiOff } from "lucide-react";
 
 interface Device {
   id: string;

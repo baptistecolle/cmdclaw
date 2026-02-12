@@ -1,16 +1,16 @@
-import { Sandbox } from "e2b";
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk/v2/client";
+import { eq, and, asc } from "drizzle-orm";
+import { Sandbox } from "e2b";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
 import { skill, message, providerAuth } from "@/server/db/schema";
+import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integration-skill-service";
 import {
   COMPACTION_SUMMARY_PREFIX,
   SESSION_BOUNDARY_PREFIX,
 } from "@/server/services/session-constants";
-import { eq, and, asc } from "drizzle-orm";
 import { downloadFromS3 } from "@/server/storage/s3-client";
 import { decrypt } from "@/server/utils/encryption";
-import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integration-skill-service";
 import { logServerEvent, type ObservabilityContext } from "@/server/utils/observability";
 import type { SandboxBackend, ExecuteResult } from "./types";
 
@@ -66,7 +66,9 @@ type SessionInitLifecycleCallback = (
 ) => void;
 
 function formatErrorMessage(error: unknown): string {
-  if (error instanceof Error) {return `${error.name}: ${error.message}`;}
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
   return String(error);
 }
 
@@ -81,7 +83,9 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
     attempts += 1;
     try {
       const res = await fetch(`${url}/doc`, { method: "GET" });
-      if (res.ok) {return;}
+      if (res.ok) {
+        return;
+      }
       lastError = `status_${res.status}`;
     } catch {
       // Server not ready yet
@@ -266,8 +270,12 @@ export async function getOrCreateSandbox(
         background: true,
         onStderr: (data) => {
           const line = data.trim();
-          if (!line) {return;}
-          if (stderrBuffer.length >= 20) {stderrBuffer.shift();}
+          if (!line) {
+            return;
+          }
+          if (stderrBuffer.length >= 20) {
+            stderrBuffer.shift();
+          }
           stderrBuffer.push(line);
           logServerEvent(
             "warn",
@@ -547,7 +555,9 @@ async function replayConversationHistory(
     orderBy: asc(message.createdAt),
   });
 
-  if (messages.length === 0) {return;}
+  if (messages.length === 0) {
+    return;
+  }
 
   const boundaryIndex = messages
     .map((m, idx) =>
@@ -584,9 +594,15 @@ async function replayConversationHistory(
         if (m.contentParts) {
           const parts = m.contentParts
             .map((p) => {
-              if (p.type === "text") {return p.text;}
-              if (p.type === "tool_use") {return `[Used ${p.name}]`;}
-              if (p.type === "tool_result") {return `[Result received]`;}
+              if (p.type === "text") {
+                return p.text;
+              }
+              if (p.type === "tool_use") {
+                return `[Used ${p.name}]`;
+              }
+              if (p.type === "tool_result") {
+                return `[Result received]`;
+              }
               return "";
             })
             .filter(Boolean)

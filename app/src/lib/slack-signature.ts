@@ -7,11 +7,15 @@ import { env } from "@/env";
  */
 export function verifySlackSignature(body: string, timestamp: string, signature: string): boolean {
   const secret = env.SLACK_SIGNING_SECRET;
-  if (!secret) {return false;}
+  if (!secret) {
+    return false;
+  }
 
   // Reject requests older than 5 minutes (replay attack prevention)
   const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - Number(timestamp)) > 300) {return false;}
+  if (Math.abs(now - Number(timestamp)) > 300) {
+    return false;
+  }
 
   const sigBasestring = `v0:${timestamp}:${body}`;
   const mySignature =

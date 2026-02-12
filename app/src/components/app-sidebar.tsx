@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import {
   MessageSquare,
   Plug,
@@ -13,19 +11,9 @@ import {
   Flag,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { authClient } from "@/lib/auth-client";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -34,6 +22,18 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/animate-ui/components/radix/sheet";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { authClient } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 type SessionData = Awaited<ReturnType<typeof authClient.getSession>>["data"];
 
@@ -53,12 +53,16 @@ export function AppSidebar() {
     authClient
       .getSession()
       .then((res) => {
-        if (!mounted) {return;}
+        if (!mounted) {
+          return;
+        }
         const hasSession = res?.data?.session && res?.data?.user;
         setSession(hasSession ? res.data : null);
       })
       .catch(() => {
-        if (mounted) {setSession(null);}
+        if (mounted) {
+          setSession(null);
+        }
       });
     return () => {
       mounted = false;
@@ -151,7 +155,9 @@ export function AppSidebar() {
               value={reportMessage}
               onChange={(e) => {
                 setReportMessage(e.target.value);
-                if (reportError) {setReportError("");}
+                if (reportError) {
+                  setReportError("");
+                }
               }}
               placeholder="Describe the issue..."
               className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[160px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"

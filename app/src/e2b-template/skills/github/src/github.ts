@@ -17,7 +17,9 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: { ...headers, ...options?.headers },
   });
-  if (!res.ok) {throw new Error(`${res.status} ${await res.text()}`);}
+  if (!res.ok) {
+    throw new Error(`${res.status} ${await res.text()}`);
+  }
   return (await res.json()) as T;
 }
 
@@ -215,7 +217,9 @@ async function listIssues() {
     state: values.state || "open",
     per_page: values.limit || "20",
   });
-  if (values.labels) {params.set("labels", values.labels);}
+  if (values.labels) {
+    params.set("labels", values.labels);
+  }
 
   const issues = await api<
     Array<{

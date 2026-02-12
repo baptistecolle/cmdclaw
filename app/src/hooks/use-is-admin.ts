@@ -1,7 +1,7 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
+import { authClient } from "@/lib/auth-client";
 
 export function useIsAdmin() {
   const [isAdmin, setIsAdmin] = useState(false);

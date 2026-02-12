@@ -53,12 +53,24 @@ function getJidPhoneNumber(jid: string): string {
 }
 
 function extractMessageText(msg: proto.IMessage | null | undefined): string | null {
-  if (!msg) {return null;}
-  if (msg.conversation) {return msg.conversation;}
-  if (msg.extendedTextMessage?.text) {return msg.extendedTextMessage.text;}
-  if (msg.imageMessage?.caption) {return msg.imageMessage.caption;}
-  if (msg.videoMessage?.caption) {return msg.videoMessage.caption;}
-  if (msg.documentMessage?.caption) {return msg.documentMessage.caption;}
+  if (!msg) {
+    return null;
+  }
+  if (msg.conversation) {
+    return msg.conversation;
+  }
+  if (msg.extendedTextMessage?.text) {
+    return msg.extendedTextMessage.text;
+  }
+  if (msg.imageMessage?.caption) {
+    return msg.imageMessage.caption;
+  }
+  if (msg.videoMessage?.caption) {
+    return msg.videoMessage.caption;
+  }
+  if (msg.documentMessage?.caption) {
+    return msg.documentMessage.caption;
+  }
   return null;
 }
 
@@ -66,7 +78,9 @@ async function readAuthData(key: string): Promise<unknown | null> {
   const record = await db.query.whatsappAuthState.findFirst({
     where: eq(whatsappAuthState.id, key),
   });
-  if (!record) {return null;}
+  if (!record) {
+    return null;
+  }
   return JSON.parse(record.data, BufferJSON.reviver);
 }
 
@@ -140,7 +154,9 @@ async function getOrCreateConversation(waJid: string, userId: string): Promise<s
     where: eq(whatsappConversation.waJid, waJid),
   });
 
-  if (existing) {return existing.conversationId;}
+  if (existing) {
+    return existing.conversationId;
+  }
 
   const [newConv] = await db
     .insert(conversation)
@@ -174,7 +190,9 @@ async function collectGenerationResponse(generationId: string, userId: string): 
 
 async function handleLinkCode(waJid: string, messageText: string) {
   const code = normalizeLinkCode(messageText);
-  if (!code) {return false;}
+  if (!code) {
+    return false;
+  }
 
   const linkCode = await db.query.whatsappLinkCode.findFirst({
     where: and(
@@ -184,7 +202,9 @@ async function handleLinkCode(waJid: string, messageText: string) {
     ),
   });
 
-  if (!linkCode) {return false;}
+  if (!linkCode) {
+    return false;
+  }
 
   const linkedUser = await db.query.user.findFirst({
     where: eq(user.id, linkCode.userId),
@@ -238,7 +258,9 @@ async function handleIncomingMessage(waJid: string, text: string, displayName: s
 
   if (!link) {
     const linked = await handleLinkCode(waJid, text);
-    if (linked) {return;}
+    if (linked) {
+      return;
+    }
     await socket?.sendMessage(waJid, {
       text: "To link this WhatsApp number, open Bap Settings and generate a WhatsApp link code, then send it here.",
     });
@@ -269,7 +291,9 @@ async function handleIncomingMessage(waJid: string, text: string, displayName: s
 }
 
 export async function ensureWhatsAppSocket(): Promise<void> {
-  if (state.status === "connected" || isConnecting) {return;}
+  if (state.status === "connected" || isConnecting) {
+    return;
+  }
 
   isConnecting = true;
   state.status = "connecting";
@@ -312,14 +336,22 @@ export async function ensureWhatsAppSocket(): Promise<void> {
     socket.ev.on("messages.upsert", async (m) => {
       try {
         const message = m.messages?.[0];
-        if (!message || !message.message) {return;}
-        if (message.key?.fromMe) {return;}
+        if (!message || !message.message) {
+          return;
+        }
+        if (message.key?.fromMe) {
+          return;
+        }
 
         const waJid = message.key?.remoteJid;
-        if (!waJid || waJid === "status@broadcast" || waJid.endsWith("@g.us")) {return;}
+        if (!waJid || waJid === "status@broadcast" || waJid.endsWith("@g.us")) {
+          return;
+        }
 
         const text = extractMessageText(message.message);
-        if (!text) {return;}
+        if (!text) {
+          return;
+        }
 
         const displayName = message.pushName ?? "WhatsApp user";
         await handleIncomingMessage(waJid, text, displayName);

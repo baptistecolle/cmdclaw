@@ -1,6 +1,6 @@
+import type { Page } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { expect, test } from "../../../tests/e2e/live-fixtures";
-import type { Page } from "@playwright/test";
 
 const liveEnabled = process.env.E2E_LIVE === "1";
 const storageStatePath = process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
@@ -67,8 +67,12 @@ test.describe("@live chat", () => {
       .poll(
         async () => {
           const text = (await assistantBubble.textContent())?.trim() ?? "";
-          if (!text) {return "empty";}
-          if (text.startsWith("Error:")) {return "error";}
+          if (!text) {
+            return "empty";
+          }
+          if (text.startsWith("Error:")) {
+            return "error";
+          }
           return "ok";
         },
         {

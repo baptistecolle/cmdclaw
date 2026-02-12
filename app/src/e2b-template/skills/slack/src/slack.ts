@@ -1,6 +1,6 @@
-import { parseArgs } from "util";
-import { readFile, access } from "fs/promises";
 import { constants } from "fs";
+import { readFile, access } from "fs/promises";
+import { parseArgs } from "util";
 
 type JsonValue = ReturnType<typeof JSON.parse>;
 
@@ -30,7 +30,9 @@ async function api<T = JsonValue>(method: string, body?: Record<string, JsonValu
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = (await res.json()) as Record<string, JsonValue>;
-  if (!data.ok) {throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);}
+  if (!data.ok) {
+    throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
+  }
   return data as T;
 }
 
@@ -68,7 +70,9 @@ async function apiFormData<T = JsonValue>(method: string, formData: FormData): P
     body: formData,
   });
   const data = (await res.json()) as Record<string, JsonValue>;
-  if (!data.ok) {throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);}
+  if (!data.ok) {
+    throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
+  }
   return data as T;
 }
 
@@ -193,7 +197,9 @@ async function sendMessage() {
     channel: values.channel,
     text: values.text,
   };
-  if (values.thread) {body.thread_ts = values.thread;}
+  if (values.thread) {
+    body.thread_ts = values.thread;
+  }
 
   if (actor === "bot") {
     try {
@@ -205,7 +211,8 @@ async function sendMessage() {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("not_in_channel")) {
         throw new Error(
-          "Bot is not in that channel. Invite the Slack app to the channel, or send with --as user.", { cause: error },
+          "Bot is not in that channel. Invite the Slack app to the channel, or send with --as user.",
+          { cause: error },
         );
       }
       throw error;
@@ -222,11 +229,13 @@ async function sendMessage() {
       const identity = await getTokenIdentity().catch(() => null);
       if (identity?.isBotToken) {
         throw new Error(
-          `--as user was selected, but SLACK_ACCESS_TOKEN is a bot token (bot_id=${identity.botId ?? "unknown"}). Reconnect Slack integration to refresh a user token, or use --as bot.`, { cause: error },
+          `--as user was selected, but SLACK_ACCESS_TOKEN is a bot token (bot_id=${identity.botId ?? "unknown"}). Reconnect Slack integration to refresh a user token, or use --as bot.`,
+          { cause: error },
         );
       }
       throw new Error(
-        "Slack returned not_in_channel for your user token. Join the target channel with that Slack user and retry.", { cause: error },
+        "Slack returned not_in_channel for your user token. Join the target channel with that Slack user and retry.",
+        { cause: error },
       );
     }
     throw error;

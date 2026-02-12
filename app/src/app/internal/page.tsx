@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { Eye, Wrench } from "lucide-react";
+import Link from "next/link";
 
 const internalPages = [
   {

@@ -1,20 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import { Loader2, Play, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import {
-  useWorkflow,
-  useUpdateWorkflow,
-  useWorkflowRuns,
-  useTriggerWorkflow,
-  type WorkflowSchedule,
-} from "@/orpc/hooks";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +16,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -32,15 +26,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
+import { Switch } from "@/components/ui/switch";
 import {
   INTEGRATION_DISPLAY_NAMES,
   INTEGRATION_LOGOS,
   type IntegrationType,
 } from "@/lib/integration-icons";
-import { Loader2, Play, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { cn } from "@/lib/utils";
+import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
+import {
+  useWorkflow,
+  useUpdateWorkflow,
+  useWorkflowRuns,
+  useTriggerWorkflow,
+  type WorkflowSchedule,
+} from "@/orpc/hooks";
 
 const TRIGGERS = [
   { value: "schedule", label: "Run on a schedule" },
@@ -49,7 +49,9 @@ const TRIGGERS = [
 ];
 
 function formatDate(value?: Date | string | null) {
-  if (!value) {return "—";}
+  if (!value) {
+    return "—";
+  }
   const date = typeof value === "string" ? new Date(value) : value;
   return date.toLocaleString();
 }
@@ -91,7 +93,9 @@ export default function WorkflowEditorPage() {
   );
 
   useEffect(() => {
-    if (!workflow) {return;}
+    if (!workflow) {
+      return;
+    }
     const availableIntegrationTypes = Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[];
     const workflowAllowedIntegrations = (workflow.allowedIntegrations ?? []) as IntegrationType[];
     const hasRestriction =
@@ -129,7 +133,9 @@ export default function WorkflowEditorPage() {
   }, [workflow]);
 
   useEffect(() => {
-    if (!notification) {return;}
+    if (!notification) {
+      return;
+    }
     const timer = setTimeout(() => setNotification(null), 4000);
     return () => clearTimeout(timer);
   }, [notification]);
@@ -155,7 +161,9 @@ export default function WorkflowEditorPage() {
   };
 
   const buildSchedule = (): WorkflowSchedule | null => {
-    if (triggerType !== "schedule") {return null;}
+    if (triggerType !== "schedule") {
+      return null;
+    }
 
     switch (scheduleType) {
       case "interval":
@@ -189,7 +197,9 @@ export default function WorkflowEditorPage() {
   };
 
   const handleSave = async () => {
-    if (!workflowId) {return;}
+    if (!workflowId) {
+      return;
+    }
     setSaving(true);
     try {
       await updateWorkflow.mutateAsync({
@@ -212,7 +222,9 @@ export default function WorkflowEditorPage() {
   };
 
   const handleRun = async () => {
-    if (!workflowId) {return;}
+    if (!workflowId) {
+      return;
+    }
     try {
       await triggerWorkflow.mutateAsync({ id: workflowId, payload: {} });
       setNotification({ type: "success", message: "Workflow run started." });

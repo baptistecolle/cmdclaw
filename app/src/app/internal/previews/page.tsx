@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
+import Link from "next/link";
 import { INTEGRATION_PREVIEWS } from "@/components/chat/previews";
 import { PREVIEW_MOCK_DATA } from "@/components/chat/previews/mock-data";
 
@@ -15,7 +15,9 @@ function PreviewCard({ children, label }: { children: React.ReactNode; label: st
 }
 
 function MissingMockDataAlert({ integrations }: { integrations: string[] }) {
-  if (integrations.length === 0) {return null;}
+  if (integrations.length === 0) {
+    return null;
+  }
 
   return (
     <div className="mb-8 rounded-lg border border-amber-500/50 bg-amber-500/10 p-4">

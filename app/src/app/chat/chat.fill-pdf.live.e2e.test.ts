@@ -1,8 +1,8 @@
+import type { Download, Page, Response } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "../../../tests/e2e/live-fixtures";
-import type { Download, Page, Response } from "@playwright/test";
 
 const liveEnabled = process.env.E2E_LIVE === "1";
 const storageStatePath = process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
@@ -48,7 +48,9 @@ function findFirstHttpUrl(value: unknown): string | null {
   if (Array.isArray(value)) {
     for (const item of value) {
       const found = findFirstHttpUrl(item);
-      if (found) {return found;}
+      if (found) {
+        return found;
+      }
     }
     return null;
   }
@@ -56,7 +58,9 @@ function findFirstHttpUrl(value: unknown): string | null {
   if (value && typeof value === "object") {
     for (const objectValue of Object.values(value)) {
       const found = findFirstHttpUrl(objectValue);
-      if (found) {return found;}
+      if (found) {
+        return found;
+      }
     }
   }
 
@@ -153,14 +157,18 @@ test.describe("@live chat fill-pdf", () => {
       .poll(
         async () => {
           const currentCount = await assistantMessages.count();
-          if (currentCount > initialAssistantCount) {return "assistant";}
+          if (currentCount > initialAssistantCount) {
+            return "assistant";
+          }
 
           const waitingForApproval = await page
             .getByText("Waiting for approval")
             .first()
             .isVisible()
             .catch(() => false);
-          if (waitingForApproval) {return "approval_blocked";}
+          if (waitingForApproval) {
+            return "approval_blocked";
+          }
 
           return "waiting";
         },
@@ -183,8 +191,12 @@ test.describe("@live chat fill-pdf", () => {
       .poll(
         async () => {
           const text = (await assistantBubble.textContent())?.trim() ?? "";
-          if (!text) {return "empty";}
-          if (text.startsWith("Error:")) {return "error";}
+          if (!text) {
+            return "empty";
+          }
+          if (text.startsWith("Error:")) {
+            return "error";
+          }
           return "ok";
         },
         {

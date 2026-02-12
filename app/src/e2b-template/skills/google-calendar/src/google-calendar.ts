@@ -53,11 +53,15 @@ async function listEvents() {
 
   const now = new Date();
   params.set("timeMin", values.timeMin || now.toISOString());
-  if (values.timeMax) {params.set("timeMax", values.timeMax);}
+  if (values.timeMax) {
+    params.set("timeMax", values.timeMax);
+  }
 
   const calendarId = encodeURIComponent(values.calendar || "primary");
   const res = await fetch(`${BASE_URL}/calendars/${calendarId}/events?${params}`, { headers });
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const { items = [] } = (await res.json()) as { items?: CalendarEvent[] };
   const events = items.map((event) => ({
@@ -75,7 +79,9 @@ async function listEvents() {
 async function getEvent(eventId: string) {
   const calendarId = encodeURIComponent(values.calendar || "primary");
   const res = await fetch(`${BASE_URL}/calendars/${calendarId}/events/${eventId}`, { headers });
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const event = (await res.json()) as CalendarEvent;
   console.log(
@@ -148,7 +154,9 @@ async function createEvent() {
     body: JSON.stringify(event),
   });
 
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
   const created = (await res.json()) as { htmlLink?: string };
   console.log(`Event created: ${created.htmlLink}`);
 }
@@ -158,13 +166,21 @@ async function updateEvent(eventId: string) {
 
   // First get the existing event
   const getRes = await fetch(`${BASE_URL}/calendars/${calendarId}/events/${eventId}`, { headers });
-  if (!getRes.ok) {throw new Error(await getRes.text());}
+  if (!getRes.ok) {
+    throw new Error(await getRes.text());
+  }
   const existing = (await getRes.json()) as CalendarEvent;
 
   // Update fields
-  if (values.summary) {existing.summary = values.summary;}
-  if (values.description) {existing.description = values.description;}
-  if (values.location) {existing.location = values.location;}
+  if (values.summary) {
+    existing.summary = values.summary;
+  }
+  if (values.description) {
+    existing.description = values.description;
+  }
+  if (values.location) {
+    existing.location = values.location;
+  }
 
   if (values.start) {
     const isAllDay = !values.start.includes("T");
@@ -196,7 +212,9 @@ async function updateEvent(eventId: string) {
     body: JSON.stringify(existing),
   });
 
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
   console.log(`Event updated: ${eventId}`);
 }
 
@@ -207,13 +225,17 @@ async function deleteEvent(eventId: string) {
     headers,
   });
 
-  if (!res.ok && res.status !== 204) {throw new Error(await res.text());}
+  if (!res.ok && res.status !== 204) {
+    throw new Error(await res.text());
+  }
   console.log(`Event deleted: ${eventId}`);
 }
 
 async function listCalendars() {
   const res = await fetch(`${BASE_URL}/users/me/calendarList`, { headers });
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const { items = [] } = (await res.json()) as {
     items?: Array<{
@@ -250,7 +272,9 @@ async function todayEvents() {
 
   const calendarId = encodeURIComponent(values.calendar || "primary");
   const res = await fetch(`${BASE_URL}/calendars/${calendarId}/events?${params}`, { headers });
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const { items = [] } = (await res.json()) as { items?: CalendarEvent[] };
   const events = items.map((event) => ({

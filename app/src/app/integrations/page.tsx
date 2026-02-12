@@ -1,9 +1,25 @@
 "use client";
 
-import { Suspense, useRef } from "react";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import {
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Search,
+  ChevronDown,
+  Plus,
+  Trash2,
+  Puzzle,
+} from "lucide-react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useRef } from "react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { getIntegrationActions } from "@/lib/integration-icons";
+import { cn } from "@/lib/utils";
 import {
   useIntegrationList,
   useGetAuthUrl,
@@ -17,22 +33,6 @@ import {
   useDeleteCustomIntegration,
   useGetCustomAuthUrl,
 } from "@/orpc/hooks";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  ExternalLink,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  Search,
-  ChevronDown,
-  Plus,
-  Trash2,
-  Puzzle,
-} from "lucide-react";
-import { getIntegrationActions } from "@/lib/integration-icons";
-import { cn } from "@/lib/utils";
-import { Checkbox } from "@/components/ui/checkbox";
 
 type FilterTab = "all" | "connected" | "not_connected";
 
@@ -334,10 +334,16 @@ function IntegrationsPageContent() {
       config.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       config.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-    if (!matchesSearch) {return false;}
+    if (!matchesSearch) {
+      return false;
+    }
 
-    if (activeTab === "connected") {return !!integration || isWhatsAppConnected;}
-    if (activeTab === "not_connected") {return !integration && !isWhatsAppConnected;}
+    if (activeTab === "connected") {
+      return !!integration || isWhatsAppConnected;
+    }
+    if (activeTab === "not_connected") {
+      return !integration && !isWhatsAppConnected;
+    }
     return true;
   });
 

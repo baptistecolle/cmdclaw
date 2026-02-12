@@ -9,11 +9,11 @@
  */
 
 import type { ServerWebSocket } from "bun";
+import { eq } from "drizzle-orm";
+import type { DaemonMessage, DaemonResponse } from "@/server/sandbox/types";
 import { db } from "@/server/db/client";
 import { device } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
 import { verifyDeviceToken } from "@/server/services/device-auth";
-import type { DaemonMessage, DaemonResponse } from "@/server/sandbox/types";
 
 interface DeviceConnection {
   ws: ServerWebSocket<WebSocketData>;
@@ -51,7 +51,9 @@ const REQUEST_TIMEOUT_MS = 120_000; // 2 minutes for command execution
  */
 export function sendToDevice(deviceId: string, message: DaemonMessage): boolean {
   const conn = connections.get(deviceId);
-  if (!conn) {return false;}
+  if (!conn) {
+    return false;
+  }
 
   try {
     conn.ws.send(JSON.stringify(message));
@@ -148,7 +150,9 @@ async function handleAuthentication(
 
 async function handleDisconnect(ws: ServerWebSocket<WebSocketData>): Promise<void> {
   const { deviceId } = ws.data;
-  if (!deviceId) {return;}
+  if (!deviceId) {
+    return;
+  }
 
   connections.delete(deviceId);
 
@@ -177,7 +181,9 @@ function handleMessage(ws: ServerWebSocket<WebSocketData>, raw: string): void {
   // Handle pong from daemon
   if (msg.type === "pong") {
     const conn = connections.get(ws.data.deviceId);
-    if (conn) {conn.lastPing = Date.now();}
+    if (conn) {
+      conn.lastPing = Date.now();
+    }
     return;
   }
 
@@ -265,7 +271,9 @@ export function startWebSocketServer(port: number = 4097): void {
         const { token, deviceId } = ws.data;
         if (token && deviceId) {
           const ok = await handleAuthentication(ws, token, deviceId);
-          if (!ok) {return;}
+          if (!ok) {
+            return;
+          }
         } else {
           ws.close(4001, "Missing token or deviceId");
         }

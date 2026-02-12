@@ -79,7 +79,9 @@ export function DualPanelWorkspace({
 
   const onPointerMove = useCallback(
     (event: globalThis.PointerEvent) => {
-      if (!dragStateRef.current.active || !containerRef.current) {return;}
+      if (!dragStateRef.current.active || !containerRef.current) {
+        return;
+      }
       const rect = containerRef.current.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const leftPct = (x / rect.width) * 100;

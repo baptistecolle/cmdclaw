@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { AppShell } from "@/components/app-shell";
-import { authClient } from "@/lib/auth-client";
 import { CheckCircle2, Loader2, Monitor, XCircle } from "lucide-react";
+import { Suspense, useState } from "react";
+import { AppShell } from "@/components/app-shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { authClient } from "@/lib/auth-client";
 
 function ConnectDevicePageContent() {
   const [code, setCode] = useState("");
@@ -15,7 +15,9 @@ function ConnectDevicePageContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!code.trim()) {return;}
+    if (!code.trim()) {
+      return;
+    }
 
     setStatus("submitting");
     setErrorMsg("");

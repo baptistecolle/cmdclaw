@@ -96,10 +96,18 @@ async function createContact() {
     process.exit(1);
   }
   const properties: Record<string, string> = { email: values.email };
-  if (values.firstname) {properties.firstname = values.firstname;}
-  if (values.lastname) {properties.lastname = values.lastname;}
-  if (values.company) {properties.company = values.company;}
-  if (values.phone) {properties.phone = values.phone;}
+  if (values.firstname) {
+    properties.firstname = values.firstname;
+  }
+  if (values.lastname) {
+    properties.lastname = values.lastname;
+  }
+  if (values.company) {
+    properties.company = values.company;
+  }
+  if (values.phone) {
+    properties.phone = values.phone;
+  }
 
   const data = await api("/crm/v3/objects/contacts", {
     method: "POST",
@@ -184,8 +192,12 @@ async function createCompany() {
     process.exit(1);
   }
   const properties: Record<string, string> = { name: values.name };
-  if (values.domain) {properties.domain = values.domain;}
-  if (values.industry) {properties.industry = values.industry;}
+  if (values.domain) {
+    properties.domain = values.domain;
+  }
+  if (values.industry) {
+    properties.industry = values.industry;
+  }
 
   const data = await api("/crm/v3/objects/companies", {
     method: "POST",
@@ -252,7 +264,9 @@ async function createDeal() {
     pipeline: values.pipeline,
     dealstage: values.stage,
   };
-  if (values.amount) {properties.amount = values.amount;}
+  if (values.amount) {
+    properties.amount = values.amount;
+  }
 
   const data = await api("/crm/v3/objects/deals", {
     method: "POST",
@@ -319,7 +333,9 @@ async function createTicket() {
     hs_pipeline: values.pipeline,
     hs_pipeline_stage: values.stage,
   };
-  if (values.body) {properties.content = values.body;}
+  if (values.body) {
+    properties.content = values.body;
+  }
 
   const data = await api("/crm/v3/objects/tickets", {
     method: "POST",
@@ -390,8 +406,12 @@ async function createTask() {
     hs_task_status: "NOT_STARTED",
     hs_task_type: "TODO",
   };
-  if (values.body) {properties.hs_task_body = values.body;}
-  if (values.due) {properties.hs_timestamp = new Date(values.due).getTime().toString();}
+  if (values.body) {
+    properties.hs_task_body = values.body;
+  }
+  if (values.due) {
+    properties.hs_timestamp = new Date(values.due).getTime().toString();
+  }
 
   const data = await api("/crm/v3/objects/tasks", {
     method: "POST",

@@ -124,7 +124,9 @@ export class OpenAIBackend implements LLMBackend {
         }
       }
     } catch (err: unknown) {
-      if (params.signal?.aborted) {return;}
+      if (params.signal?.aborted) {
+        return;
+      }
       const message = err instanceof Error ? err.message : "Unknown error";
       yield { type: "error", error: message };
     }

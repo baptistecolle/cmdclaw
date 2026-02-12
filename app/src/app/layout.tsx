@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { AutumnProvider } from "autumn-js/react";
-
-import { ORPCProvider } from "@/orpc/provider";
+import { Geist, Geist_Mono } from "next/font/google";
 import { PostHogClientProvider } from "@/components/posthog-provider";
 import { env } from "@/env";
+import { ORPCProvider } from "@/orpc/provider";
 import "./globals.css";
 
 const geistSans = Geist({

@@ -1,6 +1,6 @@
 import type { Session, User } from "better-auth";
-import { db } from "@/server/db/client";
 import { auth } from "@/lib/auth";
+import { db } from "@/server/db/client";
 
 export type ORPCContext = {
   headers: Headers;

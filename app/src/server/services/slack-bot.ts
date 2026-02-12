@@ -1,7 +1,7 @@
-import { db } from "@/server/db/client";
-import { slackUserLink, slackConversation, conversation } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { env } from "@/env";
+import { db } from "@/server/db/client";
+import { slackUserLink, slackConversation, conversation } from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
 
 // ─── Event deduplication (in-memory, 5-min TTL) ─────────────
@@ -13,9 +13,13 @@ function isDuplicate(eventId: string): boolean {
   const now = Date.now();
   // Cleanup old entries
   for (const [id, ts] of processedEvents) {
-    if (now - ts > DEDUP_TTL_MS) {processedEvents.delete(id);}
+    if (now - ts > DEDUP_TTL_MS) {
+      processedEvents.delete(id);
+    }
   }
-  if (processedEvents.has(eventId)) {return true;}
+  if (processedEvents.has(eventId)) {
+    return true;
+  }
   processedEvents.set(eventId, now);
   return false;
 }
@@ -133,13 +137,19 @@ export async function handleSlackEvent(payload: SlackEvent) {
   const { event, event_id, team_id } = payload;
 
   // Skip bot messages
-  if (event.bot_id) {return;}
+  if (event.bot_id) {
+    return;
+  }
 
   // Deduplicate
-  if (isDuplicate(event_id)) {return;}
+  if (isDuplicate(event_id)) {
+    return;
+  }
 
   // Only handle app_mention and message (DM)
-  if (event.type !== "app_mention" && event.type !== "message") {return;}
+  if (event.type !== "app_mention" && event.type !== "message") {
+    return;
+  }
 
   const slackUserId = event.user;
   const channel = event.channel;
@@ -150,7 +160,9 @@ export async function handleSlackEvent(payload: SlackEvent) {
     .replace(/<@[A-Z0-9]+>/g, "")
     .trim();
 
-  if (!messageText) {return;}
+  if (!messageText) {
+    return;
+  }
 
   try {
     // Look up linked Bap user
@@ -248,7 +260,9 @@ async function getOrCreateConversation(
     ),
   });
 
-  if (existing) {return existing.conversationId;}
+  if (existing) {
+    return existing.conversationId;
+  }
 
   // Create a new Bap conversation
   const [newConv] = await db
@@ -291,7 +305,9 @@ async function collectGenerationResponse(generationId: string, userId: string): 
 // ─── Message splitting ──────────────────────────────────────
 
 function splitMessage(text: string, maxLen: number): string[] {
-  if (text.length <= maxLen) {return [text];}
+  if (text.length <= maxLen) {
+    return [text];
+  }
 
   const chunks: string[] = [];
   let remaining = text;

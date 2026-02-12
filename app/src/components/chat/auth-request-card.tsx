@@ -1,11 +1,11 @@
 "use client";
 
+import { ChevronDown, ChevronRight, Check, X, Loader2, Link2 } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Check, X, Loader2, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { getIntegrationDisplayName, getIntegrationLogo } from "@/lib/integration-icons";
+import { cn } from "@/lib/utils";
 
 export interface AuthRequestCardProps {
   integrations: string[];

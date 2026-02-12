@@ -1,7 +1,7 @@
+import { eq, and } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db/client";
 import { integration } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
 import { getUnipileAccount } from "@/server/integrations/unipile";
 
 interface AccountStatusPayload {

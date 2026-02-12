@@ -1,7 +1,5 @@
 "use client";
 
-import * as React from "react";
-import { Tooltip as TooltipPrimitive } from "radix-ui";
 import {
   AnimatePresence,
   motion,
@@ -11,9 +9,10 @@ import {
   type HTMLMotionProps,
   type MotionValue,
 } from "motion/react";
-
-import { getStrictContext } from "@/lib/get-strict-context";
+import { Tooltip as TooltipPrimitive } from "radix-ui";
+import * as React from "react";
 import { useControlledState } from "@/hooks/use-controlled-state";
+import { getStrictContext } from "@/lib/get-strict-context";
 
 type TooltipContextType = {
   isOpen: boolean;

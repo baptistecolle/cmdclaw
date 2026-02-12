@@ -1,5 +1,5 @@
+import { XIcon } from "lucide-react";
 import * as React from "react";
-
 import {
   Sheet as SheetPrimitive,
   SheetTrigger as SheetTriggerPrimitive,
@@ -22,7 +22,6 @@ import {
   type SheetDescriptionProps as SheetDescriptionPrimitiveProps,
 } from "@/components/animate-ui/primitives/radix/sheet";
 import { cn } from "@/lib/utils";
-import { XIcon } from "lucide-react";
 
 type SheetProps = SheetPrimitiveProps;
 

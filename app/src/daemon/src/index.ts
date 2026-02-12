@@ -12,12 +12,12 @@
  *   bap-daemon auth --server  Specify a custom server URL
  */
 
-import { loadConfig, clearConfig } from "./config";
+import { platform, arch } from "os";
 import { authenticate } from "./auth";
-import { WSClient } from "./ws-client";
+import { loadConfig, clearConfig } from "./config";
 import { detectLocalProviders } from "./llm-proxy";
 import { logger, setVerbose } from "./logger";
-import { platform, arch } from "os";
+import { WSClient } from "./ws-client";
 
 const DEFAULT_SERVER_URL = "https://heybap.com";
 

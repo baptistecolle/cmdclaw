@@ -1,8 +1,8 @@
 "use client";
 
 import { useCustomer } from "autumn-js/react";
-import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, CreditCard, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export default function BillingPage() {

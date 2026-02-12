@@ -1,7 +1,7 @@
-import { parseArgs } from "util";
+import { constants } from "fs";
 import { writeFile, mkdir, readFile, access } from "fs/promises";
 import { dirname } from "path";
-import { constants } from "fs";
+import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
 if (!TOKEN) {
@@ -70,7 +70,9 @@ async function listFiles() {
   }
 
   const res = await fetch(`${DRIVE_URL}/files?${params}`, { headers });
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const { files = [] } = (await res.json()) as { files?: DriveFile[] };
   const items = files.map((f) => ({
@@ -90,7 +92,9 @@ async function getFile(fileId: string) {
     `${DRIVE_URL}/files/${fileId}?fields=id,name,mimeType,size,modifiedTime,createdTime,webViewLink,parents,description,starred`,
     { headers },
   );
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const file = (await res.json()) as DriveFile;
   console.log(
@@ -116,7 +120,9 @@ async function getFile(fileId: string) {
 async function downloadFile(fileId: string) {
   // First get file metadata
   const metaRes = await fetch(`${DRIVE_URL}/files/${fileId}?fields=name,mimeType`, { headers });
-  if (!metaRes.ok) {throw new Error(await metaRes.text());}
+  if (!metaRes.ok) {
+    throw new Error(await metaRes.text());
+  }
   const meta = (await metaRes.json()) as { name?: string; mimeType?: string };
   if (!meta.mimeType) {
     throw new Error("File metadata response missing mimeType");
@@ -141,7 +147,9 @@ async function downloadFile(fileId: string) {
   }
 
   const res = await fetch(downloadUrl, { headers });
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const buffer = await res.arrayBuffer();
   await mkdir(dirname(fileName), { recursive: true }).catch(() => {});
@@ -164,7 +172,9 @@ async function searchFiles() {
   });
 
   const res = await fetch(`${DRIVE_URL}/files?${params}`, { headers });
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const { files = [] } = (await res.json()) as { files?: DriveFile[] };
   const items = files.map((f) => ({
@@ -227,7 +237,9 @@ async function uploadFile() {
     body,
   });
 
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
   const uploaded = (await res.json()) as DriveFile;
   console.log(`Uploaded: ${uploaded.name} (ID: ${uploaded.id})`);
 }
@@ -253,7 +265,9 @@ async function createFolder() {
     body: JSON.stringify(metadata),
   });
 
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
   const folder = (await res.json()) as DriveFile;
   console.log(`Folder created: ${folder.name} (ID: ${folder.id})`);
 }
@@ -264,7 +278,9 @@ async function deleteFile(fileId: string) {
     headers,
   });
 
-  if (!res.ok && res.status !== 204) {throw new Error(await res.text());}
+  if (!res.ok && res.status !== 204) {
+    throw new Error(await res.text());
+  }
   console.log(`File deleted: ${fileId}`);
 }
 
@@ -277,7 +293,9 @@ async function listFolders() {
   });
 
   const res = await fetch(`${DRIVE_URL}/files?${params}`, { headers });
-  if (!res.ok) {throw new Error(await res.text());}
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   const { files = [] } = (await res.json()) as { files?: DriveFile[] };
   const folders = files.map((f) => ({

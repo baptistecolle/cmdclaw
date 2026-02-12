@@ -20,7 +20,9 @@ function normalizeWorkflowName(text: string): string | null {
     .replace(/\s+/g, " ")
     .trim();
 
-  if (!cleaned) {return null;}
+  if (!cleaned) {
+    return null;
+  }
   return cleaned.slice(0, 128);
 }
 
@@ -61,7 +63,9 @@ export async function generateWorkflowName(context: WorkflowNameContext): Promis
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    if (!text) {return null;}
+    if (!text) {
+      return null;
+    }
     return normalizeWorkflowName(text);
   } catch (error) {
     console.error("[WorkflowName] Error generating workflow name:", error);

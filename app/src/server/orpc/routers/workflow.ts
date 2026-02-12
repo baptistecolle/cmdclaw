@@ -1,14 +1,14 @@
 import { ORPCError } from "@orpc/server";
-import { z } from "zod";
-import { protectedProcedure } from "../middleware";
-import { generation, user, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
 import { and, eq } from "drizzle-orm";
-import { triggerWorkflowRun } from "@/server/services/workflow-service";
+import { z } from "zod";
+import { generation, user, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
 import {
   removeWorkflowScheduleJob,
   syncWorkflowScheduleJob,
 } from "@/server/services/workflow-scheduler";
+import { triggerWorkflowRun } from "@/server/services/workflow-service";
 import { generateWorkflowName } from "@/server/utils/generate-workflow-name";
+import { protectedProcedure } from "../middleware";
 
 const integrationTypeSchema = z.enum([
   "gmail",
@@ -282,12 +282,24 @@ const update = protectedProcedure
         }
       }
     }
-    if (input.status !== undefined) {updates.status = input.status;}
-    if (input.triggerType !== undefined) {updates.triggerType = input.triggerType;}
-    if (input.prompt !== undefined) {updates.prompt = input.prompt;}
-    if (input.promptDo !== undefined) {updates.promptDo = input.promptDo ?? null;}
-    if (input.promptDont !== undefined) {updates.promptDont = input.promptDont ?? null;}
-    if (input.autoApprove !== undefined) {updates.autoApprove = input.autoApprove;}
+    if (input.status !== undefined) {
+      updates.status = input.status;
+    }
+    if (input.triggerType !== undefined) {
+      updates.triggerType = input.triggerType;
+    }
+    if (input.prompt !== undefined) {
+      updates.prompt = input.prompt;
+    }
+    if (input.promptDo !== undefined) {
+      updates.promptDo = input.promptDo ?? null;
+    }
+    if (input.promptDont !== undefined) {
+      updates.promptDont = input.promptDont ?? null;
+    }
+    if (input.autoApprove !== undefined) {
+      updates.autoApprove = input.autoApprove;
+    }
     if (input.allowedIntegrations !== undefined) {
       updates.allowedIntegrations = input.allowedIntegrations;
     }

@@ -4,8 +4,8 @@
  */
 
 import { appendFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
 import { homedir } from "os";
+import { join } from "path";
 
 const LOG_DIR = join(homedir(), ".bap");
 const LOG_PATH = join(LOG_DIR, "daemon.log");

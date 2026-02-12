@@ -124,8 +124,14 @@ vi.mock("@/server/utils/observability", () => ({
   logServerEvent: vi.fn(),
 }));
 
-import { generationManager } from "./generation-manager";
 import { env } from "@/env";
+import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
+import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
+import {
+  getCliEnvForUser,
+  getCliInstructionsWithCustom,
+  getEnabledIntegrationTypes,
+} from "@/server/integrations/cli-env";
 import {
   getOrCreateSession,
   writeSkillsToSandbox,
@@ -133,21 +139,15 @@ import {
   writeResolvedIntegrationSkillsToSandbox,
   getIntegrationSkillsSystemPrompt,
 } from "@/server/sandbox/e2b";
-import {
-  getCliEnvForUser,
-  getCliInstructionsWithCustom,
-  getEnabledIntegrationTypes,
-} from "@/server/integrations/cli-env";
+import { getSandboxBackend } from "@/server/sandbox/factory";
+import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integration-skill-service";
+import { syncMemoryToSandbox, buildMemorySystemPrompt } from "@/server/services/memory-service";
 import {
   uploadSandboxFile,
   collectNewE2BFiles,
   readSandboxFileAsBuffer,
 } from "@/server/services/sandbox-file-service";
-import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integration-skill-service";
-import { syncMemoryToSandbox, buildMemorySystemPrompt } from "@/server/services/memory-service";
-import { getSandboxBackend } from "@/server/sandbox/factory";
-import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
-import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
+import { generationManager } from "./generation-manager";
 
 type GenerationCtx = {
   id: string;
@@ -1217,8 +1217,9 @@ describe("generationManager transitions", () => {
     >);
     vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
     vi.mocked(parseBashCommand).mockImplementation((command) => {
-      if (command === "slack forbidden")
-        {return { integration: "slack" } as ReturnType<typeof parseBashCommand>;}
+      if (command === "slack forbidden") {
+        return { integration: "slack" } as ReturnType<typeof parseBashCommand>;
+      }
       return null;
     });
     vi.mocked(checkToolPermissions).mockImplementation((toolName) => {
@@ -1256,8 +1257,12 @@ describe("generationManager transitions", () => {
       storageKey: "k/report.txt",
     });
     vi.mocked(toolCallToCommand).mockImplementation((toolName) => {
-      if (toolName === "bash_exec") {return { command: "run-ok", isWrite: false };}
-      if (toolName === "bash_fail") {return { command: "run-fail", isWrite: false };}
+      if (toolName === "bash_exec") {
+        return { command: "run-ok", isWrite: false };
+      }
+      if (toolName === "bash_fail") {
+        return { command: "run-fail", isWrite: false };
+      }
       return null;
     });
 

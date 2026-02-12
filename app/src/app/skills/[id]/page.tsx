@@ -1,24 +1,5 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef, useCallback } from "react";
-import { useHotkeys } from "react-hotkeys-hook";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import NextImage from "next/image";
-import {
-  useSkill,
-  useUpdateSkill,
-  useDeleteSkill,
-  useAddSkillFile,
-  useUpdateSkillFile,
-  useDeleteSkillFile,
-  useUploadSkillDocument,
-  useDeleteSkillDocument,
-  useGetDocumentUrl,
-} from "@/orpc/hooks";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { SkillEditor, parseSkillContent, serializeSkillContent } from "@/components/skill-editor";
 import {
   ArrowLeft,
   Loader2,
@@ -36,7 +17,13 @@ import {
   Image,
   FileSpreadsheet,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import NextImage from "next/image";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
+import { SkillEditor, parseSkillContent, serializeSkillContent } from "@/components/skill-editor";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +31,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { IconPicker } from "@/components/ui/icon-picker";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import {
+  useSkill,
+  useUpdateSkill,
+  useDeleteSkill,
+  useAddSkillFile,
+  useUpdateSkillFile,
+  useDeleteSkillFile,
+  useUploadSkillDocument,
+  useDeleteSkillDocument,
+  useGetDocumentUrl,
+} from "@/orpc/hooks";
 
 type EditorMode = "rich" | "markdown";
 
@@ -201,10 +201,14 @@ function SkillEditorPageContent() {
 
   const handleSaveFile = useCallback(
     async (showNotificationIfNoChanges = false) => {
-      if (!selectedFileId) {return;}
+      if (!selectedFileId) {
+        return;
+      }
 
       const selectedFile = skill?.files.find((f) => f.id === selectedFileId);
-      if (!selectedFile) {return;}
+      if (!selectedFile) {
+        return;
+      }
 
       const content =
         selectedFile.path === "SKILL.md"
@@ -276,7 +280,9 @@ function SkillEditorPageContent() {
   );
 
   const handleAddFile = async () => {
-    if (!newFilePath.trim()) {return;}
+    if (!newFilePath.trim()) {
+      return;
+    }
 
     try {
       await addFile.mutateAsync({
@@ -294,7 +300,9 @@ function SkillEditorPageContent() {
   };
 
   const handleDeleteFile = async () => {
-    if (!fileToDelete) {return;}
+    if (!fileToDelete) {
+      return;
+    }
 
     try {
       await deleteFile.mutateAsync(fileToDelete.id);
@@ -315,7 +323,9 @@ function SkillEditorPageContent() {
   };
 
   const handleDeleteSkill = async () => {
-    if (!confirm(`Delete skill "${skillDisplayName}"? This cannot be undone.`)) {return;}
+    if (!confirm(`Delete skill "${skillDisplayName}"? This cannot be undone.`)) {
+      return;
+    }
 
     try {
       await deleteSkill.mutateAsync(skillId);
@@ -328,7 +338,9 @@ function SkillEditorPageContent() {
   // Document handlers
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) {return;}
+    if (!file) {
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -373,7 +385,9 @@ function SkillEditorPageContent() {
   };
 
   const handleDeleteDocument = async () => {
-    if (!documentToDelete) {return;}
+    if (!documentToDelete) {
+      return;
+    }
 
     try {
       await deleteDocument.mutateAsync(documentToDelete.id);
@@ -397,14 +411,22 @@ function SkillEditorPageContent() {
   };
 
   const getDocumentIcon = (mimeType: string) => {
-    if (mimeType.startsWith("image/")) {return Image;}
-    if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) {return FileSpreadsheet;}
+    if (mimeType.startsWith("image/")) {
+      return Image;
+    }
+    if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) {
+      return FileSpreadsheet;
+    }
     return File;
   };
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) {return `${bytes} B`;}
-    if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
@@ -430,7 +452,9 @@ function SkillEditorPageContent() {
     }
 
     // Don't auto-save if no file is selected
-    if (!selectedFileId) {return;}
+    if (!selectedFileId) {
+      return;
+    }
 
     // Clear existing timeout
     if (autoSaveTimeoutRef.current) {
@@ -639,8 +663,12 @@ function SkillEditorPageContent() {
           {/* Text files */}
           {skill.files
             .toSorted((a, b) => {
-              if (a.path === "SKILL.md") {return -1;}
-              if (b.path === "SKILL.md") {return 1;}
+              if (a.path === "SKILL.md") {
+                return -1;
+              }
+              if (b.path === "SKILL.md") {
+                return 1;
+              }
               return a.path.localeCompare(b.path);
             })
             .map((file) => (
@@ -770,7 +798,9 @@ function SkillEditorPageContent() {
               className="h-8 flex-1 text-sm"
               autoFocus
               onKeyDown={(e) => {
-                if (e.key === "Enter") {handleAddFile();}
+                if (e.key === "Enter") {
+                  handleAddFile();
+                }
                 if (e.key === "Escape") {
                   setShowAddFile(false);
                   setNewFilePath("");
@@ -840,7 +870,9 @@ Add your skill instructions here..."
           {selectedDocumentId &&
             (() => {
               const selectedDoc = skill.documents?.find((d) => d.id === selectedDocumentId);
-              if (!selectedDoc) {return null;}
+              if (!selectedDoc) {
+                return null;
+              }
 
               const isViewable = isViewableDocument(selectedDoc.mimeType);
 

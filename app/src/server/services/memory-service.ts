@@ -1,8 +1,7 @@
-import crypto from "node:crypto";
-import OpenAI from "openai";
 import { format, parseISO, isValid } from "date-fns";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-
+import crypto from "node:crypto";
+import OpenAI from "openai";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
 import {
@@ -17,9 +16,9 @@ import {
   sessionTranscriptChunk,
   type ContentPart,
 } from "@/server/db/schema";
+import { SESSION_BOUNDARY_PREFIX } from "@/server/services/session-constants";
 import { decrypt } from "@/server/utils/encryption";
 import { generateConversationTitle } from "@/server/utils/generate-title";
-import { SESSION_BOUNDARY_PREFIX } from "@/server/services/session-constants";
 
 export type MemoryFileType = "longterm" | "daily";
 
@@ -93,9 +92,13 @@ function formatTimeOnly(value: Date): string {
 }
 
 function parseDateInput(value?: string): Date | null {
-  if (!value) {return null;}
+  if (!value) {
+    return null;
+  }
   const parsed = parseISO(value);
-  if (!isValid(parsed)) {return null;}
+  if (!isValid(parsed)) {
+    return null;
+  }
   return parsed;
 }
 
@@ -112,7 +115,9 @@ function resolveFileType(input: MemoryWriteInput | MemoryGetInput): {
     const match = normalized.match(/^memory\/(\d{4}-\d{2}-\d{2})\.md$/i);
     if (match?.[1]) {
       const parsed = parseDateInput(match[1]);
-      if (!parsed) {return null;}
+      if (!parsed) {
+        return null;
+      }
       return { type: "daily", date: parsed };
     }
   }
@@ -130,8 +135,12 @@ function resolveFileType(input: MemoryWriteInput | MemoryGetInput): {
 }
 
 function getFilePath(file: MemoryFileRow): string {
-  if (file.type === "longterm") {return "MEMORY.md";}
-  if (!file.date) {return "memory/unknown.md";}
+  if (file.type === "longterm") {
+    return "MEMORY.md";
+  }
+  if (!file.date) {
+    return "memory/unknown.md";
+  }
   return `memory/${formatDateOnly(file.date)}.md`;
 }
 
@@ -166,7 +175,9 @@ function formatEntryMarkdown(file: MemoryFileRow, entry: MemoryEntryRow): string
 
 function buildEntryEmbeddingText(entry: MemoryEntryRow): string {
   const lines = [];
-  if (entry.title) {lines.push(`Title: ${entry.title}`);}
+  if (entry.title) {
+    lines.push(`Title: ${entry.title}`);
+  }
   if (entry.tags && entry.tags.length > 0) {
     lines.push(`Tags: ${entry.tags.join(", ")}`);
   }
@@ -223,7 +234,9 @@ export async function ensureMemoryFile(params: {
     ),
   });
 
-  if (existing) {return existing;}
+  if (existing) {
+    return existing;
+  }
 
   const [created] = await db
     .insert(memoryFile)
@@ -271,9 +284,13 @@ async function embedTexts(
   texts: string[],
   model: string,
 ): Promise<number[][] | null> {
-  if (texts.length === 0) {return [];}
+  if (texts.length === 0) {
+    return [];
+  }
   const apiKey = await getOpenAIApiKey(userId);
-  if (!apiKey) {return null;}
+  if (!apiKey) {
+    return null;
+  }
 
   const client = new OpenAI({ apiKey });
   const response = await client.embeddings.create({
@@ -289,7 +306,9 @@ export function chunkMarkdown(
   chunking: { tokens: number; overlap: number },
 ): Array<{ startLine: number; endLine: number; text: string; hash: string }> {
   const lines = content.split("\n");
-  if (lines.length === 0) {return [];}
+  if (lines.length === 0) {
+    return [];
+  }
 
   const maxChars = Math.max(32, chunking.tokens * 4);
   const overlapChars = Math.max(0, chunking.overlap * 4);
@@ -304,10 +323,14 @@ export function chunkMarkdown(
   let currentChars = 0;
 
   const flush = () => {
-    if (current.length === 0) {return;}
+    if (current.length === 0) {
+      return;
+    }
     const first = current[0];
     const last = current[current.length - 1];
-    if (!first || !last) {return;}
+    if (!first || !last) {
+      return;
+    }
     const text = current.map((entry) => entry.line).join("\n");
     chunks.push({
       startLine: first.lineNo,
@@ -327,10 +350,14 @@ export function chunkMarkdown(
     const kept: Array<{ line: string; lineNo: number }> = [];
     for (let i = current.length - 1; i >= 0; i -= 1) {
       const entry = current[i];
-      if (!entry) {continue;}
+      if (!entry) {
+        continue;
+      }
       acc += entry.line.length + 1;
       kept.unshift(entry);
-      if (acc >= overlapChars) {break;}
+      if (acc >= overlapChars) {
+        break;
+      }
     }
     current = kept;
     currentChars = kept.reduce((sum, entry) => sum + entry.line.length + 1, 0);
@@ -431,7 +458,9 @@ export async function readMemoryFile(
   input: MemoryGetInput,
 ): Promise<{ path: string; text: string } | null> {
   const resolved = resolveFileType(input);
-  if (!resolved) {return null;}
+  if (!resolved) {
+    return null;
+  }
 
   const file = await db.query.memoryFile.findFirst({
     where: and(
@@ -441,7 +470,9 @@ export async function readMemoryFile(
     ),
   });
 
-  if (!file) {return null;}
+  if (!file) {
+    return null;
+  }
 
   const entries = await db.query.memoryEntry.findMany({
     where: eq(memoryEntry.fileId, file.id),
@@ -483,13 +514,17 @@ export async function readSessionTranscriptByPath(
   input: MemoryGetInput,
 ): Promise<{ path: string; text: string } | null> {
   const normalized = input.path.trim().replace(/^\//, "");
-  if (!normalized.toLowerCase().startsWith("sessions/")) {return null;}
+  if (!normalized.toLowerCase().startsWith("sessions/")) {
+    return null;
+  }
 
   const transcript = await db.query.sessionTranscript.findFirst({
     where: and(eq(sessionTranscript.userId, input.userId), eq(sessionTranscript.path, normalized)),
   });
 
-  if (!transcript) {return null;}
+  if (!transcript) {
+    return null;
+  }
 
   return {
     path: getTranscriptPath(transcript),
@@ -594,14 +629,18 @@ export async function writeSessionTranscriptFromConversation(input: {
   const convo = await db.query.conversation.findFirst({
     where: and(eq(conversation.id, input.conversationId), eq(conversation.userId, input.userId)),
   });
-  if (!convo) {return null;}
+  if (!convo) {
+    return null;
+  }
 
   const messages = await db.query.message.findMany({
     where: eq(message.conversationId, input.conversationId),
     orderBy: asc(message.createdAt),
   });
 
-  if (messages.length === 0) {return null;}
+  if (messages.length === 0) {
+    return null;
+  }
 
   const boundaryIndex = messages
     .map((m, idx) =>
@@ -626,7 +665,9 @@ export async function writeSessionTranscriptFromConversation(input: {
     }
     return m.role === "user" || m.role === "assistant";
   });
-  if (messagesForTranscript.length === 0) {return null;}
+  if (messagesForTranscript.length === 0) {
+    return null;
+  }
 
   const lastUser = [...messagesForTranscript].toReversed().find((m) => m.role === "user");
   const lastAssistant = [...messagesForTranscript].toReversed().find((m) => m.role === "assistant");
@@ -826,7 +867,9 @@ export async function searchMemory(input: MemorySearchInput): Promise<MemorySear
     .toSorted((a, b) => b.score - a.score)
     .slice(0, limit);
 
-  if (scored.length === 0) {return [];}
+  if (scored.length === 0) {
+    return [];
+  }
 
   const fileIds = Array.from(new Set(scored.map((row) => row.fileId)));
   const entryIds = Array.from(
@@ -965,7 +1008,9 @@ async function searchSessionTranscripts(input: MemorySearchInput): Promise<Memor
     .toSorted((a, b) => b.score - a.score)
     .slice(0, limit);
 
-  if (scored.length === 0) {return [];}
+  if (scored.length === 0) {
+    return [];
+  }
 
   const transcriptIds = Array.from(new Set(scored.map((row) => row.transcriptId)));
   const transcripts = await db.query.sessionTranscript.findMany({
@@ -1010,7 +1055,9 @@ export async function syncMemoryToSandbox(
 ): Promise<string[]> {
   const files = await listMemoryFiles(userId);
   const transcripts = await listSessionTranscripts(userId);
-  if (files.length === 0 && transcripts.length === 0) {return [];}
+  if (files.length === 0 && transcripts.length === 0) {
+    return [];
+  }
 
   await ensureDir(`${MEMORY_BASE_PATH}/memory`);
   await ensureDir(SESSION_BASE_PATH);

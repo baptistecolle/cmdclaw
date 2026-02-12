@@ -1,6 +1,6 @@
+import type { Session, User } from "better-auth";
 import { os, ORPCError } from "@orpc/server";
 import type { ORPCContext } from "./context";
-import type { Session, User } from "better-auth";
 
 // Base procedure with context
 export const baseProcedure = os.$context<ORPCContext>();

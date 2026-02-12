@@ -1,25 +1,25 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Image from "next/image";
 import { ChevronDown, ChevronRight, Check, X, Loader2, ShieldAlert, Code } from "lucide-react";
+import Image from "next/image";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { getIntegrationLogo, getIntegrationDisplayName } from "@/lib/integration-icons";
 import { parseCliCommand } from "@/lib/parse-cli-command";
-import { GenericPreview } from "./previews";
+import { cn } from "@/lib/utils";
 import type { PreviewProps } from "./previews";
-import { SlackPreview } from "./previews/slack-preview";
-import { GmailPreview } from "./previews/gmail-preview";
+import { GenericPreview } from "./previews";
+import { AirtablePreview } from "./previews/airtable-preview";
 import { CalendarPreview } from "./previews/calendar-preview";
 import { DocsPreview } from "./previews/docs-preview";
-import { SheetsPreview } from "./previews/sheets-preview";
 import { DrivePreview } from "./previews/drive-preview";
-import { NotionPreview } from "./previews/notion-preview";
-import { LinearPreview } from "./previews/linear-preview";
 import { GithubPreview } from "./previews/github-preview";
-import { AirtablePreview } from "./previews/airtable-preview";
+import { GmailPreview } from "./previews/gmail-preview";
 import { HubspotPreview } from "./previews/hubspot-preview";
+import { LinearPreview } from "./previews/linear-preview";
+import { NotionPreview } from "./previews/notion-preview";
+import { SheetsPreview } from "./previews/sheets-preview";
+import { SlackPreview } from "./previews/slack-preview";
 
 export interface ToolApprovalCardProps {
   toolUseId: string;
@@ -83,13 +83,17 @@ export function ToolApprovalCard({
 
   // Parse the command to extract structured data
   const parsedCommand = useMemo(() => {
-    if (!command) {return null;}
+    if (!command) {
+      return null;
+    }
     return parseCliCommand(command);
   }, [command]);
 
   // Build preview props
   const previewProps = useMemo(() => {
-    if (!parsedCommand) {return null;}
+    if (!parsedCommand) {
+      return null;
+    }
     return {
       integration: parsedCommand.integration,
       operation: parsedCommand.operation,

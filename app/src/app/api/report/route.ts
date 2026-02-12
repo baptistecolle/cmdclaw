@@ -1,5 +1,5 @@
-import { auth } from "@/lib/auth";
 import { env } from "@/env";
+import { auth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 const REPORT_SLACK_CHANNEL_NAME = "bugs";
@@ -24,7 +24,9 @@ async function lookupSlackChannelIdByName(channelName: string): Promise<SlackCha
       limit: "200",
       types: "public_channel,private_channel,mpim",
     });
-    if (cursor) {params.set("cursor", cursor);}
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
 
     const response = await fetch(`https://slack.com/api/conversations.list?${params.toString()}`, {
       method: "GET",
@@ -49,7 +51,9 @@ async function lookupSlackChannelIdByName(channelName: string): Promise<SlackCha
 
     const match = result.channels?.find((channel) => {
       const name = channel.name_normalized ?? channel.name;
-      if (!name) {return false;}
+      if (!name) {
+        return false;
+      }
       return normalizeSlackChannelName(name) === targetName;
     });
     if (match?.id) {
@@ -57,7 +61,9 @@ async function lookupSlackChannelIdByName(channelName: string): Promise<SlackCha
     }
 
     const nextCursor = result.response_metadata?.next_cursor?.trim();
-    if (!nextCursor) {break;}
+    if (!nextCursor) {
+      break;
+    }
     cursor = nextCursor;
   }
 

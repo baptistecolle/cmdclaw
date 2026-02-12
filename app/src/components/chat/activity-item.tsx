@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-import ReactMarkdown from "react-markdown";
 import {
   Wrench,
   Check,
@@ -17,12 +15,14 @@ import {
   StopCircle,
   type LucideIcon,
 } from "lucide-react";
+import Image from "next/image";
+import ReactMarkdown from "react-markdown";
+import type { IntegrationType } from "@/lib/integration-icons";
 import {
   getIntegrationLogo,
   getIntegrationDisplayName,
   getOperationLabel,
 } from "@/lib/integration-icons";
-import type { IntegrationType } from "@/lib/integration-icons";
 
 // Map internal SDK tool names to user-friendly display names
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -74,8 +74,12 @@ type Props = {
 };
 
 function formatValue(value: unknown): string {
-  if (value === undefined || value === null) {return "";}
-  if (typeof value === "string") {return value;}
+  if (value === undefined || value === null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
   try {
     return JSON.stringify(value, null, 2);
   } catch {
@@ -85,7 +89,9 @@ function formatValue(value: unknown): string {
 
 // Extract command string from Bash tool input
 function formatInput(input: unknown, toolName?: string): string {
-  if (input === undefined || input === null) {return "";}
+  if (input === undefined || input === null) {
+    return "";
+  }
 
   // For Bash commands, extract just the command string
   if (toolName === "Bash" && typeof input === "object" && input !== null) {
@@ -103,7 +109,9 @@ export function ActivityItem({ item }: Props) {
 
   // Get icon for tool calls only
   const getIcon = () => {
-    if (type !== "tool_call" && type !== "tool_result") {return null;}
+    if (type !== "tool_call" && type !== "tool_result") {
+      return null;
+    }
 
     // Integration icons take priority
     if (integration) {
@@ -131,7 +139,9 @@ export function ActivityItem({ item }: Props) {
   };
 
   const getStatusIcon = () => {
-    if (type === "thinking") {return null;}
+    if (type === "thinking") {
+      return null;
+    }
 
     switch (status) {
       case "running":

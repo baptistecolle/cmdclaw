@@ -1,8 +1,8 @@
 "use client";
 
+import { Download } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
-import { Download } from "lucide-react";
 import type { SandboxFileData } from "./message-list";
 
 type Props = {

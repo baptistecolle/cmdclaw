@@ -1,5 +1,4 @@
 import * as React from "react";
-
 import {
   TooltipProvider as TooltipProviderPrimitive,
   Tooltip as TooltipPrimitive,

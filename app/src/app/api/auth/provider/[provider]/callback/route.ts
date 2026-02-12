@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { consumePending } from "@/server/ai/pending-oauth";
 import {
   SUBSCRIPTION_PROVIDERS,
   isOAuthProviderConfig,
   type SubscriptionProviderID,
 } from "@/server/ai/subscription-providers";
 import { storeProviderTokens } from "@/server/orpc/routers/provider-auth";
-import { consumePending } from "@/server/ai/pending-oauth";
-import { auth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 

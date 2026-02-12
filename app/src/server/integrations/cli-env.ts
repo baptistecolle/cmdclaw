@@ -1,10 +1,10 @@
-import { db } from "@/server/db/client";
-import { integration, customIntegrationCredential } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
 import type { IntegrationType } from "@/server/oauth/config";
 import { env } from "@/env";
+import { db } from "@/server/db/client";
+import { integration, customIntegrationCredential } from "@/server/db/schema";
 import { decrypt } from "@/server/lib/encryption";
+import { getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
 
 // Token-based integrations map to their access token env var
 const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
@@ -49,8 +49,12 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
 
   if (linkedinIntegration && linkedinIntegration.providerAccountId) {
     cliEnv.LINKEDIN_ACCOUNT_ID = linkedinIntegration.providerAccountId;
-    if (env.UNIPILE_API_KEY) {cliEnv.UNIPILE_API_KEY = env.UNIPILE_API_KEY;}
-    if (env.UNIPILE_DSN) {cliEnv.UNIPILE_DSN = env.UNIPILE_DSN;}
+    if (env.UNIPILE_API_KEY) {
+      cliEnv.UNIPILE_API_KEY = env.UNIPILE_API_KEY;
+    }
+    if (env.UNIPILE_DSN) {
+      cliEnv.UNIPILE_DSN = env.UNIPILE_DSN;
+    }
   }
 
   // Salesforce special case - needs instance URL from metadata
@@ -164,7 +168,9 @@ export async function getCliInstructionsWithCustom(
       },
     });
 
-    if (customCreds.length === 0) {return base;}
+    if (customCreds.length === 0) {
+      return base;
+    }
 
     const customSections = customCreds.map((cred) => {
       const integ = cred.customIntegration;
@@ -519,8 +525,12 @@ export async function getTokensForIntegrations(
 
     if (linkedinIntegration && linkedinIntegration.providerAccountId) {
       tokens.LINKEDIN_ACCOUNT_ID = linkedinIntegration.providerAccountId;
-      if (env.UNIPILE_API_KEY) {tokens.UNIPILE_API_KEY = env.UNIPILE_API_KEY;}
-      if (env.UNIPILE_DSN) {tokens.UNIPILE_DSN = env.UNIPILE_DSN;}
+      if (env.UNIPILE_API_KEY) {
+        tokens.UNIPILE_API_KEY = env.UNIPILE_API_KEY;
+      }
+      if (env.UNIPILE_DSN) {
+        tokens.UNIPILE_DSN = env.UNIPILE_DSN;
+      }
     }
   }
 

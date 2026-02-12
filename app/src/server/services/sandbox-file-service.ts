@@ -1,10 +1,10 @@
-import { db } from "@/server/db/client";
-import { sandboxFile } from "@/server/db/schema";
-import { uploadToS3, ensureBucket } from "@/server/storage/s3-client";
+import type { Sandbox } from "e2b";
 import { lookup as mimeLookup } from "mime-types";
 import path from "path";
 import type { SandboxBackend } from "@/server/sandbox/types";
-import type { Sandbox } from "e2b";
+import { db } from "@/server/db/client";
+import { sandboxFile } from "@/server/db/schema";
+import { uploadToS3, ensureBucket } from "@/server/storage/s3-client";
 
 export interface SandboxFileUpload {
   path: string;
@@ -141,7 +141,9 @@ export async function collectNewSandboxFiles(
     return [];
   }
 
-  if (!result.stdout?.trim()) {return [];}
+  if (!result.stdout?.trim()) {
+    return [];
+  }
 
   const paths = result.stdout
     .trim()
@@ -199,7 +201,9 @@ export async function collectNewE2BFiles(
     return [];
   }
 
-  if (!result.stdout?.trim()) {return [];}
+  if (!result.stdout?.trim()) {
+    return [];
+  }
 
   const paths = result.stdout
     .trim()

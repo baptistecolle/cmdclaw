@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import { Check, AlertCircle, ChevronRight, Eye, StopCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { cn } from "@/lib/utils";
-import { IntegrationBadges } from "./integration-badges";
-import { ActivityItem, type ActivityItemData } from "./activity-item";
+import { useState } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
+import { cn } from "@/lib/utils";
+import { ActivityItem, type ActivityItemData } from "./activity-item";
+import { IntegrationBadges } from "./integration-badges";
 
 type Props = {
   messageId: string;

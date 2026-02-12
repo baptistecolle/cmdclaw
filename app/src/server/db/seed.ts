@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-
 import { db, closePool } from "./client";
 import { user } from "./schema";
 

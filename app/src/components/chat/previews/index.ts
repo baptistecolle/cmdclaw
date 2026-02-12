@@ -1,16 +1,16 @@
 import type { ComponentType } from "react";
 import type { PreviewProps } from "./preview-styles";
-import { SlackPreview } from "./slack-preview";
-import { GmailPreview } from "./gmail-preview";
+import { AirtablePreview } from "./airtable-preview";
 import { CalendarPreview } from "./calendar-preview";
 import { DocsPreview } from "./docs-preview";
-import { SheetsPreview } from "./sheets-preview";
 import { DrivePreview } from "./drive-preview";
-import { NotionPreview } from "./notion-preview";
-import { LinearPreview } from "./linear-preview";
 import { GithubPreview } from "./github-preview";
-import { AirtablePreview } from "./airtable-preview";
+import { GmailPreview } from "./gmail-preview";
 import { HubspotPreview } from "./hubspot-preview";
+import { LinearPreview } from "./linear-preview";
+import { NotionPreview } from "./notion-preview";
+import { SheetsPreview } from "./sheets-preview";
+import { SlackPreview } from "./slack-preview";
 
 export type { PreviewProps } from "./preview-styles";
 export { GenericPreview } from "./generic-preview";

@@ -3,8 +3,8 @@
  * daemon device via WebSocket.
  */
 
-import type { SandboxBackend, ExecuteResult } from "./types";
 import { waitForResponse, isDeviceOnline } from "@/server/ws/server";
+import type { SandboxBackend, ExecuteResult } from "./types";
 
 export class BYOCSandboxBackend implements SandboxBackend {
   private deviceId: string;
@@ -93,7 +93,9 @@ export class BYOCSandboxBackend implements SandboxBackend {
   }
 
   async teardown(): Promise<void> {
-    if (!this.conversationId) {return;}
+    if (!this.conversationId) {
+      return;
+    }
 
     try {
       await waitForResponse(this.deviceId, {

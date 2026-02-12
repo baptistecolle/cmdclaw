@@ -1,8 +1,8 @@
 "use client";
 
+import { Send, Square, Mic, Paperclip, X } from "lucide-react";
 import Image from "next/image";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Square, Mic, Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +57,9 @@ export function ChatInput({
       const remaining = MAX_FILES - prev.length;
       const toAdd: AttachmentItem[] = [];
       for (const file of fileArray.slice(0, remaining)) {
-        if (file.size > MAX_FILE_SIZE) {continue;}
+        if (file.size > MAX_FILE_SIZE) {
+          continue;
+        }
         const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
         toAdd.push({ file, preview });
       }
@@ -68,7 +70,9 @@ export function ChatInput({
   const removeAttachment = useCallback((index: number) => {
     setAttachments((prev) => {
       const item = prev[index];
-      if (item?.preview) {URL.revokeObjectURL(item.preview);}
+      if (item?.preview) {
+        URL.revokeObjectURL(item.preview);
+      }
       return prev.filter((_, i) => i !== index);
     });
   }, []);
@@ -82,7 +86,9 @@ export function ChatInput({
     });
 
   const handleSubmit = async () => {
-    if ((!value.trim() && attachments.length === 0) || disabled) {return;}
+    if ((!value.trim() && attachments.length === 0) || disabled) {
+      return;
+    }
 
     let attachmentData: AttachmentData[] | undefined;
     if (attachments.length > 0) {
@@ -95,7 +101,9 @@ export function ChatInput({
       );
       // Clean up previews
       for (const a of attachments) {
-        if (a.preview) {URL.revokeObjectURL(a.preview);}
+        if (a.preview) {
+          URL.revokeObjectURL(a.preview);
+        }
       }
       setAttachments([]);
     }
@@ -190,7 +198,9 @@ export function ChatInput({
           multiple
           className="hidden"
           onChange={(e) => {
-            if (e.target.files) {addFiles(e.target.files);}
+            if (e.target.files) {
+              addFiles(e.target.files);
+            }
             e.target.value = "";
           }}
         />
@@ -210,23 +220,33 @@ export function ChatInput({
           <Button
             onMouseDown={(e) => {
               e.preventDefault();
-              if (!disabled && !isStreaming) {onStartRecording();}
+              if (!disabled && !isStreaming) {
+                onStartRecording();
+              }
             }}
             onMouseUp={(e) => {
               e.preventDefault();
-              if (isRecording) {onStopRecording();}
+              if (isRecording) {
+                onStopRecording();
+              }
             }}
             onMouseLeave={(e) => {
               e.preventDefault();
-              if (isRecording) {onStopRecording();}
+              if (isRecording) {
+                onStopRecording();
+              }
             }}
             onTouchStart={(e) => {
               e.preventDefault();
-              if (!disabled && !isStreaming) {onStartRecording();}
+              if (!disabled && !isStreaming) {
+                onStartRecording();
+              }
             }}
             onTouchEnd={(e) => {
               e.preventDefault();
-              if (isRecording) {onStopRecording();}
+              if (isRecording) {
+                onStopRecording();
+              }
             }}
             disabled={disabled && !isRecording}
             size="icon"

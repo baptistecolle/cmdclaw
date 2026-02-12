@@ -1,10 +1,10 @@
-import readline from "node:readline";
-import { homedir } from "node:os";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, basename, resolve, extname } from "node:path";
+import type { RouterClient } from "@orpc/server";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import type { RouterClient } from "@orpc/server";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, basename, resolve, extname } from "node:path";
+import readline from "node:readline";
 import type { AppRouter } from "../src/server/orpc";
 import { createGenerationRuntime } from "../src/lib/generation-runtime";
 import { runGenerationStream } from "../src/lib/generation-stream";
@@ -144,7 +144,9 @@ function ensureBapDir(): void {
 
 function loadConfig(): ChatConfig | null {
   try {
-    if (!existsSync(CONFIG_PATH)) {return null;}
+    if (!existsSync(CONFIG_PATH)) {
+      return null;
+    }
     const raw = readFileSync(CONFIG_PATH, "utf-8");
     return JSON.parse(raw) as ChatConfig;
   } catch {
@@ -443,7 +445,9 @@ async function runGeneration(
             conversationId: doneConversationId,
             messageId,
           });
-          if (outputStarted) {process.stdout.write("\n");}
+          if (outputStarted) {
+            process.stdout.write("\n");
+          }
           if (options.validatePersistence) {
             await validatePersistedAssistantMessage(
               client,

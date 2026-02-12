@@ -1,10 +1,10 @@
 "use client";
 
 import { Bot } from "lucide-react";
-import { ToolCallDisplay } from "./tool-call-display";
+import type { MessagePart } from "./message-list";
 import { TextPartDisplay } from "./text-part-display";
 import { ThinkingPartDisplay } from "./thinking-part-display";
-import type { MessagePart } from "./message-list";
+import { ToolCallDisplay } from "./tool-call-display";
 
 type Props = {
   parts: MessagePart[];

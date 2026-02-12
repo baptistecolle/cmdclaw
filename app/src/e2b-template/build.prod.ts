@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 import { Template, defaultBuildLogger } from "e2b";
-import { template } from "./template";
 import path from "path";
+import { template } from "./template";
 
 // Load .env from parent directory
 config({ path: path.join(process.cwd(), ".env") });

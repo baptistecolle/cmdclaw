@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 import { usePathname } from "next/navigation";
-import { useWorkflowList } from "@/orpc/hooks";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
+import { useWorkflowList } from "@/orpc/hooks";
 
 function formatDate(value?: Date | string | null) {
-  if (!value) {return "—";}
+  if (!value) {
+    return "—";
+  }
   const date = typeof value === "string" ? new Date(value) : value;
   return date.toLocaleString();
 }

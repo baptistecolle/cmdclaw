@@ -166,10 +166,18 @@ const commands = {
       .toSorted((a: { name: string; custom: boolean }, b: { name: string; custom: boolean }) => {
         const aCommon = commonObjects.indexOf(a.name);
         const bCommon = commonObjects.indexOf(b.name);
-        if (aCommon !== -1 && bCommon !== -1) {return aCommon - bCommon;}
-        if (aCommon !== -1) {return -1;}
-        if (bCommon !== -1) {return 1;}
-        if (a.custom !== b.custom) {return a.custom ? 1 : -1;}
+        if (aCommon !== -1 && bCommon !== -1) {
+          return aCommon - bCommon;
+        }
+        if (aCommon !== -1) {
+          return -1;
+        }
+        if (bCommon !== -1) {
+          return 1;
+        }
+        if (a.custom !== b.custom) {
+          return a.custom ? 1 : -1;
+        }
         return a.name.localeCompare(b.name);
       });
 
@@ -200,7 +208,9 @@ async function main() {
     switch (command) {
       case "query": {
         const soql = args.slice(1).join(" ");
-        if (!soql) {throw new Error("Usage: salesforce query <SOQL>");}
+        if (!soql) {
+          throw new Error("Usage: salesforce query <SOQL>");
+        }
         result = await commands.query(soql);
         break;
       }
@@ -237,7 +247,9 @@ async function main() {
 
       case "describe": {
         const [, objectType] = args;
-        if (!objectType) {throw new Error("Usage: salesforce describe <ObjectType>");}
+        if (!objectType) {
+          throw new Error("Usage: salesforce describe <ObjectType>");
+        }
         result = await commands.describe(objectType);
         break;
       }
@@ -249,7 +261,9 @@ async function main() {
 
       case "search": {
         const sosl = args.slice(1).join(" ");
-        if (!sosl) {throw new Error("Usage: salesforce search <SOSL>");}
+        if (!sosl) {
+          throw new Error("Usage: salesforce search <SOSL>");
+        }
         result = await commands.search(sosl);
         break;
       }

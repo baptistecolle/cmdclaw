@@ -1,9 +1,9 @@
+import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { baseProcedure, protectedProcedure } from "../middleware";
+import { auth } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { device } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { baseProcedure, protectedProcedure } from "../middleware";
 
 /**
  * Register a new device (called by daemon after Better Auth device code flow).

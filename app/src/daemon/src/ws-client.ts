@@ -4,9 +4,9 @@
  * and routes incoming messages to handlers.
  */
 
+import { proxyChatRequest } from "./llm-proxy";
 import { logger } from "./logger";
 import { setupSandbox, executeCommand, writeFile, readFile, teardownSandbox } from "./sandbox";
-import { proxyChatRequest } from "./llm-proxy";
 
 const MIN_RECONNECT_MS = 1000;
 const MAX_RECONNECT_MS = 30_000;
@@ -59,7 +59,9 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function toBaseMessage(value: unknown): WSBaseMessage | null {
   const record = asRecord(value);
-  if (!record || typeof record.type !== "string") {return null;}
+  if (!record || typeof record.type !== "string") {
+    return null;
+  }
   return {
     type: record.type,
     id: typeof record.id === "string" ? record.id : undefined,
@@ -140,7 +142,9 @@ export class WSClient {
   }
 
   private send(data: unknown): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {return;}
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
     this.ws.send(JSON.stringify(data));
   }
 

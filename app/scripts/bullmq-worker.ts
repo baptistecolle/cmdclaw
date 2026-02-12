@@ -1,7 +1,7 @@
-import { startQueues, stopQueues } from "../src/server/queues";
 import { closePool } from "../src/server/db/client";
-import { reconcileScheduledWorkflowJobs } from "../src/server/services/workflow-scheduler";
+import { startQueues, stopQueues } from "../src/server/queues";
 import { startGmailWorkflowWatcher } from "../src/server/services/workflow-gmail-watcher";
+import { reconcileScheduledWorkflowJobs } from "../src/server/services/workflow-scheduler";
 import { startXDmWorkflowWatcher } from "../src/server/services/workflow-x-dm-watcher";
 
 const { worker, queueEvents, workerConnection, queueEventsConnection, queueName, redisUrl } =
@@ -11,7 +11,9 @@ const stopXDmWatcher = startXDmWorkflowWatcher();
 let shutdownPromise: Promise<void> | null = null;
 
 const shutdown = async () => {
-  if (shutdownPromise) {return shutdownPromise;}
+  if (shutdownPromise) {
+    return shutdownPromise;
+  }
 
   shutdownPromise = (async () => {
     console.log("[worker] shutting down...");

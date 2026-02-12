@@ -1,7 +1,13 @@
 "use client";
 
+import { Loader2, Plus, Pencil, Trash2, Play, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { INTEGRATION_DISPLAY_NAMES, type IntegrationType } from "@/lib/integration-icons";
+import { cn } from "@/lib/utils";
+import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
 import {
   useWorkflowList,
   useCreateWorkflow,
@@ -9,15 +15,11 @@ import {
   useDeleteWorkflow,
   useTriggerWorkflow,
 } from "@/orpc/hooks";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
-import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
-import { INTEGRATION_DISPLAY_NAMES, type IntegrationType } from "@/lib/integration-icons";
-import { Loader2, Plus, Pencil, Trash2, Play, CheckCircle2, XCircle } from "lucide-react";
 
 function formatDate(value?: Date | string | null) {
-  if (!value) {return "—";}
+  if (!value) {
+    return "—";
+  }
   const date = typeof value === "string" ? new Date(value) : value;
   return date.toLocaleString();
 }
@@ -41,7 +43,9 @@ export default function WorkflowsPage() {
   const [expandedRunsByWorkflow, setExpandedRunsByWorkflow] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!notification) {return;}
+    if (!notification) {
+      return;
+    }
     const timer = setTimeout(() => setNotification(null), 5000);
     return () => clearTimeout(timer);
   }, [notification]);
@@ -76,7 +80,9 @@ export default function WorkflowsPage() {
   };
 
   const handleDelete = async () => {
-    if (!workflowToDelete) {return;}
+    if (!workflowToDelete) {
+      return;
+    }
     try {
       await deleteWorkflow.mutateAsync(workflowToDelete.id);
       setNotification({

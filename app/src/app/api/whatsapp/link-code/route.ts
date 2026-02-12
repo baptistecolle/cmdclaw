@@ -1,7 +1,7 @@
+import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { whatsappLinkCode, whatsappUserLink } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
 
 function generateLinkCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();

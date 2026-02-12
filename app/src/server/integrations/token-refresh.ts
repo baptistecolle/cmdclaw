@@ -1,8 +1,8 @@
+import { eq, and } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { integration, integrationToken, customIntegrationCredential } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
-import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 import { decrypt } from "@/server/lib/encryption";
+import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 
 // Refresh tokens 5 minutes before expiry
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
@@ -259,7 +259,9 @@ export async function getValidCustomTokens(userId: string): Promise<Map<string, 
       .map(async (c) => {
         const oauth = c.customIntegration.oauthConfig;
         if (!oauth || !c.refreshToken || !c.clientId || !c.clientSecret) {
-          if (c.accessToken) {tokens.set(c.id, c.accessToken);}
+          if (c.accessToken) {
+            tokens.set(c.id, c.accessToken);
+          }
           return;
         }
 
@@ -276,7 +278,9 @@ export async function getValidCustomTokens(userId: string): Promise<Map<string, 
             );
             tokens.set(c.id, newToken);
           } catch {
-            if (c.accessToken) {tokens.set(c.id, c.accessToken);}
+            if (c.accessToken) {
+              tokens.set(c.id, c.accessToken);
+            }
           }
         } else if (c.accessToken) {
           tokens.set(c.id, c.accessToken);

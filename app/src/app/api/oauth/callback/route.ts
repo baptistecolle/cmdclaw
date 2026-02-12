@@ -1,8 +1,8 @@
+import { eq, and } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { integration, integrationToken } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 
 export async function GET(request: NextRequest) {

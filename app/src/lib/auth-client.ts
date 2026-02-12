@@ -8,8 +8,8 @@ import {
   lastLoginMethodClient,
   magicLinkClient,
 } from "better-auth/client/plugins";
-import { env } from "@/env";
 import type { auth } from "@/lib/auth";
+import { env } from "@/env";
 
 const getAuthClientBaseURL = () => {
   if (typeof window !== "undefined") {

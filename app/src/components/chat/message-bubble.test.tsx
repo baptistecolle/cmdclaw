@@ -3,8 +3,8 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { MessageBubble } from "./message-bubble";
 import type { SandboxFileData } from "./message-list";
+import { MessageBubble } from "./message-bubble";
 
 describe("MessageBubble", () => {
   it("renders user messages in the user bubble", () => {

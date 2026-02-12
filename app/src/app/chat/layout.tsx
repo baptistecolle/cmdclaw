@@ -1,17 +1,17 @@
 "use client";
 
-import { ChatSidebar } from "@/components/chat/chat-sidebar";
-import { AppShell } from "@/components/app-shell";
+import { Copy, Check, Loader2 } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   SidebarProvider,
   SidebarInset,
   SidebarTrigger,
 } from "@/components/animate-ui/components/radix/sidebar";
+import { AppShell } from "@/components/app-shell";
+import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useConversation, useCurrentUser } from "@/orpc/hooks";
-import { useParams, useRouter } from "next/navigation";
-import { Copy, Check, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
 
 type Message = {
   role: string;
@@ -65,7 +65,9 @@ function CopyButton() {
   const { data: conversation } = useConversation(conversationId);
   const [copied, setCopied] = useState(false);
 
-  if (!conversationId || !conversation) {return null;}
+  if (!conversationId || !conversation) {
+    return null;
+  }
 
   const conv = conversation as {
     title?: string;
@@ -73,7 +75,9 @@ function CopyButton() {
   };
 
   const handleCopy = async () => {
-    if (!conv.messages) {return;}
+    if (!conv.messages) {
+      return;
+    }
 
     const markdown = formatChatToMarkdown(conv.messages, conv.title);
     await navigator.clipboard.writeText(markdown);

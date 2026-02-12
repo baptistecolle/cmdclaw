@@ -75,7 +75,9 @@ export class AnthropicBackend implements LLMBackend {
               : string) || "end_turn",
       } as StreamEvent;
     } catch (err: unknown) {
-      if (params.signal?.aborted) {return;}
+      if (params.signal?.aborted) {
+        return;
+      }
       const message = err instanceof Error ? err.message : "Unknown error";
       yield { type: "error", error: message };
     }

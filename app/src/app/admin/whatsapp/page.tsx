@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useState } from "react";
-import QRCode from "qrcode";
-import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import Image from "next/image";
+import QRCode from "qrcode";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 type WhatsAppStatus = {
   status: "disconnected" | "connecting" | "connected";
@@ -28,12 +28,16 @@ export default function AdminWhatsAppPage() {
           throw new Error(await res.text());
         }
         const data = (await res.json()) as WhatsAppStatus;
-        if (!active) {return;}
+        if (!active) {
+          return;
+        }
         setWaStatus(data);
       } catch (err) {
         console.error("Failed to load WhatsApp status:", err);
       } finally {
-        if (active) {setWaLoading(false);}
+        if (active) {
+          setWaLoading(false);
+        }
       }
     };
 

@@ -1,17 +1,17 @@
 "use client";
 
-import { Suspense, useRef, useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import Image from "next/image";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useRef, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   useIntegrationList,
   useGetAuthUrl,
   useCompleteOnboarding,
   useLinkLinkedIn,
 } from "@/orpc/hooks";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const integrationConfig = {
   gmail: {

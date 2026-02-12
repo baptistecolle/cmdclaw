@@ -1,6 +1,6 @@
-import { protectedProcedure } from "../middleware";
-import { user } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
+import { user } from "@/server/db/schema";
+import { protectedProcedure } from "../middleware";
 
 // Get current user with onboardedAt status
 const me = protectedProcedure.handler(async ({ context }) => {

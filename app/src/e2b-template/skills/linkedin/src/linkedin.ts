@@ -59,7 +59,9 @@ async function listChats() {
     account_id: LINKEDIN_ACCOUNT_ID!,
     limit: limit.toString(),
   });
-  if (values.cursor) {params.set("cursor", values.cursor);}
+  if (values.cursor) {
+    params.set("cursor", values.cursor);
+  }
 
   const data = await api(`/chats?${params}`);
   const chats =
@@ -104,7 +106,9 @@ async function listMessages(chatId: string) {
     account_id: LINKEDIN_ACCOUNT_ID!,
     limit: limit.toString(),
   });
-  if (values.cursor) {params.set("cursor", values.cursor);}
+  if (values.cursor) {
+    params.set("cursor", values.cursor);
+  }
 
   const data = await api(`/chats/${chatId}/messages?${params}`);
   const messages =
@@ -236,7 +240,9 @@ async function sendInvitation(profileId: string, message?: string) {
     account_id: LINKEDIN_ACCOUNT_ID,
     provider_id: profileId,
   };
-  if (message) {body.message = message;}
+  if (message) {
+    body.message = message;
+  }
 
   await api("/users/invite", {
     method: "POST",
@@ -269,7 +275,9 @@ async function listConnections() {
     account_id: LINKEDIN_ACCOUNT_ID!,
     limit: limit.toString(),
   });
-  if (values.cursor) {params.set("cursor", values.cursor);}
+  if (values.cursor) {
+    params.set("cursor", values.cursor);
+  }
 
   const data = await api(`/users/relations?${params}`);
 
@@ -335,8 +343,12 @@ async function listPosts(profileId?: string) {
     account_id: LINKEDIN_ACCOUNT_ID!,
     limit: limit.toString(),
   });
-  if (profileId) {params.set("identifier", profileId);}
-  if (values.cursor) {params.set("cursor", values.cursor);}
+  if (profileId) {
+    params.set("identifier", profileId);
+  }
+  if (values.cursor) {
+    params.set("cursor", values.cursor);
+  }
 
   const data = await api(`/posts?${params}`);
 
@@ -383,7 +395,9 @@ async function listCompanyPosts(companyId: string) {
     account_id: LINKEDIN_ACCOUNT_ID!,
     limit: limit.toString(),
   });
-  if (values.cursor) {params.set("cursor", values.cursor);}
+  if (values.cursor) {
+    params.set("cursor", values.cursor);
+  }
 
   const data = await api(`/companies/${companyId}/posts?${params}`);
 

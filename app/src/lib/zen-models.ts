@@ -11,7 +11,9 @@ const MODELS_DEV_URL = "https://models.dev/api.json";
 export const PREFERRED_ZEN_FREE_MODEL = "kimi-k2.5-free";
 
 function isFreeModel(model: ProviderModel): boolean {
-  if (!model.cost) {return false;}
+  if (!model.cost) {
+    return false;
+  }
   return model.cost.input === 0 && model.cost.output === 0;
 }
 

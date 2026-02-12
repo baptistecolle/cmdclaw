@@ -1,8 +1,8 @@
 "use client";
 
-import { ChatArea } from "@/components/chat/chat-area";
-import { use, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { use, useEffect } from "react";
+import { ChatArea } from "@/components/chat/chat-area";
 import { client } from "@/orpc/client";
 
 type Props = {

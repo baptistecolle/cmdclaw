@@ -1,21 +1,21 @@
 import { ORPCError } from "@orpc/server";
+import { createHash, randomBytes } from "crypto";
+import { eq, and, or } from "drizzle-orm";
 import { z } from "zod";
-import { protectedProcedure } from "../middleware";
 import {
   integration,
   integrationToken,
   customIntegration,
   customIntegrationCredential,
 } from "@/server/db/schema";
-import { eq, and, or } from "drizzle-orm";
-import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
-import { createHash, randomBytes } from "crypto";
 import {
   generateLinkedInAuthUrl,
   deleteUnipileAccount,
   getUnipileAccount,
 } from "@/server/integrations/unipile";
 import { encrypt, decrypt } from "@/server/lib/encryption";
+import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
+import { protectedProcedure } from "../middleware";
 
 // PKCE helpers for Airtable OAuth
 function generateCodeVerifier(): string {

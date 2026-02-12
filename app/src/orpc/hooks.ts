@@ -2,7 +2,6 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
-import { client } from "./client";
 import {
   runGenerationStream,
   type ToolUseData,
@@ -12,6 +11,7 @@ import {
   type SandboxFileData,
   type GenerationCallbacks,
 } from "@/lib/generation-stream";
+import { client } from "./client";
 
 const STREAM_NOT_READY_ERROR =
   "Generation is still processing but cannot be streamed from this server yet. Please refresh shortly.";
@@ -23,7 +23,9 @@ function isStreamNotReadyError(message: string | undefined): boolean {
 }
 
 async function waitForRetry(signal: AbortSignal, delayMs: number): Promise<boolean> {
-  if (signal.aborted) {return false;}
+  if (signal.aborted) {
+    return false;
+  }
   return await new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => {
       signal.removeEventListener("abort", onAbort);

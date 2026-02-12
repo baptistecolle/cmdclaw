@@ -5,8 +5,8 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { resolve, dirname } from "path";
-import { logger } from "./logger";
 import { getSandboxDir } from "./config";
+import { logger } from "./logger";
 
 const DEFAULT_TIMEOUT_MS = 120_000; // 2 minutes
 

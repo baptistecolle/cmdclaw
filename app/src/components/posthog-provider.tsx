@@ -1,10 +1,9 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
 import { PostHogProvider, usePostHog } from "posthog-js/react";
-
+import { Suspense, useEffect } from "react";
 import { env } from "@/env";
 import { authClient } from "@/lib/auth-client";
 
@@ -25,7 +24,9 @@ function PostHogPageView() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (!posthogClient) {return;}
+    if (!posthogClient) {
+      return;
+    }
     const search = searchParams?.toString();
     const url = `${window.location.origin}${pathname}${search ? `?${search}` : ""}`;
     posthogClient.capture("$pageview", { $current_url: url });
@@ -38,27 +39,35 @@ function PostHogIdentify() {
   const posthogClient = usePostHog();
 
   useEffect(() => {
-    if (!posthogClient) {return;}
+    if (!posthogClient) {
+      return;
+    }
     let cancelled = false;
 
     authClient
       .getSession()
       .then((res) => {
-        if (cancelled) {return;}
+        if (cancelled) {
+          return;
+        }
         const user = res?.data?.user;
         if (!user) {
           posthogClient.reset();
           return;
         }
         const properties: Record<string, string> = {};
-        if (user.email) {properties.email = user.email;}
+        if (user.email) {
+          properties.email = user.email;
+        }
         if ("name" in user && typeof user.name === "string" && user.name) {
           properties.name = user.name;
         }
         posthogClient.identify(user.id, properties);
       })
       .catch(() => {
-        if (!cancelled) {posthogClient.reset();}
+        if (!cancelled) {
+          posthogClient.reset();
+        }
       });
 
     return () => {
