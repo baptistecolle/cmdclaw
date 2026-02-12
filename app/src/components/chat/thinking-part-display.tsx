@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRight, Brain } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -12,6 +12,9 @@ type Props = {
 
 export function ThinkingPartDisplay({ content, isStreaming, defaultExpanded = false }: Props) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const handleToggleExpanded = useCallback(() => {
+    setIsExpanded((prev) => !prev);
+  }, []);
 
   // Preview: first 80 chars or first line
   const firstLine = content.split("\n")[0];
@@ -21,7 +24,7 @@ export function ThinkingPartDisplay({ content, isStreaming, defaultExpanded = fa
     <div className="rounded-lg border border-muted-foreground/20 bg-muted/50">
       {/* Header - always visible */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleToggleExpanded}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/80 transition-colors"
       >
         <ChevronRight

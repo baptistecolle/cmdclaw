@@ -86,7 +86,7 @@ export function ChatInput({
     });
   }, []);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if ((!value.trim() && attachments.length === 0) || disabled) {
       return;
     }
@@ -111,32 +111,116 @@ export function ChatInput({
 
     onSend(value.trim(), attachmentData);
     setValue("");
-  };
+  }, [attachments, disabled, onSend, value]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  };
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit],
+  );
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
-  };
+  }, []);
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files.length > 0) {
-      addFiles(e.dataTransfer.files);
-    }
-  };
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      if (e.dataTransfer.files.length > 0) {
+        addFiles(e.dataTransfer.files);
+      }
+    },
+    [addFiles],
+  );
+
+  const handleRemoveAttachmentClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const index = Number(e.currentTarget.dataset.attachmentIndex);
+      if (Number.isFinite(index)) {
+        removeAttachment(index);
+      }
+    },
+    [removeAttachment],
+  );
+
+  const handleOpenFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) {
+        addFiles(e.target.files);
+      }
+      e.target.value = "";
+    },
+    [addFiles],
+  );
+
+  const handleValueChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setValue(e.target.value);
+  }, []);
+
+  const handleRecordMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!disabled && !isStreaming) {
+        onStartRecording?.();
+      }
+    },
+    [disabled, isStreaming, onStartRecording],
+  );
+
+  const handleRecordMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (isRecording) {
+        onStopRecording?.();
+      }
+    },
+    [isRecording, onStopRecording],
+  );
+
+  const handleRecordMouseLeave = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (isRecording) {
+        onStopRecording?.();
+      }
+    },
+    [isRecording, onStopRecording],
+  );
+
+  const handleRecordTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      e.preventDefault();
+      if (!disabled && !isStreaming) {
+        onStartRecording?.();
+      }
+    },
+    [disabled, isStreaming, onStartRecording],
+  );
+
+  const handleRecordTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      e.preventDefault();
+      if (isRecording) {
+        onStopRecording?.();
+      }
+    },
+    [isRecording, onStopRecording],
+  );
 
   return (
     <div
@@ -171,7 +255,8 @@ export function ChatInput({
               <span className="max-w-[120px] truncate">{a.file.name}</span>
               <button
                 type="button"
-                onClick={() => removeAttachment(i)}
+                data-attachment-index={i}
+                onClick={handleRemoveAttachmentClick}
                 className="ml-0.5 rounded-full p-0.5 hover:bg-muted"
               >
                 <X className="h-3 w-3" />
@@ -189,7 +274,7 @@ export function ChatInput({
           variant="ghost"
           className="h-9 w-9 shrink-0"
           disabled={disabled || isStreaming || attachments.length >= MAX_FILES}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={handleOpenFilePicker}
         >
           <Paperclip className="h-4 w-4" />
         </Button>
@@ -198,19 +283,14 @@ export function ChatInput({
           type="file"
           multiple
           className="hidden"
-          onChange={(e) => {
-            if (e.target.files) {
-              addFiles(e.target.files);
-            }
-            e.target.value = "";
-          }}
+          onChange={handleFileInputChange}
         />
 
         <textarea
           ref={textareaRef}
           data-testid="chat-input"
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={handleValueChange}
           onKeyDown={handleKeyDown}
           placeholder="Send a message..."
           disabled={disabled}
@@ -219,36 +299,11 @@ export function ChatInput({
         />
         {onStartRecording && onStopRecording && (
           <Button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              if (!disabled && !isStreaming) {
-                onStartRecording();
-              }
-            }}
-            onMouseUp={(e) => {
-              e.preventDefault();
-              if (isRecording) {
-                onStopRecording();
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.preventDefault();
-              if (isRecording) {
-                onStopRecording();
-              }
-            }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              if (!disabled && !isStreaming) {
-                onStartRecording();
-              }
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              if (isRecording) {
-                onStopRecording();
-              }
-            }}
+            onMouseDown={handleRecordMouseDown}
+            onMouseUp={handleRecordMouseUp}
+            onMouseLeave={handleRecordMouseLeave}
+            onTouchStart={handleRecordTouchStart}
+            onTouchEnd={handleRecordTouchEnd}
             disabled={disabled && !isRecording}
             size="icon"
             variant={isRecording ? "destructive" : "outline"}

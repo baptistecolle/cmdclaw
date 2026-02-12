@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import type { IntegrationType } from "@/lib/integration-icons";
 import { Switch } from "@/components/ui/switch";
@@ -739,6 +739,15 @@ export function ChatArea({ conversationId }: Props) {
       prev.map((seg) => (seg.id === segmentId ? { ...seg, isExpanded: !seg.isExpanded } : seg)),
     );
   }, []);
+  const segmentToggleHandlers = useMemo(() => {
+    const handlers = new Map<string, () => void>();
+    for (const segment of segments) {
+      handlers.set(segment.id, () => {
+        toggleSegmentExpand(segment.id);
+      });
+    }
+    return handlers;
+  }, [segments, toggleSegmentExpand]);
 
   const handleSend = useCallback(
     async (content: string, attachments?: AttachmentData[]) => {
@@ -1057,6 +1066,45 @@ export function ChatArea({ conversationId }: Props) {
       console.error("Failed to cancel auth:", err);
     }
   }, [submitAuthResult, segments, syncFromRuntime]);
+  const segmentApproveHandlers = useMemo(() => {
+    const handlers = new Map<string, () => void>();
+    for (const segment of segments) {
+      const toolUseId = segment.approval?.toolUseId;
+      if (!toolUseId) {
+        continue;
+      }
+      handlers.set(segment.id, () => {
+        void handleApprove(toolUseId);
+      });
+    }
+    return handlers;
+  }, [handleApprove, segments]);
+  const segmentDenyHandlers = useMemo(() => {
+    const handlers = new Map<string, () => void>();
+    for (const segment of segments) {
+      const toolUseId = segment.approval?.toolUseId;
+      if (!toolUseId) {
+        continue;
+      }
+      handlers.set(segment.id, () => {
+        void handleDeny(toolUseId);
+      });
+    }
+    return handlers;
+  }, [handleDeny, segments]);
+  const handleAutoApproveChange = useCallback(
+    (checked: boolean) => {
+      if (conversationId) {
+        updateAutoApprove({
+          id: conversationId,
+          autoApprove: checked,
+        });
+      } else {
+        setLocalAutoApprove(checked);
+      }
+    },
+    [conversationId, updateAutoApprove],
+  );
 
   // Voice recording: stop and transcribe
   const stopRecordingAndTranscribe = useCallback(async () => {
@@ -1212,7 +1260,7 @@ export function ChatArea({ conversationId }: Props) {
                               !segment.auth
                             }
                             isExpanded={segment.isExpanded}
-                            onToggleExpand={() => toggleSegmentExpand(segment.id)}
+                            onToggleExpand={segmentToggleHandlers.get(segment.id)}
                             integrationsUsed={segmentIntegrations}
                           />
                         )}
@@ -1228,8 +1276,8 @@ export function ChatArea({ conversationId }: Props) {
                             command={segment.approval.command}
                             status={segment.approval.status}
                             isLoading={isApproving}
-                            onApprove={() => handleApprove(segment.approval!.toolUseId)}
-                            onDeny={() => handleDeny(segment.approval!.toolUseId)}
+                            onApprove={segmentApproveHandlers.get(segment.id)!}
+                            onDeny={segmentDenyHandlers.get(segment.id)!}
                           />
                         )}
 
@@ -1293,16 +1341,7 @@ export function ChatArea({ conversationId }: Props) {
                         ?.autoApprove ?? false)
                     : localAutoApprove
                 }
-                onCheckedChange={(checked) => {
-                  if (conversationId) {
-                    updateAutoApprove({
-                      id: conversationId,
-                      autoApprove: checked,
-                    });
-                  } else {
-                    setLocalAutoApprove(checked);
-                  }
-                }}
+                onCheckedChange={handleAutoApproveChange}
               />
               <label
                 htmlFor="auto-approve"

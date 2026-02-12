@@ -27,7 +27,7 @@ import {
   handleCommandNavigation,
   type JSONContent,
 } from "novel";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { defaultExtensions } from "./novel-extensions";
 
@@ -138,6 +138,74 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
       initialContent.current = content;
     }
   }, [content, editorKey]);
+  const handleEditorKeyDown = useCallback(
+    (_view: unknown, event: KeyboardEvent) => handleCommandNavigation(event),
+    [],
+  );
+  const editorProps = useMemo(
+    () => ({
+      handleDOMEvents: {
+        keydown: handleEditorKeyDown,
+      },
+    }),
+    [handleEditorKeyDown],
+  );
+  const handleEditorUpdate = useCallback(
+    ({ editor }: { editor: Editor }) => {
+      const markdown = editorToMarkdown(editor);
+      onChange(markdown);
+    },
+    [onChange],
+  );
+  const suggestionCommandHandlers = useMemo(() => {
+    const handlers = new Map<string, (val: string) => void>();
+    for (const item of suggestionItems) {
+      handlers.set(item.title, (val: string) => {
+        item.command(val as SuggestionCommandArgs);
+      });
+    }
+    return handlers;
+  }, []);
+  const slotAfter = useMemo(
+    () => (
+      <EditorCommand className="z-50 h-auto max-h-[330px] overflow-y-auto rounded-md border bg-background px-1 py-2 shadow-md">
+        <EditorCommandEmpty className="px-2 text-sm text-muted-foreground">
+          No results
+        </EditorCommandEmpty>
+        <EditorCommandList>
+          {suggestionItems.map((item) => (
+            <EditorCommandItem
+              key={item.title}
+              value={item.title}
+              onCommand={suggestionCommandHandlers.get(item.title)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer aria-selected:bg-accent"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
+                {item.icon}
+              </div>
+              <div>
+                <p className="font-medium">{item.title}</p>
+                <p className="text-xs text-muted-foreground">{item.description}</p>
+              </div>
+            </EditorCommandItem>
+          ))}
+        </EditorCommandList>
+      </EditorCommand>
+    ),
+    [suggestionCommandHandlers],
+  );
+  const handleSelectBold = useCallback((editor: Editor) => {
+    editor.chain().focus().toggleBold().run();
+  }, []);
+  const handleSelectItalic = useCallback((editor: Editor) => {
+    editor.chain().focus().toggleItalic().run();
+  }, []);
+  const handleSelectStrike = useCallback((editor: Editor) => {
+    editor.chain().focus().toggleStrike().run();
+  }, []);
+  const handleSelectCode = useCallback((editor: Editor) => {
+    editor.chain().focus().toggleCode().run();
+  }, []);
 
   return (
     <EditorRoot>
@@ -157,64 +225,21 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
         )}
         extensions={defaultExtensions}
         initialContent={parseMarkdownToJSON(content)}
-        editorProps={{
-          handleDOMEvents: {
-            keydown: (_view, event) => handleCommandNavigation(event),
-          },
-        }}
-        onUpdate={({ editor }) => {
-          const markdown = editorToMarkdown(editor);
-          onChange(markdown);
-        }}
-        slotAfter={
-          <EditorCommand className="z-50 h-auto max-h-[330px] overflow-y-auto rounded-md border bg-background px-1 py-2 shadow-md">
-            <EditorCommandEmpty className="px-2 text-sm text-muted-foreground">
-              No results
-            </EditorCommandEmpty>
-            <EditorCommandList>
-              {suggestionItems.map((item) => (
-                <EditorCommandItem
-                  key={item.title}
-                  value={item.title}
-                  onCommand={(val) => item.command(val as SuggestionCommandArgs)}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer aria-selected:bg-accent"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
-                    {item.icon}
-                  </div>
-                  <div>
-                    <p className="font-medium">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{item.description}</p>
-                  </div>
-                </EditorCommandItem>
-              ))}
-            </EditorCommandList>
-          </EditorCommand>
-        }
+        editorProps={editorProps}
+        onUpdate={handleEditorUpdate}
+        slotAfter={slotAfter}
       >
         <EditorBubble className="flex w-fit max-w-[90vw] overflow-hidden rounded-md border bg-background shadow-xl">
-          <EditorBubbleItem
-            onSelect={(editor) => editor.chain().focus().toggleBold().run()}
-            className="p-2 hover:bg-accent"
-          >
+          <EditorBubbleItem onSelect={handleSelectBold} className="p-2 hover:bg-accent">
             <Bold className="h-4 w-4" />
           </EditorBubbleItem>
-          <EditorBubbleItem
-            onSelect={(editor) => editor.chain().focus().toggleItalic().run()}
-            className="p-2 hover:bg-accent"
-          >
+          <EditorBubbleItem onSelect={handleSelectItalic} className="p-2 hover:bg-accent">
             <Italic className="h-4 w-4" />
           </EditorBubbleItem>
-          <EditorBubbleItem
-            onSelect={(editor) => editor.chain().focus().toggleStrike().run()}
-            className="p-2 hover:bg-accent"
-          >
+          <EditorBubbleItem onSelect={handleSelectStrike} className="p-2 hover:bg-accent">
             <Strikethrough className="h-4 w-4" />
           </EditorBubbleItem>
-          <EditorBubbleItem
-            onSelect={(editor) => editor.chain().focus().toggleCode().run()}
-            className="p-2 hover:bg-accent"
-          >
+          <EditorBubbleItem onSelect={handleSelectCode} className="p-2 hover:bg-accent">
             <Code className="h-4 w-4" />
           </EditorBubbleItem>
         </EditorBubble>

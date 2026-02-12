@@ -530,20 +530,22 @@ class GenerationManager {
       try {
         const { uploadToS3, ensureBucket } = await import("@/server/storage/s3-client");
         await ensureBucket();
-        for (const a of params.attachments) {
-          const base64Data = a.dataUrl.split(",")[1] || "";
-          const buffer = Buffer.from(base64Data, "base64");
-          const sanitizedFilename = a.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-          const storageKey = `attachments/${conv.id}/${userMsg.id}/${Date.now()}-${sanitizedFilename}`;
-          await uploadToS3(storageKey, buffer, a.mimeType);
-          await db.insert(messageAttachment).values({
-            messageId: userMsg.id,
-            filename: a.name,
-            mimeType: a.mimeType,
-            sizeBytes: buffer.length,
-            storageKey,
-          });
-        }
+        await Promise.all(
+          params.attachments.map(async (a) => {
+            const base64Data = a.dataUrl.split(",")[1] || "";
+            const buffer = Buffer.from(base64Data, "base64");
+            const sanitizedFilename = a.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+            const storageKey = `attachments/${conv.id}/${userMsg.id}/${Date.now()}-${sanitizedFilename}`;
+            await uploadToS3(storageKey, buffer, a.mimeType);
+            await db.insert(messageAttachment).values({
+              messageId: userMsg.id,
+              filename: a.name,
+              mimeType: a.mimeType,
+              sizeBytes: buffer.length,
+              storageKey,
+            });
+          }),
+        );
         logServerEvent(
           "info",
           "START_GENERATION_PHASE_DONE",
@@ -941,7 +943,15 @@ class GenerationManager {
 
         yield { type: "status_change", status: genRecord.status };
 
-        while (Date.now() - startedAt < maxWaitMs) {
+        const pollForTerminal = async function* (): AsyncGenerator<
+          GenerationStreamEvent,
+          void,
+          unknown
+        > {
+          if (Date.now() - startedAt >= maxWaitMs) {
+            return;
+          }
+
           await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
 
           const latest = await db.query.generation.findFirst({
@@ -971,7 +981,11 @@ class GenerationManager {
             }
             return;
           }
-        }
+
+          yield* pollForTerminal();
+        };
+
+        yield* pollForTerminal();
 
         const errorMessage =
           "Generation is still processing but cannot be streamed from this server yet. Please refresh shortly.";
@@ -1092,7 +1106,17 @@ class GenerationManager {
     ctx.subscribers.set(subscriberId, subscriber);
 
     try {
-      while (!isUnsubscribed) {
+      const waitForMoreEvents = () =>
+        new Promise<void>((resolve) => {
+          resolveWait = resolve;
+          setTimeout(resolve, 100);
+        });
+
+      const streamEvents = async function* (): AsyncGenerator<GenerationStreamEvent, void, unknown> {
+        if (isUnsubscribed) {
+          return;
+        }
+
         // Yield all queued events
         while (eventQueue.length > 0) {
           const event = eventQueue.shift()!;
@@ -1101,25 +1125,20 @@ class GenerationManager {
           // Check for terminal events
           if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
             isUnsubscribed = true;
-            break;
+            return;
           }
-        }
-
-        if (isUnsubscribed) {
-          break;
         }
 
         // Check if generation is complete
         if (ctx.status === "completed" || ctx.status === "cancelled" || ctx.status === "error") {
-          break;
+          return;
         }
 
-        // Wait for more events
-        await new Promise<void>((resolve) => {
-          resolveWait = resolve;
-          setTimeout(resolve, 100);
-        });
-      }
+        await waitForMoreEvents();
+        yield* streamEvents();
+      };
+
+      yield* streamEvents();
     } finally {
       // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
       ctx.subscribers.delete(subscriberId);
@@ -1594,21 +1613,24 @@ class GenerationManager {
           with: { customIntegration: true },
         });
 
-        const customPerms: Record<string, { read: string[]; write: string[] }> = {};
-
-        for (const cred of customCreds) {
-          const integ = cred.customIntegration;
-          // Filter by allowed custom integrations if set
-          if (
-            ctx.allowedCustomIntegrations &&
-            !ctx.allowedCustomIntegrations.includes(integ.slug)
-          ) {
-            continue;
+        const eligibleCustomCreds = customCreds.filter((cred) => {
+          if (!ctx.allowedCustomIntegrations) {
+            return true;
           }
-          // Write CLI code to sandbox
-          const cliPath = `/app/cli/custom-${integ.slug}.ts`;
-          await sandbox.files.write(cliPath, integ.cliCode);
-          // Collect permissions
+          return ctx.allowedCustomIntegrations.includes(cred.customIntegration.slug);
+        });
+
+        await Promise.all(
+          eligibleCustomCreds.map(async (cred) => {
+            const integ = cred.customIntegration;
+            const cliPath = `/app/cli/custom-${integ.slug}.ts`;
+            await sandbox.files.write(cliPath, integ.cliCode);
+          }),
+        );
+
+        const customPerms: Record<string, { read: string[]; write: string[] }> = {};
+        for (const cred of eligibleCustomCreds) {
+          const integ = cred.customIntegration;
           customPerms[`custom-${integ.slug}`] = {
             read: integ.permissions.readOps,
             write: integ.permissions.writeOps,
@@ -1623,12 +1645,8 @@ class GenerationManager {
         }
 
         const allowedSkillSlugs = new Set<string>(allowedIntegrations);
-        for (const cred of customCreds) {
-          const slug = cred.customIntegration.slug;
-          if (ctx.allowedCustomIntegrations && !ctx.allowedCustomIntegrations.includes(slug)) {
-            continue;
-          }
-          allowedSkillSlugs.add(slug);
+        for (const cred of eligibleCustomCreds) {
+          allowedSkillSlugs.add(cred.customIntegration.slug);
         }
 
         const writtenIntegrationSkills = await writeResolvedIntegrationSkillsToSandbox(
@@ -1690,15 +1708,18 @@ class GenerationManager {
         { type: "text", text: ctx.userMessageContent },
       ];
       if (ctx.attachments && ctx.attachments.length > 0) {
-        for (const a of ctx.attachments) {
-          if (a.mimeType.startsWith("image/")) {
-            promptParts.push({
-              type: "file",
-              mime: a.mimeType,
-              url: a.dataUrl,
-              filename: a.name,
-            });
-          } else {
+        await Promise.all(
+          ctx.attachments.map(async (a) => {
+            if (a.mimeType.startsWith("image/")) {
+              promptParts.push({
+                type: "file",
+                mime: a.mimeType,
+                url: a.dataUrl,
+                filename: a.name,
+              });
+              return;
+            }
+
             // Write non-image file to sandbox and tell the LLM where it is
             const sandboxPath = `/home/user/uploads/${a.name}`;
             try {
@@ -1727,8 +1748,8 @@ class GenerationManager {
                 text: `The user tried to upload a file "${a.name}" but it could not be written to the sandbox.`,
               });
             }
-          }
-        }
+          }),
+        );
       }
       if (stagedUploadCount > 0 || stagedUploadFailureCount > 0) {
         logServerEvent(
@@ -1876,30 +1897,32 @@ class GenerationManager {
 
           console.log(`[GenerationManager] Found ${newFiles.length} new files in E2B sandbox`);
 
-          for (const file of newFiles) {
-            try {
-              const fileRecord = await uploadSandboxFile({
-                path: file.path,
-                content: file.content,
-                conversationId: ctx.conversationId,
-              });
-              ctx.uploadedSandboxFileIds?.add(fileRecord.id);
+          await Promise.all(
+            newFiles.map(async (file) => {
+              try {
+                const fileRecord = await uploadSandboxFile({
+                  path: file.path,
+                  content: file.content,
+                  conversationId: ctx.conversationId,
+                });
+                ctx.uploadedSandboxFileIds?.add(fileRecord.id);
 
-              // Broadcast sandbox_file event so UI can update
-              this.broadcast(ctx, {
-                type: "sandbox_file",
-                fileId: fileRecord.id,
-                path: file.path,
-                filename: fileRecord.filename,
-                mimeType: fileRecord.mimeType,
-                sizeBytes: fileRecord.sizeBytes,
-              });
+                // Broadcast sandbox_file event so UI can update
+                this.broadcast(ctx, {
+                  type: "sandbox_file",
+                  fileId: fileRecord.id,
+                  path: file.path,
+                  filename: fileRecord.filename,
+                  mimeType: fileRecord.mimeType,
+                  sizeBytes: fileRecord.sizeBytes,
+                });
 
-              uploadedSandboxFileCount += 1;
-            } catch (err) {
-              console.error(`[GenerationManager] Failed to upload sandbox file ${file.path}:`, err);
-            }
-          }
+                uploadedSandboxFileCount += 1;
+              } catch (err) {
+                console.error(`[GenerationManager] Failed to upload sandbox file ${file.path}:`, err);
+              }
+            }),
+          );
         } catch (err) {
           console.error("[GenerationManager] Failed to collect sandbox files:", err);
         }
@@ -1981,18 +2004,22 @@ class GenerationManager {
       );
       if (resolvedCommunityIntegrationSkills.length > 0) {
         await sandbox.execute('mkdir -p "/app/.opencode/integration-skills"');
-        for (const skill of resolvedCommunityIntegrationSkills) {
-          const skillDir = `/app/.opencode/integration-skills/${skill.slug}`;
-          await sandbox.execute(`mkdir -p "${skillDir}"`);
-          for (const file of skill.files) {
-            const filePath = `${skillDir}/${file.path}`;
-            const idx = filePath.lastIndexOf("/");
-            if (idx > 0) {
-              await sandbox.execute(`mkdir -p "${filePath.slice(0, idx)}"`);
-            }
-            await sandbox.writeFile(filePath, file.content);
-          }
-        }
+        await Promise.all(
+          resolvedCommunityIntegrationSkills.map(async (skill) => {
+            const skillDir = `/app/.opencode/integration-skills/${skill.slug}`;
+            await sandbox.execute(`mkdir -p "${skillDir}"`);
+            await Promise.all(
+              skill.files.map(async (file) => {
+                const filePath = `${skillDir}/${file.path}`;
+                const idx = filePath.lastIndexOf("/");
+                if (idx > 0) {
+                  await sandbox.execute(`mkdir -p "${filePath.slice(0, idx)}"`);
+                }
+                await sandbox.writeFile(filePath, file.content);
+              }),
+            );
+          }),
+        );
       }
       const integrationSkillsPrompt = getIntegrationSkillsSystemPrompt(
         resolvedCommunityIntegrationSkills.map((skill) => skill.slug),
@@ -2027,13 +2054,17 @@ class GenerationManager {
       let iterationCount = 0;
       const MAX_ITERATIONS = 50;
 
-      while (hasToolCalls && iterationCount < MAX_ITERATIONS) {
+      const runDirectToolLoop = async (): Promise<void> => {
+        if (!hasToolCalls || iterationCount >= MAX_ITERATIONS) {
+          return;
+        }
+
         if (ctx.abortController.signal.aborted) {
           await this.finishGeneration(ctx, "cancelled");
           return;
         }
 
-        iterationCount++;
+        iterationCount += 1;
         hasToolCalls = false;
 
         // Call LLM
@@ -2050,9 +2081,9 @@ class GenerationManager {
           signal: ctx.abortController.signal,
         });
 
-        for await (const event of stream) {
+        await this.consumeAsyncStream(stream, async (event) => {
           if (ctx.abortController.signal.aborted) {
-            break;
+            return true;
           }
 
           switch (event.type) {
@@ -2060,7 +2091,6 @@ class GenerationManager {
               ctx.assistantContent += event.text;
               this.broadcast(ctx, { type: "text", content: event.text });
 
-              // Accumulate text into content parts
               const lastPart = ctx.contentParts[ctx.contentParts.length - 1];
               if (lastPart && lastPart.type === "text") {
                 lastPart.text += event.text;
@@ -2068,7 +2098,6 @@ class GenerationManager {
                 ctx.contentParts.push({ type: "text", text: event.text });
               }
 
-              // Also accumulate for the response blocks
               const lastBlock = assistantContentBlocks[assistantContentBlocks.length - 1];
               if (lastBlock && lastBlock.type === "text") {
                 lastBlock.text += event.text;
@@ -2079,21 +2108,17 @@ class GenerationManager {
               this.scheduleSave(ctx);
               break;
             }
-
             case "tool_use_start": {
               currentToolUseId = event.toolUseId;
               currentToolName = event.toolName;
               currentToolJson = "";
               break;
             }
-
             case "tool_use_delta": {
               currentToolJson += event.jsonDelta;
               break;
             }
-
             case "tool_use_end": {
-              // Parse the accumulated JSON
               let toolInput: Record<string, unknown> = {};
               try {
                 toolInput = JSON.parse(currentToolJson);
@@ -2109,7 +2134,6 @@ class GenerationManager {
               };
               assistantContentBlocks.push(toolBlock);
 
-              // Broadcast tool use
               this.broadcast(ctx, {
                 type: "tool_use",
                 toolName: currentToolName,
@@ -2128,7 +2152,6 @@ class GenerationManager {
               hasToolCalls = true;
               break;
             }
-
             case "thinking": {
               this.broadcast(ctx, {
                 type: "thinking",
@@ -2137,38 +2160,34 @@ class GenerationManager {
               });
               break;
             }
-
             case "usage": {
               ctx.usage.inputTokens += event.inputTokens;
               ctx.usage.outputTokens += event.outputTokens;
               break;
             }
-
             case "error": {
               throw new Error(event.error);
             }
           }
-        }
+
+          return false;
+        });
 
         if (ctx.abortController.signal.aborted) {
           await this.finishGeneration(ctx, "cancelled");
           return;
         }
 
-        // If there are tool calls, execute them and loop
         if (hasToolCalls) {
-          // Add assistant response to messages
           loopMessages.push({
             role: "assistant",
             content: assistantContentBlocks,
           });
 
-          // Execute tool calls
           const toolResults: ContentBlock[] = [];
-
-          for (const block of assistantContentBlocks) {
+          await this.forEachSequential(assistantContentBlocks, async (block) => {
             if (block.type !== "tool_use") {
-              continue;
+              return;
             }
 
             if (block.name.startsWith("memory_")) {
@@ -2179,21 +2198,18 @@ class GenerationManager {
                 content: memoryResult.content,
                 is_error: memoryResult.isError,
               });
-
               this.broadcast(ctx, {
                 type: "tool_result",
                 toolName: block.name,
                 result: memoryResult.content,
               });
-
               ctx.contentParts.push({
                 type: "tool_result",
                 tool_use_id: block.id,
                 content: memoryResult.content,
               });
-
               await this.saveProgress(ctx);
-              continue;
+              return;
             }
 
             if (ctx.allowedIntegrations !== undefined && block.name === "bash") {
@@ -2209,33 +2225,26 @@ class GenerationManager {
                   content: `Integration "${parsed.integration}" is not allowed for this workflow.`,
                   is_error: true,
                 });
-
                 this.broadcast(ctx, {
                   type: "tool_result",
                   toolName: block.name,
                   result: "Integration not allowed",
                 });
-
                 ctx.contentParts.push({
                   type: "tool_result",
                   tool_use_id: block.id,
                   content: "Integration not allowed",
                 });
-
-                continue;
+                return;
               }
             }
 
-            // Check permissions
             const permCheck = checkToolPermissions(block.name, block.input, allowedIntegrations);
-
             if (permCheck.needsAuth) {
-              // Request auth from user
               const authResult = await this.waitForAuth(ctx.id, {
                 integration: permCheck.integration!,
                 reason: permCheck.reason,
               });
-
               if (!authResult.success) {
                 toolResults.push({
                   type: "tool_result",
@@ -2243,32 +2252,27 @@ class GenerationManager {
                   content: `Authentication not completed for ${permCheck.integrationName}. The user needs to connect this integration first.`,
                   is_error: true,
                 });
-
                 this.broadcast(ctx, {
                   type: "tool_result",
                   toolName: block.name,
                   result: "Authentication not completed",
                 });
-
                 ctx.contentParts.push({
                   type: "tool_result",
                   tool_use_id: block.id,
                   content: "Authentication not completed",
                 });
-
-                continue;
+                return;
               }
             }
 
             if (permCheck.needsApproval) {
-              // Request user approval for write operations
               const decision = await this.waitForApproval(ctx.id, {
                 toolInput: block.input,
                 integration: permCheck.integration || "",
                 operation: "",
                 command: (block.input.command as string) || "",
               });
-
               if (decision === "deny") {
                 toolResults.push({
                   type: "tool_result",
@@ -2276,49 +2280,38 @@ class GenerationManager {
                   content: "User denied this action",
                   is_error: true,
                 });
-
                 this.broadcast(ctx, {
                   type: "tool_result",
                   toolName: block.name,
                   result: "User denied this action",
                 });
-
                 ctx.contentParts.push({
                   type: "tool_result",
                   tool_use_id: block.id,
                   content: "User denied this action",
                 });
-
-                continue;
+                return;
               }
             }
 
-            // Handle send_file tool specially - upload file to S3 and broadcast
             if (block.name === "send_file") {
               const filePath = block.input.path as string;
               let resultContent: string;
               let isError = false;
-
               try {
                 const content = await readSandboxFileAsBuffer(sandbox!, filePath);
                 if (content.length === 0) {
                   throw new Error("File not found or empty");
                 }
-
                 const fileRecord = await uploadSandboxFile({
                   path: filePath,
                   content,
                   conversationId: ctx.conversationId,
-                  messageId: undefined, // Will be linked when message is saved
+                  messageId: undefined,
                 });
                 ctx.uploadedSandboxFileIds?.add(fileRecord.id);
-
                 resultContent = `File sent successfully: ${path.basename(filePath)}`;
-
-                // Track this file so we don't collect it again in auto-collection
                 ctx.sentFilePaths?.add(filePath);
-
-                // Broadcast sandbox_file event so UI can update
                 this.broadcast(ctx, {
                   type: "sandbox_file",
                   fileId: fileRecord.id,
@@ -2331,41 +2324,34 @@ class GenerationManager {
                 resultContent = `Failed to send file: ${err instanceof Error ? err.message : "Unknown error"}`;
                 isError = true;
               }
-
               toolResults.push({
                 type: "tool_result",
                 tool_use_id: block.id,
                 content: resultContent,
                 is_error: isError,
               });
-
               this.broadcast(ctx, {
                 type: "tool_result",
                 toolName: block.name,
                 result: resultContent,
               });
-
               ctx.contentParts.push({
                 type: "tool_result",
                 tool_use_id: block.id,
                 content: resultContent,
               });
-
               await this.saveProgress(ctx);
-              continue;
+              return;
             }
 
-            // Execute the tool
             const cmdInfo = toolCallToCommand(block.name, block.input);
             let resultContent: string;
             let isError = false;
-
             if (cmdInfo) {
               try {
                 const execResult = await sandbox!.execute(cmdInfo.command, {
                   timeout: (block.input.timeout as number) || 120_000,
                 });
-
                 resultContent = execResult.stdout || execResult.stderr || "(no output)";
                 if (execResult.exitCode !== 0 && execResult.stderr) {
                   resultContent = `Exit code: ${execResult.exitCode}\n${execResult.stderr}\n${execResult.stdout}`;
@@ -2379,41 +2365,38 @@ class GenerationManager {
               resultContent = `Unknown tool: ${block.name}`;
               isError = true;
             }
-
-            // Truncate very long outputs
             if (resultContent.length > 100_000) {
               resultContent = resultContent.slice(0, 100_000) + "\n... (output truncated)";
             }
-
             toolResults.push({
               type: "tool_result",
               tool_use_id: block.id,
               content: resultContent,
               is_error: isError,
             });
-
             this.broadcast(ctx, {
               type: "tool_result",
               toolName: block.name,
               result: resultContent,
             });
-
             ctx.contentParts.push({
               type: "tool_result",
               tool_use_id: block.id,
               content: resultContent,
             });
-
             await this.saveProgress(ctx);
-          }
+          });
 
-          // Add tool results as a user message for the next loop
           loopMessages.push({
             role: "user",
             content: toolResults,
           });
         }
-      }
+
+        await runDirectToolLoop();
+      };
+
+      await runDirectToolLoop();
 
       if (iterationCount >= MAX_ITERATIONS) {
         console.warn("[GenerationManager] Hit max iterations in tool loop");
@@ -2826,7 +2809,11 @@ class GenerationManager {
     let iterations = 0;
     let hasToolCalls = true;
 
-    while (hasToolCalls && iterations < MEMORY_FLUSH_MAX_ITERATIONS) {
+    const flushMemoryLoop = async (): Promise<void> => {
+      if (!hasToolCalls || iterations >= MEMORY_FLUSH_MAX_ITERATIONS) {
+        return;
+      }
+
       iterations += 1;
       hasToolCalls = false;
 
@@ -2842,7 +2829,7 @@ class GenerationManager {
         model: ctx.model,
       });
 
-      for await (const event of stream) {
+      await this.consumeAsyncStream(stream, async (event) => {
         if (event.type === "text_delta") {
           assistantBlocks.push({ type: "text", text: event.text });
         } else if (event.type === "tool_use_start") {
@@ -2869,23 +2856,20 @@ class GenerationManager {
           ctx.usage.inputTokens += event.inputTokens;
           ctx.usage.outputTokens += event.outputTokens;
         }
-      }
+        return false;
+      });
 
       if (!hasToolCalls) {
-        break;
+        return;
       }
 
       loopMessages.push({ role: "assistant", content: assistantBlocks });
 
       const toolResults: ContentBlock[] = [];
-      for (const block of assistantBlocks) {
-        if (block.type !== "tool_use") {
-          continue;
+      await this.forEachSequential(assistantBlocks, async (block) => {
+        if (block.type !== "tool_use" || !block.name.startsWith("memory_")) {
+          return;
         }
-        if (!block.name.startsWith("memory_")) {
-          continue;
-        }
-
         const memoryResult = await this.executeMemoryTool(ctx, sandbox, block);
         toolResults.push({
           type: "tool_result",
@@ -2893,14 +2877,17 @@ class GenerationManager {
           content: memoryResult.content,
           is_error: memoryResult.isError,
         });
-      }
+      });
 
       if (toolResults.length === 0) {
-        break;
+        return;
       }
 
       loopMessages.push({ role: "user", content: toolResults });
-    }
+      await flushMemoryLoop();
+    };
+
+    await flushMemoryLoop();
   }
 
   /**
@@ -3166,15 +3153,17 @@ class GenerationManager {
               replayTextPartId = partId;
               setCurrentTextPart(part, partId);
             };
-            for (const pendingPart of pendingParts) {
-              await this.processOpencodeMessagePart(
-                ctx,
-                pendingPart,
-                replayTextPart,
-                replayTextPartId,
-                replaySetCurrentTextPart,
-              );
-            }
+            await Promise.all(
+              pendingParts.map(async (pendingPart) => {
+                await this.processOpencodeMessagePart(
+                  ctx,
+                  pendingPart,
+                  replayTextPart,
+                  replayTextPartId,
+                  replaySetCurrentTextPart,
+                );
+              }),
+            );
           }
         }
         break;
@@ -3402,20 +3391,22 @@ class GenerationManager {
       .map((line) => line.trim())
       .filter(Boolean);
 
-    for (const filePath of paths) {
-      try {
-        const content = await sandbox.files.read(filePath);
-        const created = await this.importIntegrationSkillDraftContent(ctx, String(content));
-        if (created > 0) {
-          await sandbox.commands.run(`rm -f "${filePath}"`);
+    await Promise.all(
+      paths.map(async (filePath) => {
+        try {
+          const content = await sandbox.files.read(filePath);
+          const created = await this.importIntegrationSkillDraftContent(ctx, String(content));
+          if (created > 0) {
+            await sandbox.commands.run(`rm -f "${filePath}"`);
+          }
+        } catch (error) {
+          console.error(
+            `[GenerationManager] Failed to import integration skill draft ${filePath}:`,
+            error,
+          );
         }
-      } catch (error) {
-        console.error(
-          `[GenerationManager] Failed to import integration skill draft ${filePath}:`,
-          error,
-        );
-      }
-    }
+      }),
+    );
   }
 
   private async importIntegrationSkillDraftsFromSandbox(
@@ -3431,20 +3422,22 @@ class GenerationManager {
       .map((line) => line.trim())
       .filter(Boolean);
 
-    for (const filePath of paths) {
-      try {
-        const content = await sandbox.readFile(filePath);
-        const created = await this.importIntegrationSkillDraftContent(ctx, content);
-        if (created > 0) {
-          await sandbox.execute(`rm -f "${filePath}"`);
+    await Promise.all(
+      paths.map(async (filePath) => {
+        try {
+          const content = await sandbox.readFile(filePath);
+          const created = await this.importIntegrationSkillDraftContent(ctx, content);
+          if (created > 0) {
+            await sandbox.execute(`rm -f "${filePath}"`);
+          }
+        } catch (error) {
+          console.error(
+            `[GenerationManager] Failed to import integration skill draft ${filePath}:`,
+            error,
+          );
         }
-      } catch (error) {
-        console.error(
-          `[GenerationManager] Failed to import integration skill draft ${filePath}:`,
-          error,
-        );
-      }
-    }
+      }),
+    );
   }
 
   private async importIntegrationSkillDraftContent(
@@ -3461,51 +3454,88 @@ class GenerationManager {
     const drafts = Array.isArray(parsed) ? parsed : [parsed];
     let createdCount = 0;
 
-    for (const draft of drafts) {
-      if (!draft || typeof draft !== "object") {
-        continue;
-      }
-      const rec = draft as Record<string, unknown>;
-      const slug = typeof rec.slug === "string" ? rec.slug : "";
-      const title = typeof rec.title === "string" ? rec.title : "";
-      const description = typeof rec.description === "string" ? rec.description : "";
-      if (!slug || !title || !description) {
-        continue;
-      }
+    const creationResults = await Promise.all(
+      drafts.map(async (draft) => {
+        if (!draft || typeof draft !== "object") {
+          return 0;
+        }
+        const rec = draft as Record<string, unknown>;
+        const slug = typeof rec.slug === "string" ? rec.slug : "";
+        const title = typeof rec.title === "string" ? rec.title : "";
+        const description = typeof rec.description === "string" ? rec.description : "";
+        if (!slug || !title || !description) {
+          return 0;
+        }
 
-      const files = Array.isArray(rec.files)
-        ? rec.files
-            .map((entry) => {
-              if (!entry || typeof entry !== "object") {
-                return null;
-              }
-              const e = entry as Record<string, unknown>;
-              if (typeof e.path !== "string" || typeof e.content !== "string") {
-                return null;
-              }
-              return { path: e.path, content: e.content };
-            })
-            .filter((entry): entry is { path: string; content: string } => !!entry)
-        : [];
+        const files = Array.isArray(rec.files)
+          ? rec.files
+              .map((entry) => {
+                if (!entry || typeof entry !== "object") {
+                  return null;
+                }
+                const e = entry as Record<string, unknown>;
+                if (typeof e.path !== "string" || typeof e.content !== "string") {
+                  return null;
+                }
+                return { path: e.path, content: e.content };
+              })
+              .filter((entry): entry is { path: string; content: string } => !!entry)
+          : [];
 
-      try {
-        await createCommunityIntegrationSkill(ctx.userId, {
-          slug,
-          title,
-          description,
-          files,
-          setAsPreferred: rec.setAsPreferred === true,
-        });
-        createdCount += 1;
-      } catch (error) {
-        console.warn(
-          `[GenerationManager] Skipped integration skill draft for slug '${slug}':`,
-          error instanceof Error ? error.message : error,
-        );
-      }
-    }
+        try {
+          await createCommunityIntegrationSkill(ctx.userId, {
+            slug,
+            title,
+            description,
+            files,
+            setAsPreferred: rec.setAsPreferred === true,
+          });
+          return 1;
+        } catch (error) {
+          console.warn(
+            `[GenerationManager] Skipped integration skill draft for slug '${slug}':`,
+            error instanceof Error ? error.message : error,
+          );
+          return 0;
+        }
+      }),
+    );
+    createdCount = creationResults.reduce((sum, value) => sum + value, 0);
 
     return createdCount;
+  }
+
+  private async forEachSequential<T>(
+    items: readonly T[],
+    handler: (item: T, index: number) => Promise<void>,
+  ): Promise<void> {
+    const run = async (index: number): Promise<void> => {
+      if (index >= items.length) {
+        return;
+      }
+      await handler(items[index], index);
+      await run(index + 1);
+    };
+    await run(0);
+  }
+
+  private async consumeAsyncStream<T>(
+    stream: AsyncIterable<T>,
+    onEvent: (event: T) => Promise<boolean | void>,
+  ): Promise<void> {
+    const iterator = stream[Symbol.asyncIterator]();
+    const consumeNext = async (): Promise<void> => {
+      const { value, done } = await iterator.next();
+      if (done) {
+        return;
+      }
+      const shouldStop = await onEvent(value);
+      if (shouldStop) {
+        return;
+      }
+      await consumeNext();
+    };
+    await consumeNext();
   }
 
   private async handleApprovalTimeout(ctx: GenerationContext): Promise<void> {
@@ -3843,32 +3873,34 @@ class GenerationManager {
             excludePaths,
           );
 
-          for (const file of newFiles) {
-            try {
-              const fileRecord = await uploadSandboxFile({
-                path: file.path,
-                content: file.content,
-                conversationId: ctx.conversationId,
-                messageId: undefined, // Will be linked below
-              });
-              ctx.uploadedSandboxFileIds?.add(fileRecord.id);
+          await Promise.all(
+            newFiles.map(async (file) => {
+              try {
+                const fileRecord = await uploadSandboxFile({
+                  path: file.path,
+                  content: file.content,
+                  conversationId: ctx.conversationId,
+                  messageId: undefined, // Will be linked below
+                });
+                ctx.uploadedSandboxFileIds?.add(fileRecord.id);
 
-              // Broadcast sandbox_file event
-              this.broadcast(ctx, {
-                type: "sandbox_file",
-                fileId: fileRecord.id,
-                path: file.path,
-                filename: fileRecord.filename,
-                mimeType: fileRecord.mimeType,
-                sizeBytes: fileRecord.sizeBytes,
-              });
-            } catch (err) {
-              console.warn(
-                `[GenerationManager] Failed to upload collected file ${file.path}:`,
-                err,
-              );
-            }
-          }
+                // Broadcast sandbox_file event
+                this.broadcast(ctx, {
+                  type: "sandbox_file",
+                  fileId: fileRecord.id,
+                  path: file.path,
+                  filename: fileRecord.filename,
+                  mimeType: fileRecord.mimeType,
+                  sizeBytes: fileRecord.sizeBytes,
+                });
+              } catch (err) {
+                console.warn(
+                  `[GenerationManager] Failed to upload collected file ${file.path}:`,
+                  err,
+                );
+              }
+            }),
+          );
         } catch (err) {
           console.error("[GenerationManager] Failed to collect new sandbox files:", err);
         }

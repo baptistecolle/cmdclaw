@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronRight, Check, X, Loader2, ShieldAlert, Code } from "lucide-react";
 import Image from "next/image";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { getIntegrationLogo, getIntegrationDisplayName } from "@/lib/integration-icons";
 import { parseCliCommand } from "@/lib/parse-cli-command";
@@ -102,6 +102,27 @@ export function ToolApprovalCard({
       command: parsedCommand.rawCommand,
     };
   }, [parsedCommand]);
+  const handleToggleExpanded = useCallback(() => {
+    setExpanded((prev) => !prev);
+  }, []);
+  const handleToggleRawCommand = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setShowRawCommand((prev) => !prev);
+  }, []);
+  const handleDenyClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      onDeny();
+    },
+    [onDeny],
+  );
+  const handleApproveClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      onApprove();
+    },
+    [onApprove],
+  );
 
   return (
     <div
@@ -113,7 +134,7 @@ export function ToolApprovalCard({
       )}
     >
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggleExpanded}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
       >
         {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -157,10 +178,7 @@ export function ToolApprovalCard({
           {command && (
             <div className="mb-3">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowRawCommand(!showRawCommand);
-                }}
+                onClick={handleToggleRawCommand}
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Code className="h-3 w-3" />
@@ -185,10 +203,7 @@ export function ToolApprovalCard({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeny();
-                }}
+                onClick={handleDenyClick}
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -200,10 +215,7 @@ export function ToolApprovalCard({
               </Button>
               <Button
                 size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onApprove();
-                }}
+                onClick={handleApproveClick}
                 disabled={isLoading}
               >
                 {isLoading ? (

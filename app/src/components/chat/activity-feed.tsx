@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronUp, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import { ActivityItem, type ActivityItemData } from "./activity-item";
@@ -21,6 +21,11 @@ type Props = {
 // Line height is ~18px (text-xs with line-height), 5 lines = ~90px + padding
 const COLLAPSED_HEIGHT = 100;
 const MAX_EXPANDED_HEIGHT = 400;
+const ACTIVITY_FEED_EXPAND_TRANSITION = { duration: 0.2, ease: "easeInOut" };
+const ACTIVITY_ITEM_INITIAL = { opacity: 0, y: 5 };
+const ACTIVITY_ITEM_ANIMATE = { opacity: 1, y: 0 };
+const ACTIVITY_ITEM_EXIT = { opacity: 0 };
+const ACTIVITY_ITEM_TRANSITION = { duration: 0.15 };
 
 export function ActivityFeed({
   items,
@@ -32,6 +37,9 @@ export function ActivityFeed({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
   const shouldAutoScroll = isStreaming ? false : userHasScrolled;
+  const contentHeight = isExpanded ? MAX_EXPANDED_HEIGHT : COLLAPSED_HEIGHT;
+  const contentAnimate = useMemo(() => ({ height: contentHeight }), [contentHeight]);
+  const contentStyle = useMemo(() => ({ height: contentHeight }), [contentHeight]);
 
   // Auto-scroll to bottom when new items arrive (unless user has scrolled up)
   useEffect(() => {
@@ -104,10 +112,8 @@ export function ActivityFeed({
       {/* Content */}
       <motion.div
         initial={false}
-        animate={{
-          height: isExpanded ? MAX_EXPANDED_HEIGHT : COLLAPSED_HEIGHT,
-        }}
-        transition={{ duration: 0.2, ease: "easeInOut" }}
+        animate={contentAnimate}
+        transition={ACTIVITY_FEED_EXPAND_TRANSITION}
         className="overflow-hidden"
       >
         <div
@@ -117,18 +123,16 @@ export function ActivityFeed({
             "overflow-y-auto px-3 py-2",
             isExpanded ? `h-[${MAX_EXPANDED_HEIGHT}px]` : `h-[${COLLAPSED_HEIGHT}px]`,
           )}
-          style={{
-            height: isExpanded ? MAX_EXPANDED_HEIGHT : COLLAPSED_HEIGHT,
-          }}
+          style={contentStyle}
         >
           <AnimatePresence initial={false}>
             {items.map((item) => (
               <motion.div
                 key={item.id}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
+                initial={ACTIVITY_ITEM_INITIAL}
+                animate={ACTIVITY_ITEM_ANIMATE}
+                exit={ACTIVITY_ITEM_EXIT}
+                transition={ACTIVITY_ITEM_TRANSITION}
               >
                 <ActivityItem item={item} />
               </motion.div>

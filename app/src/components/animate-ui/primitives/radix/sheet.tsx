@@ -11,7 +11,26 @@ type SheetContextType = {
   setIsOpen: (isOpen: boolean) => void;
 };
 
+type Side = "top" | "bottom" | "left" | "right";
+
 const [SheetProvider, useSheet] = getStrictContext<SheetContextType>("SheetContext");
+const SHEET_OVERLAY_DEFAULT_TRANSITION = { duration: 0.2, ease: "easeInOut" };
+const SHEET_CONTENT_DEFAULT_TRANSITION = { type: "spring", stiffness: 150, damping: 22 };
+const SHEET_OVERLAY_INITIAL = { opacity: 0, filter: "blur(4px)" };
+const SHEET_OVERLAY_ANIMATE = { opacity: 1, filter: "blur(0px)" };
+const SHEET_OVERLAY_EXIT = { opacity: 0, filter: "blur(4px)" };
+const SHEET_OFFSCREEN: Record<Side, { x?: string; y?: string; opacity: number }> = {
+  right: { x: "100%", opacity: 0 },
+  left: { x: "-100%", opacity: 0 },
+  top: { y: "-100%", opacity: 0 },
+  bottom: { y: "100%", opacity: 0 },
+};
+const SHEET_POSITION_STYLE: Record<Side, React.CSSProperties> = {
+  right: { insetBlock: 0, right: 0 },
+  left: { insetBlock: 0, left: 0 },
+  top: { insetInline: 0, top: 0 },
+  bottom: { insetInline: 0, bottom: 0 },
+};
 
 type SheetProps = React.ComponentProps<typeof SheetPrimitive.Root>;
 
@@ -22,8 +41,10 @@ function Sheet(props: SheetProps) {
     onChange: props.onOpenChange,
   });
 
+  const contextValue = React.useMemo(() => ({ isOpen, setIsOpen }), [isOpen, setIsOpen]);
+
   return (
-    <SheetProvider value={{ isOpen, setIsOpen }}>
+    <SheetProvider value={contextValue}>
       <SheetPrimitive.Root data-slot="sheet" {...props} onOpenChange={setIsOpen} />
     </SheetProvider>
   );
@@ -60,7 +81,7 @@ type SheetOverlayProps = Omit<
   HTMLMotionProps<"div">;
 
 function SheetOverlay({
-  transition = { duration: 0.2, ease: "easeInOut" },
+  transition = SHEET_OVERLAY_DEFAULT_TRANSITION,
   ...props
 }: SheetOverlayProps) {
   return (
@@ -68,17 +89,15 @@ function SheetOverlay({
       <motion.div
         key="sheet-overlay"
         data-slot="sheet-overlay"
-        initial={{ opacity: 0, filter: "blur(4px)" }}
-        animate={{ opacity: 1, filter: "blur(0px)" }}
-        exit={{ opacity: 0, filter: "blur(4px)" }}
+        initial={SHEET_OVERLAY_INITIAL}
+        animate={SHEET_OVERLAY_ANIMATE}
+        exit={SHEET_OVERLAY_EXIT}
         transition={transition}
         {...props}
       />
     </SheetPrimitive.Overlay>
   );
 }
-
-type Side = "top" | "bottom" | "left" | "right";
 
 type SheetContentProps = React.ComponentProps<typeof SheetPrimitive.Content> &
   HTMLMotionProps<"div"> & {
@@ -87,26 +106,21 @@ type SheetContentProps = React.ComponentProps<typeof SheetPrimitive.Content> &
 
 function SheetContent({
   side = "right",
-  transition = { type: "spring", stiffness: 150, damping: 22 },
+  transition = SHEET_CONTENT_DEFAULT_TRANSITION,
   style,
   children,
   ...props
 }: SheetContentProps) {
   const axis = side === "left" || side === "right" ? "x" : "y";
-
-  const offscreen: Record<Side, { x?: string; y?: string; opacity: number }> = {
-    right: { x: "100%", opacity: 0 },
-    left: { x: "-100%", opacity: 0 },
-    top: { y: "-100%", opacity: 0 },
-    bottom: { y: "100%", opacity: 0 },
-  };
-
-  const positionStyle: Record<Side, React.CSSProperties> = {
-    right: { insetBlock: 0, right: 0 },
-    left: { insetBlock: 0, left: 0 },
-    top: { insetInline: 0, top: 0 },
-    bottom: { insetInline: 0, bottom: 0 },
-  };
+  const animate = React.useMemo(() => ({ [axis]: 0, opacity: 1 }), [axis]);
+  const resolvedStyle = React.useMemo(
+    () => ({
+      position: "fixed",
+      ...SHEET_POSITION_STYLE[side],
+      ...style,
+    }),
+    [side, style],
+  );
 
   return (
     <SheetPrimitive.Content asChild forceMount {...props}>
@@ -114,14 +128,10 @@ function SheetContent({
         key="sheet-content"
         data-slot="sheet-content"
         data-side={side}
-        initial={offscreen[side]}
-        animate={{ [axis]: 0, opacity: 1 }}
-        exit={offscreen[side]}
-        style={{
-          position: "fixed",
-          ...positionStyle[side],
-          ...style,
-        }}
+        initial={SHEET_OFFSCREEN[side]}
+        animate={animate}
+        exit={SHEET_OFFSCREEN[side]}
+        style={resolvedStyle}
         transition={transition}
       >
         {children}

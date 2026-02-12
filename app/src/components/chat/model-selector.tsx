@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, Check, Lock } from "lucide-react";
+import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -123,6 +124,19 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
 
   const currentModel = allModels.find((m) => m.id === selectedModel);
   const displayName = currentModel?.name ?? selectedModel;
+  const handleModelSelect = useCallback(
+    (event: Event) => {
+      const target = event.currentTarget as HTMLElement;
+      const modelId = target.dataset.modelId;
+      if (modelId) {
+        onModelChange(modelId);
+      }
+    },
+    [onModelChange],
+  );
+  const openSubscriptions = useCallback(() => {
+    window.location.href = "/settings/subscriptions";
+  }, []);
 
   return (
     <DropdownMenu>
@@ -144,7 +158,8 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
           <DropdownMenuItem
             key={model.id}
             data-testid={`chat-model-option-${model.id}`}
-            onClick={() => onModelChange(model.id)}
+            data-model-id={model.id}
+            onClick={handleModelSelect}
           >
             <span className="flex-1">{model.name}</span>
             {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
@@ -159,7 +174,8 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
               <DropdownMenuItem
                 key={model.id}
                 data-testid={`chat-model-option-${model.id}`}
-                onClick={() => onModelChange(model.id)}
+                data-model-id={model.id}
+                onClick={handleModelSelect}
               >
                 <span className="flex-1">{model.name}</span>
                 {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
@@ -178,7 +194,8 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
             <DropdownMenuItem
               key={model.id}
               data-testid={`chat-model-option-${model.id}`}
-              onClick={() => onModelChange(model.id)}
+              data-model-id={model.id}
+              onClick={handleModelSelect}
             >
               <span className="flex-1">{model.name}</span>
               {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
@@ -187,9 +204,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         ) : (
           <DropdownMenuItem
             className="text-xs text-muted-foreground"
-            onClick={() => {
-              window.location.href = "/settings/subscriptions";
-            }}
+            onClick={openSubscriptions}
           >
             Connect in Settings to unlock
           </DropdownMenuItem>
@@ -205,7 +220,8 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
             <DropdownMenuItem
               key={model.id}
               data-testid={`chat-model-option-${model.id}`}
-              onClick={() => onModelChange(model.id)}
+              data-model-id={model.id}
+              onClick={handleModelSelect}
             >
               <span className="flex-1">{model.name}</span>
               {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
@@ -214,9 +230,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         ) : (
           <DropdownMenuItem
             className="text-xs text-muted-foreground"
-            onClick={() => {
-              window.location.href = "/settings/subscriptions";
-            }}
+            onClick={openSubscriptions}
           >
             Connect in Settings to unlock
           </DropdownMenuItem>
@@ -232,7 +246,8 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
             <DropdownMenuItem
               key={model.id}
               data-testid={`chat-model-option-${model.id}`}
-              onClick={() => onModelChange(model.id)}
+              data-model-id={model.id}
+              onClick={handleModelSelect}
             >
               <span className="flex-1">{model.name}</span>
               {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
@@ -241,9 +256,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         ) : (
           <DropdownMenuItem
             className="text-xs text-muted-foreground"
-            onClick={() => {
-              window.location.href = "/settings/subscriptions";
-            }}
+            onClick={openSubscriptions}
           >
             Connect in Settings to unlock
           </DropdownMenuItem>

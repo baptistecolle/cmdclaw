@@ -10,6 +10,12 @@ import {
 import { LoaderIcon, SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const EMOJI_PICKER_LIST_COMPONENTS = {
+  Row: EmojiPickerRow,
+  Emoji: EmojiPickerEmoji,
+  CategoryHeader: EmojiPickerCategoryHeader,
+};
+
 function EmojiPicker({
   className,
   ...props
@@ -104,11 +110,7 @@ function EmojiPickerContent({
       </EmojiPickerPrimitive.Empty>
       <EmojiPickerPrimitive.List
         className="select-none pb-1"
-        components={{
-          Row: EmojiPickerRow,
-          Emoji: EmojiPickerEmoji,
-          CategoryHeader: EmojiPickerCategoryHeader,
-        }}
+        components={EMOJI_PICKER_LIST_COMPONENTS}
         data-slot="emoji-picker-list"
       />
     </EmojiPickerPrimitive.Viewport>

@@ -27,6 +27,13 @@ const PhoneInput: React.ForwardRefExoticComponent<PhoneInputProps> = React.forwa
   React.ElementRef<typeof RPNInput.default>,
   PhoneInputProps
 >(({ className, onChange, value, ...props }, ref) => {
+  const handleValueChange = React.useCallback(
+    (nextValue: RPNInput.Value | undefined) => {
+      onChange?.(nextValue || ("" as RPNInput.Value));
+    },
+    [onChange],
+  );
+
   return (
     <RPNInput.default
       ref={ref}
@@ -36,7 +43,7 @@ const PhoneInput: React.ForwardRefExoticComponent<PhoneInputProps> = React.forwa
       inputComponent={InputComponent}
       smartCaret={false}
       value={value || undefined}
-      onChange={(nextValue) => onChange?.(nextValue || ("" as RPNInput.Value))}
+      onChange={handleValueChange}
       {...props}
     />
   );
@@ -68,18 +75,34 @@ const CountrySelect = ({
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);
+  const handleOpenChange = React.useCallback((open: boolean) => {
+    setIsOpen(open);
+    if (open) {
+      setSearchValue("");
+    }
+  }, []);
+
+  const handleSearchChange = React.useCallback((nextValue: string) => {
+    setSearchValue(nextValue);
+    setTimeout(() => {
+      if (!scrollAreaRef.current) {
+        return;
+      }
+      const viewportElement = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]",
+      );
+      if (viewportElement) {
+        viewportElement.scrollTop = 0;
+      }
+    }, 0);
+  }, []);
+
+  const handleSelectComplete = React.useCallback(() => {
+    setIsOpen(false);
+  }, []);
 
   return (
-    <Popover
-      open={isOpen}
-      modal
-      onOpenChange={(open) => {
-        setIsOpen(open);
-        if (open) {
-          setSearchValue("");
-        }
-      }}
-    >
+    <Popover open={isOpen} modal onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -97,20 +120,7 @@ const CountrySelect = ({
         <Command>
           <CommandInput
             value={searchValue}
-            onValueChange={(nextValue) => {
-              setSearchValue(nextValue);
-              setTimeout(() => {
-                if (!scrollAreaRef.current) {
-                  return;
-                }
-                const viewportElement = scrollAreaRef.current.querySelector(
-                  "[data-radix-scroll-area-viewport]",
-                );
-                if (viewportElement) {
-                  viewportElement.scrollTop = 0;
-                }
-              }, 0);
-            }}
+            onValueChange={handleSearchChange}
             placeholder="Search country..."
           />
           <CommandList>
@@ -125,7 +135,7 @@ const CountrySelect = ({
                       countryName={label}
                       selectedCountry={selectedCountry}
                       onChange={onChange}
-                      onSelectComplete={() => setIsOpen(false)}
+                      onSelectComplete={handleSelectComplete}
                     />
                   ) : null,
                 )}
@@ -151,10 +161,10 @@ const CountrySelectOption = ({
   onChange,
   onSelectComplete,
 }: CountrySelectOptionProps) => {
-  const handleSelect = () => {
+  const handleSelect = React.useCallback(() => {
     onChange(country);
     onSelectComplete();
-  };
+  }, [country, onChange, onSelectComplete]);
 
   return (
     <CommandItem className="gap-2" onSelect={handleSelect}>

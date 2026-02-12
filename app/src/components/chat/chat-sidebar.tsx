@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Plus, Trash2, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useCallback } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -43,14 +44,34 @@ export function ChatSidebar() {
   const data = rawData as ConversationListData | undefined;
   const deleteConversation = useDeleteConversation();
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    await deleteConversation.mutateAsync(id);
-    if (pathname === `/chat/${id}`) {
-      router.push("/chat");
-    }
-  };
+  const handleDelete = useCallback(
+    async (id: string, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      await deleteConversation.mutateAsync(id);
+      if (pathname === `/chat/${id}`) {
+        router.push("/chat");
+      }
+    },
+    [deleteConversation, pathname, router],
+  );
+
+  const handleCreateNewChat = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("new-chat"));
+    router.push("/chat");
+  }, [router]);
+
+  const handleDeleteMenuClick = useCallback(
+    (event: Event) => {
+      const target = event.currentTarget as HTMLElement;
+      const id = target.dataset.conversationId;
+      if (!id) {
+        return;
+      }
+      void handleDelete(id, event as unknown as React.MouseEvent);
+    },
+    [handleDelete],
+  );
 
   return (
     <Sidebar collapsible="icon" className="border-r">
@@ -58,11 +79,7 @@ export function ChatSidebar() {
         <Button
           variant="outline"
           className="w-full justify-start gap-2 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
-          onClick={() => {
-            // Dispatch event to reset chat state if already on /chat
-            window.dispatchEvent(new CustomEvent("new-chat"));
-            router.push("/chat");
-          }}
+          onClick={handleCreateNewChat}
         >
           <Plus className="h-4 w-4 shrink-0" />
           <span className="group-data-[collapsible=icon]:hidden">New chat</span>
@@ -111,7 +128,8 @@ export function ChatSidebar() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" side="right">
                         <DropdownMenuItem
-                          onClick={(e) => handleDelete(conv.id, e)}
+                          data-conversation-id={conv.id}
+                          onClick={handleDeleteMenuClick}
                           className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />

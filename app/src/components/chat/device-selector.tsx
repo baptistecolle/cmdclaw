@@ -1,7 +1,7 @@
 "use client";
 
 import { Monitor, Cloud, Wifi } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -60,12 +60,36 @@ export function DeviceSelector({ selectedDeviceId, onSelect }: Props) {
     };
   }, []);
 
+  const selected = selectedDeviceId ? devices.find((d) => d.id === selectedDeviceId) : null;
+  const devicesById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const device of devices) {
+      map.set(device.id, device.id);
+    }
+    return map;
+  }, [devices]);
+  const handleSelectCloud = useCallback(() => {
+    onSelect(undefined);
+  }, [onSelect]);
+  const handleSelectDevice = useCallback(
+    (event: Event) => {
+      const target = event.currentTarget as HTMLElement;
+      const deviceId = target.dataset.deviceId;
+      if (!deviceId) {
+        return;
+      }
+      const resolvedDeviceId = devicesById.get(deviceId);
+      if (resolvedDeviceId) {
+        onSelect(resolvedDeviceId);
+      }
+    },
+    [devicesById, onSelect],
+  );
+
   // Don't render if no devices are available
   if (devices.length === 0) {
     return null;
   }
-
-  const selected = selectedDeviceId ? devices.find((d) => d.id === selectedDeviceId) : null;
 
   return (
     <DropdownMenu>
@@ -94,13 +118,13 @@ export function DeviceSelector({ selectedDeviceId, onSelect }: Props) {
         <DropdownMenuLabel className="text-xs">Backend</DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem onClick={() => onSelect(undefined)}>
+        <DropdownMenuItem onClick={handleSelectCloud}>
           <Cloud className="mr-2 h-3.5 w-3.5" />
           <span>Cloud (E2B)</span>
         </DropdownMenuItem>
 
         {devices.map((device) => (
-          <DropdownMenuItem key={device.id} onClick={() => onSelect(device.id)}>
+          <DropdownMenuItem key={device.id} data-device-id={device.id} onClick={handleSelectDevice}>
             <Monitor className="mr-2 h-3.5 w-3.5" />
             <span className="flex items-center gap-1.5">
               {device.name}

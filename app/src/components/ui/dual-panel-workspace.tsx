@@ -94,10 +94,10 @@ export function DualPanelWorkspace({
     setIsDragging(false);
   }, []);
 
-  const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const startDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDragging(true);
-  };
+  }, []);
 
   useEffect(() => {
     if (!isDragging) {
@@ -119,6 +119,25 @@ export function DualPanelWorkspace({
   }, [isDragging, onPointerMove, stopDrag]);
 
   const leftWidth = 100 - rightWidth;
+  const switchToLeftPanel = useCallback(() => {
+    setMobilePanel("left");
+  }, []);
+  const switchToRightPanel = useCallback(() => {
+    setMobilePanel("right");
+  }, []);
+  const leftPanelStyle = useMemo(() => ({ width: `${leftWidth}%` }), [leftWidth]);
+  const rightPanelStyle = useMemo(() => ({ width: `${rightWidth}%` }), [rightWidth]);
+  const handleSeparatorKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "ArrowLeft") {
+        setWidthWithinBounds(rightWidth + 2);
+      }
+      if (event.key === "ArrowRight") {
+        setWidthWithinBounds(rightWidth - 2);
+      }
+    },
+    [rightWidth, setWidthWithinBounds],
+  );
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
@@ -127,7 +146,7 @@ export function DualPanelWorkspace({
           type="button"
           variant={mobilePanel === "left" ? "default" : "outline"}
           size="sm"
-          onClick={() => setMobilePanel("left")}
+          onClick={switchToLeftPanel}
         >
           {leftTitle}
         </Button>
@@ -135,7 +154,7 @@ export function DualPanelWorkspace({
           type="button"
           variant={mobilePanel === "right" ? "default" : "outline"}
           size="sm"
-          onClick={() => setMobilePanel("right")}
+          onClick={switchToRightPanel}
         >
           {rightTitle}
         </Button>
@@ -162,7 +181,7 @@ export function DualPanelWorkspace({
       <div ref={containerRef} className="hidden min-h-0 flex-1 md:flex">
         <section
           className="flex min-h-0 flex-col overflow-hidden rounded-l-xl border bg-background"
-          style={{ width: `${leftWidth}%` }}
+          style={leftPanelStyle}
         >
           <div className="border-b px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {leftTitle}
@@ -176,14 +195,7 @@ export function DualPanelWorkspace({
           aria-label="Resize panels"
           tabIndex={0}
           onPointerDown={startDrag}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft") {
-              setWidthWithinBounds(rightWidth + 2);
-            }
-            if (event.key === "ArrowRight") {
-              setWidthWithinBounds(rightWidth - 2);
-            }
-          }}
+          onKeyDown={handleSeparatorKeyDown}
           className="group relative w-3 cursor-col-resize"
         >
           <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-foreground/40" />
@@ -192,7 +204,7 @@ export function DualPanelWorkspace({
 
         <section
           className="flex min-h-0 flex-col overflow-hidden rounded-r-xl border bg-background"
-          style={{ width: `${rightWidth}%` }}
+          style={rightPanelStyle}
         >
           <div className="border-b px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {rightTitle}

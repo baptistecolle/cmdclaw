@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronRight, Check, X, Loader2, Link2 } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getIntegrationDisplayName, getIntegrationLogo } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,37 @@ export function AuthRequestCard({
   isLoading,
 }: AuthRequestCardProps) {
   const [expanded, setExpanded] = useState(true);
+  const integrationsByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const integration of integrations) {
+      map.set(integration, integration);
+    }
+    return map;
+  }, [integrations]);
+  const handleToggleExpanded = useCallback(() => {
+    setExpanded((prev) => !prev);
+  }, []);
+  const handleCancelClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      onCancel();
+    },
+    [onCancel],
+  );
+  const handleConnectClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      const integration = event.currentTarget.dataset.integrationKey;
+      if (!integration) {
+        return;
+      }
+      const resolved = integrationsByKey.get(integration);
+      if (resolved) {
+        onConnect(resolved);
+      }
+    },
+    [integrationsByKey, onConnect],
+  );
 
   return (
     <div
@@ -39,7 +70,7 @@ export function AuthRequestCard({
       )}
     >
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggleExpanded}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
       >
         {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -126,10 +157,7 @@ export function AuthRequestCard({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCancel();
-                          }}
+                          onClick={handleCancelClick}
                           disabled={isLoading}
                         >
                           <X className="h-4 w-4 mr-1" />
@@ -138,10 +166,8 @@ export function AuthRequestCard({
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onConnect(integration);
-                          }}
+                          data-integration-key={integration}
+                          onClick={handleConnectClick}
                           disabled={isLoading}
                         >
                           {isLoading ? (

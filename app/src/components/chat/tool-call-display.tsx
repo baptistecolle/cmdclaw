@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronRight, Wrench, Check, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 type Props = {
   name: string;
@@ -12,11 +12,14 @@ type Props = {
 export function ToolCallDisplay({ name, input, result }: Props) {
   const [expanded, setExpanded] = useState(false);
   const isComplete = result !== undefined;
+  const handleToggleExpanded = useCallback(() => {
+    setExpanded((prev) => !prev);
+  }, []);
 
   return (
     <div className="rounded-lg border bg-card text-card-foreground">
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggleExpanded}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
       >
         {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

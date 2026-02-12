@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { EmojiPicker, EmojiPickerContent, EmojiPickerSearch } from "@/components/ui/emoji-picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -23,15 +23,22 @@ export function IconDisplay({ icon, className }: { icon?: string | null; classNa
 export function IconPicker({ value, onChange, children }: IconPickerProps) {
   const [open, setOpen] = useState(false);
 
-  const handleEmojiSelect = (emoji: string) => {
+  const handleEmojiSelect = useCallback((emoji: string) => {
     onChange(emoji);
     setOpen(false);
-  };
+  }, [onChange]);
 
-  const handleRemove = () => {
+  const handleRemove = useCallback(() => {
     onChange(null);
     setOpen(false);
-  };
+  }, [onChange]);
+
+  const handleEmojiPickerSelect = useCallback(
+    (emoji: { emoji: string }) => {
+      handleEmojiSelect(emoji.emoji);
+    },
+    [handleEmojiSelect],
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -59,7 +66,7 @@ export function IconPicker({ value, onChange, children }: IconPickerProps) {
         </div>
         <EmojiPicker
           className="h-[280px] w-full border-none"
-          onEmojiSelect={(emoji) => handleEmojiSelect(emoji.emoji)}
+          onEmojiSelect={handleEmojiPickerSelect}
         >
           <EmojiPickerSearch placeholder="Search emoji..." />
           <EmojiPickerContent />

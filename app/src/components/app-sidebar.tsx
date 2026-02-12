@@ -13,7 +13,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -69,13 +69,13 @@ export function AppSidebar() {
     };
   }, []);
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     const { error } = await authClient.signOut();
     if (!error) {
       setSession(null);
       router.push("/login");
     }
-  };
+  }, [router]);
 
   const userEmail = session?.user?.email ?? "";
   const avatarInitial = userEmail ? userEmail.charAt(0).toUpperCase() : "";
@@ -95,7 +95,7 @@ export function AppSidebar() {
     return pathname === href || pathname.startsWith(href + "/");
   };
 
-  const handleSubmitReport = async () => {
+  const handleSubmitReport = useCallback(async () => {
     const message = reportMessage.trim();
     if (!message) {
       setReportError("Please enter a message.");
@@ -133,7 +133,41 @@ export function AppSidebar() {
     } finally {
       setIsSubmittingReport(false);
     }
-  };
+  }, [reportAttachment, reportMessage]);
+
+  const handleReportMessageChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setReportMessage(e.target.value);
+      if (reportError) {
+        setReportError("");
+      }
+    },
+    [reportError],
+  );
+
+  const handleAttachmentChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setReportAttachment(file);
+  }, []);
+
+  const openAttachmentPicker = useCallback(() => {
+    attachmentInputRef.current?.click();
+  }, []);
+
+  const clearAttachment = useCallback(() => {
+    setReportAttachment(null);
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = "";
+    }
+  }, []);
+
+  const closeReportSheet = useCallback(() => {
+    setReportOpen(false);
+  }, []);
+
+  const openReportSheet = useCallback(() => {
+    setReportOpen(true);
+  }, []);
 
   return (
     <>
@@ -153,12 +187,7 @@ export function AppSidebar() {
           <div className="flex-1 px-4 pb-2">
             <textarea
               value={reportMessage}
-              onChange={(e) => {
-                setReportMessage(e.target.value);
-                if (reportError) {
-                  setReportError("");
-                }
-              }}
+              onChange={handleReportMessageChange}
               placeholder="Describe the issue..."
               className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[160px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
             />
@@ -166,17 +195,10 @@ export function AppSidebar() {
               ref={attachmentInputRef}
               type="file"
               className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                setReportAttachment(file);
-              }}
+              onChange={handleAttachmentChange}
             />
             <div className="mt-3 flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => attachmentInputRef.current?.click()}
-              >
+              <Button type="button" variant="outline" onClick={openAttachmentPicker}>
                 Add attachment
               </Button>
               {reportAttachment && (
@@ -187,12 +209,7 @@ export function AppSidebar() {
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => {
-                      setReportAttachment(null);
-                      if (attachmentInputRef.current) {
-                        attachmentInputRef.current.value = "";
-                      }
-                    }}
+                    onClick={clearAttachment}
                   >
                     Remove
                   </Button>
@@ -204,7 +221,7 @@ export function AppSidebar() {
           <SheetFooter className="border-t">
             <Button
               variant="outline"
-              onClick={() => setReportOpen(false)}
+              onClick={closeReportSheet}
               disabled={isSubmittingReport}
             >
               Cancel
@@ -256,7 +273,7 @@ export function AppSidebar() {
             <TooltipTrigger asChild>
               <button
                 type="button"
-                onClick={() => setReportOpen(true)}
+                onClick={openReportSheet}
                 className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-9 w-9 items-center justify-center rounded-md transition-colors"
               >
                 <Flag className="h-4 w-4" />

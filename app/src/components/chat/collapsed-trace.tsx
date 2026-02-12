@@ -2,11 +2,16 @@
 
 import { Check, AlertCircle, ChevronRight, Eye, StopCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import { ActivityItem, type ActivityItemData } from "./activity-item";
 import { IntegrationBadges } from "./integration-badges";
+
+const COLLAPSED_TRACE_EXPANDED_INITIAL = { height: 0, opacity: 0 };
+const COLLAPSED_TRACE_EXPANDED_ANIMATE = { height: "auto", opacity: 1 };
+const COLLAPSED_TRACE_EXPANDED_EXIT = { height: 0, opacity: 0 };
+const COLLAPSED_TRACE_EXPANDED_TRANSITION = { duration: 0.2, ease: "easeInOut" };
 
 type Props = {
   messageId: string;
@@ -34,12 +39,12 @@ export function CollapsedTrace({
   );
 
   // Handle toggle - use external handler if provided
-  const handleToggle = () => {
+  const handleToggle = useCallback(() => {
     if (onToggleExpand) {
       onToggleExpand();
     }
-    setIsExpanded(!isExpanded);
-  };
+    setIsExpanded((prev) => !prev);
+  }, [onToggleExpand]);
 
   return (
     <div
@@ -88,10 +93,10 @@ export function CollapsedTrace({
       <AnimatePresence initial={false}>
         {isExpanded && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
+            initial={COLLAPSED_TRACE_EXPANDED_INITIAL}
+            animate={COLLAPSED_TRACE_EXPANDED_ANIMATE}
+            exit={COLLAPSED_TRACE_EXPANDED_EXIT}
+            transition={COLLAPSED_TRACE_EXPANDED_TRANSITION}
             className="overflow-hidden"
           >
             <div className="border-t border-border/30 px-3 py-2 max-h-[300px] overflow-y-auto">

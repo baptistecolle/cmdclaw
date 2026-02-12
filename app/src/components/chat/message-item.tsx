@@ -2,7 +2,7 @@
 
 import { Paperclip, Download, FileIcon, Eye } from "lucide-react";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
 import { useDownloadAttachment, useDownloadSandboxFile } from "@/orpc/hooks";
 import type { ActivityItemData } from "./activity-item";
@@ -36,6 +36,12 @@ type Props = {
   sandboxFiles?: SandboxFileData[];
 };
 
+const NOOP = () => {};
+
+function getAttachmentKey(a: AttachmentData): string {
+  return a.id ?? `${a.name}-${a.mimeType}-${a.dataUrl}`;
+}
+
 export function MessageItem({
   id,
   role,
@@ -50,59 +56,71 @@ export function MessageItem({
   const { mutateAsync: downloadAttachment } = useDownloadAttachment();
   const { mutateAsync: downloadSandboxFile } = useDownloadSandboxFile();
 
-  const getAttachmentUrl = async (attachment: AttachmentData): Promise<string | null> => {
-    if (attachment.id) {
-      const result = await downloadAttachment(attachment.id);
-      return result.url;
-    }
-    return attachment.dataUrl || null;
-  };
-
-  const handleViewAttachment = async (attachment: AttachmentData) => {
-    try {
-      const url = await getAttachmentUrl(attachment);
-      if (!url) {
-        return;
+  const getAttachmentUrl = useCallback(
+    async (attachment: AttachmentData): Promise<string | null> => {
+      if (attachment.id) {
+        const result = await downloadAttachment(attachment.id);
+        return result.url;
       }
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      console.error("Failed to open attachment:", err);
-    }
-  };
+      return attachment.dataUrl || null;
+    },
+    [downloadAttachment],
+  );
 
-  const handleDownload = async (attachment: AttachmentData) => {
-    try {
-      const url = await getAttachmentUrl(attachment);
-      if (!url) {
-        return;
+  const handleViewAttachment = useCallback(
+    async (attachment: AttachmentData) => {
+      try {
+        const url = await getAttachmentUrl(attachment);
+        if (!url) {
+          return;
+        }
+        window.open(url, "_blank", "noopener,noreferrer");
+      } catch (err) {
+        console.error("Failed to open attachment:", err);
       }
+    },
+    [getAttachmentUrl],
+  );
 
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = attachment.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error("Failed to download attachment:", err);
-    }
-  };
+  const handleDownload = useCallback(
+    async (attachment: AttachmentData) => {
+      try {
+        const url = await getAttachmentUrl(attachment);
+        if (!url) {
+          return;
+        }
 
-  const handleDownloadSandboxFile = async (file: SandboxFileData) => {
-    try {
-      const result = await downloadSandboxFile(file.fileId);
-      // Trigger download via temporary link
-      const link = document.createElement("a");
-      link.href = result.url;
-      link.download = file.filename;
-      link.target = "_blank";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error("Failed to download sandbox file:", err);
-    }
-  };
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = attachment.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        console.error("Failed to download attachment:", err);
+      }
+    },
+    [getAttachmentUrl],
+  );
+
+  const handleDownloadSandboxFile = useCallback(
+    async (file: SandboxFileData) => {
+      try {
+        const result = await downloadSandboxFile(file.fileId);
+        // Trigger download via temporary link
+        const link = document.createElement("a");
+        link.href = result.url;
+        link.download = file.filename;
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        console.error("Failed to download sandbox file:", err);
+      }
+    },
+    [downloadSandboxFile],
+  );
 
   const hasInterruptedMarker = useMemo(
     () => !!parts?.some((p) => p.type === "system" && p.content === "Interrupted by user"),
@@ -229,7 +247,7 @@ export function MessageItem({
   }, [parts, content]);
 
   // Toggle segment expand/collapse
-  const toggleSegmentExpand = (segmentId: string) => {
+  const toggleSegmentExpand = useCallback((segmentId: string) => {
     setExpandedSegments((prev) => {
       const next = new Set(prev);
       if (next.has(segmentId)) {
@@ -240,7 +258,75 @@ export function MessageItem({
       }
       return next;
     });
-  };
+  }, []);
+
+  const attachmentsByKey = useMemo(() => {
+    const map = new Map<string, AttachmentData>();
+    for (const attachment of attachments ?? []) {
+      map.set(getAttachmentKey(attachment), attachment);
+    }
+    return map;
+  }, [attachments]);
+
+  const sandboxFilesById = useMemo(() => {
+    const map = new Map<string, SandboxFileData>();
+    for (const file of sandboxFiles ?? []) {
+      map.set(file.fileId, file);
+    }
+    return map;
+  }, [sandboxFiles]);
+
+  const segmentToggleHandlers = useMemo(() => {
+    const handlers = new Map<string, () => void>();
+    for (const segment of segments) {
+      handlers.set(segment.id, () => {
+        toggleSegmentExpand(segment.id);
+      });
+    }
+    return handlers;
+  }, [segments, toggleSegmentExpand]);
+
+  const handleAttachmentViewClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      const key = event.currentTarget.dataset.attachmentKey;
+      if (!key) {
+        return;
+      }
+      const attachment = attachmentsByKey.get(key);
+      if (attachment) {
+        void handleViewAttachment(attachment);
+      }
+    },
+    [attachmentsByKey, handleViewAttachment],
+  );
+
+  const handleAttachmentDownloadClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      const key = event.currentTarget.dataset.attachmentKey;
+      if (!key) {
+        return;
+      }
+      const attachment = attachmentsByKey.get(key);
+      if (attachment) {
+        void handleDownload(attachment);
+      }
+    },
+    [attachmentsByKey, handleDownload],
+  );
+
+  const handleSandboxFileClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      const fileId = event.currentTarget.dataset.fileId;
+      if (!fileId) {
+        return;
+      }
+      const file = sandboxFilesById.get(fileId);
+      if (file) {
+        void handleDownloadSandboxFile(file);
+      }
+    },
+    [handleDownloadSandboxFile, sandboxFilesById],
+  );
 
   // Check if we have segments with approvals (need segmented display)
   const hasApprovals = segments.some((seg) => seg.approval !== null);
@@ -253,10 +339,7 @@ export function MessageItem({
           <div className="flex flex-wrap gap-2 justify-end">
             {attachments.map((a) =>
               a.mimeType.startsWith("image/") && a.dataUrl ? (
-                <div
-                  key={a.id ?? `${a.name}-${a.mimeType}-${a.dataUrl}`}
-                  className="relative group"
-                >
+                <div key={getAttachmentKey(a)} className="relative group">
                   <Image
                     src={a.dataUrl}
                     alt={a.name}
@@ -267,10 +350,18 @@ export function MessageItem({
                   />
                   {(a.id || a.dataUrl) && (
                     <div className="absolute top-1 right-1 flex items-center gap-1 rounded-md bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                      <button type="button" onClick={() => handleViewAttachment(a)}>
+                      <button
+                        type="button"
+                        data-attachment-key={getAttachmentKey(a)}
+                        onClick={handleAttachmentViewClick}
+                      >
                         <Eye className="h-3.5 w-3.5" />
                       </button>
-                      <button type="button" onClick={() => handleDownload(a)}>
+                      <button
+                        type="button"
+                        data-attachment-key={getAttachmentKey(a)}
+                        onClick={handleAttachmentDownloadClick}
+                      >
                         <Download className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -278,14 +369,15 @@ export function MessageItem({
                 </div>
               ) : (
                 <div
-                  key={a.id ?? `${a.name}-${a.mimeType}-${a.dataUrl}`}
+                  key={getAttachmentKey(a)}
                   className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs"
                 >
                   <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="max-w-[200px] truncate">{a.name}</span>
                   <button
                     type="button"
-                    onClick={() => handleViewAttachment(a)}
+                    data-attachment-key={getAttachmentKey(a)}
+                    onClick={handleAttachmentViewClick}
                     className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
                   >
                     <Eye className="h-3 w-3 text-muted-foreground" />
@@ -293,7 +385,8 @@ export function MessageItem({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDownload(a)}
+                    data-attachment-key={getAttachmentKey(a)}
+                    onClick={handleAttachmentDownloadClick}
                     className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
                   >
                     <Download className="h-3 w-3 text-muted-foreground" />
@@ -343,7 +436,7 @@ export function MessageItem({
                       hasError={hasError && index === segments.length - 1}
                       activityItems={segment.items}
                       defaultExpanded={isExpanded}
-                      onToggleExpand={() => toggleSegmentExpand(segment.id)}
+                      onToggleExpand={segmentToggleHandlers.get(segment.id) ?? NOOP}
                     />
                   )}
 
@@ -357,8 +450,8 @@ export function MessageItem({
                       operation={segment.approval.operation}
                       command={segment.approval.command}
                       status={segment.approval.status}
-                      onApprove={() => {}}
-                      onDeny={() => {}}
+                      onApprove={NOOP}
+                      onDeny={NOOP}
                       readonly
                     />
                   )}
@@ -404,7 +497,8 @@ export function MessageItem({
           {sandboxFiles.map((file) => (
             <button
               key={file.fileId}
-              onClick={() => handleDownloadSandboxFile(file)}
+              data-file-id={file.fileId}
+              onClick={handleSandboxFileClick}
               className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm"
             >
               <FileIcon className="w-4 h-4 text-muted-foreground" />

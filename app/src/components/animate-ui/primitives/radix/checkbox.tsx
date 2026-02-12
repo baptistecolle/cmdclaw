@@ -12,6 +12,31 @@ type CheckboxContextType = {
 };
 
 const [CheckboxProvider, useCheckbox] = getStrictContext<CheckboxContextType>("CheckboxContext");
+const CHECKBOX_WHILE_TAP = { scale: 0.95 };
+const CHECKBOX_WHILE_HOVER = { scale: 1.05 };
+const INDETERMINATE_INITIAL = { pathLength: 0, opacity: 0 };
+const INDETERMINATE_ANIMATE = {
+  pathLength: 1,
+  opacity: 1,
+  transition: { duration: 0.2 },
+};
+const CHECKBOX_PATH_VARIANTS = {
+  checked: {
+    pathLength: 1,
+    opacity: 1,
+    transition: {
+      duration: 0.2,
+      delay: 0.2,
+    },
+  },
+  unchecked: {
+    pathLength: 0,
+    opacity: 0,
+    transition: {
+      duration: 0.2,
+    },
+  },
+};
 
 type CheckboxProps = HTMLMotionProps<"button"> &
   Omit<React.ComponentProps<typeof CheckboxPrimitive.Root>, "asChild">;
@@ -31,9 +56,13 @@ function Checkbox({
     defaultValue: defaultChecked,
     onChange: onCheckedChange,
   });
+  const contextValue = React.useMemo(
+    () => ({ isChecked, setIsChecked }),
+    [isChecked, setIsChecked],
+  );
 
   return (
-    <CheckboxProvider value={{ isChecked, setIsChecked }}>
+    <CheckboxProvider value={contextValue}>
       <CheckboxPrimitive.Root
         defaultChecked={defaultChecked}
         checked={checked}
@@ -46,8 +75,8 @@ function Checkbox({
       >
         <motion.button
           data-slot="checkbox"
-          whileTap={{ scale: 0.95 }}
-          whileHover={{ scale: 1.05 }}
+          whileTap={CHECKBOX_WHILE_TAP}
+          whileHover={CHECKBOX_WHILE_HOVER}
           {...props}
         />
       </CheckboxPrimitive.Root>
@@ -80,35 +109,15 @@ function CheckboxIndicator(props: CheckboxIndicatorProps) {
             x2="19"
             y2="12"
             strokeLinecap="round"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{
-              pathLength: 1,
-              opacity: 1,
-              transition: { duration: 0.2 },
-            }}
+            initial={INDETERMINATE_INITIAL}
+            animate={INDETERMINATE_ANIMATE}
           />
         ) : (
           <motion.path
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M4.5 12.75l6 6 9-13.5"
-            variants={{
-              checked: {
-                pathLength: 1,
-                opacity: 1,
-                transition: {
-                  duration: 0.2,
-                  delay: 0.2,
-                },
-              },
-              unchecked: {
-                pathLength: 0,
-                opacity: 0,
-                transition: {
-                  duration: 0.2,
-                },
-              },
-            }}
+            variants={CHECKBOX_PATH_VARIANTS}
           />
         )}
       </motion.svg>
