@@ -21,6 +21,8 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   hubspot: "hubspot",
   linkedin: "linkedin",
   salesforce: "salesforce",
+  reddit: "reddit",
+  twitter: "twitter",
 };
 
 const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
@@ -107,6 +109,20 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
     read: ["query", "get", "describe", "objects", "search"],
     write: ["create", "update"],
   },
+  reddit: {
+    read: [
+      "feed", "subreddit", "post", "user", "search", "multireddit",
+      "inbox", "subscriptions",
+    ],
+    write: [
+      "vote", "comment", "reply", "save", "unsave", "submit",
+      "delete", "edit", "message", "read", "subscribe", "unsubscribe",
+    ],
+  },
+  twitter: {
+    read: ["me", "user", "user-id", "timeline", "mentions", "search", "likes", "followers", "following"],
+    write: ["post", "reply", "quote", "like", "unlike", "retweet", "unretweet", "follow", "unfollow"],
+  },
 };
 
 const INTEGRATION_NAMES: Record<string, string> = {
@@ -123,6 +139,8 @@ const INTEGRATION_NAMES: Record<string, string> = {
   hubspot: "HubSpot",
   linkedin: "LinkedIn",
   salesforce: "Salesforce",
+  reddit: "Reddit",
+  twitter: "X (Twitter)",
 };
 
 export interface ParsedCommand {

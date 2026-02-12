@@ -32,6 +32,22 @@ describe("parseBashCommand", () => {
       isWrite: false,
     });
   });
+
+  test("parses twitter and reddit operations", () => {
+    expect(parseBashCommand("twitter post --text hello")).toEqual({
+      integration: "twitter",
+      operation: "post",
+      integrationName: "X (Twitter)",
+      isWrite: true,
+    });
+
+    expect(parseBashCommand("reddit feed --limit 5")).toEqual({
+      integration: "reddit",
+      operation: "feed",
+      integrationName: "Reddit",
+      isWrite: false,
+    });
+  });
 });
 
 describe("checkToolPermissions", () => {
@@ -74,6 +90,35 @@ describe("checkToolPermissions", () => {
 
   test("allows read commands with auth", () => {
     expect(checkToolPermissions("bash", { command: "github prs" }, ["github"])).toEqual({
+      allowed: true,
+      needsApproval: false,
+      needsAuth: false,
+    });
+  });
+
+  test("requires auth for twitter when integration token is missing", () => {
+    expect(checkToolPermissions("bash", { command: "twitter timeline -l 5" }, [])).toEqual({
+      allowed: false,
+      needsApproval: false,
+      needsAuth: true,
+      integration: "twitter",
+      integrationName: "X (Twitter)",
+      reason: "X (Twitter) authentication required",
+    });
+  });
+
+  test("requires approval for reddit write operations with auth", () => {
+    expect(checkToolPermissions("bash", { command: "reddit comment --id t3_123 --text hi" }, ["reddit"])).toEqual({
+      allowed: false,
+      needsApproval: true,
+      needsAuth: false,
+      integration: "reddit",
+      integrationName: "Reddit",
+    });
+  });
+
+  test("allows reddit read operations when auth exists", () => {
+    expect(checkToolPermissions("bash", { command: "reddit feed -l 10" }, ["reddit"])).toEqual({
       allowed: true,
       needsApproval: false,
       needsAuth: false,

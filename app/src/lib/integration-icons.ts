@@ -363,29 +363,36 @@ export function getIntegrationActions(integration: string): { key: string; label
   const labels = INTEGRATION_OPERATION_LABELS[integration as IntegrationType];
   if (!labels) return [];
 
+  const verbMap: Record<string, string> = {
+    Listing: "List",
+    Getting: "Get",
+    Reading: "Read",
+    Searching: "Search",
+    Creating: "Create",
+    Updating: "Update",
+    Deleting: "Delete",
+    Sending: "Send",
+    Adding: "Add",
+    Uploading: "Upload",
+    Appending: "Append",
+    Completing: "Complete",
+    Removing: "Remove",
+    Commenting: "Comment on",
+    Reacting: "React to",
+    Starting: "Start",
+  };
+
   return Object.entries(labels).map(([key, label]) => ({
     key,
-    // Convert "Listing channels" to "List channels" for cleaner display
-    label: label.replace(/^(Listing|Getting|Reading|Searching|Creating|Updating|Deleting|Sending|Adding|Uploading|Appending|Completing|Removing|Commenting|Reacting|Starting)/, (match) => {
-      const verbMap: Record<string, string> = {
-        Listing: "List",
-        Getting: "Get",
-        Reading: "Read",
-        Searching: "Search",
-        Creating: "Create",
-        Updating: "Update",
-        Deleting: "Delete",
-        Sending: "Send",
-        Adding: "Add",
-        Uploading: "Upload",
-        Appending: "Append",
-        Completing: "Complete",
-        Removing: "Remove",
-        Commenting: "Comment on",
-        Reacting: "React to",
-        Starting: "Start",
-      };
-      return verbMap[match] || match;
-    }),
+    // Convert labels like "Listing channels" into "List channels".
+    label: (() => {
+      const match = label.match(
+        /^(Listing|Getting|Reading|Searching|Creating|Updating|Deleting|Sending|Adding|Uploading|Appending|Completing|Removing|Commenting|Reacting|Starting)\b(?:\s+(?:on|to))?/
+      );
+      if (!match) return label;
+      const verb = match[1];
+      const replacement = verbMap[verb] || verb;
+      return `${replacement}${label.slice(match[0].length)}`.trim();
+    })(),
   }));
 }

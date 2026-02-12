@@ -26,6 +26,10 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   github: "github",
   airtable: "airtable",
   hubspot: "hubspot",
+  linkedin: "linkedin",
+  salesforce: "salesforce",
+  reddit: "reddit",
+  twitter: "twitter",
 };
 
 /**
@@ -59,6 +63,19 @@ export function parseCliCommand(command: string): ParsedCommand | null {
       operation = `${resource}.${action}`;
     }
     argStartIndex = 3;
+  }
+
+  // LinkedIn has nested pattern: linkedin <resource> <action>
+  if (integration === "linkedin" && tokens.length >= 3) {
+    const resource = tokens[1];
+    const action = tokens[2];
+    if (resource === "search") {
+      operation = "search";
+      argStartIndex = 2;
+    } else {
+      operation = `${resource}.${action}`;
+      argStartIndex = 3;
+    }
   }
 
   // Parse arguments

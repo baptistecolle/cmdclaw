@@ -15,4 +15,6 @@ This repository is organized into several top-level folders. Each folder can hav
 ## Testing
 
 Avoid mocks as much as possible, Test actual implementation, do not duplicate logic into tests
-try to colocated tests with the code they test when relevant.
+try to colocated tests with the code they test when relevant. for collacting use this format `*.test.ts` or `*.e2e.test.ts`
+
+
