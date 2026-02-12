@@ -1,0 +1,173 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+function createProcedureStub() {
+  const stub: any = {
+    input: vi.fn(() => stub),
+    output: vi.fn(() => stub),
+    handler: vi.fn((fn: any) => fn),
+  };
+  return stub;
+}
+
+const {
+  generationFindFirstMock,
+  conversationFindFirstMock,
+  dbMock,
+  generationManagerMock,
+} = vi.hoisted(() => {
+  const generationFindFirstMock = vi.fn();
+  const conversationFindFirstMock = vi.fn();
+
+  const dbMock = {
+    query: {
+      generation: {
+        findFirst: generationFindFirstMock,
+      },
+      conversation: {
+        findFirst: conversationFindFirstMock,
+      },
+    },
+  };
+
+  const generationManagerMock = {
+    startGeneration: vi.fn(),
+    subscribeToGeneration: vi.fn(),
+    cancelGeneration: vi.fn(),
+    submitApproval: vi.fn(),
+    submitAuthResult: vi.fn(),
+    getGenerationStatus: vi.fn(),
+    getGenerationForConversation: vi.fn(),
+  };
+
+  return {
+    generationFindFirstMock,
+    conversationFindFirstMock,
+    dbMock,
+    generationManagerMock,
+  };
+});
+
+vi.mock("../middleware", () => ({
+  protectedProcedure: createProcedureStub(),
+}));
+
+vi.mock("@/server/db/client", () => ({
+  db: dbMock,
+}));
+
+vi.mock("@/server/services/generation-manager", () => ({
+  generationManager: generationManagerMock,
+}));
+
+vi.mock("@/server/utils/observability", () => ({
+  logServerEvent: vi.fn(),
+}));
+
+import { generationRouter } from "./generation";
+
+const context = { user: { id: "user-1" } } as any;
+const generationRouterAny = generationRouter as any;
+
+describe("generationRouter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    generationManagerMock.cancelGeneration.mockResolvedValue(true);
+    generationManagerMock.submitApproval.mockResolvedValue(true);
+    generationManagerMock.submitAuthResult.mockResolvedValue(true);
+    generationManagerMock.getGenerationStatus.mockResolvedValue({
+      status: "running",
+      contentParts: [],
+      pendingApproval: null,
+      usage: { inputTokens: 1, outputTokens: 2 },
+    });
+  });
+
+  it("enforces generation ownership in getGenerationStatus", async () => {
+    generationFindFirstMock.mockResolvedValue({
+      id: "gen-1",
+      conversation: { userId: "another-user" },
+    });
+
+    await expect(
+      generationRouterAny.getGenerationStatus({
+        input: { generationId: "gen-1" },
+        context,
+      })
+    ).rejects.toThrow("Access denied");
+  });
+
+  it("enforces conversation ownership in getActiveGeneration", async () => {
+    conversationFindFirstMock.mockResolvedValue({
+      id: "conv-1",
+      userId: "another-user",
+      generationStatus: "idle",
+      currentGenerationId: null,
+    });
+
+    await expect(
+      generationRouterAny.getActiveGeneration({
+        input: { conversationId: "conv-1" },
+        context,
+      })
+    ).rejects.toThrow("Access denied");
+  });
+
+  it("maps active generation status from manager", async () => {
+    conversationFindFirstMock.mockResolvedValue({
+      id: "conv-1",
+      userId: "user-1",
+      generationStatus: "idle",
+      currentGenerationId: null,
+    });
+    generationManagerMock.getGenerationForConversation.mockReturnValue("gen-active");
+    generationManagerMock.getGenerationStatus.mockResolvedValue({
+      status: "running",
+      contentParts: [],
+      pendingApproval: null,
+      usage: { inputTokens: 0, outputTokens: 0 },
+    });
+
+    const result = await generationRouterAny.getActiveGeneration({
+      input: { conversationId: "conv-1" },
+      context,
+    });
+
+    expect(result).toEqual({
+      generationId: "gen-active",
+      status: "generating",
+    });
+  });
+
+  it("passes cancel, approval, and auth calls through to generationManager", async () => {
+    const cancelResult = await generationRouterAny.cancelGeneration({
+      input: { generationId: "gen-1" },
+      context,
+    });
+    const approvalResult = await generationRouterAny.submitApproval({
+      input: { generationId: "gen-1", toolUseId: "tool-1", decision: "approve" },
+      context,
+    });
+    const authResult = await generationRouterAny.submitAuthResult({
+      input: { generationId: "gen-1", integration: "slack", success: true },
+      context,
+    });
+
+    expect(cancelResult).toEqual({ success: true });
+    expect(approvalResult).toEqual({ success: true });
+    expect(authResult).toEqual({ success: true });
+
+    expect(generationManagerMock.cancelGeneration).toHaveBeenCalledWith("gen-1", "user-1");
+    expect(generationManagerMock.submitApproval).toHaveBeenCalledWith(
+      "gen-1",
+      "tool-1",
+      "approve",
+      "user-1"
+    );
+    expect(generationManagerMock.submitAuthResult).toHaveBeenCalledWith(
+      "gen-1",
+      "slack",
+      true,
+      "user-1"
+    );
+  });
+});
