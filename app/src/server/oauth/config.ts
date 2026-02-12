@@ -360,6 +360,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
       "tweet.read",
       "tweet.write",
       "users.read",
+      "dm.read",
       "like.read",
       "like.write",
       "follows.read",

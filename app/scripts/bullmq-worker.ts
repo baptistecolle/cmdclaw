@@ -2,10 +2,12 @@ import { startQueues, stopQueues } from "../src/server/queues";
 import { closePool } from "../src/server/db/client";
 import { reconcileScheduledWorkflowJobs } from "../src/server/services/workflow-scheduler";
 import { startGmailWorkflowWatcher } from "../src/server/services/workflow-gmail-watcher";
+import { startXDmWorkflowWatcher } from "../src/server/services/workflow-x-dm-watcher";
 
 const { worker, queueEvents, workerConnection, queueEventsConnection, queueName, redisUrl } =
   startQueues();
 const stopGmailWatcher = startGmailWorkflowWatcher();
+const stopXDmWatcher = startXDmWorkflowWatcher();
 let shutdownPromise: Promise<void> | null = null;
 
 const shutdown = async () => {
@@ -15,6 +17,7 @@ const shutdown = async () => {
     console.log("[worker] shutting down...");
 
     stopGmailWatcher();
+    stopXDmWatcher();
     await Promise.allSettled([
       stopQueues(worker, queueEvents, workerConnection, queueEventsConnection),
       closePool(),

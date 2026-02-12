@@ -9,6 +9,7 @@ const redisOptions = { maxRetriesPerRequest: null, enableReadyCheck: false } as 
 
 export const SCHEDULED_WORKFLOW_JOB_NAME = "workflow:scheduled-trigger";
 export const GMAIL_WORKFLOW_JOB_NAME = "workflow:gmail-trigger";
+export const X_DM_WORKFLOW_JOB_NAME = "workflow:x-dm-trigger";
 
 type JobPayload = Record<string, unknown> & { workflowId?: string };
 type JobHandler = Processor<JobPayload, unknown, string>;
@@ -65,6 +66,27 @@ const handlers: Record<string, JobHandler> = {
       if (isActiveWorkflowRunConflict(error)) {
         console.warn(
           `[worker] skipped gmail workflow trigger because run is already active for workflow ${workflowId}`
+        );
+        return;
+      }
+      throw error;
+    }
+  },
+  [X_DM_WORKFLOW_JOB_NAME]: async (job) => {
+    const workflowId = job.data?.workflowId;
+    if (!workflowId || typeof workflowId !== "string") {
+      throw new Error(`Missing workflowId in x dm job "${job.id}"`);
+    }
+
+    try {
+      return await triggerWorkflowRun({
+        workflowId,
+        triggerPayload: job.data?.triggerPayload ?? {},
+      });
+    } catch (error) {
+      if (isActiveWorkflowRunConflict(error)) {
+        console.warn(
+          `[worker] skipped x dm workflow trigger because run is already active for workflow ${workflowId}`
         );
         return;
       }
