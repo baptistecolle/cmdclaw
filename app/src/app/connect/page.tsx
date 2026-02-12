@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Loader2, Monitor, XCircle } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ function ConnectDevicePageContent() {
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!code.trim()) {
@@ -52,7 +52,11 @@ function ConnectDevicePageContent() {
       setStatus("error");
       setErrorMsg("An error occurred. Please try again.");
     }
-  };
+  }, [code]);
+
+  const handleCodeChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCode(event.target.value.toUpperCase());
+  }, []);
 
   return (
     <AppShell>
@@ -85,7 +89,7 @@ function ConnectDevicePageContent() {
                 <Input
                   type="text"
                   value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  onChange={handleCodeChange}
                   placeholder="ABCD1234"
                   maxLength={12}
                   className="text-center text-lg font-mono tracking-widest"

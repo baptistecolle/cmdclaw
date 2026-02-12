@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, Monitor, Trash2, Wifi, WifiOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { client } from "@/orpc/client";
 
@@ -13,6 +13,32 @@ interface Device {
   lastSeenAt: string | null;
   capabilities: unknown;
   createdAt: string;
+}
+
+function RevokeDeviceButton({
+  deviceId,
+  isRevoking,
+  onRevoke,
+}: {
+  deviceId: string;
+  isRevoking: boolean;
+  onRevoke: (deviceId: string) => Promise<void>;
+}) {
+  const handleClick = useCallback(() => {
+    void onRevoke(deviceId);
+  }, [deviceId, onRevoke]);
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleClick}
+      disabled={isRevoking}
+      className="text-destructive hover:text-destructive"
+    >
+      {isRevoking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+    </Button>
+  );
 }
 
 export default function DevicesPage() {
@@ -38,7 +64,7 @@ export default function DevicesPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleRevoke = async (deviceId: string) => {
+  const handleRevoke = useCallback(async (deviceId: string) => {
     setRevoking(deviceId);
     try {
       await client.device.revoke({ deviceId });
@@ -48,7 +74,7 @@ export default function DevicesPage() {
     } finally {
       setRevoking(null);
     }
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -114,19 +140,11 @@ export default function DevicesPage() {
                 </div>
               </div>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleRevoke(device.id)}
-                disabled={revoking === device.id}
-                className="text-destructive hover:text-destructive"
-              >
-                {revoking === device.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-              </Button>
+              <RevokeDeviceButton
+                deviceId={device.id}
+                isRevoking={revoking === device.id}
+                onRevoke={handleRevoke}
+              />
             </div>
           ))}
         </div>

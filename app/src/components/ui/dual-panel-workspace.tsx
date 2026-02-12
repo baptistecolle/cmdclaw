@@ -40,9 +40,8 @@ export function DualPanelWorkspace({
   className,
 }: DualPanelWorkspaceProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragStateRef = useRef<{ active: boolean }>({ active: false });
-  const pointerUpHandlerRef = useRef<(() => void) | null>(null);
   const [mobilePanel, setMobilePanel] = useState<"left" | "right">("right");
+  const [isDragging, setIsDragging] = useState(false);
   const [rightWidth, setRightWidth] = useState(() => {
     if (!storageKey || typeof window === "undefined") {
       return defaultRightWidth;
@@ -79,7 +78,7 @@ export function DualPanelWorkspace({
 
   const onPointerMove = useCallback(
     (event: globalThis.PointerEvent) => {
-      if (!dragStateRef.current.active || !containerRef.current) {
+      if (!containerRef.current) {
         return;
       }
       const rect = containerRef.current.getBoundingClientRect();
@@ -92,32 +91,32 @@ export function DualPanelWorkspace({
   );
 
   const stopDrag = useCallback(() => {
-    dragStateRef.current.active = false;
-    document.body.style.cursor = "";
-    document.body.style.userSelect = "";
-    window.removeEventListener("pointermove", onPointerMove);
-    if (pointerUpHandlerRef.current) {
-      window.removeEventListener("pointerup", pointerUpHandlerRef.current);
-      pointerUpHandlerRef.current = null;
-    }
-  }, [onPointerMove]);
+    setIsDragging(false);
+  }, []);
 
   const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
-    dragStateRef.current.active = true;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    window.addEventListener("pointermove", onPointerMove);
-    const handlePointerUp = () => stopDrag();
-    pointerUpHandlerRef.current = handlePointerUp;
-    window.addEventListener("pointerup", handlePointerUp);
+    setIsDragging(true);
   };
 
   useEffect(() => {
+    if (!isDragging) {
+      return;
+    }
+
+    const handlePointerUp = () => stopDrag();
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
     return () => {
-      stopDrag();
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
     };
-  }, [stopDrag]);
+  }, [isDragging, onPointerMove, stopDrag]);
 
   const leftWidth = 100 - rightWidth;
 

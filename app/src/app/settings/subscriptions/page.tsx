@@ -105,6 +105,55 @@ function SearchParamsHandler({
   return null;
 }
 
+function ProviderConnectButton({
+  providerId,
+  isConnected,
+  isConnecting,
+  isDisconnecting,
+  onConnect,
+  onDisconnect,
+}: {
+  providerId: ProviderID;
+  isConnected: boolean;
+  isConnecting: boolean;
+  isDisconnecting: boolean;
+  onConnect: (provider: ProviderID) => Promise<void>;
+  onDisconnect: (provider: ProviderID) => Promise<void>;
+}) {
+  const handleConnectClick = useCallback(() => {
+    void onConnect(providerId);
+  }, [onConnect, providerId]);
+
+  const handleDisconnectClick = useCallback(() => {
+    void onDisconnect(providerId);
+  }, [onDisconnect, providerId]);
+
+  if (isConnected) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleDisconnectClick}
+        disabled={isDisconnecting}
+      >
+        {isDisconnecting ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
+        Disconnect
+      </Button>
+    );
+  }
+
+  return (
+    <Button size="sm" onClick={handleConnectClick} disabled={isConnecting}>
+      {isConnecting ? (
+        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+      ) : (
+        <ExternalLink className="mr-2 h-3 w-3" />
+      )}
+      Connect
+    </Button>
+  );
+}
+
 export default function SubscriptionsPage() {
   const { data, isLoading } = useProviderAuthStatus();
   const connectProvider = useConnectProvider();
@@ -131,7 +180,7 @@ export default function SubscriptionsPage() {
     }
   }, [notification]);
 
-  const handleConnect = async (provider: ProviderID) => {
+  const handleConnect = useCallback(async (provider: ProviderID) => {
     setConnectingProvider(provider);
 
     if (provider === "kimi") {
@@ -174,9 +223,9 @@ export default function SubscriptionsPage() {
       });
       setConnectingProvider(null);
     }
-  };
+  }, [connectProvider, setProviderApiKey]);
 
-  const handleDisconnect = async (provider: ProviderID) => {
+  const handleDisconnect = useCallback(async (provider: ProviderID) => {
     try {
       await disconnectProvider.mutateAsync(provider);
       setNotification({
@@ -190,7 +239,7 @@ export default function SubscriptionsPage() {
         message: "Failed to disconnect. Please try again.",
       });
     }
-  };
+  }, [disconnectProvider]);
 
   if (isLoading) {
     return (
@@ -265,30 +314,14 @@ export default function SubscriptionsPage() {
                 </div>
 
                 <div className="shrink-0">
-                  {isConnected ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDisconnect(provider.id)}
-                      disabled={isDisconnecting}
-                    >
-                      {isDisconnecting ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
-                      Disconnect
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => handleConnect(provider.id)}
-                      disabled={isConnecting}
-                    >
-                      {isConnecting ? (
-                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                      ) : (
-                        <ExternalLink className="mr-2 h-3 w-3" />
-                      )}
-                      Connect
-                    </Button>
-                  )}
+                  <ProviderConnectButton
+                    providerId={provider.id}
+                    isConnected={isConnected}
+                    isConnecting={isConnecting}
+                    isDisconnecting={isDisconnecting}
+                    onConnect={handleConnect}
+                    onDisconnect={handleDisconnect}
+                  />
                 </div>
               </div>
             </div>

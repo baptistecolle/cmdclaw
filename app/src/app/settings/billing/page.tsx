@@ -2,6 +2,7 @@
 
 import { useCustomer } from "autumn-js/react";
 import { Loader2, CheckCircle2, CreditCard, Sparkles } from "lucide-react";
+import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -10,17 +11,17 @@ export default function BillingPage() {
 
   const isPro = customer?.products?.some((p) => p.id === "pro");
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = useCallback(async () => {
     await attach({ productId: "pro" });
-  };
+  }, [attach]);
 
-  const handleCancel = async () => {
+  const handleCancel = useCallback(async () => {
     await cancel({ productId: "pro" });
-  };
+  }, [cancel]);
 
-  const handleManageBilling = async () => {
+  const handleManageBilling = useCallback(async () => {
     await openBillingPortal();
-  };
+  }, [openBillingPortal]);
 
   if (isLoading) {
     return (

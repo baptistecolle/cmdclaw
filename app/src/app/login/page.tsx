@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
@@ -47,6 +47,20 @@ function LastUsedBadge() {
     </span>
   );
 }
+
+function LoginLoadingCard() {
+  return (
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
+      <div className="space-y-1 text-center">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Bap</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+const loginFallbackNode = <LoginLoadingCard />;
 
 function LoginContent() {
   const searchParams = useSearchParams();
@@ -95,7 +109,7 @@ function LoginContent() {
     };
   }, [router, callbackUrl]);
 
-  const requestMagicLink = async (event: React.FormEvent<HTMLFormElement>) => {
+  const requestMagicLink = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatus("sending");
     setError(null);
@@ -114,34 +128,28 @@ function LoginContent() {
     }
 
     setStatus("sent");
-  };
+  }, [callbackUrl, email]);
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = useCallback(async () => {
     await authClient.signIn.social({
       provider: "google",
       callbackURL: callbackUrl,
     });
-  };
+  }, [callbackUrl]);
 
-  const handleAppleSignIn = async () => {
+  const handleAppleSignIn = useCallback(async () => {
     await authClient.signIn.social({
       provider: "apple",
       callbackURL: callbackUrl,
     });
-  };
+  }, [callbackUrl]);
+
+  const handleEmailChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(event.target.value);
+  }, []);
 
   if (isCheckingSession) {
-    return (
-      <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
-        <div className="space-y-1 text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Bap
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoginLoadingCard />;
   }
 
   return (
@@ -185,7 +193,7 @@ function LoginContent() {
             autoComplete="email"
             placeholder="you@example.com"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={handleEmailChange}
             required
             aria-invalid={status === "error"}
           />
@@ -216,19 +224,7 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background px-4 py-12 flex items-center justify-center">
-      <Suspense
-        fallback={
-          <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
-            <div className="space-y-1 text-center">
-              <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                Bap
-              </p>
-              <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            </div>
-          </div>
-        }
-      >
+      <Suspense fallback={loginFallbackNode}>
         <LoginContent />
       </Suspense>
     </div>

@@ -2,8 +2,11 @@
 
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { useMemo } from "react";
 import { INTEGRATION_PREVIEWS } from "@/components/chat/previews";
 import { PREVIEW_MOCK_DATA } from "@/components/chat/previews/mock-data";
+
+const EMPTY_POSITIONAL_ARGS: string[] = [];
 
 function PreviewCard({ children, label }: { children: React.ReactNode; label: string }) {
   return (
@@ -46,12 +49,15 @@ function MissingMockDataAlert({ integrations }: { integrations: string[] }) {
 }
 
 export default function PreviewsPage() {
-  const integrations = Object.entries(INTEGRATION_PREVIEWS);
+  const integrations = useMemo(() => Object.entries(INTEGRATION_PREVIEWS), []);
 
-  // Find integrations without mock data
-  const missingMockData = integrations
-    .filter(([key]) => !PREVIEW_MOCK_DATA[key] || PREVIEW_MOCK_DATA[key].length === 0)
-    .map(([key]) => key);
+  const missingMockData = useMemo(
+    () =>
+      integrations
+        .filter(([key]) => !PREVIEW_MOCK_DATA[key] || PREVIEW_MOCK_DATA[key].length === 0)
+        .map(([key]) => key),
+    [integrations],
+  );
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -86,13 +92,16 @@ export default function PreviewsPage() {
               <section key={integrationKey}>
                 <h2 className="text-xl font-semibold mb-4 pb-2 border-b">{config.displayName}</h2>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {mockData.map((preview, index) => (
-                    <PreviewCard key={`${integrationKey}-${index}`} label={preview.label}>
+                  {mockData.map((preview) => (
+                    <PreviewCard
+                      key={`${integrationKey}-${preview.operation}-${preview.label}`}
+                      label={preview.label}
+                    >
                       <Component
                         integration={integrationKey}
                         operation={preview.operation}
                         args={preview.args}
-                        positionalArgs={preview.positionalArgs || []}
+                        positionalArgs={preview.positionalArgs ?? EMPTY_POSITIONAL_ARGS}
                         command={`${integrationKey} ${preview.operation}`}
                       />
                     </PreviewCard>

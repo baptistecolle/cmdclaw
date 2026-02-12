@@ -2,7 +2,7 @@
 
 import { Copy, Check, Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import {
   SidebarProvider,
   SidebarInset,
@@ -65,17 +65,15 @@ function CopyButton() {
   const { data: conversation } = useConversation(conversationId);
   const [copied, setCopied] = useState(false);
 
-  if (!conversationId || !conversation) {
-    return null;
-  }
+  const conv = conversation as
+    | {
+        title?: string;
+        messages?: Message[];
+      }
+    | undefined;
 
-  const conv = conversation as {
-    title?: string;
-    messages?: Message[];
-  };
-
-  const handleCopy = async () => {
-    if (!conv.messages) {
+  const handleCopy = useCallback(async () => {
+    if (!conv?.messages) {
       return;
     }
 
@@ -83,7 +81,11 @@ function CopyButton() {
     await navigator.clipboard.writeText(markdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
+  }, [conv?.messages, conv?.title]);
+
+  if (!conversationId || !conversation) {
+    return null;
+  }
 
   return (
     <button

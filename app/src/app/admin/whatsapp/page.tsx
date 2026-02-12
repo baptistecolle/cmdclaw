@@ -3,7 +3,7 @@
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import QRCode from "qrcode";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type WhatsAppStatus = {
@@ -16,6 +16,21 @@ export default function AdminWhatsAppPage() {
   const [waStatus, setWaStatus] = useState<WhatsAppStatus | null>(null);
   const [waQrDataUrl, setWaQrDataUrl] = useState<string | null>(null);
   const [waLoading, setWaLoading] = useState(false);
+
+  const handleReconnect = useCallback(async () => {
+    setWaLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp/start", {
+        method: "POST",
+      });
+      if (res.ok) {
+        const data = (await res.json()) as WhatsAppStatus;
+        setWaStatus(data);
+      }
+    } finally {
+      setWaLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -80,20 +95,7 @@ export default function AdminWhatsAppPage() {
             </p>
           </div>
           <Button
-            onClick={async () => {
-              setWaLoading(true);
-              try {
-                const res = await fetch("/api/whatsapp/start", {
-                  method: "POST",
-                });
-                if (res.ok) {
-                  const data = (await res.json()) as WhatsAppStatus;
-                  setWaStatus(data);
-                }
-              } finally {
-                setWaLoading(false);
-              }
-            }}
+            onClick={handleReconnect}
             disabled={waLoading}
           >
             {waLoading ? (

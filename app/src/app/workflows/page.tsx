@@ -2,7 +2,7 @@
 
 import { Loader2, Plus, Pencil, Trash2, Play, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { INTEGRATION_DISPLAY_NAMES, type IntegrationType } from "@/lib/integration-icons";
@@ -22,6 +22,109 @@ function formatDate(value?: Date | string | null) {
   }
   const date = typeof value === "string" ? new Date(value) : value;
   return date.toLocaleString();
+}
+
+function getWorkflowDisplayName(name?: string | null) {
+  const trimmed = name?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : "New Workflow";
+}
+
+function WorkflowStatusSwitch({
+  checked,
+  workflowId,
+  onToggle,
+}: {
+  checked: boolean;
+  workflowId: string;
+  onToggle: (id: string, status: "on" | "off") => Promise<void>;
+}) {
+  const handleCheckedChange = useCallback(
+    (value: boolean) => {
+      void onToggle(workflowId, value ? "on" : "off");
+    },
+    [onToggle, workflowId],
+  );
+
+  return <Switch checked={checked} onCheckedChange={handleCheckedChange} />;
+}
+
+function WorkflowRunButton({
+  workflowId,
+  disabled,
+  onRun,
+}: {
+  workflowId: string;
+  disabled: boolean;
+  onRun: (id: string) => Promise<void>;
+}) {
+  const handleClick = useCallback(() => {
+    void onRun(workflowId);
+  }, [onRun, workflowId]);
+
+  return (
+    <Button variant="secondary" size="sm" onClick={handleClick} disabled={disabled}>
+      <Play className="mr-2 h-4 w-4" />
+      Run
+    </Button>
+  );
+}
+
+function WorkflowDeleteButton({
+  workflowId,
+  name,
+  onRequestDelete,
+}: {
+  workflowId: string;
+  name: string;
+  onRequestDelete: (item: { id: string; name: string }) => void;
+}) {
+  const handleClick = useCallback(() => {
+    onRequestDelete({ id: workflowId, name });
+  }, [name, onRequestDelete, workflowId]);
+
+  return (
+    <Button variant="ghost" size="icon" onClick={handleClick}>
+      <Trash2 className="h-4 w-4" />
+    </Button>
+  );
+}
+
+function WorkflowExpandButton({
+  workflowId,
+  expanded,
+  hiddenCount,
+  onSetExpanded,
+}: {
+  workflowId: string;
+  expanded: boolean;
+  hiddenCount: number;
+  onSetExpanded: (id: string, expanded: boolean) => void;
+}) {
+  const handleExpand = useCallback(() => {
+    onSetExpanded(workflowId, true);
+  }, [onSetExpanded, workflowId]);
+
+  const handleCollapse = useCallback(() => {
+    onSetExpanded(workflowId, false);
+  }, [onSetExpanded, workflowId]);
+
+  if (hiddenCount > 0 && !expanded) {
+    return (
+      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={handleExpand}>
+        Show {hiddenCount} more
+      </Button>
+    );
+  }
+
+  if (expanded) {
+    return (
+      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={handleCollapse}>
+        Show less
+      </Button>
+    );
+  }
+
+  return null;
 }
 
 export default function WorkflowsPage() {
@@ -50,7 +153,7 @@ export default function WorkflowsPage() {
     return () => clearTimeout(timer);
   }, [notification]);
 
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     setIsCreating(true);
     try {
       const result = await createWorkflow.mutateAsync({
@@ -68,18 +171,18 @@ export default function WorkflowsPage() {
       });
       setIsCreating(false);
     }
-  };
+  }, [createWorkflow]);
 
-  const handleToggle = async (id: string, status: "on" | "off") => {
+  const handleToggle = useCallback(async (id: string, status: "on" | "off") => {
     try {
       await updateWorkflow.mutateAsync({ id, status });
       refetch();
     } catch (error) {
       console.error("Failed to toggle workflow:", error);
     }
-  };
+  }, [refetch, updateWorkflow]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!workflowToDelete) {
       return;
     }
@@ -98,9 +201,9 @@ export default function WorkflowsPage() {
         message: "Failed to delete workflow.",
       });
     }
-  };
+  }, [deleteWorkflow, refetch, workflowToDelete]);
 
-  const handleRun = async (id: string) => {
+  const handleRun = useCallback(async (id: string) => {
     try {
       await triggerWorkflow.mutateAsync({ id, payload: {} });
       setNotification({
@@ -115,14 +218,28 @@ export default function WorkflowsPage() {
         message: "Failed to run workflow. Check rate limit or status.",
       });
     }
-  };
+  }, [refetch, triggerWorkflow]);
+
+  const handleSetWorkflowToDelete = useCallback((item: { id: string; name: string } | null) => {
+    setWorkflowToDelete(item);
+  }, []);
+
+  const handleSetExpandedRuns = useCallback((id: string, expanded: boolean) => {
+    setExpandedRunsByWorkflow((prev) => ({
+      ...prev,
+      [id]: expanded,
+    }));
+  }, []);
+
+  const handleModalOverlayClick = useCallback(() => {
+    setWorkflowToDelete(null);
+  }, []);
+
+  const handleModalContentClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+  }, []);
 
   const workflowList = Array.isArray(workflows) ? workflows : [];
-  const getWorkflowDisplayName = (name?: string | null) => {
-    const trimmed = name?.trim();
-    return trimmed && trimmed.length > 0 ? trimmed : "New Workflow";
-  };
-
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -211,40 +328,28 @@ export default function WorkflowsPage() {
 
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex items-center gap-2 rounded-full bg-muted/50 px-2.5 py-1">
-                          <Switch
+                          <WorkflowStatusSwitch
                             checked={wf.status === "on"}
-                            onCheckedChange={(checked) =>
-                              handleToggle(wf.id, checked ? "on" : "off")
-                            }
+                            workflowId={wf.id}
+                            onToggle={handleToggle}
                           />
                           <span className="text-sm">{wf.status === "on" ? "On" : "Off"}</span>
                         </div>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleRun(wf.id)}
+                        <WorkflowRunButton
+                          workflowId={wf.id}
                           disabled={wf.status !== "on"}
-                        >
-                          <Play className="mr-2 h-4 w-4" />
-                          Run
-                        </Button>
+                          onRun={handleRun}
+                        />
                         <Button variant="ghost" size="icon" asChild>
                           <Link href={`/workflows/${wf.id}`}>
                             <Pencil className="h-4 w-4" />
                           </Link>
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            setWorkflowToDelete({
-                              id: wf.id,
-                              name: getWorkflowDisplayName(wf.name),
-                            })
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <WorkflowDeleteButton
+                          workflowId={wf.id}
+                          name={getWorkflowDisplayName(wf.name)}
+                          onRequestDelete={handleSetWorkflowToDelete}
+                        />
                       </div>
                     </div>
 
@@ -271,36 +376,12 @@ export default function WorkflowsPage() {
                               </span>
                             </Link>
                           ))}
-                          {hiddenCount > 0 ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 px-2 text-xs"
-                              onClick={() =>
-                                setExpandedRunsByWorkflow((prev) => ({
-                                  ...prev,
-                                  [wf.id]: true,
-                                }))
-                              }
-                            >
-                              Show {hiddenCount} more
-                            </Button>
-                          ) : null}
-                          {isExpanded && recentRuns.length > 1 ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 px-2 text-xs"
-                              onClick={() =>
-                                setExpandedRunsByWorkflow((prev) => ({
-                                  ...prev,
-                                  [wf.id]: false,
-                                }))
-                              }
-                            >
-                              Show less
-                            </Button>
-                          ) : null}
+                          <WorkflowExpandButton
+                            workflowId={wf.id}
+                            expanded={isExpanded && recentRuns.length > 1}
+                            hiddenCount={hiddenCount}
+                            onSetExpanded={handleSetExpandedRuns}
+                          />
                         </div>
                       ) : (
                         <div className="text-sm text-muted-foreground">No runs yet.</div>
@@ -317,11 +398,11 @@ export default function WorkflowsPage() {
       {workflowToDelete && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-          onClick={() => setWorkflowToDelete(null)}
+          onClick={handleModalOverlayClick}
         >
           <div
             className="w-full max-w-md rounded-lg border bg-background p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+            onClick={handleModalContentClick}
           >
             <h3 className="text-lg font-semibold">Delete workflow?</h3>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -330,7 +411,7 @@ export default function WorkflowsPage() {
             <div className="mt-6 flex items-center justify-end gap-2">
               <Button
                 variant="ghost"
-                onClick={() => setWorkflowToDelete(null)}
+                onClick={handleModalOverlayClick}
                 disabled={deleteWorkflow.isPending}
               >
                 Cancel

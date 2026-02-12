@@ -5,7 +5,6 @@ type LiveFixtures = {
   liveChatModel: string;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export const test = base.extend<{}, LiveFixtures>({
   liveChatModel: [
     async ({}, use) => {

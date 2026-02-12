@@ -1,15 +1,15 @@
 "use client";
 
 import { ApiReferenceReact } from "@scalar/api-reference-react";
-import "@scalar/api-reference-react/style.css";
+import scalarStyles from "@scalar/api-reference-react/style.css";
+
+void scalarStyles;
+
+const docsConfiguration = {
+  url: "/api/openapi",
+  theme: "kepler",
+} as const;
 
 export default function DocsPage() {
-  return (
-    <ApiReferenceReact
-      configuration={{
-        url: "/api/openapi",
-        theme: "kepler",
-      }}
-    />
-  );
+  return <ApiReferenceReact configuration={docsConfiguration} />;
 }

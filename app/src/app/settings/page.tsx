@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -63,7 +63,7 @@ export default function SettingsPage() {
     }
   }, [notification]);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
@@ -80,9 +80,9 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [firstName, lastName, phoneNumber]);
 
-  const handleGenerateLinkCode = async () => {
+  const handleGenerateLinkCode = useCallback(async () => {
     setLinkLoading(true);
     try {
       const res = await fetch("/api/whatsapp/link-code", { method: "POST" });
@@ -105,9 +105,9 @@ export default function SettingsPage() {
     } finally {
       setLinkLoading(false);
     }
-  };
+  }, []);
 
-  const handleRemovePhoneNumber = async () => {
+  const handleRemovePhoneNumber = useCallback(async () => {
     setRemovingPhone(true);
     try {
       const res = await fetch("/api/settings/phone-number", {
@@ -138,7 +138,25 @@ export default function SettingsPage() {
     } finally {
       setRemovingPhone(false);
     }
-  };
+  }, []);
+
+  const handleFirstNameChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setFirstName(event.target.value);
+    },
+    [],
+  );
+
+  const handleLastNameChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setLastName(event.target.value);
+    },
+    [],
+  );
+
+  const handlePhoneNumberChange = useCallback((value?: string) => {
+    setPhoneNumber(value ?? "");
+  }, []);
 
   const user = sessionData?.user;
 
@@ -193,7 +211,7 @@ export default function SettingsPage() {
               <Input
                 type="text"
                 value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                onChange={handleFirstNameChange}
                 placeholder="Enter your first name"
               />
             </div>
@@ -203,7 +221,7 @@ export default function SettingsPage() {
               <Input
                 type="text"
                 value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                onChange={handleLastNameChange}
                 placeholder="Enter your last name"
               />
             </div>
@@ -216,7 +234,7 @@ export default function SettingsPage() {
               international
               countryCallingCodeEditable={false}
               value={phoneNumber}
-              onChange={(value) => setPhoneNumber(value ?? "")}
+              onChange={handlePhoneNumberChange}
               placeholder="Enter your phone number"
             />
             <p className="mt-1 text-xs text-muted-foreground">will be used for whatsapp</p>

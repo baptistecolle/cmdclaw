@@ -3,7 +3,7 @@
 import { CheckCircle2, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useRef, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -58,7 +58,6 @@ const integrationConfig = {
 
 type IntegrationType = keyof typeof integrationConfig;
 
-// Order: recommended first, then others
 const recommendedIntegrations: IntegrationType[] = ["gmail", "google_calendar"];
 const otherIntegrations: IntegrationType[] = [
   "google_docs",
@@ -71,6 +70,73 @@ const otherIntegrations: IntegrationType[] = [
   "linkedin",
 ];
 
+function OnboardingIntegrationsFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+const onboardingIntegrationsFallbackNode = <OnboardingIntegrationsFallback />;
+
+function IntegrationIconButton({
+  type,
+  isRecommended,
+  isConnected,
+  isConnecting,
+  onConnect,
+}: {
+  type: IntegrationType;
+  isRecommended: boolean;
+  isConnected: boolean;
+  isConnecting: boolean;
+  onConnect: (type: IntegrationType) => Promise<void>;
+}) {
+  const config = integrationConfig[type];
+
+  const handleClick = useCallback(() => {
+    if (!isConnected) {
+      void onConnect(type);
+    }
+  }, [isConnected, onConnect, type]);
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isConnected || isConnecting}
+      className={cn(
+        "relative flex flex-col items-center gap-2 rounded-xl p-4 transition-all",
+        "border hover:border-primary/50 hover:bg-muted/50",
+        isConnected && "border-green-500/50 bg-green-500/5",
+        isRecommended && !isConnected && "border-primary/30 bg-primary/5",
+        isConnecting && "opacity-50 cursor-wait",
+      )}
+    >
+      {isConnected && (
+        <div className="absolute -top-1.5 -right-1.5">
+          <CheckCircle2 className="h-5 w-5 text-green-500 fill-background" />
+        </div>
+      )}
+      {isRecommended && !isConnected && (
+        <span className="text-[10px] font-medium text-primary">Recommended</span>
+      )}
+      {isConnecting ? (
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      ) : isRecommended ? (
+        <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-white dark:bg-gray-800 border shadow-sm">
+          <Image src={config.icon} alt={config.name} width={32} height={32} />
+        </div>
+      ) : (
+        <div className="flex items-center justify-center w-8 h-8">
+          <Image src={config.icon} alt={config.name} width={32} height={32} />
+        </div>
+      )}
+      <span className="text-xs font-medium text-muted-foreground">{config.name}</span>
+    </button>
+  );
+}
+
 function OnboardingIntegrationsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -81,7 +147,6 @@ function OnboardingIntegrationsContent() {
   const [connectingType, setConnectingType] = useState<string | null>(null);
   const linkedInLinkingRef = useRef(false);
 
-  // Handle LinkedIn account_id from redirect
   useEffect(() => {
     const accountId = searchParams.get("account_id");
     if (accountId && !linkedInLinkingRef.current) {
@@ -100,7 +165,6 @@ function OnboardingIntegrationsContent() {
     }
   }, [searchParams, linkLinkedIn, refetch]);
 
-  // Handle OAuth success/error
   useEffect(() => {
     const success = searchParams.get("success");
     const error = searchParams.get("error");
@@ -113,81 +177,38 @@ function OnboardingIntegrationsContent() {
     }
   }, [searchParams, refetch]);
 
-  const handleConnect = async (type: IntegrationType) => {
-    setConnectingType(type);
-    try {
-      const result = await getAuthUrl.mutateAsync({
-        type,
-        redirectUrl: `${window.location.origin}/onboarding/integrations`,
-      });
-      window.location.assign(result.authUrl);
-    } catch (error) {
-      console.error("Failed to get auth URL:", error);
-      setConnectingType(null);
-    }
-  };
+  const handleConnect = useCallback(
+    async (type: IntegrationType) => {
+      setConnectingType(type);
+      try {
+        const result = await getAuthUrl.mutateAsync({
+          type,
+          redirectUrl: `${window.location.origin}/onboarding/integrations`,
+        });
+        window.location.assign(result.authUrl);
+      } catch (error) {
+        console.error("Failed to get auth URL:", error);
+        setConnectingType(null);
+      }
+    },
+    [getAuthUrl],
+  );
 
-  const handleContinue = async () => {
+  const handleContinue = useCallback(async () => {
     await completeOnboarding.mutateAsync();
     router.push("/chat");
-  };
+  }, [completeOnboarding, router]);
 
-  const handleSkip = async () => {
+  const handleSkip = useCallback(async () => {
     await completeOnboarding.mutateAsync();
     router.push("/chat");
-  };
+  }, [completeOnboarding, router]);
 
   const integrationsList = Array.isArray(integrations) ? integrations : [];
   const connectedIntegrations = new Set(integrationsList.map((i) => i.type));
 
-  const renderIntegrationIcon = (type: IntegrationType, isRecommended: boolean) => {
-    const config = integrationConfig[type];
-    const isConnected = connectedIntegrations.has(type);
-    const isConnecting = connectingType === type;
-
-    return (
-      <button
-        key={type}
-        onClick={() => !isConnected && handleConnect(type)}
-        disabled={isConnected || isConnecting}
-        className={cn(
-          "relative flex flex-col items-center gap-2 rounded-xl p-4 transition-all",
-          "border hover:border-primary/50 hover:bg-muted/50",
-          isConnected && "border-green-500/50 bg-green-500/5",
-          isRecommended && !isConnected && "border-primary/30 bg-primary/5",
-          isConnecting && "opacity-50 cursor-wait",
-        )}
-      >
-        {isConnected && (
-          <div className="absolute -top-1.5 -right-1.5">
-            <CheckCircle2 className="h-5 w-5 text-green-500 fill-background" />
-          </div>
-        )}
-        {isRecommended && !isConnected && (
-          <span className="text-[10px] font-medium text-primary">Recommended</span>
-        )}
-        {isConnecting ? (
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        ) : isRecommended ? (
-          <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-white dark:bg-gray-800 border shadow-sm">
-            <Image src={config.icon} alt={config.name} width={32} height={32} />
-          </div>
-        ) : (
-          <div className="flex items-center justify-center w-8 h-8">
-            <Image src={config.icon} alt={config.name} width={32} height={32} />
-          </div>
-        )}
-        <span className="text-xs font-medium text-muted-foreground">{config.name}</span>
-      </button>
-    );
-  };
-
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <OnboardingIntegrationsFallback />;
   }
 
   return (
@@ -202,9 +223,17 @@ function OnboardingIntegrationsContent() {
         </div>
 
         <div className="bg-card rounded-2xl border p-6 mb-6">
-          {/* Recommended integrations */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-            {recommendedIntegrations.map((type) => renderIntegrationIcon(type, true))}
+            {recommendedIntegrations.map((type) => (
+              <IntegrationIconButton
+                key={type}
+                type={type}
+                isRecommended
+                isConnected={connectedIntegrations.has(type)}
+                isConnecting={connectingType === type}
+                onConnect={handleConnect}
+              />
+            ))}
           </div>
 
           <div className="relative mb-6">
@@ -216,9 +245,17 @@ function OnboardingIntegrationsContent() {
             </div>
           </div>
 
-          {/* Other integrations */}
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
-            {otherIntegrations.map((type) => renderIntegrationIcon(type, false))}
+            {otherIntegrations.map((type) => (
+              <IntegrationIconButton
+                key={type}
+                type={type}
+                isRecommended={false}
+                isConnected={connectedIntegrations.has(type)}
+                isConnecting={connectingType === type}
+                onConnect={handleConnect}
+              />
+            ))}
           </div>
         </div>
 
@@ -237,13 +274,7 @@ function OnboardingIntegrationsContent() {
 
 export default function OnboardingIntegrationsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      }
-    >
+    <Suspense fallback={onboardingIntegrationsFallbackNode}>
       <OnboardingIntegrationsContent />
     </Suspense>
   );

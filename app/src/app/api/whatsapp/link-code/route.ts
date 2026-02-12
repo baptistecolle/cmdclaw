@@ -7,6 +7,37 @@ function generateLinkCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+async function insertLinkCodeWithRetry(params: {
+  userId: string;
+  expiresAt: Date;
+  maxAttempts: number;
+  attempt?: number;
+}): Promise<{ ok: true; code: string } | { ok: false }> {
+  const { userId, expiresAt, maxAttempts } = params;
+  const attempt = params.attempt ?? 0;
+  const code = generateLinkCode();
+
+  try {
+    await db.insert(whatsappLinkCode).values({
+      userId,
+      code,
+      expiresAt,
+    });
+    return { ok: true, code };
+  } catch (err) {
+    if (attempt >= maxAttempts - 1) {
+      console.error("[whatsapp-link] Failed to create code:", err);
+      return { ok: false };
+    }
+    return insertLinkCodeWithRetry({
+      userId,
+      expiresAt,
+      maxAttempts,
+      attempt: attempt + 1,
+    });
+  }
+}
+
 export async function POST(request: Request) {
   const sessionData = await auth.api.getSession({ headers: request.headers });
   const currentUser = sessionData?.user;
@@ -29,26 +60,17 @@ export async function POST(request: Request) {
 
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-  let code = "";
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    code = generateLinkCode();
-    try {
-      await db.insert(whatsappLinkCode).values({
-        userId: currentUser.id,
-        code,
-        expiresAt,
-      });
-      break;
-    } catch (err) {
-      if (attempt === 4) {
-        console.error("[whatsapp-link] Failed to create code:", err);
-        return new Response("Failed to create link code", { status: 500 });
-      }
-    }
+  const inserted = await insertLinkCodeWithRetry({
+    userId: currentUser.id,
+    expiresAt,
+    maxAttempts: 5,
+  });
+  if (!inserted.ok) {
+    return new Response("Failed to create link code", { status: 500 });
   }
 
   return Response.json({
-    code,
+    code: inserted.code,
     expiresAt: expiresAt.toISOString(),
     alreadyLinked: !!existingLink,
   });

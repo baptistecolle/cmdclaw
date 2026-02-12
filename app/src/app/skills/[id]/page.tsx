@@ -47,6 +47,47 @@ import {
 
 type EditorMode = "rich" | "markdown";
 
+function generateSlug(displayName: string): string {
+  return displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9-\s]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 64);
+}
+
+function generateDisplayName(slug: string): string {
+  return slug
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function isViewableDocument(mimeType: string) {
+  return mimeType === "application/pdf" || mimeType.startsWith("image/");
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function SkillEditorPageFallback() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="h-6 w-6 animate-spin" />
+    </div>
+  );
+}
+
+const skillEditorPageFallbackNode = <SkillEditorPageFallback />;
+
 function SkillEditorPageContent() {
   const params = useParams();
   const router = useRouter();
@@ -126,37 +167,18 @@ function SkillEditorPageContent() {
     }
   }, [skill, selectedFileId, selectedDocumentId]);
 
-  // Auto-generate slug from display name
-  const generateSlug = (displayName: string): string => {
-    return displayName
-      .toLowerCase()
-      .replace(/[^a-z0-9-\s]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 64);
-  };
-
-  // Generate display name from slug (reverse of generateSlug)
-  const generateDisplayName = (slug: string): string => {
-    return slug
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  };
-
-  const handleDisplayNameChange = (value: string) => {
+  const handleDisplayNameChange = useCallback((value: string) => {
     setSkillDisplayName(value);
     // Auto-generate slug if user hasn't manually edited it
     if (!isEditingSlug) {
       setSkillSlug(generateSlug(value));
     }
-  };
+  }, [isEditingSlug]);
 
-  const handleSelectFile = (fileId: string) => {
+  const handleSelectFile = useCallback((fileId: string) => {
     if (selectedFileId) {
       // Auto-save current file before switching
-      handleSaveFile();
+      void handleSaveFile();
     }
     const file = skill?.files.find((f) => f.id === fileId);
     if (file) {
@@ -170,16 +192,12 @@ function SkillEditorPageContent() {
         setEditedContent(file.content);
       }
     }
-  };
+  }, [handleSaveFile, selectedFileId, skill?.files]);
 
-  const isViewableDocument = (mimeType: string) => {
-    return mimeType === "application/pdf" || mimeType.startsWith("image/");
-  };
-
-  const handleSelectDocument = async (docId: string) => {
+  const handleSelectDocument = useCallback(async (docId: string) => {
     if (selectedFileId) {
       // Auto-save current file before switching
-      handleSaveFile();
+      await handleSaveFile();
     }
     setSelectedFileId(null);
     setSelectedDocumentId(docId);
@@ -197,7 +215,7 @@ function SkillEditorPageContent() {
         setIsLoadingDocumentUrl(false);
       }
     }
-  };
+  }, [getDocumentUrl, handleSaveFile, selectedFileId, skill?.documents]);
 
   const handleSaveFile = useCallback(
     async (showNotificationIfNoChanges = false) => {
@@ -279,7 +297,7 @@ function SkillEditorPageContent() {
     ],
   );
 
-  const handleAddFile = async () => {
+  const handleAddFile = useCallback(async () => {
     if (!newFilePath.trim()) {
       return;
     }
@@ -297,9 +315,9 @@ function SkillEditorPageContent() {
     } catch {
       setNotification({ type: "error", message: "Failed to add file" });
     }
-  };
+  }, [addFile, newFilePath, refetch, skillId]);
 
-  const handleDeleteFile = async () => {
+  const handleDeleteFile = useCallback(async () => {
     if (!fileToDelete) {
       return;
     }
@@ -320,9 +338,9 @@ function SkillEditorPageContent() {
     } catch {
       setNotification({ type: "error", message: "Failed to delete file" });
     }
-  };
+  }, [deleteFile, fileToDelete, refetch, selectedFileId, skill?.files]);
 
-  const handleDeleteSkill = async () => {
+  const handleDeleteSkill = useCallback(async () => {
     if (!confirm(`Delete skill "${skillDisplayName}"? This cannot be undone.`)) {
       return;
     }
@@ -333,10 +351,10 @@ function SkillEditorPageContent() {
     } catch {
       setNotification({ type: "error", message: "Failed to delete skill" });
     }
-  };
+  }, [deleteSkill, router, skillDisplayName, skillId]);
 
   // Document handlers
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
       return;
@@ -367,9 +385,9 @@ function SkillEditorPageContent() {
         fileInputRef.current.value = "";
       }
     }
-  };
+  }, [refetch, skillId, uploadDocument]);
 
-  const handleDownloadDocument = async (docId: string) => {
+  const handleDownloadDocument = useCallback(async (docId: string) => {
     try {
       const { url, filename } = await getDocumentUrl.mutateAsync(docId);
       const link = document.createElement("a");
@@ -382,9 +400,9 @@ function SkillEditorPageContent() {
     } catch {
       setNotification({ type: "error", message: "Failed to get download URL" });
     }
-  };
+  }, [getDocumentUrl]);
 
-  const handleDeleteDocument = async () => {
+  const handleDeleteDocument = useCallback(async () => {
     if (!documentToDelete) {
       return;
     }
@@ -408,7 +426,7 @@ function SkillEditorPageContent() {
     } catch {
       setNotification({ type: "error", message: "Failed to delete document" });
     }
-  };
+  }, [deleteDocument, documentToDelete, refetch, selectedDocumentId, skill?.files]);
 
   const getDocumentIcon = (mimeType: string) => {
     if (mimeType.startsWith("image/")) {
@@ -418,16 +436,6 @@ function SkillEditorPageContent() {
       return FileSpreadsheet;
     }
     return File;
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) {
-      return `${bytes} B`;
-    }
-    if (bytes < 1024 * 1024) {
-      return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   // Auto-dismiss notification
@@ -493,6 +501,156 @@ function SkillEditorPageContent() {
     { enableOnFormTags: ["INPUT", "TEXTAREA"] },
     [handleSaveFile],
   );
+
+  const handleDisplayNameInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      handleDisplayNameChange(event.target.value);
+    },
+    [handleDisplayNameChange],
+  );
+
+  const handleSlugInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSkillSlug(
+      event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"),
+    );
+  }, []);
+
+  const handleStopEditingSlug = useCallback(() => {
+    setIsEditingSlug(false);
+  }, []);
+
+  const handleSlugInputKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" || event.key === "Escape") {
+      setIsEditingSlug(false);
+    }
+  }, []);
+
+  const handleStartEditingSlug = useCallback(() => {
+    setIsEditingSlug(true);
+  }, []);
+
+  const handleDescriptionInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSkillDescription(event.target.value);
+  }, []);
+
+  const handleStopEditingDescription = useCallback(() => {
+    setIsEditingDescription(false);
+  }, []);
+
+  const handleDescriptionInputKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter" || event.key === "Escape") {
+        setIsEditingDescription(false);
+      }
+    },
+    [],
+  );
+
+  const handleStartEditingDescription = useCallback(() => {
+    setIsEditingDescription(true);
+  }, []);
+
+  const handleFileTabClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      const fileId = event.currentTarget.dataset.fileId;
+      if (fileId) {
+        handleSelectFile(fileId);
+      }
+    },
+    [handleSelectFile],
+  );
+
+  const handlePromptDeleteFile = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const fileId = event.currentTarget.dataset.fileId;
+    const filePath = event.currentTarget.dataset.filePath;
+    if (fileId && filePath) {
+      setFileToDelete({ id: fileId, path: filePath });
+    }
+  }, []);
+
+  const handleDocumentTabClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const docId = event.currentTarget.dataset.docId;
+      if (docId) {
+        void handleSelectDocument(docId);
+      }
+    },
+    [handleSelectDocument],
+  );
+
+  const handlePromptDeleteDocument = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const docId = event.currentTarget.dataset.docId;
+    const filename = event.currentTarget.dataset.docFilename;
+    if (docId && filename) {
+      setDocumentToDelete({ id: docId, filename });
+    }
+  }, []);
+
+  const handleShowAddFile = useCallback(() => {
+    setShowAddFile(true);
+  }, []);
+
+  const handleTriggerDocumentUpload = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleSetEditorModeRich = useCallback(() => {
+    setEditorMode("rich");
+  }, []);
+
+  const handleSetEditorModeMarkdown = useCallback(() => {
+    setEditorMode("markdown");
+  }, []);
+
+  const handleNewFilePathChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setNewFilePath(event.target.value);
+  }, []);
+
+  const handleCancelAddFile = useCallback(() => {
+    setShowAddFile(false);
+    setNewFilePath("");
+  }, []);
+
+  const handleNewFilePathKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter") {
+        void handleAddFile();
+      }
+      if (event.key === "Escape") {
+        handleCancelAddFile();
+      }
+    },
+    [handleAddFile, handleCancelAddFile],
+  );
+
+  const handleMarkdownChange = useCallback(
+    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const parsed = parseSkillContent(event.target.value);
+      setSkillSlug(parsed.name);
+      setSkillDescription(parsed.description);
+      setSkillBody(parsed.body);
+      if (parsed.name !== skillSlug) {
+        setSkillDisplayName(generateDisplayName(parsed.name));
+      }
+    },
+    [skillSlug],
+  );
+
+  const handleCancelDeleteDocument = useCallback(() => {
+    setDocumentToDelete(null);
+  }, []);
+
+  const handleCancelDeleteFile = useCallback(() => {
+    setFileToDelete(null);
+  }, []);
+
+  const handleDownloadSelectedDocument = useCallback(() => {
+    if (selectedDocumentId) {
+      void handleDownloadDocument(selectedDocumentId);
+    }
+  }, [handleDownloadDocument, selectedDocumentId]);
 
   if (isLoading) {
     return (
@@ -588,7 +746,7 @@ function SkillEditorPageContent() {
               ref={displayNameRef}
               type="text"
               value={skillDisplayName}
-              onChange={(e) => handleDisplayNameChange(e.target.value)}
+              onChange={handleDisplayNameInputChange}
               placeholder="Untitled Skill"
               className="w-full bg-transparent text-3xl font-bold outline-none placeholder:text-muted-foreground/50 focus:outline-none pt-1"
             />
@@ -601,26 +759,15 @@ function SkillEditorPageContent() {
                 ref={slugRef}
                 type="text"
                 value={skillSlug}
-                onChange={(e) =>
-                  setSkillSlug(
-                    e.target.value
-                      .toLowerCase()
-                      .replace(/[^a-z0-9-]/g, "-")
-                      .replace(/-+/g, "-"),
-                  )
-                }
-                onBlur={() => setIsEditingSlug(false)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === "Escape") {
-                    setIsEditingSlug(false);
-                  }
-                }}
+                onChange={handleSlugInputChange}
+                onBlur={handleStopEditingSlug}
+                onKeyDown={handleSlugInputKeyDown}
                 className="h-6 bg-transparent font-mono text-xs text-muted-foreground outline-none"
                 autoFocus
               />
             ) : (
               <button
-                onClick={() => setIsEditingSlug(true)}
+                onClick={handleStartEditingSlug}
                 className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
                 <span className="font-mono">{skillSlug || "skill-slug"}</span>
@@ -635,20 +782,16 @@ function SkillEditorPageContent() {
               ref={descriptionRef}
               type="text"
               value={skillDescription}
-              onChange={(e) => setSkillDescription(e.target.value)}
-              onBlur={() => setIsEditingDescription(false)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === "Escape") {
-                  setIsEditingDescription(false);
-                }
-              }}
+              onChange={handleDescriptionInputChange}
+              onBlur={handleStopEditingDescription}
+              onKeyDown={handleDescriptionInputKeyDown}
               placeholder="Add a description..."
               className="w-full bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/50"
               autoFocus
             />
           ) : (
             <button
-              onClick={() => setIsEditingDescription(true)}
+              onClick={handleStartEditingDescription}
               className="text-left text-sm text-muted-foreground hover:text-foreground"
             >
               {skillDescription || (
@@ -674,7 +817,8 @@ function SkillEditorPageContent() {
             .map((file) => (
               <button
                 key={file.id}
-                onClick={() => handleSelectFile(file.id)}
+                data-file-id={file.id}
+                onClick={handleFileTabClick}
                 className={cn(
                   "group flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors",
                   selectedFileId === file.id
@@ -686,10 +830,9 @@ function SkillEditorPageContent() {
                 {file.path}
                 {file.path !== "SKILL.md" && (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFileToDelete({ id: file.id, path: file.path });
-                    }}
+                    data-file-id={file.id}
+                    data-file-path={file.path}
+                    onClick={handlePromptDeleteFile}
                     className="ml-0.5 rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
                   >
                     <Trash2 className="h-2.5 w-2.5" />
@@ -703,7 +846,8 @@ function SkillEditorPageContent() {
             return (
               <div
                 key={doc.id}
-                onClick={() => handleSelectDocument(doc.id)}
+                data-doc-id={doc.id}
+                onClick={handleDocumentTabClick}
                 className={cn(
                   "group flex cursor-pointer items-center gap-1 px-2.5 py-1.5 text-xs transition-colors",
                   selectedDocumentId === doc.id
@@ -714,10 +858,9 @@ function SkillEditorPageContent() {
                 <Icon className="h-3 w-3" />
                 {doc.filename}
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDocumentToDelete({ id: doc.id, filename: doc.filename });
-                  }}
+                  data-doc-id={doc.id}
+                  data-doc-filename={doc.filename}
+                  onClick={handlePromptDeleteDocument}
                   className="ml-0.5 rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
                 >
                   <Trash2 className="h-2.5 w-2.5" />
@@ -732,12 +875,12 @@ function SkillEditorPageContent() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => setShowAddFile(true)}>
+              <DropdownMenuItem onClick={handleShowAddFile}>
                 <FileText className="h-4 w-4" />
                 Text file
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => fileInputRef.current?.click()}
+                onClick={handleTriggerDocumentUpload}
                 disabled={isUploading}
               >
                 {isUploading ? (
@@ -761,7 +904,7 @@ function SkillEditorPageContent() {
           {isSkillMd && (
             <div className="ml-auto flex items-center gap-0.5">
               <button
-                onClick={() => setEditorMode("rich")}
+                onClick={handleSetEditorModeRich}
                 className={cn(
                   "rounded p-1.5 transition-colors",
                   editorMode === "rich"
@@ -773,7 +916,7 @@ function SkillEditorPageContent() {
                 <Eye className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={() => setEditorMode("markdown")}
+                onClick={handleSetEditorModeMarkdown}
                 className={cn(
                   "rounded p-1.5 transition-colors",
                   editorMode === "markdown"
@@ -794,30 +937,15 @@ function SkillEditorPageContent() {
             <Input
               placeholder="filename.md"
               value={newFilePath}
-              onChange={(e) => setNewFilePath(e.target.value)}
+              onChange={handleNewFilePathChange}
               className="h-8 flex-1 text-sm"
               autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleAddFile();
-                }
-                if (e.key === "Escape") {
-                  setShowAddFile(false);
-                  setNewFilePath("");
-                }
-              }}
+              onKeyDown={handleNewFilePathKeyDown}
             />
             <Button size="sm" onClick={handleAddFile} disabled={!newFilePath.trim()}>
               Add
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setShowAddFile(false);
-                setNewFilePath("");
-              }}
-            >
+            <Button variant="ghost" size="sm" onClick={handleCancelAddFile}>
               Cancel
             </Button>
           </div>
@@ -837,16 +965,7 @@ function SkillEditorPageContent() {
               ) : isSkillMd && editorMode === "markdown" ? (
                 <textarea
                   value={serializeSkillContent(skillSlug, skillDescription, skillBody)}
-                  onChange={(e) => {
-                    const parsed = parseSkillContent(e.target.value);
-                    setSkillSlug(parsed.name);
-                    setSkillDescription(parsed.description);
-                    setSkillBody(parsed.body);
-                    // Also update display name when name changes in markdown mode
-                    if (parsed.name !== skillSlug) {
-                      setSkillDisplayName(generateDisplayName(parsed.name));
-                    }
-                  }}
+                  onChange={handleMarkdownChange}
                   className="h-full w-full rounded-lg border bg-background p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                   placeholder="---
 name: skill-name
@@ -889,6 +1008,7 @@ Add your skill instructions here..."
                   return (
                     <iframe
                       src={documentUrl}
+                      sandbox="allow-same-origin allow-downloads"
                       className="h-full w-full rounded-lg border"
                       title={selectedDoc.filename}
                     />
@@ -921,7 +1041,7 @@ Add your skill instructions here..."
                       {formatFileSize(selectedDoc.sizeBytes)}
                     </p>
                   </div>
-                  <Button onClick={() => handleDownloadDocument(selectedDoc.id)}>
+                  <Button onClick={handleDownloadSelectedDocument}>
                     <Download className="mr-2 h-4 w-4" />
                     Download
                   </Button>
@@ -940,7 +1060,7 @@ Add your skill instructions here..."
                 cannot be undone.
               </p>
               <div className="mt-4 flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setDocumentToDelete(null)}>
+                <Button variant="outline" onClick={handleCancelDeleteDocument}>
                   Cancel
                 </Button>
                 <Button variant="destructive" onClick={handleDeleteDocument}>
@@ -961,7 +1081,7 @@ Add your skill instructions here..."
                 &quot;? This action cannot be undone.
               </p>
               <div className="mt-4 flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setFileToDelete(null)}>
+                <Button variant="outline" onClick={handleCancelDeleteFile}>
                   Cancel
                 </Button>
                 <Button variant="destructive" onClick={handleDeleteFile}>
@@ -977,15 +1097,5 @@ Add your skill instructions here..."
 }
 
 export default function SkillEditorPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      }
-    >
-      <SkillEditorPageContent />
-    </Suspense>
-  );
+  return <Suspense fallback={skillEditorPageFallbackNode}><SkillEditorPageContent /></Suspense>;
 }

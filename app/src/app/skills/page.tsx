@@ -3,7 +3,7 @@
 import { Plus, Loader2, FileText, Pencil, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconDisplay } from "@/components/ui/icon-picker";
@@ -23,7 +23,7 @@ function SkillsPageContent() {
     message: string;
   } | null>(null);
 
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     setIsCreating(true);
     try {
       const result = await createSkill.mutateAsync({
@@ -39,18 +39,18 @@ function SkillsPageContent() {
       });
       setIsCreating(false);
     }
-  };
+  }, [createSkill, router]);
 
-  const handleToggle = async (id: string, enabled: boolean) => {
+  const handleToggle = useCallback(async (id: string, enabled: boolean) => {
     try {
       await updateSkill.mutateAsync({ id, enabled });
       refetch();
     } catch (error) {
       console.error("Failed to toggle skill:", error);
     }
-  };
+  }, [refetch, updateSkill]);
 
-  const handleDelete = async (id: string, displayName: string) => {
+  const handleDelete = useCallback(async (id: string, displayName: string) => {
     if (!confirm(`Are you sure you want to delete "${displayName}"?`)) {
       return;
     }
@@ -68,12 +68,15 @@ function SkillsPageContent() {
         message: "Failed to delete skill.",
       });
     }
-  };
+  }, [deleteSkill, refetch]);
 
-  // Auto-dismiss notification
-  if (notification) {
-    setTimeout(() => setNotification(null), 5000);
-  }
+  useEffect(() => {
+    if (!notification) {
+      return;
+    }
+    const timer = setTimeout(() => setNotification(null), 5000);
+    return () => clearTimeout(timer);
+  }, [notification]);
 
   const skillsList = Array.isArray(skills) ? skills : [];
 
@@ -151,9 +154,10 @@ function SkillsPageContent() {
 
               <div className="flex items-center gap-2">
                 <label className="flex cursor-pointer items-center gap-2">
-                  <Checkbox
+                  <SkillEnabledCheckbox
                     checked={skill.enabled}
-                    onCheckedChange={(checked) => handleToggle(skill.id, checked === true)}
+                    skillId={skill.id}
+                    onToggle={handleToggle}
                   />
                   <span className="text-sm">Enabled</span>
                 </label>
@@ -162,13 +166,11 @@ function SkillsPageContent() {
                     <Pencil className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(skill.id, skill.displayName)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <SkillDeleteButton
+                  skillId={skill.id}
+                  displayName={skill.displayName}
+                  onDelete={handleDelete}
+                />
               </div>
             </div>
           ))}
@@ -179,15 +181,54 @@ function SkillsPageContent() {
 }
 
 export default function SkillsPage() {
+  return <Suspense fallback={skillsPageFallbackNode}><SkillsPageContent /></Suspense>;
+}
+
+function SkillEnabledCheckbox({
+  checked,
+  skillId,
+  onToggle,
+}: {
+  checked: boolean;
+  skillId: string;
+  onToggle: (id: string, enabled: boolean) => Promise<void>;
+}) {
+  const handleCheckedChange = useCallback(
+    (value: boolean | "indeterminate") => {
+      void onToggle(skillId, value === true);
+    },
+    [onToggle, skillId],
+  );
+
+  return <Checkbox checked={checked} onCheckedChange={handleCheckedChange} />;
+}
+
+function SkillDeleteButton({
+  skillId,
+  displayName,
+  onDelete,
+}: {
+  skillId: string;
+  displayName: string;
+  onDelete: (id: string, displayName: string) => Promise<void>;
+}) {
+  const handleClick = useCallback(() => {
+    void onDelete(skillId, displayName);
+  }, [displayName, onDelete, skillId]);
+
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      }
-    >
-      <SkillsPageContent />
-    </Suspense>
+    <Button variant="ghost" size="icon" onClick={handleClick}>
+      <Trash2 className="h-4 w-4" />
+    </Button>
   );
 }
+
+function SkillsPageFallback() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="h-6 w-6 animate-spin" />
+    </div>
+  );
+}
+
+const skillsPageFallbackNode = <SkillsPageFallback />;

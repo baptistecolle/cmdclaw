@@ -16,9 +16,7 @@ type SlackChannelLookupResult = { ok: true; channelId: string } | { ok: false; e
 
 async function lookupSlackChannelIdByName(channelName: string): Promise<SlackChannelLookupResult> {
   const targetName = normalizeSlackChannelName(channelName);
-  let cursor: string | undefined;
-
-  while (true) {
+  const lookupPage = async (cursor?: string): Promise<SlackChannelLookupResult> => {
     const params = new URLSearchParams({
       exclude_archived: "true",
       limit: "200",
@@ -62,15 +60,16 @@ async function lookupSlackChannelIdByName(channelName: string): Promise<SlackCha
 
     const nextCursor = result.response_metadata?.next_cursor?.trim();
     if (!nextCursor) {
-      break;
+      return {
+        ok: false,
+        error: `Slack channel not found: ${channelName}`,
+      };
     }
-    cursor = nextCursor;
-  }
 
-  return {
-    ok: false,
-    error: `Slack channel not found: ${channelName}`,
+    return lookupPage(nextCursor);
   };
+
+  return lookupPage();
 }
 
 async function resolveReportSlackChannelId(): Promise<SlackChannelLookupResult> {

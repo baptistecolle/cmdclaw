@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useRef } from "react";
+import { Suspense, useCallback, useRef } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -135,15 +135,183 @@ const integrationConfig = {
   },
 } as const;
 
+const defaultCustomForm: CustomFormState = {
+  slug: "",
+  name: "",
+  description: "",
+  baseUrl: "",
+  authType: "api_key",
+  apiKey: "",
+  clientId: "",
+  clientSecret: "",
+  authUrl: "",
+  tokenUrl: "",
+  scopes: "",
+};
+
 type IntegrationType = keyof typeof integrationConfig;
 type OAuthIntegrationType = Exclude<IntegrationType, "whatsapp">;
 type CustomAuthType = "oauth2" | "api_key" | "bearer_token";
+type CustomFormState = {
+  slug: string;
+  name: string;
+  description: string;
+  baseUrl: string;
+  authType: CustomAuthType;
+  apiKey: string;
+  clientId: string;
+  clientSecret: string;
+  authUrl: string;
+  tokenUrl: string;
+  scopes: string;
+};
 
 function toErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message;
   }
   return fallback;
+}
+
+function IntegrationsPageFallback() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="h-6 w-6 animate-spin" />
+    </div>
+  );
+}
+
+const integrationsPageFallbackNode = <IntegrationsPageFallback />;
+
+function IntegrationEnabledCheckbox({
+  integrationId,
+  checked,
+  onToggle,
+}: {
+  integrationId: string;
+  checked: boolean;
+  onToggle: (id: string, enabled: boolean) => Promise<void>;
+}) {
+  const handleCheckedChange = useCallback(
+    (value: boolean | "indeterminate") => {
+      void onToggle(integrationId, value === true);
+    },
+    [integrationId, onToggle],
+  );
+
+  return <Checkbox checked={checked} onCheckedChange={handleCheckedChange} />;
+}
+
+function IntegrationDisconnectButton({
+  integrationId,
+  onDisconnect,
+}: {
+  integrationId: string;
+  onDisconnect: (id: string) => Promise<void>;
+}) {
+  const handleClick = useCallback(() => {
+    void onDisconnect(integrationId);
+  }, [integrationId, onDisconnect]);
+
+  return (
+    <Button variant="ghost" size="sm" onClick={handleClick}>
+      Disconnect
+    </Button>
+  );
+}
+
+function IntegrationConnectButton({
+  integrationType,
+  isConnecting,
+  onConnect,
+}: {
+  integrationType: OAuthIntegrationType;
+  isConnecting: boolean;
+  onConnect: (type: OAuthIntegrationType) => Promise<void>;
+}) {
+  const handleClick = useCallback(() => {
+    void onConnect(integrationType);
+  }, [integrationType, onConnect]);
+
+  return (
+    <Button onClick={handleClick} disabled={isConnecting}>
+      {isConnecting ? "Connecting..." : "Connect"}
+      <ExternalLink className="ml-2 h-4 w-4" />
+    </Button>
+  );
+}
+
+function CustomIntegrationEnabledCheckbox({
+  customIntegrationId,
+  checked,
+  onToggle,
+}: {
+  customIntegrationId: string;
+  checked: boolean;
+  onToggle: (customIntegrationId: string, enabled: boolean) => Promise<void>;
+}) {
+  const handleCheckedChange = useCallback(
+    (value: boolean | "indeterminate") => {
+      void onToggle(customIntegrationId, value === true);
+    },
+    [customIntegrationId, onToggle],
+  );
+
+  return <Checkbox checked={checked} onCheckedChange={handleCheckedChange} />;
+}
+
+function CustomIntegrationDisconnectButton({
+  customIntegrationId,
+  onDisconnect,
+}: {
+  customIntegrationId: string;
+  onDisconnect: (customIntegrationId: string) => Promise<void>;
+}) {
+  const handleClick = useCallback(() => {
+    void onDisconnect(customIntegrationId);
+  }, [customIntegrationId, onDisconnect]);
+
+  return (
+    <Button variant="ghost" size="sm" onClick={handleClick}>
+      Disconnect
+    </Button>
+  );
+}
+
+function CustomIntegrationOAuthConnectButton({
+  slug,
+  onConnect,
+}: {
+  slug: string;
+  onConnect: (slug: string) => Promise<void>;
+}) {
+  const handleClick = useCallback(() => {
+    void onConnect(slug);
+  }, [onConnect, slug]);
+
+  return (
+    <Button onClick={handleClick}>
+      Connect <ExternalLink className="ml-2 h-4 w-4" />
+    </Button>
+  );
+}
+
+function CustomIntegrationDeleteButton({
+  customIntegrationId,
+  onDelete,
+}: {
+  customIntegrationId: string;
+  onDelete: (customIntegrationId: string) => Promise<void>;
+}) {
+  const handleClick = useCallback(() => {
+    void onDelete(customIntegrationId);
+  }, [customIntegrationId, onDelete]);
+
+  return (
+    <Button variant="ghost" size="sm" onClick={handleClick}>
+      <Trash2 className="h-4 w-4 text-destructive" />
+    </Button>
+  );
 }
 
 function IntegrationsPageContent() {
@@ -172,19 +340,7 @@ function IntegrationsPageContent() {
     "disconnected" | "connecting" | "connected" | null
   >(null);
   const [showAddCustom, setShowAddCustom] = useState(false);
-  const [customForm, setCustomForm] = useState({
-    slug: "",
-    name: "",
-    description: "",
-    baseUrl: "",
-    authType: "api_key" as CustomAuthType,
-    apiKey: "",
-    clientId: "",
-    clientSecret: "",
-    authUrl: "",
-    tokenUrl: "",
-    scopes: "",
-  });
+  const [customForm, setCustomForm] = useState<CustomFormState>(defaultCustomForm);
 
   // Handle LinkedIn account_id from redirect (Unipile hosted auth)
   useEffect(() => {
@@ -247,7 +403,7 @@ function IntegrationsPageContent() {
     }
   }, [notification]);
 
-  const handleConnect = async (type: OAuthIntegrationType) => {
+  const handleConnect = useCallback(async (type: OAuthIntegrationType) => {
     setConnectingType(type);
     try {
       const result = await getAuthUrl.mutateAsync({
@@ -263,25 +419,67 @@ function IntegrationsPageContent() {
         message: "Failed to start connection. Please try again.",
       });
     }
-  };
+  }, [getAuthUrl]);
 
-  const handleToggle = async (id: string, enabled: boolean) => {
+  const handleToggle = useCallback(async (id: string, enabled: boolean) => {
     try {
       await toggleIntegration.mutateAsync({ id, enabled });
       refetch();
     } catch (error) {
       console.error("Failed to toggle integration:", error);
     }
-  };
+  }, [refetch, toggleIntegration]);
 
-  const handleDisconnect = async (id: string) => {
+  const handleDisconnect = useCallback(async (id: string) => {
     try {
       await disconnectIntegration.mutateAsync(id);
       refetch();
     } catch (error) {
       console.error("Failed to disconnect integration:", error);
     }
-  };
+  }, [disconnectIntegration, refetch]);
+
+  const handleToggleCustom = useCallback(
+    async (customIntegrationId: string, enabled: boolean) => {
+      await toggleCustom.mutateAsync({ customIntegrationId, enabled });
+      await refetchCustom();
+    },
+    [refetchCustom, toggleCustom],
+  );
+
+  const handleDisconnectCustom = useCallback(
+    async (customIntegrationId: string) => {
+      await disconnectCustom.mutateAsync(customIntegrationId);
+      await refetchCustom();
+    },
+    [disconnectCustom, refetchCustom],
+  );
+
+  const handleConnectCustomOAuth = useCallback(
+    async (slug: string) => {
+      try {
+        const result = await getCustomAuthUrl.mutateAsync({
+          slug,
+          redirectUrl: window.location.href,
+        });
+        window.location.href = result.authUrl;
+      } catch {
+        setNotification({
+          type: "error",
+          message: "Failed to start OAuth flow",
+        });
+      }
+    },
+    [getCustomAuthUrl],
+  );
+
+  const handleDeleteCustom = useCallback(
+    async (customIntegrationId: string) => {
+      await deleteCustom.mutateAsync(customIntegrationId);
+      await refetchCustom();
+    },
+    [deleteCustom, refetchCustom],
+  );
 
   useEffect(() => {
     let active = true;
@@ -360,6 +558,146 @@ function IntegrationsPageContent() {
     },
   ];
 
+  const handleTabClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    const nextTab = event.currentTarget.dataset.tab as FilterTab | undefined;
+    if (nextTab) {
+      setActiveTab(nextTab);
+    }
+  }, []);
+
+  const handleSearchQueryChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  }, []);
+
+  const handleStopPropagation = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+  }, []);
+
+  const handleToggleExpandedCard = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      const type = event.currentTarget.dataset.integrationType;
+      if (!type) {
+        return;
+      }
+      setExpandedCard((current) => (current === type ? null : type));
+    },
+    [],
+  );
+
+  const handleOpenWhatsAppIntegration = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    window.location.href = "/integrations/whatsapp";
+  }, []);
+
+  const handleShowAddCustom = useCallback(() => {
+    setShowAddCustom(true);
+  }, []);
+
+  const handleHideAddCustom = useCallback(() => {
+    setShowAddCustom(false);
+  }, []);
+
+  const handleDialogContentClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+  }, []);
+
+  const handleCustomSlugChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const slug = event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    setCustomForm((prev) => ({ ...prev, slug }));
+  }, []);
+
+  const handleCustomNameChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomForm((prev) => ({ ...prev, name: event.target.value }));
+  }, []);
+
+  const handleCustomDescriptionChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomForm((prev) => ({ ...prev, description: event.target.value }));
+  }, []);
+
+  const handleCustomBaseUrlChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomForm((prev) => ({ ...prev, baseUrl: event.target.value }));
+  }, []);
+
+  const handleCustomAuthTypeChange = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      setCustomForm((prev) => ({ ...prev, authType: event.target.value as CustomAuthType }));
+    },
+    [],
+  );
+
+  const handleCustomApiKeyChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomForm((prev) => ({ ...prev, apiKey: event.target.value }));
+  }, []);
+
+  const handleCustomClientIdChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomForm((prev) => ({ ...prev, clientId: event.target.value }));
+  }, []);
+
+  const handleCustomClientSecretChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setCustomForm((prev) => ({ ...prev, clientSecret: event.target.value }));
+    },
+    [],
+  );
+
+  const handleCustomAuthUrlChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomForm((prev) => ({ ...prev, authUrl: event.target.value }));
+  }, []);
+
+  const handleCustomTokenUrlChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomForm((prev) => ({ ...prev, tokenUrl: event.target.value }));
+  }, []);
+
+  const handleCustomScopesChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomForm((prev) => ({ ...prev, scopes: event.target.value }));
+  }, []);
+
+  const handleCreateCustomIntegration = useCallback(async () => {
+    try {
+      await createCustom.mutateAsync({
+        slug: customForm.slug,
+        name: customForm.name,
+        description: customForm.description || customForm.name,
+        baseUrl: customForm.baseUrl,
+        authType: customForm.authType,
+        oauthConfig:
+          customForm.authType === "oauth2"
+            ? {
+                authUrl: customForm.authUrl,
+                tokenUrl: customForm.tokenUrl,
+                scopes: customForm.scopes
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              }
+            : null,
+        apiKeyConfig:
+          customForm.authType === "api_key"
+            ? {
+                method: "header" as const,
+                headerName: "Authorization",
+              }
+            : null,
+        clientId: customForm.clientId || null,
+        clientSecret: customForm.clientSecret || null,
+        apiKey: customForm.apiKey || null,
+      });
+      setShowAddCustom(false);
+      setCustomForm(defaultCustomForm);
+      refetchCustom();
+      setNotification({
+        type: "success",
+        message: "Custom integration created!",
+      });
+    } catch (error: unknown) {
+      setNotification({
+        type: "error",
+        message: toErrorMessage(error, "Failed to create integration"),
+      });
+    }
+  }, [createCustom, customForm, refetchCustom]);
+
   return (
     <div>
       <div className="mb-6">
@@ -392,7 +730,8 @@ function IntegrationsPageContent() {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              data-tab={tab.id}
+              onClick={handleTabClick}
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 activeTab === tab.id
@@ -420,7 +759,7 @@ function IntegrationsPageContent() {
           <Input
             placeholder="Search integrations..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchQueryChange}
             className="pl-9"
           />
         </div>
@@ -480,10 +819,8 @@ function IntegrationsPageContent() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedCard(isExpanded ? null : type);
-                        }}
+                        data-integration-type={type}
+                        onClick={handleToggleExpandedCard}
                       >
                         {isExpanded ? "Hide" : "Show"} Capabilities
                         <ChevronDown
@@ -495,51 +832,31 @@ function IntegrationsPageContent() {
                       </Button>
                     )}
                     {isWhatsApp ? (
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.location.href = "/integrations/whatsapp";
-                        }}
-                      >
+                      <Button onClick={handleOpenWhatsAppIntegration}>
                         {isWhatsAppConnected ? "Manage" : "Connect"}
                         <ExternalLink className="ml-2 h-4 w-4" />
                       </Button>
                     ) : integration ? (
                       <>
-                        <label
-                          className="flex cursor-pointer items-center gap-2"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Checkbox
+                        <label className="flex cursor-pointer items-center gap-2" onClick={handleStopPropagation}>
+                          <IntegrationEnabledCheckbox
                             checked={integration.enabled}
-                            onCheckedChange={(checked) =>
-                              handleToggle(integration.id, checked === true)
-                            }
+                            integrationId={integration.id}
+                            onToggle={handleToggle}
                           />
                           <span className="text-sm">Enabled</span>
                         </label>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDisconnect(integration.id);
-                          }}
-                        >
-                          Disconnect
-                        </Button>
+                        <IntegrationDisconnectButton
+                          integrationId={integration.id}
+                          onDisconnect={handleDisconnect}
+                        />
                       </>
                     ) : (
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleConnect(type as OAuthIntegrationType);
-                        }}
-                        disabled={isConnecting}
-                      >
-                        {isConnecting ? "Connecting..." : "Connect"}
-                        <ExternalLink className="ml-2 h-4 w-4" />
-                      </Button>
+                      <IntegrationConnectButton
+                        integrationType={type as OAuthIntegrationType}
+                        isConnecting={isConnecting}
+                        onConnect={handleConnect}
+                      />
                     )}
                   </div>
                 </div>
@@ -584,7 +901,7 @@ function IntegrationsPageContent() {
               Add your own API integrations with custom credentials.
             </p>
           </div>
-          <Button onClick={() => setShowAddCustom(true)}>
+          <Button onClick={handleShowAddCustom}>
             <Plus className="mr-2 h-4 w-4" />
             Add Custom
           </Button>
@@ -636,61 +953,31 @@ function IntegrationsPageContent() {
                     {ci.connected ? (
                       <>
                         <label className="flex cursor-pointer items-center gap-2">
-                          <Checkbox
+                          <CustomIntegrationEnabledCheckbox
                             checked={ci.enabled}
-                            onCheckedChange={(checked) => {
-                              toggleCustom
-                                .mutateAsync({
-                                  customIntegrationId: ci.id,
-                                  enabled: checked === true,
-                                })
-                                .then(() => refetchCustom());
-                            }}
+                            customIntegrationId={ci.id}
+                            onToggle={handleToggleCustom}
                           />
                           <span className="text-sm">Enabled</span>
                         </label>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            disconnectCustom.mutateAsync(ci.id).then(() => refetchCustom());
-                          }}
-                        >
-                          Disconnect
-                        </Button>
+                        <CustomIntegrationDisconnectButton
+                          customIntegrationId={ci.id}
+                          onDisconnect={handleDisconnectCustom}
+                        />
                       </>
                     ) : ci.authType === "oauth2" ? (
-                      <Button
-                        onClick={async () => {
-                          try {
-                            const result = await getCustomAuthUrl.mutateAsync({
-                              slug: ci.slug,
-                              redirectUrl: window.location.href,
-                            });
-                            window.location.href = result.authUrl;
-                          } catch {
-                            setNotification({
-                              type: "error",
-                              message: "Failed to start OAuth flow",
-                            });
-                          }
-                        }}
-                      >
-                        Connect <ExternalLink className="ml-2 h-4 w-4" />
-                      </Button>
+                      <CustomIntegrationOAuthConnectButton
+                        slug={ci.slug}
+                        onConnect={handleConnectCustomOAuth}
+                      />
                     ) : (
                       <span className="text-xs text-muted-foreground">Credentials saved</span>
                     )}
                     {!ci.isBuiltIn && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          deleteCustom.mutateAsync(ci.id).then(() => refetchCustom());
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <CustomIntegrationDeleteButton
+                        customIntegrationId={ci.id}
+                        onDelete={handleDeleteCustom}
+                      />
                     )}
                   </div>
                 </div>
@@ -708,11 +995,11 @@ function IntegrationsPageContent() {
       {showAddCustom && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setShowAddCustom(false)}
+          onClick={handleHideAddCustom}
         >
           <div
             className="w-full max-w-lg rounded-lg bg-background p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+            onClick={handleDialogContentClick}
           >
             <h3 className="mb-4 text-lg font-semibold">Add Custom Integration</h3>
             <div className="space-y-3 max-h-[60vh] overflow-y-auto">
@@ -721,12 +1008,7 @@ function IntegrationsPageContent() {
                 <Input
                   placeholder="e.g. trello"
                   value={customForm.slug}
-                  onChange={(e) =>
-                    setCustomForm({
-                      ...customForm,
-                      slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
-                    })
-                  }
+                  onChange={handleCustomSlugChange}
                 />
               </div>
               <div>
@@ -734,7 +1016,7 @@ function IntegrationsPageContent() {
                 <Input
                   placeholder="e.g. Trello"
                   value={customForm.name}
-                  onChange={(e) => setCustomForm({ ...customForm, name: e.target.value })}
+                  onChange={handleCustomNameChange}
                 />
               </div>
               <div>
@@ -742,12 +1024,7 @@ function IntegrationsPageContent() {
                 <Input
                   placeholder="What does this integration do?"
                   value={customForm.description}
-                  onChange={(e) =>
-                    setCustomForm({
-                      ...customForm,
-                      description: e.target.value,
-                    })
-                  }
+                  onChange={handleCustomDescriptionChange}
                 />
               </div>
               <div>
@@ -755,7 +1032,7 @@ function IntegrationsPageContent() {
                 <Input
                   placeholder="https://api.example.com"
                   value={customForm.baseUrl}
-                  onChange={(e) => setCustomForm({ ...customForm, baseUrl: e.target.value })}
+                  onChange={handleCustomBaseUrlChange}
                 />
               </div>
               <div>
@@ -763,12 +1040,7 @@ function IntegrationsPageContent() {
                 <select
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                   value={customForm.authType}
-                  onChange={(e) =>
-                    setCustomForm({
-                      ...customForm,
-                      authType: e.target.value as CustomAuthType,
-                    })
-                  }
+                  onChange={handleCustomAuthTypeChange}
                 >
                   <option value="api_key">API Key</option>
                   <option value="bearer_token">Bearer Token</option>
@@ -783,7 +1055,7 @@ function IntegrationsPageContent() {
                     type="password"
                     placeholder="Your API key"
                     value={customForm.apiKey}
-                    onChange={(e) => setCustomForm({ ...customForm, apiKey: e.target.value })}
+                    onChange={handleCustomApiKeyChange}
                   />
                 </div>
               )}
@@ -795,7 +1067,7 @@ function IntegrationsPageContent() {
                     type="password"
                     placeholder="Your bearer token"
                     value={customForm.apiKey}
-                    onChange={(e) => setCustomForm({ ...customForm, apiKey: e.target.value })}
+                    onChange={handleCustomApiKeyChange}
                   />
                 </div>
               )}
@@ -806,12 +1078,7 @@ function IntegrationsPageContent() {
                     <label className="text-sm font-medium">Client ID</label>
                     <Input
                       value={customForm.clientId}
-                      onChange={(e) =>
-                        setCustomForm({
-                          ...customForm,
-                          clientId: e.target.value,
-                        })
-                      }
+                      onChange={handleCustomClientIdChange}
                     />
                   </div>
                   <div>
@@ -819,12 +1086,7 @@ function IntegrationsPageContent() {
                     <Input
                       type="password"
                       value={customForm.clientSecret}
-                      onChange={(e) =>
-                        setCustomForm({
-                          ...customForm,
-                          clientSecret: e.target.value,
-                        })
-                      }
+                      onChange={handleCustomClientSecretChange}
                     />
                   </div>
                   <div>
@@ -832,12 +1094,7 @@ function IntegrationsPageContent() {
                     <Input
                       placeholder="https://example.com/oauth/authorize"
                       value={customForm.authUrl}
-                      onChange={(e) =>
-                        setCustomForm({
-                          ...customForm,
-                          authUrl: e.target.value,
-                        })
-                      }
+                      onChange={handleCustomAuthUrlChange}
                     />
                   </div>
                   <div>
@@ -845,12 +1102,7 @@ function IntegrationsPageContent() {
                     <Input
                       placeholder="https://example.com/oauth/token"
                       value={customForm.tokenUrl}
-                      onChange={(e) =>
-                        setCustomForm({
-                          ...customForm,
-                          tokenUrl: e.target.value,
-                        })
-                      }
+                      onChange={handleCustomTokenUrlChange}
                     />
                   </div>
                   <div>
@@ -858,7 +1110,7 @@ function IntegrationsPageContent() {
                     <Input
                       placeholder="read,write"
                       value={customForm.scopes}
-                      onChange={(e) => setCustomForm({ ...customForm, scopes: e.target.value })}
+                      onChange={handleCustomScopesChange}
                     />
                   </div>
                 </>
@@ -866,67 +1118,12 @@ function IntegrationsPageContent() {
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setShowAddCustom(false)}>
+              <Button variant="ghost" onClick={handleHideAddCustom}>
                 Cancel
               </Button>
               <Button
                 disabled={!customForm.slug || !customForm.name || !customForm.baseUrl}
-                onClick={async () => {
-                  try {
-                    await createCustom.mutateAsync({
-                      slug: customForm.slug,
-                      name: customForm.name,
-                      description: customForm.description || customForm.name,
-                      baseUrl: customForm.baseUrl,
-                      authType: customForm.authType,
-                      oauthConfig:
-                        customForm.authType === "oauth2"
-                          ? {
-                              authUrl: customForm.authUrl,
-                              tokenUrl: customForm.tokenUrl,
-                              scopes: customForm.scopes
-                                .split(",")
-                                .map((s) => s.trim())
-                                .filter(Boolean),
-                            }
-                          : null,
-                      apiKeyConfig:
-                        customForm.authType === "api_key"
-                          ? {
-                              method: "header" as const,
-                              headerName: "Authorization",
-                            }
-                          : null,
-                      clientId: customForm.clientId || null,
-                      clientSecret: customForm.clientSecret || null,
-                      apiKey: customForm.apiKey || null,
-                    });
-                    setShowAddCustom(false);
-                    setCustomForm({
-                      slug: "",
-                      name: "",
-                      description: "",
-                      baseUrl: "",
-                      authType: "api_key",
-                      apiKey: "",
-                      clientId: "",
-                      clientSecret: "",
-                      authUrl: "",
-                      tokenUrl: "",
-                      scopes: "",
-                    });
-                    refetchCustom();
-                    setNotification({
-                      type: "success",
-                      message: "Custom integration created!",
-                    });
-                  } catch (error: unknown) {
-                    setNotification({
-                      type: "error",
-                      message: toErrorMessage(error, "Failed to create integration"),
-                    });
-                  }
-                }}
+                onClick={handleCreateCustomIntegration}
               >
                 Create
               </Button>
@@ -939,15 +1136,5 @@ function IntegrationsPageContent() {
 }
 
 export default function IntegrationsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      }
-    >
-      <IntegrationsPageContent />
-    </Suspense>
-  );
+  return <Suspense fallback={integrationsPageFallbackNode}><IntegrationsPageContent /></Suspense>;
 }

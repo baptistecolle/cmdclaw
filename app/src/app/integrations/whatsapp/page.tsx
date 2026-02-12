@@ -3,7 +3,7 @@
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import QRCode from "qrcode";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -84,7 +84,7 @@ export default function WhatsAppIntegrationPage() {
       });
   }, [waStatus?.lastQr]);
 
-  const handleReconnect = async () => {
+  const handleReconnect = useCallback(async () => {
     setWaLoading(true);
     try {
       const res = await fetch("/api/whatsapp/start", { method: "POST" });
@@ -110,9 +110,9 @@ export default function WhatsAppIntegrationPage() {
     } finally {
       setWaLoading(false);
     }
-  };
+  }, []);
 
-  const handleGenerateLinkCode = async () => {
+  const handleGenerateLinkCode = useCallback(async () => {
     setLinkLoading(true);
     try {
       const res = await fetch("/api/whatsapp/link-code", { method: "POST" });
@@ -135,7 +135,7 @@ export default function WhatsAppIntegrationPage() {
     } finally {
       setLinkLoading(false);
     }
-  };
+  }, []);
 
   return (
     <div>
