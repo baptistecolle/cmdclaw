@@ -25,7 +25,11 @@ import { env } from "@/env";
 const OAUTH_PORT = 1455;
 
 function getAppUrl() {
-  return env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+  return (
+    env.APP_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    `http://localhost:${process.env.PORT ?? 3000}`
+  );
 }
 
 let server: Server | null = null;
@@ -51,7 +55,7 @@ export function ensureOAuthCallbackServer(): void {
 
     if (error) {
       console.error(
-        `[OAuthCallback] OAuth error: ${errorDescription || error}`
+        `[OAuthCallback] OAuth error: ${errorDescription || error}`,
       );
       settingsUrl.searchParams.set("provider_error", error);
       res.writeHead(302, { Location: settingsUrl.toString() });
@@ -109,7 +113,7 @@ export function ensureOAuthCallbackServer(): void {
         const errorText = await tokenResponse.text();
         console.error(
           `[OAuthCallback] Token exchange failed for ${provider}:`,
-          errorText
+          errorText,
         );
         settingsUrl.searchParams.set("provider_error", "token_exchange_failed");
         res.writeHead(302, { Location: settingsUrl.toString() });
@@ -155,7 +159,7 @@ export function ensureOAuthCallbackServer(): void {
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
       console.warn(
-        `[OAuthCallback] Port ${OAUTH_PORT} already in use (OpenCode may be running)`
+        `[OAuthCallback] Port ${OAUTH_PORT} already in use (OpenCode may be running)`,
       );
     } else {
       console.error(`[OAuthCallback] Server error:`, err);

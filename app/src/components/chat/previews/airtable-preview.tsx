@@ -6,10 +6,7 @@ import {
   IntegrationLogo,
 } from "./preview-styles";
 
-export function AirtablePreview({
-  operation,
-  args,
-}: PreviewProps) {
+export function AirtablePreview({ operation, args }: PreviewProps) {
   switch (operation) {
     case "create":
       return <AirtableCreatePreview args={args} />;
@@ -22,7 +19,11 @@ export function AirtablePreview({
   }
 }
 
-function AirtableCreatePreview({ args }: { args: Record<string, string | undefined> }) {
+function AirtableCreatePreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const baseId = args.b || args.base;
   const table = args.t || args.table;
   const fields = args.fields;
@@ -52,7 +53,11 @@ function AirtableCreatePreview({ args }: { args: Record<string, string | undefin
   );
 }
 
-function AirtableUpdatePreview({ args }: { args: Record<string, string | undefined> }) {
+function AirtableUpdatePreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const baseId = args.b || args.base;
   const table = args.t || args.table;
   const recordId = args.r || args.record;
@@ -84,7 +89,11 @@ function AirtableUpdatePreview({ args }: { args: Record<string, string | undefin
   );
 }
 
-function AirtableDeletePreview({ args }: { args: Record<string, string | undefined> }) {
+function AirtableDeletePreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const baseId = args.b || args.base;
   const table = args.t || args.table;
   const recordId = args.r || args.record;

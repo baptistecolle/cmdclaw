@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const APP_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../../../.."
+  "../../../..",
 );
 
 export type SkillCliResult = {
@@ -17,7 +17,7 @@ export type SkillCliResult = {
 export function runSkillCli(
   scriptPathFromAppRoot: string,
   args: string[],
-  envOverrides: Record<string, string | undefined>
+  envOverrides: Record<string, string | undefined>,
 ): SkillCliResult {
   const scriptPath = path.resolve(APP_ROOT, scriptPathFromAppRoot);
   const result = spawnSync("bun", [scriptPath, ...args], {

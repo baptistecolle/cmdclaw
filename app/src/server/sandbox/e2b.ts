@@ -1,9 +1,15 @@
 import { Sandbox } from "e2b";
-import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk/v2/client";
+import {
+  createOpencodeClient,
+  type OpencodeClient,
+} from "@opencode-ai/sdk/v2/client";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
 import { skill, message, conversation, providerAuth } from "@/server/db/schema";
-import { COMPACTION_SUMMARY_PREFIX, SESSION_BOUNDARY_PREFIX } from "@/server/services/session-constants";
+import {
+  COMPACTION_SUMMARY_PREFIX,
+  SESSION_BOUNDARY_PREFIX,
+} from "@/server/services/session-constants";
 import { eq, and, asc } from "drizzle-orm";
 import { downloadFromS3 } from "@/server/storage/s3-client";
 import { decrypt } from "@/server/utils/encryption";
@@ -32,7 +38,7 @@ const activeSandboxes = new Map<string, SandboxState>();
 function logLifecycle(
   event: string,
   details: Record<string, unknown>,
-  context: ObservabilityContext = {}
+  context: ObservabilityContext = {},
 ): void {
   const enrichedContext: ObservabilityContext = { source: "e2b", ...context };
   logServerEvent("info", event, details, enrichedContext);
@@ -60,7 +66,10 @@ type SessionInitStage =
   | "session_replay_completed"
   | "session_init_completed";
 
-type SessionInitLifecycleCallback = (stage: SessionInitStage, details?: Record<string, unknown>) => void;
+type SessionInitLifecycleCallback = (
+  stage: SessionInitStage,
+  details?: Record<string, unknown>,
+) => void;
 
 function formatErrorMessage(error: unknown): string {
   if (error instanceof Error) return `${error.name}: ${error.message}`;
@@ -87,7 +96,7 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(
-    `OpenCode server in sandbox failed to start (url=${url}, attempts=${attempts}, waitedMs=${Date.now() - start}, lastError=${lastError || "unknown"})`
+    `OpenCode server in sandbox failed to start (url=${url}, attempts=${attempts}, waitedMs=${Date.now() - start}, lastError=${lastError || "unknown"})`,
   );
 }
 
@@ -97,7 +106,7 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
 export async function getOrCreateSandbox(
   config: SandboxConfig,
   onLifecycle?: SessionInitLifecycleCallback,
-  telemetry?: ObservabilityContext
+  telemetry?: ObservabilityContext,
 ): Promise<Sandbox> {
   const telemetryContext: ObservabilityContext = {
     ...telemetry,
@@ -105,7 +114,9 @@ export async function getOrCreateSandbox(
     conversationId: config.conversationId,
     userId: config.userId,
   };
-  onLifecycle?.("sandbox_checking_cache", { conversationId: config.conversationId });
+  onLifecycle?.("sandbox_checking_cache", {
+    conversationId: config.conversationId,
+  });
   // Check if we have an active sandbox for this conversation
   let state = activeSandboxes.get(config.conversationId);
 
@@ -118,26 +129,38 @@ export async function getOrCreateSandbox(
           conversationId: config.conversationId,
           sandboxId: state.sandbox.sandboxId,
         });
-        logLifecycle("VM_REUSED", {
+        logLifecycle(
+          "VM_REUSED",
+          {
+            conversationId: config.conversationId,
+            sandboxId: state.sandbox.sandboxId,
+            serverUrl: state.serverUrl,
+          },
+          { ...telemetryContext, sandboxId: state.sandbox.sandboxId },
+        );
+        return state.sandbox;
+      }
+      logLifecycle(
+        "VM_CACHE_HEALTHCHECK_NOT_OK",
+        {
           conversationId: config.conversationId,
           sandboxId: state.sandbox.sandboxId,
           serverUrl: state.serverUrl,
-        }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId });
-        return state.sandbox;
-      }
-      logLifecycle("VM_CACHE_HEALTHCHECK_NOT_OK", {
-        conversationId: config.conversationId,
-        sandboxId: state.sandbox.sandboxId,
-        serverUrl: state.serverUrl,
-        status: res.status,
-      }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId });
+          status: res.status,
+        },
+        { ...telemetryContext, sandboxId: state.sandbox.sandboxId },
+      );
     } catch {
       // Sandbox or server is dead, remove from cache and create new one
-      logLifecycle("VM_CACHE_HEALTHCHECK_FAILED", {
-        conversationId: config.conversationId,
-        sandboxId: state.sandbox.sandboxId,
-        serverUrl: state.serverUrl,
-      }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId });
+      logLifecycle(
+        "VM_CACHE_HEALTHCHECK_FAILED",
+        {
+          conversationId: config.conversationId,
+          sandboxId: state.sandbox.sandboxId,
+          serverUrl: state.serverUrl,
+        },
+        { ...telemetryContext, sandboxId: state.sandbox.sandboxId },
+      );
       await state.sandbox.kill().catch(() => {});
       activeSandboxes.delete(config.conversationId);
     }
@@ -150,12 +173,16 @@ export async function getOrCreateSandbox(
     conversationId: config.conversationId,
     template: TEMPLATE_NAME,
   });
-  logLifecycle("VM_START_REQUESTED", {
-    conversationId: config.conversationId,
-    template: TEMPLATE_NAME,
-    hasAnthropicApiKey: hasApiKey,
-    timeoutMs: SANDBOX_TIMEOUT_MS,
-  }, telemetryContext);
+  logLifecycle(
+    "VM_START_REQUESTED",
+    {
+      conversationId: config.conversationId,
+      template: TEMPLATE_NAME,
+      hasAnthropicApiKey: hasApiKey,
+      timeoutMs: SANDBOX_TIMEOUT_MS,
+    },
+    telemetryContext,
+  );
 
   let sandbox: Sandbox;
   try {
@@ -163,9 +190,10 @@ export async function getOrCreateSandbox(
       envs: {
         ANTHROPIC_API_KEY: config.anthropicApiKey,
         ANVIL_API_KEY: env.ANVIL_API_KEY || "",
-        APP_URL: (env.APP_URL && new URL(env.APP_URL).hostname === "localhost"
-          ? "https://localcan.baptistecolle.com"
-          : env.APP_URL) || "",
+        APP_URL:
+          (env.APP_URL && new URL(env.APP_URL).hostname === "localhost"
+            ? "https://localcan.baptistecolle.com"
+            : env.APP_URL) || "",
         BAP_SERVER_SECRET: env.BAP_SERVER_SECRET || "",
         CONVERSATION_ID: config.conversationId,
         ...config.integrationEnvs,
@@ -173,23 +201,32 @@ export async function getOrCreateSandbox(
       timeoutMs: SANDBOX_TIMEOUT_MS,
     });
   } catch (error) {
-    logServerEvent("error", "VM_START_FAILED", {
-      conversationId: config.conversationId,
-      template: TEMPLATE_NAME,
-      durationMs: Date.now() - vmCreateStart,
-      error: formatErrorMessage(error),
-      hasAnthropicApiKey: hasApiKey,
-      hasE2BApiKey: Boolean(env.E2B_API_KEY),
-      integrationEnvCount: Object.keys(config.integrationEnvs || {}).length,
-    }, telemetryContext);
+    logServerEvent(
+      "error",
+      "VM_START_FAILED",
+      {
+        conversationId: config.conversationId,
+        template: TEMPLATE_NAME,
+        durationMs: Date.now() - vmCreateStart,
+        error: formatErrorMessage(error),
+        hasAnthropicApiKey: hasApiKey,
+        hasE2BApiKey: Boolean(env.E2B_API_KEY),
+        integrationEnvCount: Object.keys(config.integrationEnvs || {}).length,
+      },
+      telemetryContext,
+    );
     throw error;
   }
-  logLifecycle("VM_STARTED", {
-    conversationId: config.conversationId,
-    sandboxId: sandbox.sandboxId,
-    template: TEMPLATE_NAME,
-    durationMs: Date.now() - vmCreateStart,
-  }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+  logLifecycle(
+    "VM_STARTED",
+    {
+      conversationId: config.conversationId,
+      sandboxId: sandbox.sandboxId,
+      template: TEMPLATE_NAME,
+      durationMs: Date.now() - vmCreateStart,
+    },
+    { ...telemetryContext, sandboxId: sandbox.sandboxId },
+  );
   onLifecycle?.("sandbox_created", {
     conversationId: config.conversationId,
     sandboxId: sandbox.sandboxId,
@@ -199,22 +236,31 @@ export async function getOrCreateSandbox(
   // Set SANDBOX_ID env var (needed by plugin)
   try {
     await sandbox.commands.run(
-      `echo "export SANDBOX_ID=${sandbox.sandboxId}" >> ~/.bashrc`
+      `echo "export SANDBOX_ID=${sandbox.sandboxId}" >> ~/.bashrc`,
     );
   } catch (error) {
-    logServerEvent("warn", "VM_SET_SANDBOX_ID_FAILED", {
-      conversationId: config.conversationId,
-      sandboxId: sandbox.sandboxId,
-      error: formatErrorMessage(error),
-    }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+    logServerEvent(
+      "warn",
+      "VM_SET_SANDBOX_ID_FAILED",
+      {
+        conversationId: config.conversationId,
+        sandboxId: sandbox.sandboxId,
+        error: formatErrorMessage(error),
+      },
+      { ...telemetryContext, sandboxId: sandbox.sandboxId },
+    );
   }
 
   // Start OpenCode server in background
-  logLifecycle("OPENCODE_SERVER_START_REQUESTED", {
-    conversationId: config.conversationId,
-    sandboxId: sandbox.sandboxId,
-    port: OPENCODE_PORT,
-  }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+  logLifecycle(
+    "OPENCODE_SERVER_START_REQUESTED",
+    {
+      conversationId: config.conversationId,
+      sandboxId: sandbox.sandboxId,
+      port: OPENCODE_PORT,
+    },
+    { ...telemetryContext, sandboxId: sandbox.sandboxId },
+  );
   onLifecycle?.("opencode_starting", {
     conversationId: config.conversationId,
     sandboxId: sandbox.sandboxId,
@@ -231,20 +277,30 @@ export async function getOrCreateSandbox(
           if (!line) return;
           if (stderrBuffer.length >= 20) stderrBuffer.shift();
           stderrBuffer.push(line);
-          logServerEvent("warn", "OPENCODE_SERVER_STDERR", {
-            conversationId: config.conversationId,
-            sandboxId: sandbox.sandboxId,
-            stderr: line,
-          }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+          logServerEvent(
+            "warn",
+            "OPENCODE_SERVER_STDERR",
+            {
+              conversationId: config.conversationId,
+              sandboxId: sandbox.sandboxId,
+              stderr: line,
+            },
+            { ...telemetryContext, sandboxId: sandbox.sandboxId },
+          );
         },
-      }
+      },
     );
   } catch (error) {
-    logServerEvent("error", "OPENCODE_SERVER_START_FAILED", {
-      conversationId: config.conversationId,
-      sandboxId: sandbox.sandboxId,
-      error: formatErrorMessage(error),
-    }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+    logServerEvent(
+      "error",
+      "OPENCODE_SERVER_START_FAILED",
+      {
+        conversationId: config.conversationId,
+        sandboxId: sandbox.sandboxId,
+        error: formatErrorMessage(error),
+      },
+      { ...telemetryContext, sandboxId: sandbox.sandboxId },
+    );
     throw error;
   }
 
@@ -259,14 +315,19 @@ export async function getOrCreateSandbox(
   try {
     await waitForServer(serverUrl);
   } catch (error) {
-    logServerEvent("error", "OPENCODE_SERVER_READY_TIMEOUT", {
-      conversationId: config.conversationId,
-      sandboxId: sandbox.sandboxId,
-      serverUrl,
-      durationMs: Date.now() - serverReadyStart,
-      error: formatErrorMessage(error),
-      recentStderr: stderrBuffer.join(" | ").slice(0, 4000),
-    }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+    logServerEvent(
+      "error",
+      "OPENCODE_SERVER_READY_TIMEOUT",
+      {
+        conversationId: config.conversationId,
+        sandboxId: sandbox.sandboxId,
+        serverUrl,
+        durationMs: Date.now() - serverReadyStart,
+        error: formatErrorMessage(error),
+        recentStderr: stderrBuffer.join(" | ").slice(0, 4000),
+      },
+      { ...telemetryContext, sandboxId: sandbox.sandboxId },
+    );
     throw error;
   }
 
@@ -278,12 +339,16 @@ export async function getOrCreateSandbox(
   state = { sandbox, client, sessionId: null, serverUrl };
   activeSandboxes.set(config.conversationId, state);
 
-  logLifecycle("OPENCODE_SERVER_READY", {
-    conversationId: config.conversationId,
-    sandboxId: sandbox.sandboxId,
-    serverUrl,
-    durationMs: Date.now() - serverReadyStart,
-  }, { ...telemetryContext, sandboxId: sandbox.sandboxId });
+  logLifecycle(
+    "OPENCODE_SERVER_READY",
+    {
+      conversationId: config.conversationId,
+      sandboxId: sandbox.sandboxId,
+      serverUrl,
+      durationMs: Date.now() - serverReadyStart,
+    },
+    { ...telemetryContext, sandboxId: sandbox.sandboxId },
+  );
   onLifecycle?.("opencode_ready", {
     conversationId: config.conversationId,
     sandboxId: sandbox.sandboxId,
@@ -296,7 +361,9 @@ export async function getOrCreateSandbox(
 /**
  * Get the OpenCode client for a conversation's sandbox
  */
-export function getOpencodeClient(conversationId: string): OpencodeClient | undefined {
+export function getOpencodeClient(
+  conversationId: string,
+): OpencodeClient | undefined {
   const state = activeSandboxes.get(conversationId);
   return state?.client;
 }
@@ -304,7 +371,9 @@ export function getOpencodeClient(conversationId: string): OpencodeClient | unde
 /**
  * Get the sandbox state for a conversation
  */
-export function getSandboxState(conversationId: string): SandboxState | undefined {
+export function getSandboxState(
+  conversationId: string,
+): SandboxState | undefined {
   return activeSandboxes.get(conversationId);
 }
 
@@ -326,7 +395,7 @@ export async function getOrCreateSession(
     replayHistory?: boolean;
     onLifecycle?: SessionInitLifecycleCallback;
     telemetry?: ObservabilityContext;
-  }
+  },
 ): Promise<{ client: OpencodeClient; sessionId: string; sandbox: Sandbox }> {
   const telemetryContext: ObservabilityContext = {
     ...options?.telemetry,
@@ -335,13 +404,21 @@ export async function getOrCreateSession(
     userId: config.userId,
   };
   const sessionInitStartedAt = Date.now();
-  logLifecycle("SESSION_INIT_STARTED", {
-    conversationId: config.conversationId,
-    replayHistory: Boolean(options?.replayHistory),
-  }, telemetryContext);
+  logLifecycle(
+    "SESSION_INIT_STARTED",
+    {
+      conversationId: config.conversationId,
+      replayHistory: Boolean(options?.replayHistory),
+    },
+    telemetryContext,
+  );
 
   // Ensure sandbox exists
-  const sandbox = await getOrCreateSandbox(config, options?.onLifecycle, telemetryContext);
+  const sandbox = await getOrCreateSandbox(
+    config,
+    options?.onLifecycle,
+    telemetryContext,
+  );
   const state = activeSandboxes.get(config.conversationId);
 
   if (!state) {
@@ -355,13 +432,25 @@ export async function getOrCreateSession(
       sessionId: state.sessionId,
       sandboxId: state.sandbox.sandboxId,
     });
-    logLifecycle("SESSION_REUSED", {
-      conversationId: config.conversationId,
+    logLifecycle(
+      "SESSION_REUSED",
+      {
+        conversationId: config.conversationId,
+        sessionId: state.sessionId,
+        sandboxId: state.sandbox.sandboxId,
+        durationMs: Date.now() - sessionInitStartedAt,
+      },
+      {
+        ...telemetryContext,
+        sandboxId: state.sandbox.sandboxId,
+        sessionId: state.sessionId,
+      },
+    );
+    return {
+      client: state.client,
       sessionId: state.sessionId,
-      sandboxId: state.sandbox.sandboxId,
-      durationMs: Date.now() - sessionInitStartedAt,
-    }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId, sessionId: state.sessionId });
-    return { client: state.client, sessionId: state.sessionId, sandbox: state.sandbox };
+      sandbox: state.sandbox,
+    };
   }
 
   // Create a new session
@@ -370,10 +459,14 @@ export async function getOrCreateSession(
     sandboxId: state.sandbox.sandboxId,
   });
   const sessionCreateStartedAt = Date.now();
-  logLifecycle("SESSION_CREATE_REQUESTED", {
-    conversationId: config.conversationId,
-    sandboxId: state.sandbox.sandboxId,
-  }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId });
+  logLifecycle(
+    "SESSION_CREATE_REQUESTED",
+    {
+      conversationId: config.conversationId,
+      sandboxId: state.sandbox.sandboxId,
+    },
+    { ...telemetryContext, sandboxId: state.sandbox.sandboxId },
+  );
   const sessionResult = await state.client.session.create({
     title: options?.title || "Conversation",
   });
@@ -384,12 +477,16 @@ export async function getOrCreateSession(
 
   const sessionId = sessionResult.data.id;
   state.sessionId = sessionId;
-  logLifecycle("SESSION_CREATED", {
-    conversationId: config.conversationId,
-    sessionId,
-    sandboxId: state.sandbox.sandboxId,
-    durationMs: Date.now() - sessionCreateStartedAt,
-  }, { ...telemetryContext, sandboxId: state.sandbox.sandboxId, sessionId });
+  logLifecycle(
+    "SESSION_CREATED",
+    {
+      conversationId: config.conversationId,
+      sessionId,
+      sandboxId: state.sandbox.sandboxId,
+      durationMs: Date.now() - sessionCreateStartedAt,
+    },
+    { ...telemetryContext, sandboxId: state.sandbox.sandboxId, sessionId },
+  );
   options?.onLifecycle?.("session_created", {
     conversationId: config.conversationId,
     sessionId,
@@ -409,20 +506,28 @@ export async function getOrCreateSession(
       sessionId,
     });
     const replayStartedAt = Date.now();
-    logLifecycle("SESSION_REPLAY_STARTED", {
-      conversationId: config.conversationId,
-      sessionId,
-    }, { ...telemetryContext, sessionId });
+    logLifecycle(
+      "SESSION_REPLAY_STARTED",
+      {
+        conversationId: config.conversationId,
+        sessionId,
+      },
+      { ...telemetryContext, sessionId },
+    );
     await replayConversationHistory(
       state.client,
       sessionId,
-      config.conversationId
+      config.conversationId,
     );
-    logLifecycle("SESSION_REPLAY_COMPLETED", {
-      conversationId: config.conversationId,
-      sessionId,
-      durationMs: Date.now() - replayStartedAt,
-    }, { ...telemetryContext, sessionId });
+    logLifecycle(
+      "SESSION_REPLAY_COMPLETED",
+      {
+        conversationId: config.conversationId,
+        sessionId,
+        durationMs: Date.now() - replayStartedAt,
+      },
+      { ...telemetryContext, sessionId },
+    );
     options?.onLifecycle?.("session_replay_completed", {
       conversationId: config.conversationId,
       sessionId,
@@ -430,11 +535,15 @@ export async function getOrCreateSession(
     });
   }
 
-  logLifecycle("SESSION_INIT_COMPLETED", {
-    conversationId: config.conversationId,
-    sessionId,
-    durationMs: Date.now() - sessionInitStartedAt,
-  }, { ...telemetryContext, sessionId, sandboxId: state.sandbox.sandboxId });
+  logLifecycle(
+    "SESSION_INIT_COMPLETED",
+    {
+      conversationId: config.conversationId,
+      sessionId,
+      durationMs: Date.now() - sessionInitStartedAt,
+    },
+    { ...telemetryContext, sessionId, sandboxId: state.sandbox.sandboxId },
+  );
   options?.onLifecycle?.("session_init_completed", {
     conversationId: config.conversationId,
     sessionId,
@@ -450,7 +559,7 @@ export async function getOrCreateSession(
 async function replayConversationHistory(
   client: OpencodeClient,
   sessionId: string,
-  conversationId: string
+  conversationId: string,
 ): Promise<void> {
   // Fetch all messages for this conversation
   const messages = await db.query.message.findMany({
@@ -461,27 +570,36 @@ async function replayConversationHistory(
   if (messages.length === 0) return;
 
   const boundaryIndex = messages
-    .map((m, idx) => (m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1))
+    .map((m, idx) =>
+      m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX)
+        ? idx
+        : -1,
+    )
     .filter((idx) => idx >= 0)
     .pop();
 
-  const sessionMessages = boundaryIndex !== undefined
-    ? messages.slice(boundaryIndex + 1)
-    : messages;
+  const sessionMessages =
+    boundaryIndex !== undefined ? messages.slice(boundaryIndex + 1) : messages;
 
   const summaryIndex = sessionMessages
-    .map((m, idx) => (m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX) ? idx : -1))
+    .map((m, idx) =>
+      m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX)
+        ? idx
+        : -1,
+    )
     .filter((idx) => idx >= 0)
     .pop();
 
-  const summaryMessage = summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
+  const summaryMessage =
+    summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
   const summaryText = summaryMessage
     ? summaryMessage.content.replace(COMPACTION_SUMMARY_PREFIX, "").trim()
     : null;
 
-  const messagesAfterSummary = summaryIndex !== undefined
-    ? sessionMessages.slice(summaryIndex + 1)
-    : sessionMessages;
+  const messagesAfterSummary =
+    summaryIndex !== undefined
+      ? sessionMessages.slice(summaryIndex + 1)
+      : sessionMessages;
 
   // Build conversation context
   const historyContext = messagesAfterSummary
@@ -533,7 +651,7 @@ async function replayConversationHistory(
  */
 export async function injectProviderAuth(
   client: OpencodeClient,
-  userId: string
+  userId: string,
 ): Promise<void> {
   try {
     const auths = await db.query.providerAuth.findMany({
@@ -583,11 +701,15 @@ export async function killSandbox(conversationId: string): Promise<void> {
   if (state) {
     try {
       await state.sandbox.kill();
-      logLifecycle("VM_TERMINATED", {
-        conversationId,
-        sandboxId: state.sandbox.sandboxId,
-        reason: "manual_kill",
-      }, { source: "e2b", conversationId, sandboxId: state.sandbox.sandboxId });
+      logLifecycle(
+        "VM_TERMINATED",
+        {
+          conversationId,
+          sandboxId: state.sandbox.sandboxId,
+          reason: "manual_kill",
+        },
+        { source: "e2b", conversationId, sandboxId: state.sandbox.sandboxId },
+      );
     } catch (error) {
       console.error("[E2B] Failed to kill sandbox:", error);
     }
@@ -600,7 +722,7 @@ export async function killSandbox(conversationId: string): Promise<void> {
  */
 export async function cleanupAllSandboxes(): Promise<void> {
   const promises = Array.from(activeSandboxes.values()).map((state) =>
-    state.sandbox.kill().catch(console.error)
+    state.sandbox.kill().catch(console.error),
   );
   await Promise.all(promises);
   activeSandboxes.clear();
@@ -618,7 +740,7 @@ export function isE2BConfigured(): boolean {
  */
 export async function writeSkillsToSandbox(
   sandbox: Sandbox,
-  userId: string
+  userId: string,
 ): Promise<string[]> {
   // Fetch all enabled skills for user with their files and documents
   const skills = await db.query.skill.findMany({
@@ -672,7 +794,7 @@ export async function writeSkillsToSandbox(
         const arrayBuffer = new Uint8Array(buffer).buffer;
         await sandbox.files.write(docPath, arrayBuffer);
         console.log(
-          `[E2B] Written document: ${doc.filename} (${doc.sizeBytes} bytes)`
+          `[E2B] Written document: ${doc.filename} (${doc.sizeBytes} bytes)`,
         );
       } catch (error) {
         console.error(`[E2B] Failed to write document ${doc.filename}:`, error);
@@ -681,7 +803,7 @@ export async function writeSkillsToSandbox(
 
     writtenSkills.push(s.name);
     console.log(
-      `[E2B] Written skill: ${s.name} (${s.files.length} files, ${s.documents.length} documents)`
+      `[E2B] Written skill: ${s.name} (${s.files.length} files, ${s.documents.length} documents)`,
     );
   }
 
@@ -719,9 +841,12 @@ Read the SKILL.md file in each skill directory when relevant to the user's reque
 export async function writeResolvedIntegrationSkillsToSandbox(
   sandbox: Sandbox,
   userId: string,
-  allowedSlugs?: string[]
+  allowedSlugs?: string[],
 ): Promise<string[]> {
-  const resolved = await resolvePreferredCommunitySkillsForUser(userId, allowedSlugs);
+  const resolved = await resolvePreferredCommunitySkillsForUser(
+    userId,
+    allowedSlugs,
+  );
   if (resolved.length === 0) {
     return [];
   }
@@ -785,7 +910,7 @@ export class E2BSandboxBackend implements SandboxBackend {
 
   async execute(
     command: string,
-    opts?: { timeout?: number; env?: Record<string, string> }
+    opts?: { timeout?: number; env?: Record<string, string> },
   ): Promise<ExecuteResult> {
     if (!this.conversationId) {
       throw new Error("E2BSandboxBackend not set up");

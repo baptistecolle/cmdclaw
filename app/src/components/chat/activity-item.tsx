@@ -16,7 +16,11 @@ import {
   StopCircle,
   type LucideIcon,
 } from "lucide-react";
-import { getIntegrationLogo, getIntegrationDisplayName, getOperationLabel } from "@/lib/integration-icons";
+import {
+  getIntegrationLogo,
+  getIntegrationDisplayName,
+  getOperationLabel,
+} from "@/lib/integration-icons";
 import type { IntegrationType } from "@/lib/integration-icons";
 
 // Map internal SDK tool names to user-friendly display names
@@ -94,7 +98,16 @@ function formatInput(input: unknown, toolName?: string): string {
 }
 
 export function ActivityItem({ item }: Props) {
-  const { type, content, toolName, integration, operation, status, input, result } = item;
+  const {
+    type,
+    content,
+    toolName,
+    integration,
+    operation,
+    status,
+    input,
+    result,
+  } = item;
 
   // Get icon for tool calls only
   const getIcon = () => {
@@ -105,7 +118,11 @@ export function ActivityItem({ item }: Props) {
       const logo = getIntegrationLogo(integration);
       if (logo) {
         return (
-          <img src={logo} alt={getIntegrationDisplayName(integration)} className="h-3.5 w-3.5 flex-shrink-0" />
+          <img
+            src={logo}
+            alt={getIntegrationDisplayName(integration)}
+            className="h-3.5 w-3.5 flex-shrink-0"
+          />
         );
       }
     }
@@ -124,7 +141,9 @@ export function ActivityItem({ item }: Props) {
 
     switch (status) {
       case "running":
-        return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" />;
+        return (
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" />
+        );
       case "complete":
         return <Check className="h-3 w-3 text-green-500 flex-shrink-0" />;
       case "error":
@@ -171,7 +190,9 @@ export function ActivityItem({ item }: Props) {
     if (integration) {
       // Use operation or toolName (which may contain the operation)
       const op = operation || toolName;
-      return op ? getOperationLabel(integration, op) : getIntegrationDisplayName(integration);
+      return op
+        ? getOperationLabel(integration, op)
+        : getIntegrationDisplayName(integration);
     }
     return toolName ? getToolDisplayName(toolName) : content;
   })();
@@ -187,10 +208,14 @@ export function ActivityItem({ item }: Props) {
         {getStatusIcon()}
       </div>
       {formattedInput && (
-        <pre className="text-muted-foreground whitespace-pre-wrap ml-5 mt-0.5 font-mono">{formattedInput}</pre>
+        <pre className="text-muted-foreground whitespace-pre-wrap ml-5 mt-0.5 font-mono">
+          {formattedInput}
+        </pre>
       )}
       {formattedResult && (
-        <pre className="text-muted-foreground whitespace-pre-wrap ml-5 mt-0.5 font-mono">{formattedResult}</pre>
+        <pre className="text-muted-foreground whitespace-pre-wrap ml-5 mt-0.5 font-mono">
+          {formattedResult}
+        </pre>
       )}
     </div>
   );

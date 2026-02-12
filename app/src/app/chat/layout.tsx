@@ -24,10 +24,7 @@ type Message = {
   }[];
 };
 
-function formatChatToMarkdown(
-  messages: Message[],
-  title?: string
-): string {
+function formatChatToMarkdown(messages: Message[], title?: string): string {
   const lines: string[] = [];
 
   if (title) {
@@ -148,7 +145,9 @@ export default function ChatLayout({
             )}
             {isAdmin && <CopyButton />}
           </header>
-          <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">{children}</div>
+          <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">
+            {children}
+          </div>
         </SidebarInset>
       </SidebarProvider>
     </AppShell>

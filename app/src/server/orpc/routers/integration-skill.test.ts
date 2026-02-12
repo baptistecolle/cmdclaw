@@ -105,9 +105,14 @@ function createContext() {
 describe("integrationSkillRouter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    normalizeIntegrationSkillSlugMock.mockImplementation((value: string) => value.trim().toLowerCase());
+    normalizeIntegrationSkillSlugMock.mockImplementation((value: string) =>
+      value.trim().toLowerCase(),
+    );
     getOfficialIntegrationSkillIndexMock.mockResolvedValue(new Map());
-    createCommunityIntegrationSkillMock.mockResolvedValue({ id: "skill-1", slug: "slack" });
+    createCommunityIntegrationSkillMock.mockResolvedValue({
+      id: "skill-1",
+      slug: "slack",
+    });
     resolveIntegrationSkillForUserMock.mockResolvedValue(null);
     validateIntegrationSkillFilePathMock.mockReturnValue(true);
     dbMock.query.integrationSkill.findMany.mockResolvedValue([]);
@@ -156,7 +161,7 @@ describe("integrationSkillRouter", () => {
           setAsPreferred: false,
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST", message: "Invalid slug" });
   });
 
@@ -174,7 +179,7 @@ describe("integrationSkillRouter", () => {
           setAsPreferred: false,
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "BAD_REQUEST",
       message: "Failed to create integration skill",
@@ -183,7 +188,9 @@ describe("integrationSkillRouter", () => {
 
   it("maps Error instances from createFromChat to BAD_REQUEST with the original message", async () => {
     const context = createContext();
-    createCommunityIntegrationSkillMock.mockRejectedValue(new Error("already exists"));
+    createCommunityIntegrationSkillMock.mockRejectedValue(
+      new Error("already exists"),
+    );
 
     await expect(
       integrationSkillRouterAny.createFromChat({
@@ -195,7 +202,7 @@ describe("integrationSkillRouter", () => {
           setAsPreferred: false,
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "BAD_REQUEST",
       message: "already exists",
@@ -215,7 +222,7 @@ describe("integrationSkillRouter", () => {
             dirName: "slack",
           },
         ],
-      ])
+      ]),
     );
     context.db.query.integrationSkill.findMany.mockResolvedValue([
       {
@@ -248,10 +255,11 @@ describe("integrationSkillRouter", () => {
       input: { slug: "slack" },
       context,
     });
-    const findManyArgs = context.db.query.integrationSkill.findMany.mock.calls[0]?.[0];
+    const findManyArgs =
+      context.db.query.integrationSkill.findMany.mock.calls[0]?.[0];
     const orderByResult = findManyArgs.orderBy(
       { createdAt: "createdAt-field" },
-      { desc: (value: unknown) => `desc(${String(value)})` }
+      { desc: (value: unknown) => `desc(${String(value)})` },
     );
 
     expect(result).toEqual({
@@ -297,7 +305,9 @@ describe("integrationSkillRouter", () => {
     const context = createContext();
     getOfficialIntegrationSkillIndexMock.mockResolvedValue(new Map());
     context.db.query.integrationSkill.findMany.mockResolvedValue([]);
-    context.db.query.integrationSkillPreference.findFirst.mockResolvedValue(null);
+    context.db.query.integrationSkillPreference.findFirst.mockResolvedValue(
+      null,
+    );
 
     const result = await integrationSkillRouterAny.listBySlug({
       input: { slug: "slack" },
@@ -321,14 +331,19 @@ describe("integrationSkillRouter", () => {
       dirName: "slack",
     };
     resolveIntegrationSkillForUserMock.mockResolvedValue(resolved);
-    context.db.query.integrationSkillPreference.findFirst.mockResolvedValue(null);
+    context.db.query.integrationSkillPreference.findFirst.mockResolvedValue(
+      null,
+    );
 
     const result = await integrationSkillRouterAny.getResolvedForUser({
       input: { slug: "slack" },
       context,
     });
 
-    expect(resolveIntegrationSkillForUserMock).toHaveBeenCalledWith("user-1", "slack");
+    expect(resolveIntegrationSkillForUserMock).toHaveBeenCalledWith(
+      "user-1",
+      "slack",
+    );
     expect(result).toEqual({
       slug: "slack",
       resolved,
@@ -382,7 +397,7 @@ describe("integrationSkillRouter", () => {
       integrationSkillRouterAny.setPreference({
         input: { slug: "slack", preferredSource: "community" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "BAD_REQUEST",
       message: "preferredSkillId is required for community preference",
@@ -401,7 +416,7 @@ describe("integrationSkillRouter", () => {
           preferredSkillId: "missing",
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "NOT_FOUND",
       message: "Community integration skill not found",
@@ -416,7 +431,7 @@ describe("integrationSkillRouter", () => {
       integrationSkillRouterAny.setPreference({
         input: { slug: "slack", preferredSource: "official" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "BAD_REQUEST",
       message: "No official integration skill exists for slug 'slack'",
@@ -426,7 +441,9 @@ describe("integrationSkillRouter", () => {
   it("saves official preference with null preferredSkillId", async () => {
     const context = createContext();
     getOfficialIntegrationSkillIndexMock.mockResolvedValue(
-      new Map([["slack", { slug: "slack", description: "", dirName: "slack" }]])
+      new Map([
+        ["slack", { slug: "slack", description: "", dirName: "slack" }],
+      ]),
     );
 
     const result = await integrationSkillRouterAny.setPreference({
@@ -446,7 +463,9 @@ describe("integrationSkillRouter", () => {
 
   it("saves community preference when selected skill exists", async () => {
     const context = createContext();
-    context.db.query.integrationSkill.findFirst.mockResolvedValue({ id: "skill-1" });
+    context.db.query.integrationSkill.findFirst.mockResolvedValue({
+      id: "skill-1",
+    });
 
     const result = await integrationSkillRouterAny.setPreference({
       input: {
@@ -474,7 +493,7 @@ describe("integrationSkillRouter", () => {
       integrationSkillRouterAny.updateCommunitySkill({
         input: { id: "missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "NOT_FOUND",
       message: "Integration skill not found",
@@ -494,7 +513,7 @@ describe("integrationSkillRouter", () => {
       integrationSkillRouterAny.updateCommunitySkill({
         input: { id: "skill-1", title: "New" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "FORBIDDEN", message: "Not allowed" });
   });
 
@@ -506,7 +525,9 @@ describe("integrationSkillRouter", () => {
       description: "Old",
       createdByUserId: "user-1",
     });
-    validateIntegrationSkillFilePathMock.mockImplementation((path: string) => path !== "../bad.md");
+    validateIntegrationSkillFilePathMock.mockImplementation(
+      (path: string) => path !== "../bad.md",
+    );
 
     await expect(
       integrationSkillRouterAny.updateCommunitySkill({
@@ -515,7 +536,7 @@ describe("integrationSkillRouter", () => {
           files: [{ path: "../bad.md", content: "bad" }],
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "BAD_REQUEST",
       message: "Invalid file path: ../bad.md",
@@ -541,7 +562,7 @@ describe("integrationSkillRouter", () => {
           ],
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "BAD_REQUEST",
       message: "Duplicate file path: one.md",
@@ -609,7 +630,7 @@ describe("integrationSkillRouter", () => {
       integrationSkillRouterAny.deleteCommunitySkill({
         input: { id: "missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "NOT_FOUND",
       message: "Integration skill not found",
@@ -624,7 +645,7 @@ describe("integrationSkillRouter", () => {
       integrationSkillRouterAny.deleteCommunitySkill({
         input: { id: "skill-1" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "FORBIDDEN", message: "Not allowed" });
   });
 
@@ -641,7 +662,9 @@ describe("integrationSkillRouter", () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(context.mocks.updateSetMock).toHaveBeenCalledWith({ isActive: false });
+    expect(context.mocks.updateSetMock).toHaveBeenCalledWith({
+      isActive: false,
+    });
   });
 
   it("lists public community skills with default limit when input is omitted", async () => {
@@ -658,15 +681,18 @@ describe("integrationSkillRouter", () => {
       },
     ]);
 
-    const result = await integrationSkillRouterAny.listPublic({ input: undefined });
-    const findManyArgs = dbMock.query.integrationSkill.findMany.mock.calls[0]?.[0];
+    const result = await integrationSkillRouterAny.listPublic({
+      input: undefined,
+    });
+    const findManyArgs =
+      dbMock.query.integrationSkill.findMany.mock.calls[0]?.[0];
     const orderByResult = findManyArgs.orderBy(
       { createdAt: "createdAt-field" },
-      { desc: (value: unknown) => `desc(${String(value)})` }
+      { desc: (value: unknown) => `desc(${String(value)})` },
     );
 
     expect(dbMock.query.integrationSkill.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 50 })
+      expect.objectContaining({ limit: 50 }),
     );
     expect(orderByResult).toEqual(["desc(createdAt-field)"]);
     expect(result).toEqual([
@@ -690,9 +716,11 @@ describe("integrationSkillRouter", () => {
       input: { slug: "  GitHub  ", limit: 10 },
     });
 
-    expect(normalizeIntegrationSkillSlugMock).toHaveBeenCalledWith("  GitHub  ");
+    expect(normalizeIntegrationSkillSlugMock).toHaveBeenCalledWith(
+      "  GitHub  ",
+    );
     expect(dbMock.query.integrationSkill.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 10 })
+      expect.objectContaining({ limit: 10 }),
     );
   });
 });

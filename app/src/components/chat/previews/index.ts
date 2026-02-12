@@ -27,7 +27,10 @@ export interface IntegrationPreviewConfig {
 export const INTEGRATION_PREVIEWS: Record<string, IntegrationPreviewConfig> = {
   slack: { component: SlackPreview, displayName: "Slack" },
   gmail: { component: GmailPreview, displayName: "Gmail" },
-  google_calendar: { component: CalendarPreview, displayName: "Google Calendar" },
+  google_calendar: {
+    component: CalendarPreview,
+    displayName: "Google Calendar",
+  },
   google_docs: { component: DocsPreview, displayName: "Google Docs" },
   google_sheets: { component: SheetsPreview, displayName: "Google Sheets" },
   google_drive: { component: DrivePreview, displayName: "Google Drive" },
@@ -45,7 +48,7 @@ export const INTEGRATION_PREVIEWS: Record<string, IntegrationPreviewConfig> = {
  * @returns The preview component or null if not found
  */
 export function getPreviewComponent(
-  integration: string
+  integration: string,
 ): PreviewComponent | null {
   return INTEGRATION_PREVIEWS[integration]?.component || null;
 }

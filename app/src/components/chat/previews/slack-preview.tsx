@@ -7,10 +7,7 @@ import {
   IntegrationLogo,
 } from "./preview-styles";
 
-export function SlackPreview({
-  operation,
-  args,
-}: PreviewProps) {
+export function SlackPreview({ operation, args }: PreviewProps) {
   switch (operation) {
     case "send":
       return <SlackSendPreview args={args} />;
@@ -23,7 +20,11 @@ export function SlackPreview({
   }
 }
 
-function SlackSendPreview({ args }: { args: Record<string, string | undefined> }) {
+function SlackSendPreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const channel = args.c || args.channel;
   const text = args.t || args.text;
   const thread = args.thread;
@@ -52,7 +53,11 @@ function SlackSendPreview({ args }: { args: Record<string, string | undefined> }
   );
 }
 
-function SlackReactPreview({ args }: { args: Record<string, string | undefined> }) {
+function SlackReactPreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const channel = args.c || args.channel;
   const timestamp = args.ts;
   const emoji = args.e || args.emoji;
@@ -68,7 +73,9 @@ function SlackReactPreview({ args }: { args: Record<string, string | undefined> 
         <PreviewField label="Channel" value={channel} mono />
         <PreviewField label="Message" value={timestamp} mono />
         <div className="mt-2">
-          <span className="text-xs font-medium text-muted-foreground">Emoji: </span>
+          <span className="text-xs font-medium text-muted-foreground">
+            Emoji:{" "}
+          </span>
           <span className="text-lg">:{emoji}:</span>
         </div>
       </PreviewSection>
@@ -76,7 +83,11 @@ function SlackReactPreview({ args }: { args: Record<string, string | undefined> 
   );
 }
 
-function SlackUploadPreview({ args }: { args: Record<string, string | undefined> }) {
+function SlackUploadPreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const channel = args.c || args.channel;
   const file = args.file;
   const comment = args.comment;

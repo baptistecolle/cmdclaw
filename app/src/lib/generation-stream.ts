@@ -55,11 +55,22 @@ export type GenerationCallbacks = {
   onThinking?: (data: ThinkingData) => void | Promise<void>;
   onToolUse?: (data: ToolUseData) => void | Promise<void>;
   onToolResult?: (toolName: string, result: unknown) => void | Promise<void>;
-  onPendingApproval?: (data: GenerationPendingApprovalData) => void | Promise<void>;
-  onApprovalResult?: (toolUseId: string, decision: "approved" | "denied") => void | Promise<void>;
+  onPendingApproval?: (
+    data: GenerationPendingApprovalData,
+  ) => void | Promise<void>;
+  onApprovalResult?: (
+    toolUseId: string,
+    decision: "approved" | "denied",
+  ) => void | Promise<void>;
   onAuthNeeded?: (data: AuthNeededData) => void | Promise<void>;
-  onAuthProgress?: (connected: string, remaining: string[]) => void | Promise<void>;
-  onAuthResult?: (success: boolean, integrations?: string[]) => void | Promise<void>;
+  onAuthProgress?: (
+    connected: string,
+    remaining: string[],
+  ) => void | Promise<void>;
+  onAuthResult?: (
+    success: boolean,
+    integrations?: string[],
+  ) => void | Promise<void>;
   onSandboxFile?: (data: SandboxFileData) => void | Promise<void>;
   onDone?: (
     generationId: string,
@@ -69,11 +80,18 @@ export type GenerationCallbacks = {
       inputTokens: number;
       outputTokens: number;
       totalCostUsd: number;
-    }
+    },
   ) => void | Promise<void>;
-  onStarted?: (generationId: string, conversationId: string) => void | Promise<void>;
+  onStarted?: (
+    generationId: string,
+    conversationId: string,
+  ) => void | Promise<void>;
   onError?: (message: string) => void | Promise<void>;
-  onCancelled?: (data: { generationId: string; conversationId: string; messageId?: string }) => void | Promise<void>;
+  onCancelled?: (data: {
+    generationId: string;
+    conversationId: string;
+    messageId?: string;
+  }) => void | Promise<void>;
   onStatusChange?: (status: string) => void | Promise<void>;
 };
 
@@ -86,7 +104,7 @@ type RunGenerationStreamParams = {
 };
 
 export async function runGenerationStream(
-  params: RunGenerationStreamParams
+  params: RunGenerationStreamParams,
 ): Promise<{ generationId: string; conversationId: string } | null> {
   const { client, input, callbacks, signal } = params;
   let generationId = params.generationId;
@@ -100,7 +118,9 @@ export async function runGenerationStream(
   }
 
   if (!generationId) {
-    throw new Error("runGenerationStream requires either input or generationId");
+    throw new Error(
+      "runGenerationStream requires either input or generationId",
+    );
   }
 
   const iterator = signal
@@ -181,7 +201,7 @@ export async function runGenerationStream(
           event.generationId,
           event.conversationId,
           event.messageId,
-          event.usage
+          event.usage,
         );
         break;
       case "error":
@@ -200,5 +220,7 @@ export async function runGenerationStream(
     }
   }
 
-  return conversationId && generationId ? { generationId, conversationId } : null;
+  return conversationId && generationId
+    ? { generationId, conversationId }
+    : null;
 }

@@ -63,8 +63,8 @@ export default function DevicesPage() {
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Connected Devices</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage devices running the Bap daemon. Devices can execute commands and
-          proxy local LLM requests.
+          Manage devices running the Bap daemon. Devices can execute commands
+          and proxy local LLM requests.
         </p>
       </div>
 
@@ -109,7 +109,11 @@ export default function DevicesPage() {
                   <div className="text-xs text-muted-foreground">
                     {device.platform}
                     {device.lastSeenAt && !device.isOnline && (
-                      <> &middot; Last seen {new Date(device.lastSeenAt).toLocaleDateString()}</>
+                      <>
+                        {" "}
+                        &middot; Last seen{" "}
+                        {new Date(device.lastSeenAt).toLocaleDateString()}
+                      </>
                     )}
                   </div>
                 </div>

@@ -113,33 +113,41 @@ describe("GET /api/oauth/callback", () => {
   });
 
   it("redirects with missing_params when code/state are missing", async () => {
-    const request = new NextRequest("https://app.example.com/api/oauth/callback");
+    const request = new NextRequest(
+      "https://app.example.com/api/oauth/callback",
+    );
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe("https://app.example.com/integrations?error=missing_params");
+    expect(getLocation(response)).toBe(
+      "https://app.example.com/integrations?error=missing_params",
+    );
   });
 
   it("redirects to login when session is unauthorized", async () => {
     getSessionMock.mockResolvedValue(null);
 
     const request = new NextRequest(
-      `https://app.example.com/api/oauth/callback?code=abc&state=${encodeState({ userId: "user-1", type: "github", redirectUrl: "/integrations" })}`
+      `https://app.example.com/api/oauth/callback?code=abc&state=${encodeState({ userId: "user-1", type: "github", redirectUrl: "/integrations" })}`,
     );
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe("https://app.example.com/login?error=unauthorized");
+    expect(getLocation(response)).toBe(
+      "https://app.example.com/login?error=unauthorized",
+    );
   });
 
   it("redirects with invalid_state when state cannot be parsed", async () => {
     const request = new NextRequest(
-      "https://app.example.com/api/oauth/callback?code=abc&state=not-base64-json"
+      "https://app.example.com/api/oauth/callback?code=abc&state=not-base64-json",
     );
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe("https://app.example.com/integrations?error=invalid_state");
+    expect(getLocation(response)).toBe(
+      "https://app.example.com/integrations?error=invalid_state",
+    );
   });
 
   it("redirects with user_mismatch when callback state user does not match session", async () => {
@@ -150,12 +158,14 @@ describe("GET /api/oauth/callback", () => {
     });
 
     const request = new NextRequest(
-      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`
+      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`,
     );
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe("https://app.example.com/integrations?error=user_mismatch");
+    expect(getLocation(response)).toBe(
+      "https://app.example.com/integrations?error=user_mismatch",
+    );
   });
 
   it("redirects with token_exchange_failed when token exchange fails", async () => {
@@ -167,21 +177,24 @@ describe("GET /api/oauth/callback", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response("bad exchange", {
-          status: 400,
-          headers: { "Content-Type": "text/plain" },
-        })
-      )
+      vi.fn(
+        async () =>
+          new Response("bad exchange", {
+            status: 400,
+            headers: { "Content-Type": "text/plain" },
+          }),
+      ),
     );
 
     const request = new NextRequest(
-      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`
+      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`,
     );
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe("https://app.example.com/integrations?error=token_exchange_failed");
+    expect(getLocation(response)).toBe(
+      "https://app.example.com/integrations?error=token_exchange_failed",
+    );
   });
 
   it("parses Slack authed_user tokens", async () => {
@@ -193,35 +206,42 @@ describe("GET /api/oauth/callback", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            authed_user: { access_token: "xoxp-user-token", refresh_token: "refresh" },
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }
-        )
-      )
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              authed_user: {
+                access_token: "xoxp-user-token",
+                refresh_token: "refresh",
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+      ),
     );
 
     const request = new NextRequest(
-      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`
+      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`,
     );
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe("https://app.example.com/settings/integrations?success=true");
+    expect(getLocation(response)).toBe(
+      "https://app.example.com/settings/integrations?success=true",
+    );
 
     const tokenInsertCall = (insertValuesMock.mock.calls as any[]).find(
-      (call) => call[0] && typeof call[0] === "object" && "accessToken" in call[0]
+      (call) =>
+        call[0] && typeof call[0] === "object" && "accessToken" in call[0],
     );
     expect(tokenInsertCall?.[0]).toEqual(
       expect.objectContaining({
         accessToken: "xoxp-user-token",
         refreshToken: "refresh",
-      })
+      }),
     );
   });
 
@@ -243,19 +263,20 @@ describe("GET /api/oauth/callback", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            access_token: "sf-access",
-            refresh_token: "sf-refresh",
-            instance_url: "https://acme.my.salesforce.com",
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }
-        )
-      )
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              access_token: "sf-access",
+              refresh_token: "sf-refresh",
+              instance_url: "https://acme.my.salesforce.com",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+      ),
     );
 
     const state = encodeState({
@@ -265,15 +286,20 @@ describe("GET /api/oauth/callback", () => {
     });
 
     const request = new NextRequest(
-      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`
+      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`,
     );
 
     const response = await GET(request);
 
-    expect(getLocation(response)).toBe("https://app.example.com/integrations?success=true");
+    expect(getLocation(response)).toBe(
+      "https://app.example.com/integrations?success=true",
+    );
 
     const integrationInsertCall = (insertValuesMock.mock.calls as any[]).find(
-      (call) => call[0] && typeof call[0] === "object" && "providerAccountId" in call[0]
+      (call) =>
+        call[0] &&
+        typeof call[0] === "object" &&
+        "providerAccountId" in call[0],
     );
 
     expect(integrationInsertCall?.[0]).toEqual(
@@ -282,7 +308,7 @@ describe("GET /api/oauth/callback", () => {
           org: "acme",
           instanceUrl: "https://acme.my.salesforce.com",
         },
-      })
+      }),
     );
   });
 });

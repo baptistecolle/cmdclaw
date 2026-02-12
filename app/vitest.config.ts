@@ -14,10 +14,7 @@ export default defineConfig({
       "src/**/*.{test,spec}.{ts,tsx}",
       "tests/**/*.{test,spec}.{ts,tsx}",
     ],
-    exclude: [
-      "tests/e2e/**",
-      "src/**/*.e2e.test.{ts,tsx}",
-    ],
+    exclude: ["tests/e2e/**", "src/**/*.e2e.test.{ts,tsx}"],
     environment: "node",
     coverage: {
       provider: "v8",

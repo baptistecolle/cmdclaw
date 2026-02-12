@@ -140,7 +140,7 @@ describe("workflowRouter", () => {
       status: "on",
     });
     expect(syncWorkflowScheduleJobMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "wf-1" })
+      expect.objectContaining({ id: "wf-1" }),
     );
   });
 
@@ -208,7 +208,12 @@ describe("workflowRouter", () => {
         lastRunAt: startedAt,
         recentRuns: [
           { id: "run-1", status: "success", startedAt, source: "trigger" },
-          { id: "run-2", status: "failed", startedAt: secondStartedAt, source: "manual" },
+          {
+            id: "run-2",
+            status: "failed",
+            startedAt: secondStartedAt,
+            source: "manual",
+          },
         ],
       },
       {
@@ -261,8 +266,12 @@ describe("workflowRouter", () => {
       input: { id: "wf-1" },
       context,
     });
-    const getRunsArgs = context.db.query.workflowRun.findMany.mock.calls[0]?.[0];
-    const getRunsOrderBy = getRunsArgs.orderBy({ startedAt: "started-col" }, { desc: (value: unknown) => `d:${value}` });
+    const getRunsArgs =
+      context.db.query.workflowRun.findMany.mock.calls[0]?.[0];
+    const getRunsOrderBy = getRunsArgs.orderBy(
+      { startedAt: "started-col" },
+      { desc: (value: unknown) => `d:${value}` },
+    );
 
     expect(result).toEqual({
       id: "wf-1",
@@ -299,7 +308,7 @@ describe("workflowRouter", () => {
       workflowRouterAny.get({
         input: { id: "wf-missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -331,7 +340,7 @@ describe("workflowRouter", () => {
       status: "on",
     });
     expect(context.mocks.insertValuesMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Explicit Name" })
+      expect.objectContaining({ name: "Explicit Name" }),
     );
     expect(generateWorkflowNameMock).not.toHaveBeenCalled();
     expect(syncWorkflowScheduleJobMock).not.toHaveBeenCalled();
@@ -362,7 +371,7 @@ describe("workflowRouter", () => {
 
     expect(result.name).toBe("First sentence for fallback");
     expect(context.mocks.insertValuesMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "First sentence for fallback" })
+      expect.objectContaining({ name: "First sentence for fallback" }),
     );
   });
 
@@ -389,7 +398,9 @@ describe("workflowRouter", () => {
       context,
     });
 
-    expect(context.mocks.insertValuesMock).toHaveBeenCalledWith(expect.objectContaining({ name: "New Workflow" }));
+    expect(context.mocks.insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "New Workflow" }),
+    );
   });
 
   it("returns INTERNAL_SERVER_ERROR when schedule sync fails during create", async () => {
@@ -419,7 +430,7 @@ describe("workflowRouter", () => {
           },
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
   });
 
@@ -471,7 +482,7 @@ describe("workflowRouter", () => {
           name: "Name",
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -508,7 +519,7 @@ describe("workflowRouter", () => {
           schedule: { type: "daily", time: "09:00", timezone: "UTC" },
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
   });
 
@@ -534,7 +545,7 @@ describe("workflowRouter", () => {
       workflowRouterAny.update({
         input: { id: "wf-1", name: "Renamed" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -610,7 +621,7 @@ describe("workflowRouter", () => {
       expect.objectContaining({
         allowedIntegrations: ["github", "slack"],
         allowedCustomIntegrations: ["custom-1"],
-      })
+      }),
     );
   });
 
@@ -644,7 +655,9 @@ describe("workflowRouter", () => {
       context,
     });
 
-    expect(context.mocks.updateSetMock).toHaveBeenCalledWith(expect.objectContaining({ name: "" }));
+    expect(context.mocks.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "" }),
+    );
   });
 
   it("falls back to first prompt sentence when update name generation is empty", async () => {
@@ -674,12 +687,16 @@ describe("workflowRouter", () => {
     ]);
 
     await workflowRouterAny.update({
-      input: { id: "wf-1", name: "   ", prompt: "Summary sentence. another sentence" },
+      input: {
+        id: "wf-1",
+        name: "   ",
+        prompt: "Summary sentence. another sentence",
+      },
       context,
     });
 
     expect(context.mocks.updateSetMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Summary sentence" })
+      expect.objectContaining({ name: "Summary sentence" }),
     );
   });
 
@@ -714,7 +731,9 @@ describe("workflowRouter", () => {
       context,
     });
 
-    expect(context.mocks.updateSetMock).toHaveBeenCalledWith(expect.objectContaining({ name: "New Workflow" }));
+    expect(context.mocks.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "New Workflow" }),
+    );
   });
 
   it("deletes a workflow on happy path", async () => {
@@ -738,20 +757,22 @@ describe("workflowRouter", () => {
       workflowRouterAny.delete({
         input: { id: "wf-missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("returns INTERNAL_SERVER_ERROR when scheduler cleanup fails during delete", async () => {
     const context = createContext();
     context.mocks.deleteReturningMock.mockResolvedValue([{ id: "wf-1" }]);
-    removeWorkflowScheduleJobMock.mockRejectedValueOnce(new Error("queue unavailable"));
+    removeWorkflowScheduleJobMock.mockRejectedValueOnce(
+      new Error("queue unavailable"),
+    );
 
     await expect(
       workflowRouterAny.delete({
         input: { id: "wf-1" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
   });
 
@@ -804,7 +825,7 @@ describe("workflowRouter", () => {
       workflowRouterAny.getRun({
         input: { id: "run-missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -826,7 +847,7 @@ describe("workflowRouter", () => {
       workflowRouterAny.getRun({
         input: { id: "run-1" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -863,8 +884,12 @@ describe("workflowRouter", () => {
       input: { id: "run-1" },
       context,
     });
-    const eventArgs = context.db.query.workflowRunEvent.findMany.mock.calls[0]?.[0];
-    const eventsOrderBy = eventArgs.orderBy({ createdAt: "created-col" }, { asc: (value: unknown) => `a:${value}` });
+    const eventArgs =
+      context.db.query.workflowRunEvent.findMany.mock.calls[0]?.[0];
+    const eventsOrderBy = eventArgs.orderBy(
+      { createdAt: "created-col" },
+      { asc: (value: unknown) => `a:${value}` },
+    );
 
     expect(result).toEqual({
       id: "run-1",
@@ -923,7 +948,7 @@ describe("workflowRouter", () => {
       workflowRouterAny.listRuns({
         input: { workflowId: "wf-missing", limit: 10 },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -948,8 +973,12 @@ describe("workflowRouter", () => {
       input: { workflowId: "wf-1", limit: 10 },
       context,
     });
-    const listRunsArgs = context.db.query.workflowRun.findMany.mock.calls[0]?.[0];
-    const listRunsOrderBy = listRunsArgs.orderBy({ startedAt: "started-col" }, { desc: (value: unknown) => `d:${value}` });
+    const listRunsArgs =
+      context.db.query.workflowRun.findMany.mock.calls[0]?.[0];
+    const listRunsOrderBy = listRunsArgs.orderBy(
+      { startedAt: "started-col" },
+      { desc: (value: unknown) => `d:${value}` },
+    );
 
     expect(result).toEqual([
       {

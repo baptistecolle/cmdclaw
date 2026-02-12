@@ -10,7 +10,9 @@ const headers = { Authorization: TOKEN, "Content-Type": "application/json" };
 
 async function graphql(query: string, variables?: Record<string, unknown>) {
   const res = await fetch("https://api.linear.app/graphql", {
-    method: "POST", headers, body: JSON.stringify({ query, variables }),
+    method: "POST",
+    headers,
+    body: JSON.stringify({ query, variables }),
   });
   const data = await res.json();
   if (data.errors) throw new Error(JSON.stringify(data.errors));
@@ -47,8 +49,13 @@ async function listIssues() {
   }`);
 
   const issues = data.issues.nodes.map((i: any) => ({
-    identifier: i.identifier, title: i.title, state: i.state?.name,
-    priority: i.priority, assignee: i.assignee?.name, team: i.team?.key, url: i.url,
+    identifier: i.identifier,
+    title: i.title,
+    state: i.state?.name,
+    priority: i.priority,
+    assignee: i.assignee?.name,
+    team: i.team?.key,
+    url: i.url,
   }));
 
   console.log(JSON.stringify(issues, null, 2));
@@ -66,41 +73,68 @@ async function getIssue(identifier: string) {
     }
   }`);
 
-  if (!data.issues.nodes.length) throw new Error(`Issue ${identifier} not found`);
+  if (!data.issues.nodes.length)
+    throw new Error(`Issue ${identifier} not found`);
   console.log(JSON.stringify(data.issues.nodes[0], null, 2));
 }
 
 async function createIssue() {
   if (!values.team || !values.title) {
-    console.error("Required: --team <key> --title <title> [--description <text>] [--priority 0-4] [--assignee <email>]");
+    console.error(
+      "Required: --team <key> --title <title> [--description <text>] [--priority 0-4] [--assignee <email>]",
+    );
     process.exit(1);
   }
 
-  const teamData = await graphql(`query { teams(filter: { key: { eq: "${values.team}" } }) { nodes { id } } }`);
-  if (!teamData.teams.nodes.length) throw new Error(`Team ${values.team} not found`);
+  const teamData = await graphql(
+    `query { teams(filter: { key: { eq: "${values.team}" } }) { nodes { id } } }`,
+  );
+  if (!teamData.teams.nodes.length)
+    throw new Error(`Team ${values.team} not found`);
 
-  const input: Record<string, unknown> = { teamId: teamData.teams.nodes[0].id, title: values.title };
+  const input: Record<string, unknown> = {
+    teamId: teamData.teams.nodes[0].id,
+    title: values.title,
+  };
   if (values.description) input.description = values.description;
   if (values.priority) input.priority = parseInt(values.priority);
 
   if (values.assignee) {
-    const userData = await graphql(`query { users(filter: { email: { eq: "${values.assignee}" } }) { nodes { id } } }`);
-    if (userData.users.nodes.length) input.assigneeId = userData.users.nodes[0].id;
+    const userData = await graphql(
+      `query { users(filter: { email: { eq: "${values.assignee}" } }) { nodes { id } } }`,
+    );
+    if (userData.users.nodes.length)
+      input.assigneeId = userData.users.nodes[0].id;
   }
 
-  const data = await graphql(`mutation($input: IssueCreateInput!) {
-    issueCreate(input: $input) { success issue { identifier title url } }
-  }`, { input });
+  const data = await graphql(
+    `
+      mutation ($input: IssueCreateInput!) {
+        issueCreate(input: $input) {
+          success
+          issue {
+            identifier
+            title
+            url
+          }
+        }
+      }
+    `,
+    { input },
+  );
 
   if (!data.issueCreate.success) throw new Error("Failed to create issue");
-  console.log(`Created: ${data.issueCreate.issue.identifier} - ${data.issueCreate.issue.title}\n${data.issueCreate.issue.url}`);
+  console.log(
+    `Created: ${data.issueCreate.issue.identifier} - ${data.issueCreate.issue.title}\n${data.issueCreate.issue.url}`,
+  );
 }
 
 async function updateIssue(identifier: string) {
   const issueData = await graphql(`query {
     issues(filter: { identifier: { eq: "${identifier}" } }) { nodes { id team { id } } }
   }`);
-  if (!issueData.issues.nodes.length) throw new Error(`Issue ${identifier} not found`);
+  if (!issueData.issues.nodes.length)
+    throw new Error(`Issue ${identifier} not found`);
 
   const input: Record<string, unknown> = {};
   if (values.title) input.title = values.title;
@@ -112,30 +146,73 @@ async function updateIssue(identifier: string) {
     const stateData = await graphql(`query {
       workflowStates(filter: { team: { id: { eq: "${teamId}" } }, name: { eq: "${values.state}" } }) { nodes { id } }
     }`);
-    if (stateData.workflowStates.nodes.length) input.stateId = stateData.workflowStates.nodes[0].id;
+    if (stateData.workflowStates.nodes.length)
+      input.stateId = stateData.workflowStates.nodes[0].id;
   }
 
-  const data = await graphql(`mutation($id: String!, $input: IssueUpdateInput!) {
-    issueUpdate(id: $id, input: $input) { success issue { identifier state { name } url } }
-  }`, { id: issueData.issues.nodes[0].id, input });
+  const data = await graphql(
+    `
+      mutation ($id: String!, $input: IssueUpdateInput!) {
+        issueUpdate(id: $id, input: $input) {
+          success
+          issue {
+            identifier
+            state {
+              name
+            }
+            url
+          }
+        }
+      }
+    `,
+    { id: issueData.issues.nodes[0].id, input },
+  );
 
   if (!data.issueUpdate.success) throw new Error("Failed to update");
-  console.log(`Updated: ${data.issueUpdate.issue.identifier} (${data.issueUpdate.issue.state?.name})`);
+  console.log(
+    `Updated: ${data.issueUpdate.issue.identifier} (${data.issueUpdate.issue.state?.name})`,
+  );
 }
 
 async function listTeams() {
-  const data = await graphql(`query { teams { nodes { key name description } } }`);
+  const data = await graphql(`
+    query {
+      teams {
+        nodes {
+          key
+          name
+          description
+        }
+      }
+    }
+  `);
   console.log(JSON.stringify(data.teams.nodes, null, 2));
 }
 
 async function myIssues() {
-  const data = await graphql(`query {
-    viewer {
-      assignedIssues(first: 50, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
-        nodes { identifier title state { name } priority team { key } url }
+  const data = await graphql(`
+    query {
+      viewer {
+        assignedIssues(
+          first: 50
+          filter: { state: { type: { nin: ["completed", "canceled"] } } }
+        ) {
+          nodes {
+            identifier
+            title
+            state {
+              name
+            }
+            priority
+            team {
+              key
+            }
+            url
+          }
+        }
       }
     }
-  }`);
+  `);
 
   console.log(JSON.stringify(data.viewer.assignedIssues.nodes, null, 2));
 }
@@ -161,12 +238,24 @@ async function main() {
 
   try {
     switch (command) {
-      case "list": await listIssues(); break;
-      case "get": await getIssue(args[0]); break;
-      case "create": await createIssue(); break;
-      case "update": await updateIssue(args[0]); break;
-      case "teams": await listTeams(); break;
-      case "mine": await myIssues(); break;
+      case "list":
+        await listIssues();
+        break;
+      case "get":
+        await getIssue(args[0]);
+        break;
+      case "create":
+        await createIssue();
+        break;
+      case "update":
+        await updateIssue(args[0]);
+        break;
+      case "teams":
+        await listTeams();
+        break;
+      case "mine":
+        await myIssues();
+        break;
       default:
         showHelp();
     }

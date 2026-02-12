@@ -14,7 +14,9 @@ async function main() {
     cpuCount: 2,
     memoryMB: 2048,
     onBuildLogs: defaultBuildLogger(),
-    ...(process.env.E2B_ACCESS_TOKEN && { apiKey: process.env.E2B_ACCESS_TOKEN }),
+    ...(process.env.E2B_ACCESS_TOKEN && {
+      apiKey: process.env.E2B_ACCESS_TOKEN,
+    }),
   });
 
   console.log("\nTemplate built successfully!");

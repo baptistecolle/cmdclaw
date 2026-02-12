@@ -4,7 +4,11 @@
  */
 
 import type { SandboxBackend, ExecuteResult, DaemonResponse } from "./types";
-import { sendToDevice, waitForResponse, isDeviceOnline } from "@/server/ws/server";
+import {
+  sendToDevice,
+  waitForResponse,
+  isDeviceOnline,
+} from "@/server/ws/server";
 
 export class BYOCSandboxBackend implements SandboxBackend {
   private deviceId: string;
@@ -31,7 +35,7 @@ export class BYOCSandboxBackend implements SandboxBackend {
 
   async execute(
     command: string,
-    opts?: { timeout?: number; env?: Record<string, string> }
+    opts?: { timeout?: number; env?: Record<string, string> },
   ): Promise<ExecuteResult> {
     const response = await waitForResponse(
       this.deviceId,
@@ -42,7 +46,7 @@ export class BYOCSandboxBackend implements SandboxBackend {
         timeout: opts?.timeout,
         env: opts?.env,
       },
-      opts?.timeout || 120_000
+      opts?.timeout || 120_000,
     );
 
     if (response.type === "sandbox.execute.result") {

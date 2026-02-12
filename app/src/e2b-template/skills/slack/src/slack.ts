@@ -13,7 +13,7 @@ function getUserToken(): string {
   const token = process.env.SLACK_ACCESS_TOKEN;
   if (!token) {
     throw new Error(
-      "SLACK_ACCESS_TOKEN environment variable required for this command"
+      "SLACK_ACCESS_TOKEN environment variable required for this command",
     );
   }
   return token;
@@ -30,7 +30,8 @@ async function api(method: string, body?: Record<string, unknown>) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json();
-  if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
+  if (!data.ok)
+    throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
   return data;
 }
 
@@ -68,14 +69,15 @@ async function apiFormData(method: string, formData: FormData) {
     body: formData,
   });
   const data = await res.json();
-  if (!data.ok) throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
+  if (!data.ok)
+    throw new Error(`Slack API Error: ${data.error} - ${JSON.stringify(data)}`);
   return data;
 }
 
 async function postAsBot(
   channel: string,
   text: string,
-  threadTs?: string
+  threadTs?: string,
 ): Promise<{ channel?: string; ts?: string }> {
   if (!RELAY_URL) {
     throw new Error("SLACK_BOT_RELAY_URL or APP_URL is required for --as bot");
@@ -98,10 +100,10 @@ async function postAsBot(
     }),
   });
 
-  const data = await res.json().catch(() => ({} as Record<string, unknown>));
+  const data = await res.json().catch(() => ({}) as Record<string, unknown>);
   if (!res.ok || !data.ok) {
     throw new Error(
-      `Slack relay error: ${String(data.error ?? `HTTP ${res.status}`)}`
+      `Slack relay error: ${String(data.error ?? `HTTP ${res.status}`)}`,
     );
   }
 
@@ -145,15 +147,21 @@ async function listChannels() {
   });
 
   const channels = data.channels.map((ch: any) => ({
-    id: ch.id, name: ch.name, private: ch.is_private,
-    topic: ch.topic?.value, members: ch.num_members,
+    id: ch.id,
+    name: ch.name,
+    private: ch.is_private,
+    topic: ch.topic?.value,
+    members: ch.num_members,
   }));
 
   console.log(JSON.stringify(channels, null, 2));
 }
 
 async function getHistory() {
-  if (!values.channel) { console.error("Required: --channel <channelId>"); process.exit(1); }
+  if (!values.channel) {
+    console.error("Required: --channel <channelId>");
+    process.exit(1);
+  }
 
   const data = await api("conversations.history", {
     channel: values.channel,
@@ -161,8 +169,11 @@ async function getHistory() {
   });
 
   const messages = data.messages.map((m: any) => ({
-    ts: m.ts, user: m.user, text: m.text,
-    thread: m.thread_ts, replies: m.reply_count,
+    ts: m.ts,
+    user: m.user,
+    text: m.text,
+    thread: m.thread_ts,
+    replies: m.reply_count,
   }));
 
   console.log(JSON.stringify(messages, null, 2));
@@ -172,7 +183,7 @@ async function sendMessage() {
   const actor = values.as;
   if (!values.channel || !values.text || !actor) {
     console.error(
-      "Required: --channel <channelId> --text <message> --as <user|bot> [--thread <ts>]"
+      "Required: --channel <channelId> --text <message> --as <user|bot> [--thread <ts>]",
     );
     process.exit(1);
   }
@@ -182,22 +193,23 @@ async function sendMessage() {
     process.exit(1);
   }
 
-  const body: Record<string, unknown> = { channel: values.channel, text: values.text };
+  const body: Record<string, unknown> = {
+    channel: values.channel,
+    text: values.text,
+  };
   if (values.thread) body.thread_ts = values.thread;
 
   if (actor === "bot") {
     try {
-      const data = await postAsBot(
-        values.channel,
-        values.text,
-        values.thread
+      const data = await postAsBot(values.channel, values.text, values.thread);
+      console.log(
+        `Bot message sent to ${data.channel || values.channel} at ${data.ts || "unknown ts"}`,
       );
-      console.log(`Bot message sent to ${data.channel || values.channel} at ${data.ts || "unknown ts"}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("not_in_channel")) {
         throw new Error(
-          "Bot is not in that channel. Invite the Slack app to the channel, or send with --as user."
+          "Bot is not in that channel. Invite the Slack app to the channel, or send with --as user.",
         );
       }
       throw error;
@@ -214,11 +226,11 @@ async function sendMessage() {
       const identity = await getTokenIdentity().catch(() => null);
       if (identity?.isBotToken) {
         throw new Error(
-          `--as user was selected, but SLACK_ACCESS_TOKEN is a bot token (bot_id=${identity.botId ?? "unknown"}). Reconnect Slack integration to refresh a user token, or use --as bot.`
+          `--as user was selected, but SLACK_ACCESS_TOKEN is a bot token (bot_id=${identity.botId ?? "unknown"}). Reconnect Slack integration to refresh a user token, or use --as bot.`,
         );
       }
       throw new Error(
-        "Slack returned not_in_channel for your user token. Join the target channel with that Slack user and retry."
+        "Slack returned not_in_channel for your user token. Join the target channel with that Slack user and retry.",
       );
     }
     throw error;
@@ -226,7 +238,10 @@ async function sendMessage() {
 }
 
 async function searchMessages() {
-  if (!values.query) { console.error("Required: --query <search>"); process.exit(1); }
+  if (!values.query) {
+    console.error("Required: --query <search>");
+    process.exit(1);
+  }
 
   const data = await api("search.messages", {
     query: values.query,
@@ -236,11 +251,16 @@ async function searchMessages() {
   });
 
   const messages = data.messages.matches.map((m: any) => ({
-    text: m.text, user: m.user, channel: m.channel?.name,
-    permalink: m.permalink, ts: m.ts,
+    text: m.text,
+    user: m.user,
+    channel: m.channel?.name,
+    permalink: m.permalink,
+    ts: m.ts,
   }));
 
-  console.log(JSON.stringify({ total: data.messages.total, messages }, null, 2));
+  console.log(
+    JSON.stringify({ total: data.messages.total, messages }, null, 2),
+  );
 }
 
 async function getRecentMessages() {
@@ -267,45 +287,73 @@ async function getRecentMessages() {
     permalink: m.permalink,
   }));
 
-  console.log(JSON.stringify({ total: data.messages.total, returned: messages.length, messages }, null, 2));
+  console.log(
+    JSON.stringify(
+      { total: data.messages.total, returned: messages.length, messages },
+      null,
+      2,
+    ),
+  );
 }
 
 async function listUsers() {
-  const data = await api("users.list", { limit: parseInt(values.limit || "50") });
+  const data = await api("users.list", {
+    limit: parseInt(values.limit || "50"),
+  });
 
   const users = data.members
     .filter((u: any) => !u.deleted && !u.is_bot)
     .map((u: any) => ({
-      id: u.id, name: u.name, realName: u.real_name,
-      email: u.profile?.email, title: u.profile?.title,
+      id: u.id,
+      name: u.name,
+      realName: u.real_name,
+      email: u.profile?.email,
+      title: u.profile?.title,
     }));
 
   console.log(JSON.stringify(users, null, 2));
 }
 
 async function getUserInfo() {
-  if (!values.user) { console.error("Required: --user <userId>"); process.exit(1); }
+  if (!values.user) {
+    console.error("Required: --user <userId>");
+    process.exit(1);
+  }
 
   const data = await api("users.info", { user: values.user });
 
-  console.log(JSON.stringify({
-    id: data.user.id, name: data.user.name, realName: data.user.real_name,
-    email: data.user.profile?.email, title: data.user.profile?.title,
-    status: data.user.profile?.status_text, timezone: data.user.tz,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        id: data.user.id,
+        name: data.user.name,
+        realName: data.user.real_name,
+        email: data.user.profile?.email,
+        title: data.user.profile?.title,
+        status: data.user.profile?.status_text,
+        timezone: data.user.tz,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function getThread() {
   if (!values.channel || !values.thread) {
-    console.error("Required: --channel <channelId> --thread <ts>"); process.exit(1);
+    console.error("Required: --channel <channelId> --thread <ts>");
+    process.exit(1);
   }
 
   const data = await api("conversations.replies", {
-    channel: values.channel, ts: values.thread,
+    channel: values.channel,
+    ts: values.thread,
   });
 
   const messages = data.messages.map((m: any) => ({
-    ts: m.ts, user: m.user, text: m.text,
+    ts: m.ts,
+    user: m.user,
+    text: m.text,
   }));
 
   console.log(JSON.stringify(messages, null, 2));
@@ -313,12 +361,16 @@ async function getThread() {
 
 async function addReaction() {
   if (!values.channel || !values.ts || !values.emoji) {
-    console.error("Required: --channel <channelId> --ts <messageTs> --emoji <name>");
+    console.error(
+      "Required: --channel <channelId> --ts <messageTs> --emoji <name>",
+    );
     process.exit(1);
   }
 
   await api("reactions.add", {
-    channel: values.channel, timestamp: values.ts, name: values.emoji,
+    channel: values.channel,
+    timestamp: values.ts,
+    name: values.emoji,
   });
 
   console.log(`Reaction :${values.emoji}: added!`);
@@ -326,7 +378,9 @@ async function addReaction() {
 
 async function uploadFile() {
   if (!values.channel || !values.file) {
-    console.error("Required: --channel <channelId> --file <path> [--filename <name>] [--title <title>] [--text <comment>]");
+    console.error(
+      "Required: --channel <channelId> --file <path> [--filename <name>] [--title <title>] [--text <comment>]",
+    );
     process.exit(1);
   }
 
@@ -345,9 +399,12 @@ async function uploadFile() {
 
   // Step 1: Get upload URL using the new API (requires form data, not JSON)
   const formData = new FormData();
-  formData.append('filename', fileName);
-  formData.append('length', fileContent.length.toString());
-  const uploadUrlData = await apiFormData("files.getUploadURLExternal", formData);
+  formData.append("filename", fileName);
+  formData.append("length", fileContent.length.toString());
+  const uploadUrlData = await apiFormData(
+    "files.getUploadURLExternal",
+    formData,
+  );
 
   // Step 2: Upload file to the returned URL
   const uploadRes = await fetch(uploadUrlData.upload_url, {
@@ -368,18 +425,24 @@ async function uploadFile() {
   });
 
   const file = completeData.files?.[0];
-  console.log(JSON.stringify({
-    ok: true,
-    file: {
-      id: file?.id,
-      name: file?.name,
-      title: file?.title,
-      mimetype: file?.mimetype,
-      size: file?.size,
-      url: file?.url_private,
-      permalink: file?.permalink,
-    },
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        file: {
+          id: file?.id,
+          name: file?.name,
+          title: file?.title,
+          mimetype: file?.mimetype,
+          size: file?.size,
+          url: file?.url_private,
+          permalink: file?.permalink,
+        },
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 function showHelp() {
@@ -408,16 +471,36 @@ async function main() {
 
   try {
     switch (command) {
-      case "channels": await listChannels(); break;
-      case "history": await getHistory(); break;
-      case "send": await sendMessage(); break;
-      case "search": await searchMessages(); break;
-      case "recent": await getRecentMessages(); break;
-      case "users": await listUsers(); break;
-      case "user": await getUserInfo(); break;
-      case "thread": await getThread(); break;
-      case "react": await addReaction(); break;
-      case "upload": await uploadFile(); break;
+      case "channels":
+        await listChannels();
+        break;
+      case "history":
+        await getHistory();
+        break;
+      case "send":
+        await sendMessage();
+        break;
+      case "search":
+        await searchMessages();
+        break;
+      case "recent":
+        await getRecentMessages();
+        break;
+      case "users":
+        await listUsers();
+        break;
+      case "user":
+        await getUserInfo();
+        break;
+      case "thread":
+        await getThread();
+        break;
+      case "react":
+        await addReaction();
+        break;
+      case "upload":
+        await uploadFile();
+        break;
       default:
         showHelp();
     }

@@ -72,17 +72,22 @@ vi.mock("drizzle-orm", async (importOriginal) => {
   };
 });
 
-import { getValidAccessToken, getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
+import {
+  getValidAccessToken,
+  getValidTokensForUser,
+  getValidCustomTokens,
+} from "./token-refresh";
 
 function mockFetchOk(payload: unknown) {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () =>
-      new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
-    )
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    ),
   );
 }
 
@@ -164,7 +169,7 @@ describe("token-refresh", () => {
       expect.objectContaining({
         accessToken: "new-access-token",
         refreshToken: "new-refresh-token",
-      })
+      }),
     );
   });
 
@@ -197,7 +202,11 @@ describe("token-refresh", () => {
 
     const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
 
-    for (const [index, provider] of ["notion", "airtable", "reddit"].entries()) {
+    for (const [index, provider] of [
+      "notion",
+      "airtable",
+      "reddit",
+    ].entries()) {
       const [, options] = fetchMock.mock.calls[index]!;
       const headers = options?.headers as Record<string, string>;
       const body = options?.body as URLSearchParams;
@@ -215,12 +224,13 @@ describe("token-refresh", () => {
   it("falls back to the existing token when refresh fails", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response("oauth failed", {
-          status: 500,
-          headers: { "Content-Type": "text/plain" },
-        })
-      )
+      vi.fn(
+        async () =>
+          new Response("oauth failed", {
+            status: 500,
+            headers: { "Content-Type": "text/plain" },
+          }),
+      ),
     );
 
     const token = await getValidAccessToken({
@@ -376,7 +386,7 @@ describe("token-refresh", () => {
       expect.objectContaining({
         accessToken: "new-custom-token",
         refreshToken: "old-custom-refresh",
-      })
+      }),
     );
   });
 
@@ -420,7 +430,7 @@ describe("token-refresh", () => {
       expect.objectContaining({
         accessToken: "new-header-token",
         refreshToken: "new-header-refresh",
-      })
+      }),
     );
   });
 
@@ -443,12 +453,13 @@ describe("token-refresh", () => {
     ]);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response("invalid_grant", {
-          status: 400,
-          headers: { "Content-Type": "text/plain" },
-        })
-      )
+      vi.fn(
+        async () =>
+          new Response("invalid_grant", {
+            status: 400,
+            headers: { "Content-Type": "text/plain" },
+          }),
+      ),
     );
 
     const tokens = await getValidCustomTokens("user-1");

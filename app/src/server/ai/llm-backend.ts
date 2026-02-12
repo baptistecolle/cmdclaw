@@ -6,7 +6,15 @@
  */
 
 export interface LLMStreamEvent {
-  type: "text_delta" | "tool_use_start" | "tool_use_delta" | "tool_use_end" | "thinking" | "usage" | "done" | "error";
+  type:
+    | "text_delta"
+    | "tool_use_start"
+    | "tool_use_delta"
+    | "tool_use_end"
+    | "thinking"
+    | "usage"
+    | "done"
+    | "error";
 }
 
 export interface TextDeltaEvent extends LLMStreamEvent {
@@ -70,10 +78,27 @@ export interface ChatMessage {
 
 export type ContentBlock =
   | { type: "text"; text: string }
-  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-  | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean }
+  | {
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+    }
+  | {
+      type: "tool_result";
+      tool_use_id: string;
+      content: string;
+      is_error?: boolean;
+    }
   | { type: "thinking"; thinking: string; signature: string }
-  | { type: "image"; source: { type: "base64"; media_type: "image/png" | "image/jpeg" | "image/gif" | "image/webp"; data: string } };
+  | {
+      type: "image";
+      source: {
+        type: "base64";
+        media_type: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+        data: string;
+      };
+    };
 
 export interface ToolDefinition {
   name: string;

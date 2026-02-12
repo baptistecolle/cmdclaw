@@ -32,7 +32,7 @@ function getAuthSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret) {
     throw new Error(
-      "BETTER_AUTH_SECRET is required to sign better-auth session cookies for Playwright storage state."
+      "BETTER_AUTH_SECRET is required to sign better-auth session cookies for Playwright storage state.",
     );
   }
   return secret;
@@ -88,7 +88,9 @@ async function ensureUser(): Promise<{ id: string; email: string }> {
   return { id: userId, email };
 }
 
-async function createSession(userId: string): Promise<{ token: string; expiresAt: Date }> {
+async function createSession(
+  userId: string,
+): Promise<{ token: string; expiresAt: Date }> {
   const now = new Date();
   const ttlHours = Number(process.env.E2E_SESSION_TTL_HOURS ?? "24");
   const expiresAt = new Date(now.getTime() + ttlHours * 60 * 60 * 1000);
@@ -111,7 +113,7 @@ async function createSession(userId: string): Promise<{ token: string; expiresAt
 async function buildStorageState(
   baseUrl: string,
   token: string,
-  expiresAt: Date
+  expiresAt: Date,
 ): Promise<StorageState> {
   const url = new URL(baseUrl);
   const secure = url.protocol === "https:";
@@ -119,7 +121,7 @@ async function buildStorageState(
   const secret = getAuthSecret();
   const signedToken = (await serializeSignedCookie("", token, secret)).replace(
     "=",
-    ""
+    "",
   );
 
   const cookies: StorageCookie[] = [
@@ -160,7 +162,7 @@ async function verifySessionCookie(signedToken: string): Promise<void> {
 
   if (!sessionData?.session || !sessionData?.user) {
     throw new Error(
-      "Generated session cookie could not be resolved by better-auth (getSession returned null)."
+      "Generated session cookie could not be resolved by better-auth (getSession returned null).",
     );
   }
 }
@@ -174,11 +176,13 @@ async function main(): Promise<void> {
 
   const state = await buildStorageState(baseUrl, token, expiresAt);
   const signedToken = state.cookies.find(
-    (cookie) => cookie.name === "better-auth.session_token"
+    (cookie) => cookie.name === "better-auth.session_token",
   )?.value;
 
   if (!signedToken) {
-    throw new Error("Failed to create signed better-auth.session_token cookie.");
+    throw new Error(
+      "Failed to create signed better-auth.session_token cookie.",
+    );
   }
 
   await verifySessionCookie(signedToken);

@@ -63,7 +63,9 @@ export function validateIntegrationSkillFilePath(filePath: string): boolean {
 
 export async function isKnownIntegrationSlug(slug: string): Promise<boolean> {
   const builtInSlugs = new Set(integrationTypeEnum.enumValues);
-  if (builtInSlugs.has(slug as (typeof integrationTypeEnum.enumValues)[number])) {
+  if (
+    builtInSlugs.has(slug as (typeof integrationTypeEnum.enumValues)[number])
+  ) {
     return true;
   }
 
@@ -81,7 +83,11 @@ export type CreateCommunityIntegrationSkillInput = {
   setAsPreferred?: boolean;
 };
 
-function buildSkillMd(slug: string, title: string, description: string): string {
+function buildSkillMd(
+  slug: string,
+  title: string,
+  description: string,
+): string {
   return `---
 name: ${slug}
 description: ${description}
@@ -97,7 +103,7 @@ Integration skill for ${title}.
 
 export async function createCommunityIntegrationSkill(
   userId: string,
-  input: CreateCommunityIntegrationSkillInput
+  input: CreateCommunityIntegrationSkillInput,
 ): Promise<{ id: string; slug: string }> {
   const slug = normalizeIntegrationSkillSlug(input.slug);
   if (!slug) {
@@ -146,7 +152,7 @@ export async function createCommunityIntegrationSkill(
         integrationSkillId: created.id,
         path: file.path,
         content: file.content,
-      }))
+      })),
     );
   }
 
@@ -160,7 +166,10 @@ export async function createCommunityIntegrationSkill(
         preferredSkillId: created.id,
       })
       .onConflictDoUpdate({
-        target: [integrationSkillPreference.userId, integrationSkillPreference.slug],
+        target: [
+          integrationSkillPreference.userId,
+          integrationSkillPreference.slug,
+        ],
         set: {
           preferredSource: "community",
           preferredSkillId: created.id,
@@ -172,9 +181,14 @@ export async function createCommunityIntegrationSkill(
   return { id: created.id, slug: created.slug };
 }
 
-export async function getOfficialIntegrationSkillIndex(): Promise<Map<string, OfficialIntegrationSkill>> {
+export async function getOfficialIntegrationSkillIndex(): Promise<
+  Map<string, OfficialIntegrationSkill>
+> {
   const now = Date.now();
-  if (cachedOfficialSkills && now - cacheTimeMs < OFFICIAL_SKILLS_CACHE_TTL_MS) {
+  if (
+    cachedOfficialSkills &&
+    now - cacheTimeMs < OFFICIAL_SKILLS_CACHE_TTL_MS
+  ) {
     return cachedOfficialSkills;
   }
 
@@ -220,7 +234,7 @@ async function getCommunitySkillById(skillId: string) {
       eq(integrationSkill.id, skillId),
       eq(integrationSkill.source, "community"),
       eq(integrationSkill.isActive, true),
-      eq(integrationSkill.visibility, "public")
+      eq(integrationSkill.visibility, "public"),
     ),
     with: {
       files: true,
@@ -234,7 +248,7 @@ async function getLatestCommunitySkillBySlug(slug: string) {
       eq(integrationSkill.slug, slug),
       eq(integrationSkill.source, "community"),
       eq(integrationSkill.isActive, true),
-      eq(integrationSkill.visibility, "public")
+      eq(integrationSkill.visibility, "public"),
     ),
     with: {
       files: true,
@@ -245,7 +259,7 @@ async function getLatestCommunitySkillBySlug(slug: string) {
 
 export async function resolveIntegrationSkillForUser(
   userId: string,
-  slug: string
+  slug: string,
 ): Promise<ResolvedIntegrationSkill | null> {
   const normalizedSlug = normalizeIntegrationSkillSlug(slug);
   if (!normalizedSlug) return null;
@@ -256,7 +270,7 @@ export async function resolveIntegrationSkillForUser(
   const pref = await db.query.integrationSkillPreference.findFirst({
     where: and(
       eq(integrationSkillPreference.userId, userId),
-      eq(integrationSkillPreference.slug, normalizedSlug)
+      eq(integrationSkillPreference.slug, normalizedSlug),
     ),
   });
 
@@ -320,11 +334,16 @@ export async function resolveIntegrationSkillForUser(
 
 export async function resolvePreferredCommunitySkillsForUser(
   userId: string,
-  allowedSlugs?: string[]
+  allowedSlugs?: string[],
 ): Promise<Array<Extract<ResolvedIntegrationSkill, { source: "community" }>>> {
-  const whereClauses = [eq(integrationSkillPreference.userId, userId), eq(integrationSkillPreference.preferredSource, "community" as SkillSource)];
+  const whereClauses = [
+    eq(integrationSkillPreference.userId, userId),
+    eq(integrationSkillPreference.preferredSource, "community" as SkillSource),
+  ];
   if (allowedSlugs && allowedSlugs.length > 0) {
-    const normalized = allowedSlugs.map(normalizeIntegrationSkillSlug).filter(Boolean);
+    const normalized = allowedSlugs
+      .map(normalizeIntegrationSkillSlug)
+      .filter(Boolean);
     if (normalized.length === 0) return [];
     whereClauses.push(inArray(integrationSkillPreference.slug, normalized));
   }
@@ -335,7 +354,8 @@ export async function resolvePreferredCommunitySkillsForUser(
     .where(and(...whereClauses))
     .orderBy(desc(integrationSkillPreference.updatedAt));
 
-  const out: Array<Extract<ResolvedIntegrationSkill, { source: "community" }>> = [];
+  const out: Array<Extract<ResolvedIntegrationSkill, { source: "community" }>> =
+    [];
   for (const pref of prefs) {
     const resolved = await resolveIntegrationSkillForUser(userId, pref.slug);
     if (resolved?.source === "community") {

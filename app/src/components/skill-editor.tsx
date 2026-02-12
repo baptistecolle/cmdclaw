@@ -55,7 +55,12 @@ const suggestionItems = [
     searchTerms: ["title", "big", "large", "h1"],
     icon: <Heading1 className="h-4 w-4" />,
     command: ({ editor, range }: any) => {
-      editor.chain().focus().deleteRange(range).setNode("heading", { level: 1 }).run();
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .setNode("heading", { level: 1 })
+        .run();
     },
   },
   {
@@ -64,7 +69,12 @@ const suggestionItems = [
     searchTerms: ["subtitle", "medium", "h2"],
     icon: <Heading2 className="h-4 w-4" />,
     command: ({ editor, range }: any) => {
-      editor.chain().focus().deleteRange(range).setNode("heading", { level: 2 }).run();
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .setNode("heading", { level: 2 })
+        .run();
     },
   },
   {
@@ -73,7 +83,12 @@ const suggestionItems = [
     searchTerms: ["small", "h3"],
     icon: <Heading3 className="h-4 w-4" />,
     command: ({ editor, range }: any) => {
-      editor.chain().focus().deleteRange(range).setNode("heading", { level: 3 }).run();
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .setNode("heading", { level: 3 })
+        .run();
     },
   },
   {
@@ -114,7 +129,12 @@ const suggestionItems = [
   },
 ];
 
-export function SkillEditor({ content, onChange, editorKey, className }: SkillEditorProps) {
+export function SkillEditor({
+  content,
+  onChange,
+  editorKey,
+  className,
+}: SkillEditorProps) {
   const initialContent = useRef(content);
 
   // Update initialContent when editorKey changes (file switch)
@@ -136,7 +156,7 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
           "[&_p]:mb-3 [&_p]:leading-relaxed",
           "[&_ul]:mb-3 [&_ol]:mb-3",
           "[&_.is-empty.is-editor-empty]:before:content-[attr(data-placeholder)] [&_.is-empty.is-editor-empty]:before:text-muted-foreground [&_.is-empty.is-editor-empty]:before:float-left [&_.is-empty.is-editor-empty]:before:pointer-events-none [&_.is-empty.is-editor-empty]:before:h-0",
-          className
+          className,
         )}
         extensions={defaultExtensions}
         initialContent={parseMarkdownToJSON(content)}
@@ -251,7 +271,10 @@ export function parseMarkdownToJSON(markdown: string): JSONContent | undefined {
       content.push({
         type: "codeBlock",
         attrs: { language: lang || null },
-        content: codeLines.length > 0 ? [{ type: "text", text: codeLines.join("\n") }] : undefined,
+        content:
+          codeLines.length > 0
+            ? [{ type: "text", text: codeLines.join("\n") }]
+            : undefined,
       });
       continue;
     }
@@ -483,7 +506,10 @@ export function jsonToMarkdown(json: JSONContent): string {
             .join("\n");
         case "blockquote":
           const quoteText = getTextContent(node);
-          return quoteText.split("\n").map((line: string) => "> " + line).join("\n");
+          return quoteText
+            .split("\n")
+            .map((line: string) => "> " + line)
+            .join("\n");
         case "codeBlock":
           const lang = node.attrs?.language || "";
           return "```" + lang + "\n" + getTextContent(node) + "\n```";
@@ -563,7 +589,11 @@ export function parseSkillContent(content: string): {
   };
 }
 
-export function serializeSkillContent(name: string, description: string, body: string): string {
+export function serializeSkillContent(
+  name: string,
+  description: string,
+  body: string,
+): string {
   return `---
 name: ${name}
 description: ${description}

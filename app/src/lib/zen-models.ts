@@ -44,7 +44,7 @@ export async function fetchOpencodeFreeModels(): Promise<ZenModelOption[]> {
  * 4) preferred fallback when fetch fails or returns empty
  */
 export async function resolveDefaultOpencodeFreeModel(
-  overrideModel?: string | null
+  overrideModel?: string | null,
 ): Promise<string> {
   const configured = overrideModel?.trim();
   if (configured) {

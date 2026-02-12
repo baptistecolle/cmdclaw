@@ -78,8 +78,12 @@ describe("workflow-scheduler", () => {
   it("detects whether a workflow row is schedulable", () => {
     expect(isWorkflowSchedulable(createRow())).toBe(true);
     expect(isWorkflowSchedulable(createRow({ status: "off" }))).toBe(false);
-    expect(isWorkflowSchedulable(createRow({ triggerType: "manual" }))).toBe(false);
-    expect(isWorkflowSchedulable(createRow({ schedule: { type: "daily" } }))).toBe(false);
+    expect(isWorkflowSchedulable(createRow({ triggerType: "manual" }))).toBe(
+      false,
+    );
+    expect(
+      isWorkflowSchedulable(createRow({ schedule: { type: "daily" } })),
+    ).toBe(false);
   });
 
   it("removes scheduler jobs by workflow id", async () => {
@@ -94,7 +98,7 @@ describe("workflow-scheduler", () => {
       createRow({
         id: "wf-interval",
         schedule: { type: "interval", intervalMinutes: 15 },
-      })
+      }),
     );
 
     expect(upsertJobSchedulerMock).toHaveBeenCalledWith(
@@ -107,7 +111,7 @@ describe("workflow-scheduler", () => {
           workflowId: "wf-interval",
           scheduleType: "interval",
         },
-      }
+      },
     );
   });
 
@@ -116,7 +120,7 @@ describe("workflow-scheduler", () => {
       createRow({
         id: "wf-daily",
         schedule: { type: "daily", time: "09:05" },
-      })
+      }),
     );
 
     expect(upsertJobSchedulerMock).toHaveBeenCalledWith(
@@ -129,7 +133,7 @@ describe("workflow-scheduler", () => {
           workflowId: "wf-daily",
           scheduleType: "daily",
         },
-      }
+      },
     );
   });
 
@@ -143,7 +147,7 @@ describe("workflow-scheduler", () => {
           daysOfWeek: [5, 1, 5, 3],
           timezone: "America/New_York",
         },
-      })
+      }),
     );
 
     expect(upsertJobSchedulerMock).toHaveBeenCalledWith(
@@ -156,7 +160,7 @@ describe("workflow-scheduler", () => {
           workflowId: "wf-weekly",
           scheduleType: "weekly",
         },
-      }
+      },
     );
   });
 
@@ -170,7 +174,7 @@ describe("workflow-scheduler", () => {
           dayOfMonth: 21,
           timezone: "Europe/Paris",
         },
-      })
+      }),
     );
 
     expect(upsertJobSchedulerMock).toHaveBeenCalledWith(
@@ -183,7 +187,7 @@ describe("workflow-scheduler", () => {
           workflowId: "wf-monthly",
           scheduleType: "monthly",
         },
-      }
+      },
     );
   });
 
@@ -193,8 +197,8 @@ describe("workflow-scheduler", () => {
         createRow({
           id: "wf-invalid",
           schedule: { unexpected: true },
-        })
-      )
+        }),
+      ),
     ).rejects.toThrow('Workflow "wf-invalid" has invalid schedule payload');
 
     expect(upsertJobSchedulerMock).not.toHaveBeenCalled();
@@ -206,8 +210,8 @@ describe("workflow-scheduler", () => {
         createRow({
           id: "wf-invalid-time",
           schedule: { type: "daily", time: "ab:30" },
-        })
-      )
+        }),
+      ),
     ).rejects.toThrow('Invalid schedule time "ab:30"');
   });
 
@@ -217,8 +221,8 @@ describe("workflow-scheduler", () => {
         createRow({
           id: "wf-invalid-time-range",
           schedule: { type: "daily", time: "24:00" },
-        })
-      )
+        }),
+      ),
     ).rejects.toThrow('Invalid schedule time "24:00"');
   });
 
@@ -227,7 +231,7 @@ describe("workflow-scheduler", () => {
       createRow({
         id: "wf-sync",
         schedule: { type: "daily", time: "11:00", timezone: "UTC" },
-      })
+      }),
     );
 
     expect(upsertJobSchedulerMock).toHaveBeenCalledOnce();
@@ -239,7 +243,7 @@ describe("workflow-scheduler", () => {
       createRow({
         id: "wf-sync-off",
         status: "off",
-      })
+      }),
     );
 
     expect(removeJobSchedulerMock).toHaveBeenCalledWith("workflow:wf-sync-off");
@@ -266,7 +270,7 @@ describe("workflow-scheduler", () => {
     expect(findManyMock).toHaveBeenCalledOnce();
     expect(errorSpy).toHaveBeenCalledWith(
       "[workflow-scheduler] failed to reconcile workflow wf-fail",
-      expect.any(Error)
+      expect.any(Error),
     );
 
     errorSpy.mockRestore();

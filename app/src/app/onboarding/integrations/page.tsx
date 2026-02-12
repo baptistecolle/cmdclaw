@@ -140,7 +140,10 @@ function OnboardingIntegrationsContent() {
   const integrationsList = Array.isArray(integrations) ? integrations : [];
   const connectedIntegrations = new Set(integrationsList.map((i) => i.type));
 
-  const renderIntegrationIcon = (type: IntegrationType, isRecommended: boolean) => {
+  const renderIntegrationIcon = (
+    type: IntegrationType,
+    isRecommended: boolean,
+  ) => {
     const config = integrationConfig[type];
     const isConnected = connectedIntegrations.has(type);
     const isConnecting = connectingType === type;
@@ -155,7 +158,7 @@ function OnboardingIntegrationsContent() {
           "border hover:border-primary/50 hover:bg-muted/50",
           isConnected && "border-green-500/50 bg-green-500/5",
           isRecommended && !isConnected && "border-primary/30 bg-primary/5",
-          isConnecting && "opacity-50 cursor-wait"
+          isConnecting && "opacity-50 cursor-wait",
         )}
       >
         {isConnected && (
@@ -172,21 +175,11 @@ function OnboardingIntegrationsContent() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         ) : isRecommended ? (
           <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-white dark:bg-gray-800 border shadow-sm">
-            <Image
-              src={config.icon}
-              alt={config.name}
-              width={32}
-              height={32}
-            />
+            <Image src={config.icon} alt={config.name} width={32} height={32} />
           </div>
         ) : (
           <div className="flex items-center justify-center w-8 h-8">
-            <Image
-              src={config.icon}
-              alt={config.name}
-              width={32}
-              height={32}
-            />
+            <Image src={config.icon} alt={config.name} width={32} height={32} />
           </div>
         )}
         <span className="text-xs font-medium text-muted-foreground">
@@ -212,7 +205,8 @@ function OnboardingIntegrationsContent() {
             Connect your tools
           </h1>
           <p className="text-muted-foreground">
-            Connect your apps to let the AI assistant help you with tasks like reading emails, scheduling meetings, and managing documents.
+            Connect your apps to let the AI assistant help you with tasks like
+            reading emails, scheduling meetings, and managing documents.
           </p>
         </div>
 
@@ -220,7 +214,7 @@ function OnboardingIntegrationsContent() {
           {/* Recommended integrations */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
             {recommendedIntegrations.map((type) =>
-              renderIntegrationIcon(type, true)
+              renderIntegrationIcon(type, true),
             )}
           </div>
 
@@ -238,7 +232,7 @@ function OnboardingIntegrationsContent() {
           {/* Other integrations */}
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
             {otherIntegrations.map((type) =>
-              renderIntegrationIcon(type, false)
+              renderIntegrationIcon(type, false),
             )}
           </div>
         </div>

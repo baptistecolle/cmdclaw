@@ -5,7 +5,9 @@ import { constants } from "fs";
 
 const TOKEN = process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
 if (!TOKEN) {
-  console.error("Error: GOOGLE_DRIVE_ACCESS_TOKEN environment variable required");
+  console.error(
+    "Error: GOOGLE_DRIVE_ACCESS_TOKEN environment variable required",
+  );
   process.exit(1);
 }
 
@@ -32,7 +34,10 @@ const [command, ...args] = positionals;
 const EXPORT_MIMES: Record<string, { mime: string; ext: string }> = {
   "application/vnd.google-apps.document": { mime: "text/plain", ext: ".txt" },
   "application/vnd.google-apps.spreadsheet": { mime: "text/csv", ext: ".csv" },
-  "application/vnd.google-apps.presentation": { mime: "application/pdf", ext: ".pdf" },
+  "application/vnd.google-apps.presentation": {
+    mime: "application/pdf",
+    ext: ".pdf",
+  },
   "application/vnd.google-apps.drawing": { mime: "image/png", ext: ".png" },
 };
 
@@ -50,7 +55,10 @@ async function listFiles() {
   if (values.folder) {
     const existingQ = params.get("q");
     const folderQuery = `'${values.folder}' in parents`;
-    params.set("q", existingQ ? `${existingQ} and ${folderQuery}` : folderQuery);
+    params.set(
+      "q",
+      existingQ ? `${existingQ} and ${folderQuery}` : folderQuery,
+    );
   }
 
   const res = await fetch(`${DRIVE_URL}/files?${params}`, { headers });
@@ -72,28 +80,37 @@ async function listFiles() {
 async function getFile(fileId: string) {
   const res = await fetch(
     `${DRIVE_URL}/files/${fileId}?fields=id,name,mimeType,size,modifiedTime,createdTime,webViewLink,parents,description,starred`,
-    { headers }
+    { headers },
   );
   if (!res.ok) throw new Error(await res.text());
 
   const file = await res.json();
-  console.log(JSON.stringify({
-    id: file.id,
-    name: file.name,
-    mimeType: file.mimeType,
-    size: file.size ? `${Math.round(parseInt(file.size) / 1024)}KB` : "N/A",
-    createdTime: file.createdTime,
-    modifiedTime: file.modifiedTime,
-    description: file.description,
-    starred: file.starred,
-    url: file.webViewLink,
-    parents: file.parents,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        size: file.size ? `${Math.round(parseInt(file.size) / 1024)}KB` : "N/A",
+        createdTime: file.createdTime,
+        modifiedTime: file.modifiedTime,
+        description: file.description,
+        starred: file.starred,
+        url: file.webViewLink,
+        parents: file.parents,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function downloadFile(fileId: string) {
   // First get file metadata
-  const metaRes = await fetch(`${DRIVE_URL}/files/${fileId}?fields=name,mimeType`, { headers });
+  const metaRes = await fetch(
+    `${DRIVE_URL}/files/${fileId}?fields=name,mimeType`,
+    { headers },
+  );
   if (!metaRes.ok) throw new Error(await metaRes.text());
   const meta = await metaRes.json();
 
@@ -122,7 +139,9 @@ async function downloadFile(fileId: string) {
   await mkdir(dirname(fileName), { recursive: true }).catch(() => {});
   await writeFile(fileName, Buffer.from(buffer));
 
-  console.log(`Downloaded: ${fileName} (${Math.round(buffer.byteLength / 1024)}KB)`);
+  console.log(
+    `Downloaded: ${fileName} (${Math.round(buffer.byteLength / 1024)}KB)`,
+  );
 }
 
 async function searchFiles() {
@@ -193,14 +212,17 @@ async function uploadFile() {
     fileContent.toString("base64") +
     closeDelimiter;
 
-  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-    method: "POST",
-    headers: {
-      ...headers,
-      "Content-Type": `multipart/related; boundary=${boundary}`,
+  const res = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+    {
+      method: "POST",
+      headers: {
+        ...headers,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+      },
+      body,
     },
-    body,
-  });
+  );
 
   if (!res.ok) throw new Error(await res.text());
   const uploaded = await res.json();
@@ -295,14 +317,30 @@ async function main() {
 
   try {
     switch (command) {
-      case "list": await listFiles(); break;
-      case "get": await getFile(args[0]); break;
-      case "download": await downloadFile(args[0]); break;
-      case "search": await searchFiles(); break;
-      case "upload": await uploadFile(); break;
-      case "mkdir": await createFolder(); break;
-      case "delete": await deleteFile(args[0]); break;
-      case "folders": await listFolders(); break;
+      case "list":
+        await listFiles();
+        break;
+      case "get":
+        await getFile(args[0]);
+        break;
+      case "download":
+        await downloadFile(args[0]);
+        break;
+      case "search":
+        await searchFiles();
+        break;
+      case "upload":
+        await uploadFile();
+        break;
+      case "mkdir":
+        await createFolder();
+        break;
+      case "delete":
+        await deleteFile(args[0]);
+        break;
+      case "folders":
+        await listFolders();
+        break;
       default:
         showHelp();
     }

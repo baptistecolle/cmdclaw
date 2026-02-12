@@ -41,7 +41,13 @@ describe("verifySlackSignature", () => {
   it("rejects when signing secret is missing", () => {
     envState.SLACK_SIGNING_SECRET = undefined;
 
-    expect(verifySlackSignature("{}", String(Math.floor(Date.now() / 1000)), "v0=abc")).toBe(false);
+    expect(
+      verifySlackSignature(
+        "{}",
+        String(Math.floor(Date.now() / 1000)),
+        "v0=abc",
+      ),
+    ).toBe(false);
   });
 
   it("rejects old timestamps", () => {
@@ -56,9 +62,15 @@ describe("verifySlackSignature", () => {
     const originalBody = JSON.stringify({ text: "hello" });
     const tamperedBody = JSON.stringify({ text: "goodbye" });
     const timestamp = String(Math.floor(Date.now() / 1000));
-    const signature = sign(originalBody, timestamp, envState.SLACK_SIGNING_SECRET!);
+    const signature = sign(
+      originalBody,
+      timestamp,
+      envState.SLACK_SIGNING_SECRET!,
+    );
 
-    expect(verifySlackSignature(tamperedBody, timestamp, signature)).toBe(false);
+    expect(verifySlackSignature(tamperedBody, timestamp, signature)).toBe(
+      false,
+    );
   });
 
   it("returns false for malformed signatures", () => {

@@ -101,7 +101,9 @@ describe("skillRouter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     generateStorageKeyMock.mockReturnValue("skills/user-1/skill-1/doc.pdf");
-    getPresignedDownloadUrlMock.mockResolvedValue("https://example.com/presigned-url");
+    getPresignedDownloadUrlMock.mockResolvedValue(
+      "https://example.com/presigned-url",
+    );
   });
 
   it("lists user skills and maps file counts", async () => {
@@ -206,7 +208,7 @@ describe("skillRouter", () => {
       skillRouterAny.get({
         input: { id: "skill-missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -250,8 +252,12 @@ describe("skillRouter", () => {
       skillId: "skill-1",
       path: "SKILL.md",
     });
-    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain("name: my-skill");
-    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain("# My Skill");
+    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain(
+      "name: my-skill",
+    );
+    expect(context.mocks.insertValuesMock.mock.calls[1][0].content).toContain(
+      "# My Skill",
+    );
   });
 
   it("returns BAD_REQUEST when create receives a name that cannot produce a slug", async () => {
@@ -264,7 +270,7 @@ describe("skillRouter", () => {
           description: "desc",
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -290,7 +296,7 @@ describe("skillRouter", () => {
         description: "new",
         icon: null,
         enabled: false,
-      })
+      }),
     );
   });
 
@@ -301,7 +307,7 @@ describe("skillRouter", () => {
       skillRouterAny.update({
         input: { id: "skill-1", name: "!!!" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -313,7 +319,7 @@ describe("skillRouter", () => {
       skillRouterAny.update({
         input: { id: "skill-missing", description: "nope" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -337,14 +343,19 @@ describe("skillRouter", () => {
       skillRouterAny.delete({
         input: { id: "skill-missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("adds a file when skill is owned by the user", async () => {
     const context = createContext();
-    context.db.query.skill.findFirst.mockResolvedValue({ id: "skill-1", userId: "user-1" });
-    context.mocks.insertReturningMock.mockResolvedValue([{ id: "file-1", path: "notes.md" }]);
+    context.db.query.skill.findFirst.mockResolvedValue({
+      id: "skill-1",
+      userId: "user-1",
+    });
+    context.mocks.insertReturningMock.mockResolvedValue([
+      { id: "file-1", path: "notes.md" },
+    ]);
 
     const result = await skillRouterAny.addFile({
       input: {
@@ -370,7 +381,7 @@ describe("skillRouter", () => {
           content: "hello",
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -391,7 +402,9 @@ describe("skillRouter", () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(context.mocks.updateSetMock).toHaveBeenCalledWith({ content: "new content" });
+    expect(context.mocks.updateSetMock).toHaveBeenCalledWith({
+      content: "new content",
+    });
   });
 
   it("returns NOT_FOUND when updating a file not owned by user", async () => {
@@ -406,7 +419,7 @@ describe("skillRouter", () => {
       skillRouterAny.updateFile({
         input: { id: "file-1", content: "new content" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -438,7 +451,7 @@ describe("skillRouter", () => {
       skillRouterAny.deleteFile({
         input: { id: "file-1" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -450,13 +463,16 @@ describe("skillRouter", () => {
       skillRouterAny.deleteFile({
         input: { id: "file-missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("uploads a document and stores metadata", async () => {
     const context = createContext();
-    context.db.query.skill.findFirst.mockResolvedValue({ id: "skill-1", userId: "user-1" });
+    context.db.query.skill.findFirst.mockResolvedValue({
+      id: "skill-1",
+      userId: "user-1",
+    });
     context.mocks.selectWhereMock.mockResolvedValue([{ value: 2 }]);
     context.mocks.insertReturningMock.mockResolvedValue([
       {
@@ -482,14 +498,18 @@ describe("skillRouter", () => {
       "doc.pdf",
       "application/pdf",
       4,
-      2
+      2,
     );
     expect(ensureBucketMock).toHaveBeenCalledTimes(1);
-    expect(generateStorageKeyMock).toHaveBeenCalledWith("user-1", "skill-1", "doc.pdf");
+    expect(generateStorageKeyMock).toHaveBeenCalledWith(
+      "user-1",
+      "skill-1",
+      "doc.pdf",
+    );
     expect(uploadToS3Mock).toHaveBeenCalledWith(
       "skills/user-1/skill-1/doc.pdf",
       expect.any(Buffer),
-      "application/pdf"
+      "application/pdf",
     );
     expect(result).toEqual({
       id: "doc-1",
@@ -512,13 +532,16 @@ describe("skillRouter", () => {
           content: Buffer.from("test").toString("base64"),
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("propagates upload validation errors", async () => {
     const context = createContext();
-    context.db.query.skill.findFirst.mockResolvedValue({ id: "skill-1", userId: "user-1" });
+    context.db.query.skill.findFirst.mockResolvedValue({
+      id: "skill-1",
+      userId: "user-1",
+    });
     context.mocks.selectWhereMock.mockResolvedValue([{ value: 20 }]);
     validateFileUploadMock.mockImplementation(() => {
       throw new ORPCError("BAD_REQUEST", { message: "too many documents" });
@@ -533,7 +556,7 @@ describe("skillRouter", () => {
           content: Buffer.from("test").toString("base64"),
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
     expect(ensureBucketMock).not.toHaveBeenCalled();
@@ -554,7 +577,9 @@ describe("skillRouter", () => {
       context,
     });
 
-    expect(getPresignedDownloadUrlMock).toHaveBeenCalledWith("skills/user-1/skill-1/doc.pdf");
+    expect(getPresignedDownloadUrlMock).toHaveBeenCalledWith(
+      "skills/user-1/skill-1/doc.pdf",
+    );
     expect(result).toEqual({
       url: "https://example.com/presigned-url",
       filename: "doc.pdf",
@@ -574,7 +599,7 @@ describe("skillRouter", () => {
       skillRouterAny.getDocumentUrl({
         input: { id: "doc-1" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -591,7 +616,9 @@ describe("skillRouter", () => {
       context,
     });
 
-    expect(deleteFromS3Mock).toHaveBeenCalledWith("skills/user-1/skill-1/doc.pdf");
+    expect(deleteFromS3Mock).toHaveBeenCalledWith(
+      "skills/user-1/skill-1/doc.pdf",
+    );
     expect(result).toEqual({ success: true });
   });
 
@@ -603,7 +630,7 @@ describe("skillRouter", () => {
       skillRouterAny.deleteDocument({
         input: { id: "doc-missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

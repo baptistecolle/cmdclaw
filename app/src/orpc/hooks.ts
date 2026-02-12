@@ -22,7 +22,10 @@ function isStreamNotReadyError(message: string | undefined): boolean {
   return (message ?? "").trim() === STREAM_NOT_READY_ERROR;
 }
 
-async function waitForRetry(signal: AbortSignal, delayMs: number): Promise<boolean> {
+async function waitForRetry(
+  signal: AbortSignal,
+  delayMs: number,
+): Promise<boolean> {
   if (signal.aborted) return false;
   return await new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => {
@@ -144,7 +147,22 @@ export function useGetAuthUrl() {
       type,
       redirectUrl,
     }: {
-      type: "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce" | "reddit" | "twitter";
+      type:
+        | "gmail"
+        | "google_calendar"
+        | "google_docs"
+        | "google_sheets"
+        | "google_drive"
+        | "notion"
+        | "linear"
+        | "github"
+        | "airtable"
+        | "slack"
+        | "hubspot"
+        | "linkedin"
+        | "salesforce"
+        | "reddit"
+        | "twitter";
       redirectUrl: string;
     }) => client.integration.getAuthUrl({ type, redirectUrl }),
   });
@@ -155,7 +173,8 @@ export function useLinkLinkedIn() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (accountId: string) => client.integration.linkLinkedIn({ accountId }),
+    mutationFn: (accountId: string) =>
+      client.integration.linkLinkedIn({ accountId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integration"] });
     },
@@ -249,8 +268,17 @@ export function useToggleCustomIntegration() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ customIntegrationId, enabled }: { customIntegrationId: string; enabled: boolean }) =>
-      client.integration.toggleCustomIntegration({ customIntegrationId, enabled }),
+    mutationFn: ({
+      customIntegrationId,
+      enabled,
+    }: {
+      customIntegrationId: string;
+      enabled: boolean;
+    }) =>
+      client.integration.toggleCustomIntegration({
+        customIntegrationId,
+        enabled,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customIntegration"] });
     },
@@ -261,7 +289,8 @@ export function useDeleteCustomIntegration() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => client.integration.deleteCustomIntegration({ id }),
+    mutationFn: (id: string) =>
+      client.integration.deleteCustomIntegration({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customIntegration"] });
     },
@@ -270,8 +299,13 @@ export function useDeleteCustomIntegration() {
 
 export function useGetCustomAuthUrl() {
   return useMutation({
-    mutationFn: ({ slug, redirectUrl }: { slug: string; redirectUrl: string }) =>
-      client.integration.getCustomAuthUrl({ slug, redirectUrl }),
+    mutationFn: ({
+      slug,
+      redirectUrl,
+    }: {
+      slug: string;
+      redirectUrl: string;
+    }) => client.integration.getCustomAuthUrl({ slug, redirectUrl }),
   });
 }
 
@@ -355,8 +389,13 @@ export function useCreateSkill() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ displayName, description }: { displayName: string; description: string }) =>
-      client.skill.create({ displayName, description }),
+    mutationFn: ({
+      displayName,
+      description,
+    }: {
+      displayName: string;
+      description: string;
+    }) => client.skill.create({ displayName, description }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["skill"] });
     },
@@ -382,7 +421,15 @@ export function useUpdateSkill() {
       description?: string;
       icon?: string | null;
       enabled?: boolean;
-    }) => client.skill.update({ id, name, displayName, description, icon, enabled }),
+    }) =>
+      client.skill.update({
+        id,
+        name,
+        displayName,
+        description,
+        icon,
+        enabled,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["skill"] });
     },
@@ -463,7 +510,7 @@ export function useCreateWorkflow() {
       promptDont?: string;
       autoApprove?: boolean;
       allowedIntegrations: (
-        "gmail"
+        | "gmail"
         | "google_calendar"
         | "google_docs"
         | "google_sheets"
@@ -506,7 +553,7 @@ export function useUpdateWorkflow() {
       promptDont?: string | null;
       autoApprove?: boolean;
       allowedIntegrations?: (
-        "gmail"
+        | "gmail"
         | "google_calendar"
         | "google_docs"
         | "google_sheets"
@@ -718,9 +765,17 @@ export function useGeneration() {
   const queryClient = useQueryClient();
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const startGeneration = useCallback(async (
-      input: { conversationId?: string; content: string; model?: string; autoApprove?: boolean; deviceId?: string; attachments?: { name: string; mimeType: string; dataUrl: string }[] },
-      callbacks: GenerationCallbacks
+  const startGeneration = useCallback(
+    async (
+      input: {
+        conversationId?: string;
+        content: string;
+        model?: string;
+        autoApprove?: boolean;
+        deviceId?: string;
+        attachments?: { name: string; mimeType: string; dataUrl: string }[];
+      },
+      callbacks: GenerationCallbacks,
     ): Promise<{ generationId: string; conversationId: string } | null> => {
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
@@ -742,10 +797,17 @@ export function useGeneration() {
                 currentGenerationId = generationId;
                 currentConversationId = conversationId;
                 callbacks.onStarted?.(generationId, conversationId);
-                queryClient.invalidateQueries({ queryKey: ["conversation", "list"] });
+                queryClient.invalidateQueries({
+                  queryKey: ["conversation", "list"],
+                });
               },
               onDone: (generationId, conversationId, messageId, usage) => {
-                callbacks.onDone?.(generationId, conversationId, messageId, usage);
+                callbacks.onDone?.(
+                  generationId,
+                  conversationId,
+                  messageId,
+                  usage,
+                );
                 queryClient.invalidateQueries({ queryKey: ["conversation"] });
               },
               onError: (message) => {
@@ -764,101 +826,134 @@ export function useGeneration() {
           }
 
           if (!streamNotReady) {
-            return result ?? (currentGenerationId && currentConversationId
-              ? { generationId: currentGenerationId, conversationId: currentConversationId }
-              : null);
+            return (
+              result ??
+              (currentGenerationId && currentConversationId
+                ? {
+                    generationId: currentGenerationId,
+                    conversationId: currentConversationId,
+                  }
+                : null)
+            );
           }
 
           if (retries >= STREAM_MAX_RETRIES) {
             callbacks.onError?.(STREAM_NOT_READY_ERROR);
             return currentGenerationId && currentConversationId
-              ? { generationId: currentGenerationId, conversationId: currentConversationId }
+              ? {
+                  generationId: currentGenerationId,
+                  conversationId: currentConversationId,
+                }
               : null;
           }
 
           retries += 1;
-          const shouldContinue = await waitForRetry(signal, STREAM_RETRY_DELAY_MS);
+          const shouldContinue = await waitForRetry(
+            signal,
+            STREAM_RETRY_DELAY_MS,
+          );
           if (!shouldContinue) {
             return currentGenerationId && currentConversationId
-              ? { generationId: currentGenerationId, conversationId: currentConversationId }
+              ? {
+                  generationId: currentGenerationId,
+                  conversationId: currentConversationId,
+                }
               : null;
           }
         }
 
         return currentGenerationId && currentConversationId
-          ? { generationId: currentGenerationId, conversationId: currentConversationId }
+          ? {
+              generationId: currentGenerationId,
+              conversationId: currentConversationId,
+            }
           : null;
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return null;
         }
         callbacks.onError?.(
-          error instanceof Error ? error.message : "Unknown error"
+          error instanceof Error ? error.message : "Unknown error",
         );
         return null;
       } finally {
         abortControllerRef.current = null;
       }
-  }, [queryClient]);
+    },
+    [queryClient],
+  );
 
-  const subscribeToGeneration = useCallback(async (
-    generationId: string,
-    callbacks: GenerationCallbacks
-  ) => {
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
-    let currentGenerationId: string | undefined = generationId;
-    let retries = 0;
+  const subscribeToGeneration = useCallback(
+    async (generationId: string, callbacks: GenerationCallbacks) => {
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+      let currentGenerationId: string | undefined = generationId;
+      let retries = 0;
 
-    try {
-      while (!signal.aborted && currentGenerationId) {
-        let streamNotReady = false;
-        await runGenerationStream({
-          client,
-          generationId: currentGenerationId,
-          signal,
-          callbacks: {
-            ...callbacks,
-            onDone: (doneGenerationId, doneConversationId, messageId, usage) => {
-              callbacks.onDone?.(doneGenerationId, doneConversationId, messageId, usage);
-              queryClient.invalidateQueries({ queryKey: ["conversation"] });
+      try {
+        while (!signal.aborted && currentGenerationId) {
+          let streamNotReady = false;
+          await runGenerationStream({
+            client,
+            generationId: currentGenerationId,
+            signal,
+            callbacks: {
+              ...callbacks,
+              onDone: (
+                doneGenerationId,
+                doneConversationId,
+                messageId,
+                usage,
+              ) => {
+                callbacks.onDone?.(
+                  doneGenerationId,
+                  doneConversationId,
+                  messageId,
+                  usage,
+                );
+                queryClient.invalidateQueries({ queryKey: ["conversation"] });
+              },
+              onError: (message) => {
+                if (isStreamNotReadyError(message)) {
+                  streamNotReady = true;
+                  return;
+                }
+                callbacks.onError?.(message);
+              },
             },
-            onError: (message) => {
-              if (isStreamNotReadyError(message)) {
-                streamNotReady = true;
-                return;
-              }
-              callbacks.onError?.(message);
-            },
-          },
-        });
+          });
 
-        if (!streamNotReady) {
+          if (!streamNotReady) {
+            return;
+          }
+
+          if (retries >= STREAM_MAX_RETRIES) {
+            callbacks.onError?.(STREAM_NOT_READY_ERROR);
+            return;
+          }
+
+          retries += 1;
+          const shouldContinue = await waitForRetry(
+            signal,
+            STREAM_RETRY_DELAY_MS,
+          );
+          if (!shouldContinue) {
+            return;
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
           return;
         }
-
-        if (retries >= STREAM_MAX_RETRIES) {
-          callbacks.onError?.(STREAM_NOT_READY_ERROR);
-          return;
-        }
-
-        retries += 1;
-        const shouldContinue = await waitForRetry(signal, STREAM_RETRY_DELAY_MS);
-        if (!shouldContinue) {
-          return;
-        }
+        callbacks.onError?.(
+          error instanceof Error ? error.message : "Unknown error",
+        );
+      } finally {
+        abortControllerRef.current = null;
       }
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        return;
-      }
-      callbacks.onError?.(
-        error instanceof Error ? error.message : "Unknown error"
-      );
-    } finally {
-      abortControllerRef.current = null;
-    }
-  }, [queryClient]);
+    },
+    [queryClient],
+  );
 
   const abort = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -886,7 +981,8 @@ export function useSubmitApproval() {
       generationId: string;
       toolUseId: string;
       decision: "approve" | "deny";
-    }) => client.generation.submitApproval({ generationId, toolUseId, decision }),
+    }) =>
+      client.generation.submitApproval({ generationId, toolUseId, decision }),
   });
 }
 
@@ -901,7 +997,12 @@ export function useSubmitAuthResult() {
       generationId: string;
       integration: string;
       success: boolean;
-    }) => client.generation.submitAuthResult({ generationId, integration, success }),
+    }) =>
+      client.generation.submitAuthResult({
+        generationId,
+        integration,
+        success,
+      }),
   });
 }
 
@@ -909,12 +1010,19 @@ export function useSubmitAuthResult() {
 export function useActiveGeneration(conversationId: string | undefined) {
   return useQuery({
     queryKey: ["generation", "active", conversationId],
-    queryFn: () => client.generation.getActiveGeneration({ conversationId: conversationId! }),
+    queryFn: () =>
+      client.generation.getActiveGeneration({
+        conversationId: conversationId!,
+      }),
     enabled: !!conversationId,
     refetchInterval: (query) => {
       // Poll while generating or awaiting auth
       const status = query.state.data?.status;
-      if (status === "generating" || status === "awaiting_approval" || status === "awaiting_auth") {
+      if (
+        status === "generating" ||
+        status === "awaiting_approval" ||
+        status === "awaiting_auth"
+      ) {
         return 2000;
       }
       return false;
@@ -926,7 +1034,8 @@ export function useActiveGeneration(conversationId: string | undefined) {
 export function useGenerationStatus(generationId: string | undefined) {
   return useQuery({
     queryKey: ["generation", "status", generationId],
-    queryFn: () => client.generation.getGenerationStatus({ generationId: generationId! }),
+    queryFn: () =>
+      client.generation.getGenerationStatus({ generationId: generationId! }),
     enabled: !!generationId,
   });
 }
@@ -951,7 +1060,8 @@ export function useDownloadSandboxFile() {
 export function useSandboxFiles(conversationId: string | undefined) {
   return useQuery({
     queryKey: ["sandboxFiles", conversationId],
-    queryFn: () => client.conversation.getSandboxFiles({ conversationId: conversationId! }),
+    queryFn: () =>
+      client.conversation.getSandboxFiles({ conversationId: conversationId! }),
     enabled: !!conversationId,
   });
 }

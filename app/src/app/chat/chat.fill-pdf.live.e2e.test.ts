@@ -5,13 +5,21 @@ import { expect, test } from "../../../tests/e2e/live-fixtures";
 import type { Download, Page, Response } from "@playwright/test";
 
 const liveEnabled = process.env.E2E_LIVE === "1";
-const storageStatePath = process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
-const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "120000");
-const artifactTimeoutMs = Number(process.env.E2E_ARTIFACT_TIMEOUT_MS ?? "45000");
+const storageStatePath =
+  process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
+const responseTimeoutMs = Number(
+  process.env.E2E_RESPONSE_TIMEOUT_MS ?? "120000",
+);
+const artifactTimeoutMs = Number(
+  process.env.E2E_ARTIFACT_TIMEOUT_MS ?? "45000",
+);
 const fillPdfPrompt =
   process.env.E2E_FILL_PDF_PROMPT ??
   "I attached a PDF form. Fill the PDF with the name Sandra wherever a name is requested. Save the output as filled-sandra.pdf and reply with one short confirmation sentence.";
-const fixturePdfPath = resolve(process.cwd(), "tests/e2e/fixtures/questionnaire-auto.pdf");
+const fixturePdfPath = resolve(
+  process.cwd(),
+  "tests/e2e/fixtures/questionnaire-auto.pdf",
+);
 
 async function selectModel(page: Page, modelId: string): Promise<void> {
   await page.getByTestId("chat-model-selector").click();
@@ -19,12 +27,14 @@ async function selectModel(page: Page, modelId: string): Promise<void> {
 
   await expect(
     option,
-    `Model \"${modelId}\" is unavailable in the model picker. Ensure provider auth is connected for that model.`
+    `Model \"${modelId}\" is unavailable in the model picker. Ensure provider auth is connected for that model.`,
   ).toBeVisible({ timeout: 10_000 });
 
   const expectedLabel = (await option.textContent())?.trim() || modelId;
   await option.click();
-  await expect(page.getByTestId("chat-model-selector")).toContainText(expectedLabel);
+  await expect(page.getByTestId("chat-model-selector")).toContainText(
+    expectedLabel,
+  );
 }
 
 async function ensureAutoApproveEnabled(page: Page): Promise<void> {
@@ -42,7 +52,9 @@ async function ensureAutoApproveEnabled(page: Page): Promise<void> {
 
 function findFirstHttpUrl(value: unknown): string | null {
   if (typeof value === "string") {
-    return value.startsWith("http://") || value.startsWith("https://") ? value : null;
+    return value.startsWith("http://") || value.startsWith("https://")
+      ? value
+      : null;
   }
 
   if (Array.isArray(value)) {
@@ -66,12 +78,14 @@ function findFirstHttpUrl(value: unknown): string | null {
 async function readDownloadedPdfBytes(
   page: Page,
   clickAction: Promise<void>,
-  testInfo: { outputPath: (...segments: string[]) => string }
+  testInfo: { outputPath: (...segments: string[]) => string },
 ): Promise<Buffer> {
   const downloadPromise = page
     .waitForEvent("download", { timeout: artifactTimeoutMs })
     .then(async (download: Download) => {
-      const destinationPath = testInfo.outputPath(download.suggestedFilename() || "filled-sandra.pdf");
+      const destinationPath = testInfo.outputPath(
+        download.suggestedFilename() || "filled-sandra.pdf",
+      );
       await download.saveAs(destinationPath);
       return readFile(destinationPath);
     })
@@ -81,7 +95,7 @@ async function readDownloadedPdfBytes(
     (response: Response) =>
       response.request().method() === "POST" &&
       response.url().includes("downloadSandboxFile"),
-    { timeout: artifactTimeoutMs }
+    { timeout: artifactTimeoutMs },
   );
 
   await clickAction;
@@ -98,12 +112,16 @@ async function readDownloadedPdfBytes(
   const presignedUrl = findFirstHttpUrl(sandboxDownloadPayload);
 
   if (!presignedUrl) {
-    throw new Error("Failed to resolve a presigned download URL after clicking the PDF artifact.");
+    throw new Error(
+      "Failed to resolve a presigned download URL after clicking the PDF artifact.",
+    );
   }
 
   const pdfResponse = await page.request.get(presignedUrl);
   if (!pdfResponse.ok()) {
-    throw new Error(`Failed to download PDF from presigned URL: HTTP ${pdfResponse.status()}`);
+    throw new Error(
+      `Failed to download PDF from presigned URL: HTTP ${pdfResponse.status()}`,
+    );
   }
 
   return Buffer.from(await pdfResponse.body());
@@ -113,12 +131,17 @@ test.describe("@live chat fill-pdf", () => {
   test.skip(!liveEnabled, "Set E2E_LIVE=1 to run live Playwright tests");
   test.use({ storageState: storageStatePath });
 
-  test("uploads a PDF, fills it with Sandra, and downloads an openable PDF output", async ({ page, liveChatModel }, testInfo) => {
-    test.setTimeout(Math.max(responseTimeoutMs + artifactTimeoutMs + 45_000, 180_000));
+  test("uploads a PDF, fills it with Sandra, and downloads an openable PDF output", async ({
+    page,
+    liveChatModel,
+  }, testInfo) => {
+    test.setTimeout(
+      Math.max(responseTimeoutMs + artifactTimeoutMs + 45_000, 180_000),
+    );
 
     if (!existsSync(storageStatePath)) {
       throw new Error(
-        `Missing auth storage state at \"${storageStatePath}\". Generate it first before running @live e2e tests.`
+        `Missing auth storage state at \"${storageStatePath}\". Generate it first before running @live e2e tests.`,
       );
     }
 
@@ -145,59 +168,65 @@ test.describe("@live chat fill-pdf", () => {
     await input.fill(fillPdfPrompt);
     await page.getByTestId("chat-send").click();
 
-    await expect.poll(
-      async () => {
-        const currentCount = await assistantMessages.count();
-        if (currentCount > initialAssistantCount) return "assistant";
+    await expect
+      .poll(
+        async () => {
+          const currentCount = await assistantMessages.count();
+          if (currentCount > initialAssistantCount) return "assistant";
 
-        const waitingForApproval = await page
-          .getByText("Waiting for approval")
-          .first()
-          .isVisible()
-          .catch(() => false);
-        if (waitingForApproval) return "approval_blocked";
+          const waitingForApproval = await page
+            .getByText("Waiting for approval")
+            .first()
+            .isVisible()
+            .catch(() => false);
+          if (waitingForApproval) return "approval_blocked";
 
-        return "waiting";
-      },
-      {
-        timeout: responseTimeoutMs,
-        message: "Assistant did not produce a persisted message within timeout",
-      }
-    ).toBe("assistant");
+          return "waiting";
+        },
+        {
+          timeout: responseTimeoutMs,
+          message:
+            "Assistant did not produce a persisted message within timeout",
+        },
+      )
+      .toBe("assistant");
 
-    await expect.poll(
-      async () => page.url(),
-      {
+    await expect
+      .poll(async () => page.url(), {
         timeout: responseTimeoutMs,
         message: "Conversation URL was not updated to /chat/:id",
-      }
-    ).toMatch(/\/chat\/[^/?#]+/);
+      })
+      .toMatch(/\/chat\/[^/?#]+/);
 
     const assistantBubble = page.getByTestId("chat-bubble-assistant").last();
-    await expect.poll(
-      async () => {
-        const text = (await assistantBubble.textContent())?.trim() ?? "";
-        if (!text) return "empty";
-        if (text.startsWith("Error:")) return "error";
-        return "ok";
-      },
-      {
-        timeout: responseTimeoutMs,
-        message: "Assistant response was empty or an error",
-      }
-    ).toBe("ok");
+    await expect
+      .poll(
+        async () => {
+          const text = (await assistantBubble.textContent())?.trim() ?? "";
+          if (!text) return "empty";
+          if (text.startsWith("Error:")) return "error";
+          return "ok";
+        },
+        {
+          timeout: responseTimeoutMs,
+          message: "Assistant response was empty or an error",
+        },
+      )
+      .toBe("ok");
 
     const assistantMessage = page.getByTestId("chat-message-assistant").last();
-    const pdfOutputButton = assistantMessage.locator("button", { hasText: /\.pdf/i }).first();
+    const pdfOutputButton = assistantMessage
+      .locator("button", { hasText: /\.pdf/i })
+      .first();
     await expect(
       pdfOutputButton,
-      "Assistant output did not expose a downloadable PDF artifact."
+      "Assistant output did not expose a downloadable PDF artifact.",
     ).toBeVisible({ timeout: artifactTimeoutMs });
 
     const pdfBytes = await readDownloadedPdfBytes(
       page,
       pdfOutputButton.click(),
-      testInfo
+      testInfo,
     );
 
     expect(pdfBytes.byteLength).toBeGreaterThan(100);

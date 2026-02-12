@@ -27,7 +27,15 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
 
 const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
   slack: {
-    read: ["channels", "history", "search", "recent", "users", "user", "thread"],
+    read: [
+      "channels",
+      "history",
+      "search",
+      "recent",
+      "users",
+      "user",
+      "thread",
+    ],
     write: ["send", "react", "upload"],
   },
   gmail: {
@@ -68,40 +76,59 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
   },
   hubspot: {
     read: [
-      "contacts.list", "contacts.get", "contacts.search",
-      "companies.list", "companies.get",
-      "deals.list", "deals.get",
-      "tickets.list", "tickets.get",
-      "tasks.list", "tasks.get",
+      "contacts.list",
+      "contacts.get",
+      "contacts.search",
+      "companies.list",
+      "companies.get",
+      "deals.list",
+      "deals.get",
+      "tickets.list",
+      "tickets.get",
+      "tasks.list",
+      "tasks.get",
       "notes.list",
-      "pipelines.deals", "pipelines.tickets",
+      "pipelines.deals",
+      "pipelines.tickets",
       "owners",
     ],
     write: [
-      "contacts.create", "contacts.update",
-      "companies.create", "companies.update",
-      "deals.create", "deals.update",
-      "tickets.create", "tickets.update",
-      "tasks.create", "tasks.complete",
+      "contacts.create",
+      "contacts.update",
+      "companies.create",
+      "companies.update",
+      "deals.create",
+      "deals.update",
+      "tickets.create",
+      "tickets.update",
+      "tasks.create",
+      "tasks.complete",
       "notes.create",
     ],
   },
   linkedin: {
     read: [
-      "chats.list", "chats.get",
+      "chats.list",
+      "chats.get",
       "messages.list",
-      "profile.me", "profile.get", "profile.company",
+      "profile.me",
+      "profile.get",
+      "profile.company",
       "search",
       "invite.list",
       "connections.list",
-      "posts.list", "posts.get",
+      "posts.list",
+      "posts.get",
       "company.posts",
     ],
     write: [
-      "messages.send", "messages.start",
+      "messages.send",
+      "messages.start",
       "invite.send",
       "connections.remove",
-      "posts.create", "posts.comment", "posts.react",
+      "posts.create",
+      "posts.comment",
+      "posts.react",
       "company.post",
     ],
   },
@@ -111,17 +138,53 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
   },
   reddit: {
     read: [
-      "feed", "subreddit", "post", "user", "search", "multireddit",
-      "inbox", "subscriptions",
+      "feed",
+      "subreddit",
+      "post",
+      "user",
+      "search",
+      "multireddit",
+      "inbox",
+      "subscriptions",
     ],
     write: [
-      "vote", "comment", "reply", "save", "unsave", "submit",
-      "delete", "edit", "message", "read", "subscribe", "unsubscribe",
+      "vote",
+      "comment",
+      "reply",
+      "save",
+      "unsave",
+      "submit",
+      "delete",
+      "edit",
+      "message",
+      "read",
+      "subscribe",
+      "unsubscribe",
     ],
   },
   twitter: {
-    read: ["me", "user", "user-id", "timeline", "mentions", "search", "likes", "followers", "following"],
-    write: ["post", "reply", "quote", "like", "unlike", "retweet", "unretweet", "follow", "unfollow"],
+    read: [
+      "me",
+      "user",
+      "user-id",
+      "timeline",
+      "mentions",
+      "search",
+      "likes",
+      "followers",
+      "following",
+    ],
+    write: [
+      "post",
+      "reply",
+      "quote",
+      "like",
+      "unlike",
+      "retweet",
+      "unretweet",
+      "follow",
+      "unfollow",
+    ],
   },
 };
 
@@ -182,7 +245,9 @@ export function parseBashCommand(command: string): ParsedCommand | null {
   }
 
   const permissions = TOOL_PERMISSIONS[integration];
-  const isWrite = permissions ? permissions.write.includes(finalOperation) : false;
+  const isWrite = permissions
+    ? permissions.write.includes(finalOperation)
+    : false;
 
   return {
     integration,
@@ -213,7 +278,7 @@ export interface PermissionCheckResult {
 export function checkToolPermissions(
   toolName: string,
   toolInput: Record<string, unknown>,
-  connectedIntegrations: string[]
+  connectedIntegrations: string[],
 ): PermissionCheckResult {
   // Only bash commands can trigger integration permissions
   if (toolName !== "bash") {

@@ -38,17 +38,20 @@ export const defaultExtensions = [
     },
     blockquote: {
       HTMLAttributes: {
-        class: "border-l-4 border-muted-foreground/30 pl-4 italic text-muted-foreground",
+        class:
+          "border-l-4 border-muted-foreground/30 pl-4 italic text-muted-foreground",
       },
     },
     codeBlock: {
       HTMLAttributes: {
-        class: "rounded-md bg-muted border p-4 font-mono text-sm overflow-x-auto",
+        class:
+          "rounded-md bg-muted border p-4 font-mono text-sm overflow-x-auto",
       },
     },
     code: {
       HTMLAttributes: {
-        class: "rounded bg-muted px-1.5 py-0.5 font-mono text-sm before:content-none after:content-none",
+        class:
+          "rounded bg-muted px-1.5 py-0.5 font-mono text-sm before:content-none after:content-none",
         spellcheck: "false",
       },
     },
@@ -66,7 +69,8 @@ export const defaultExtensions = [
   }),
   TiptapLink.configure({
     HTMLAttributes: {
-      class: "text-primary underline underline-offset-4 hover:text-primary/80 cursor-pointer",
+      class:
+        "text-primary underline underline-offset-4 hover:text-primary/80 cursor-pointer",
     },
   }),
   TiptapUnderline,

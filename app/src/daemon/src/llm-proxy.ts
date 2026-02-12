@@ -53,7 +53,10 @@ export async function detectLocalProviders(): Promise<LocalProvider[]> {
         models,
       });
 
-      logger.info("llm-proxy", `Found ${provider.name} with ${models.length} models`);
+      logger.info(
+        "llm-proxy",
+        `Found ${provider.name} with ${models.length} models`,
+      );
     } catch {
       // Provider not running
     }
@@ -75,7 +78,7 @@ export async function proxyChatRequest(
   },
   onChunk: (chunk: unknown) => void,
   onDone: (usage?: { inputTokens: number; outputTokens: number }) => void,
-  onError: (error: string) => void
+  onError: (error: string) => void,
 ): Promise<void> {
   // Find a provider with the requested model
   const providers = await detectLocalProviders();

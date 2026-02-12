@@ -275,7 +275,7 @@ export class WSClient {
       },
       (error) => {
         this.send({ type: "llm.error", id: msg.id, error });
-      }
+      },
     );
   }
 }

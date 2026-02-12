@@ -176,7 +176,9 @@ export const conversation = pgTable(
     opencodeSessionId: text("opencode_session_id"),
     model: text("model").default("claude-sonnet-4-20250514"),
     // Generation tracking
-    generationStatus: generationStatusEnum("generation_status").default("idle").notNull(),
+    generationStatus: generationStatusEnum("generation_status")
+      .default("idle")
+      .notNull(),
     currentGenerationId: text("current_generation_id"),
     // Auto-approve sensitive operations without user confirmation
     autoApprove: boolean("auto_approve").default(false).notNull(),
@@ -190,13 +192,20 @@ export const conversation = pgTable(
   (table) => [
     index("conversation_user_id_idx").on(table.userId),
     index("conversation_created_at_idx").on(table.createdAt),
-  ]
+  ],
 );
 
 // Content part types for interleaved message structure
 export type ContentPart =
   | { type: "text"; text: string }
-  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown>; integration?: string; operation?: string }
+  | {
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+      integration?: string;
+      operation?: string;
+    }
   | { type: "tool_result"; tool_use_id: string; content: unknown }
   | { type: "thinking"; id: string; content: string }
   | { type: "system"; content: string };
@@ -226,7 +235,7 @@ export const message = pgTable(
   (table) => [
     index("message_conversation_id_idx").on(table.conversationId),
     index("message_created_at_idx").on(table.createdAt),
-  ]
+  ],
 );
 
 // Approval state stored in generation
@@ -242,8 +251,8 @@ export type PendingApproval = {
 
 // Auth state stored in generation
 export type PendingAuth = {
-  integrations: string[];  // Integration types needed
-  connectedIntegrations: string[];  // Already connected during this request
+  integrations: string[]; // Integration types needed
+  connectedIntegrations: string[]; // Already connected during this request
   requestedAt: string;
   reason?: string;
 };
@@ -258,7 +267,9 @@ export const generation = pgTable(
       .notNull()
       .references(() => conversation.id, { onDelete: "cascade" }),
     // Set when message is saved on completion
-    messageId: text("message_id").references(() => message.id, { onDelete: "set null" }),
+    messageId: text("message_id").references(() => message.id, {
+      onDelete: "set null",
+    }),
     status: generationRecordStatusEnum("status").default("running").notNull(),
     // Partial content (updated periodically during generation)
     contentParts: jsonb("content_parts").$type<ContentPart[]>(),
@@ -279,7 +290,7 @@ export const generation = pgTable(
   (table) => [
     index("generation_conversation_id_idx").on(table.conversationId),
     index("generation_status_idx").on(table.status),
-  ]
+  ],
 );
 
 // ========== INTEGRATION TYPE ENUM ==========
@@ -332,8 +343,13 @@ export const workflow = pgTable(
     promptDo: text("prompt_do"),
     promptDont: text("prompt_dont"),
     autoApprove: boolean("auto_approve").default(true).notNull(),
-    allowedIntegrations: integrationTypeEnum("allowed_integrations").array().notNull(),
-    allowedCustomIntegrations: text("allowed_custom_integrations").array().notNull().default([]),
+    allowedIntegrations: integrationTypeEnum("allowed_integrations")
+      .array()
+      .notNull(),
+    allowedCustomIntegrations: text("allowed_custom_integrations")
+      .array()
+      .notNull()
+      .default([]),
     // Schedule configuration for time-based triggers (JSON object)
     schedule: jsonb("schedule"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -345,7 +361,7 @@ export const workflow = pgTable(
   (table) => [
     index("workflow_owner_id_idx").on(table.ownerId),
     index("workflow_status_idx").on(table.status),
-  ]
+  ],
 );
 
 export const workflowRun = pgTable(
@@ -359,7 +375,9 @@ export const workflowRun = pgTable(
       .references(() => workflow.id, { onDelete: "cascade" }),
     status: workflowRunStatusEnum("status").default("running").notNull(),
     triggerPayload: jsonb("trigger_payload").notNull(),
-    generationId: text("generation_id").references(() => generation.id, { onDelete: "set null" }),
+    generationId: text("generation_id").references(() => generation.id, {
+      onDelete: "set null",
+    }),
     startedAt: timestamp("started_at").defaultNow().notNull(),
     finishedAt: timestamp("finished_at"),
     errorMessage: text("error_message"),
@@ -368,7 +386,7 @@ export const workflowRun = pgTable(
     index("workflow_run_workflow_id_idx").on(table.workflowId),
     index("workflow_run_status_idx").on(table.status),
     index("workflow_run_started_at_idx").on(table.startedAt),
-  ]
+  ],
 );
 
 export const workflowRunEvent = pgTable(
@@ -384,9 +402,7 @@ export const workflowRunEvent = pgTable(
     payload: jsonb("payload").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [
-    index("workflow_run_event_run_id_idx").on(table.workflowRunId),
-  ]
+  (table) => [index("workflow_run_event_run_id_idx").on(table.workflowRunId)],
 );
 
 // ========== INTEGRATION SCHEMA ==========
@@ -420,7 +436,7 @@ export const integration = pgTable(
     index("integration_user_id_idx").on(table.userId),
     index("integration_type_idx").on(table.type),
     uniqueIndex("integration_user_type_idx").on(table.userId, table.type),
-  ]
+  ],
 );
 
 export const integrationToken = pgTable(
@@ -445,16 +461,21 @@ export const integrationToken = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("integration_token_integration_id_idx").on(table.integrationId)]
+  (table) => [
+    index("integration_token_integration_id_idx").on(table.integrationId),
+  ],
 );
 
 // ========== RELATIONS ==========
 
-export const conversationRelations = relations(conversation, ({ one, many }) => ({
-  user: one(user, { fields: [conversation.userId], references: [user.id] }),
-  messages: many(message),
-  generations: many(generation),
-}));
+export const conversationRelations = relations(
+  conversation,
+  ({ one, many }) => ({
+    user: one(user, { fields: [conversation.userId], references: [user.id] }),
+    messages: many(message),
+    generations: many(generation),
+  }),
+);
 
 export const messageAttachment = pgTable(
   "message_attachment",
@@ -471,7 +492,7 @@ export const messageAttachment = pgTable(
     storageKey: text("storage_key").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("message_attachment_message_id_idx").on(table.messageId)]
+  (table) => [index("message_attachment_message_id_idx").on(table.messageId)],
 );
 
 // Sandbox files created by the AI agent that are surfaced to users
@@ -481,21 +502,23 @@ export const sandboxFile = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    messageId: text("message_id").references(() => message.id, { onDelete: "cascade" }),
+    messageId: text("message_id").references(() => message.id, {
+      onDelete: "cascade",
+    }),
     conversationId: text("conversation_id")
       .notNull()
       .references(() => conversation.id, { onDelete: "cascade" }),
-    path: text("path").notNull(),           // Original sandbox path: /app/output.pdf
-    filename: text("filename").notNull(),   // Just the filename: output.pdf
+    path: text("path").notNull(), // Original sandbox path: /app/output.pdf
+    filename: text("filename").notNull(), // Just the filename: output.pdf
     mimeType: text("mime_type").notNull(),
     sizeBytes: integer("size_bytes"),
-    storageKey: text("storage_key"),        // S3 key for uploaded file
+    storageKey: text("storage_key"), // S3 key for uploaded file
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     index("sandbox_file_message_id_idx").on(table.messageId),
     index("sandbox_file_conversation_id_idx").on(table.conversationId),
-  ]
+  ],
 );
 
 export const messageRelations = relations(message, ({ one, many }) => ({
@@ -512,12 +535,15 @@ export const messageRelations = relations(message, ({ one, many }) => ({
   sandboxFiles: many(sandboxFile),
 }));
 
-export const messageAttachmentRelations = relations(messageAttachment, ({ one }) => ({
-  message: one(message, {
-    fields: [messageAttachment.messageId],
-    references: [message.id],
+export const messageAttachmentRelations = relations(
+  messageAttachment,
+  ({ one }) => ({
+    message: one(message, {
+      fields: [messageAttachment.messageId],
+      references: [message.id],
+    }),
   }),
-}));
+);
 
 export const sandboxFileRelations = relations(sandboxFile, ({ one }) => ({
   message: one(message, {
@@ -558,24 +584,30 @@ export const workflowRunRelations = relations(workflowRun, ({ one, many }) => ({
   events: many(workflowRunEvent),
 }));
 
-export const workflowRunEventRelations = relations(workflowRunEvent, ({ one }) => ({
-  run: one(workflowRun, {
-    fields: [workflowRunEvent.workflowRunId],
-    references: [workflowRun.id],
+export const workflowRunEventRelations = relations(
+  workflowRunEvent,
+  ({ one }) => ({
+    run: one(workflowRun, {
+      fields: [workflowRunEvent.workflowRunId],
+      references: [workflowRun.id],
+    }),
   }),
-}));
+);
 
 export const integrationRelations = relations(integration, ({ one, many }) => ({
   user: one(user, { fields: [integration.userId], references: [user.id] }),
   tokens: many(integrationToken),
 }));
 
-export const integrationTokenRelations = relations(integrationToken, ({ one }) => ({
-  integration: one(integration, {
-    fields: [integrationToken.integrationId],
-    references: [integration.id],
+export const integrationTokenRelations = relations(
+  integrationToken,
+  ({ one }) => ({
+    integration: one(integration, {
+      fields: [integrationToken.integrationId],
+      references: [integration.id],
+    }),
   }),
-}));
+);
 
 // ========== SKILL SCHEMA ==========
 
@@ -603,9 +635,7 @@ export const skill = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
-    index("skill_user_id_idx").on(table.userId),
-  ]
+  (table) => [index("skill_user_id_idx").on(table.userId)],
 );
 
 export const skillFile = pgTable(
@@ -626,9 +656,7 @@ export const skillFile = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
-    index("skill_file_skill_id_idx").on(table.skillId),
-  ]
+  (table) => [index("skill_file_skill_id_idx").on(table.skillId)],
 );
 
 export const skillDocument = pgTable(
@@ -656,7 +684,7 @@ export const skillDocument = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("skill_document_skill_id_idx").on(table.skillId)]
+  (table) => [index("skill_document_skill_id_idx").on(table.skillId)],
 );
 
 export const skillRelations = relations(skill, ({ one, many }) => ({
@@ -681,7 +709,10 @@ export const skillDocumentRelations = relations(skillDocument, ({ one }) => ({
 
 // ========== MEMORY SCHEMA ==========
 
-export const memoryFileTypeEnum = pgEnum("memory_file_type", ["longterm", "daily"]);
+export const memoryFileTypeEnum = pgEnum("memory_file_type", [
+  "longterm",
+  "daily",
+]);
 
 export const memoryFile = pgTable(
   "memory_file",
@@ -705,8 +736,12 @@ export const memoryFile = pgTable(
   },
   (table) => [
     index("memory_file_user_id_idx").on(table.userId),
-    unique("memory_file_user_type_date_idx").on(table.userId, table.type, table.date),
-  ]
+    unique("memory_file_user_type_date_idx").on(
+      table.userId,
+      table.type,
+      table.date,
+    ),
+  ],
 );
 
 export const memoryEntry = pgTable(
@@ -733,7 +768,7 @@ export const memoryEntry = pgTable(
   (table) => [
     index("memory_entry_user_id_idx").on(table.userId),
     index("memory_entry_file_id_idx").on(table.fileId),
-  ]
+  ],
 );
 
 export const memoryChunk = pgTable(
@@ -748,8 +783,9 @@ export const memoryChunk = pgTable(
     fileId: text("file_id")
       .notNull()
       .references(() => memoryFile.id, { onDelete: "cascade" }),
-    entryId: text("entry_id")
-      .references(() => memoryEntry.id, { onDelete: "cascade" }),
+    entryId: text("entry_id").references(() => memoryEntry.id, {
+      onDelete: "cascade",
+    }),
     content: text("content").notNull(),
     contentHash: text("content_hash").notNull(),
     startLine: integer("start_line"),
@@ -765,7 +801,7 @@ export const memoryChunk = pgTable(
     index("memory_chunk_file_id_idx").on(table.fileId),
     index("memory_chunk_entry_id_idx").on(table.entryId),
     index("memory_chunk_hash_idx").on(table.contentHash),
-  ]
+  ],
 );
 
 export const memorySettings = pgTable(
@@ -788,9 +824,7 @@ export const memorySettings = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
-    unique("memory_settings_user_id_idx").on(table.userId),
-  ]
+  (table) => [unique("memory_settings_user_id_idx").on(table.userId)],
 );
 
 export const memoryFileRelations = relations(memoryFile, ({ one, many }) => ({
@@ -801,14 +835,23 @@ export const memoryFileRelations = relations(memoryFile, ({ one, many }) => ({
 
 export const memoryEntryRelations = relations(memoryEntry, ({ one, many }) => ({
   user: one(user, { fields: [memoryEntry.userId], references: [user.id] }),
-  file: one(memoryFile, { fields: [memoryEntry.fileId], references: [memoryFile.id] }),
+  file: one(memoryFile, {
+    fields: [memoryEntry.fileId],
+    references: [memoryFile.id],
+  }),
   chunks: many(memoryChunk),
 }));
 
 export const memoryChunkRelations = relations(memoryChunk, ({ one }) => ({
   user: one(user, { fields: [memoryChunk.userId], references: [user.id] }),
-  file: one(memoryFile, { fields: [memoryChunk.fileId], references: [memoryFile.id] }),
-  entry: one(memoryEntry, { fields: [memoryChunk.entryId], references: [memoryEntry.id] }),
+  file: one(memoryFile, {
+    fields: [memoryChunk.fileId],
+    references: [memoryFile.id],
+  }),
+  entry: one(memoryEntry, {
+    fields: [memoryChunk.entryId],
+    references: [memoryEntry.id],
+  }),
 }));
 
 export const memorySettingsRelations = relations(memorySettings, ({ one }) => ({
@@ -826,8 +869,9 @@ export const sessionTranscript = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    conversationId: text("conversation_id")
-      .references(() => conversation.id, { onDelete: "set null" }),
+    conversationId: text("conversation_id").references(() => conversation.id, {
+      onDelete: "set null",
+    }),
     sessionId: text("session_id"),
     title: text("title"),
     slug: text("slug"),
@@ -844,7 +888,7 @@ export const sessionTranscript = pgTable(
     index("session_transcript_user_id_idx").on(table.userId),
     index("session_transcript_conversation_id_idx").on(table.conversationId),
     unique("session_transcript_user_path_idx").on(table.userId, table.path),
-  ]
+  ],
 );
 
 export const sessionTranscriptChunk = pgTable(
@@ -873,25 +917,37 @@ export const sessionTranscriptChunk = pgTable(
     index("session_transcript_chunk_user_id_idx").on(table.userId),
     index("session_transcript_chunk_transcript_id_idx").on(table.transcriptId),
     index("session_transcript_chunk_hash_idx").on(table.contentHash),
-  ]
+  ],
 );
 
-export const sessionTranscriptRelations = relations(sessionTranscript, ({ one, many }) => ({
-  user: one(user, { fields: [sessionTranscript.userId], references: [user.id] }),
-  conversation: one(conversation, {
-    fields: [sessionTranscript.conversationId],
-    references: [conversation.id],
+export const sessionTranscriptRelations = relations(
+  sessionTranscript,
+  ({ one, many }) => ({
+    user: one(user, {
+      fields: [sessionTranscript.userId],
+      references: [user.id],
+    }),
+    conversation: one(conversation, {
+      fields: [sessionTranscript.conversationId],
+      references: [conversation.id],
+    }),
+    chunks: many(sessionTranscriptChunk),
   }),
-  chunks: many(sessionTranscriptChunk),
-}));
+);
 
-export const sessionTranscriptChunkRelations = relations(sessionTranscriptChunk, ({ one }) => ({
-  user: one(user, { fields: [sessionTranscriptChunk.userId], references: [user.id] }),
-  transcript: one(sessionTranscript, {
-    fields: [sessionTranscriptChunk.transcriptId],
-    references: [sessionTranscript.id],
+export const sessionTranscriptChunkRelations = relations(
+  sessionTranscriptChunk,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [sessionTranscriptChunk.userId],
+      references: [user.id],
+    }),
+    transcript: one(sessionTranscript, {
+      fields: [sessionTranscriptChunk.transcriptId],
+      references: [sessionTranscript.id],
+    }),
   }),
-}));
+);
 
 // ========== PROVIDER AUTH SCHEMA ==========
 // Stores encrypted provider credentials for subscription providers (ChatGPT, Gemini, Kimi)
@@ -918,7 +974,7 @@ export const providerAuth = pgTable(
   (table) => [
     unique("provider_auth_user_provider_idx").on(table.userId, table.provider),
     index("provider_auth_user_id_idx").on(table.userId),
-  ]
+  ],
 );
 
 export const providerAuthRelations = relations(providerAuth, ({ one }) => ({
@@ -930,26 +986,23 @@ export const providerAuthRelations = relations(providerAuth, ({ one }) => ({
 
 // ========== DEVICE CODE (Better Auth plugin) ==========
 
-export const deviceCode = pgTable(
-  "device_code",
-  {
-    id: text("id").primaryKey(),
-    deviceCode: text("device_code").notNull(),
-    userCode: text("user_code").notNull(),
-    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
-    clientId: text("client_id"),
-    scope: text("scope"),
-    status: text("status").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    lastPolledAt: timestamp("last_polled_at"),
-    pollingInterval: integer("polling_interval"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-);
+export const deviceCode = pgTable("device_code", {
+  id: text("id").primaryKey(),
+  deviceCode: text("device_code").notNull(),
+  userCode: text("user_code").notNull(),
+  userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+  clientId: text("client_id"),
+  scope: text("scope"),
+  status: text("status").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  lastPolledAt: timestamp("last_polled_at"),
+  pollingInterval: integer("polling_interval"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
 
 // ========== DEVICE (BYOC) SCHEMA ==========
 
@@ -979,9 +1032,7 @@ export const device = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
-    index("device_user_id_idx").on(table.userId),
-  ]
+  (table) => [index("device_user_id_idx").on(table.userId)],
 );
 
 export const deviceRelations = relations(device, ({ one }) => ({
@@ -1017,10 +1068,12 @@ export const customIntegration = pgTable(
     }>(),
     cliCode: text("cli_code").notNull(),
     cliInstructions: text("cli_instructions").notNull(),
-    permissions: jsonb("permissions").$type<{
-      readOps: string[];
-      writeOps: string[];
-    }>().notNull(),
+    permissions: jsonb("permissions")
+      .$type<{
+        readOps: string[];
+        writeOps: string[];
+      }>()
+      .notNull(),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -1036,7 +1089,7 @@ export const customIntegration = pgTable(
   (table) => [
     index("custom_integration_slug_idx").on(table.slug),
     index("custom_integration_created_by_idx").on(table.createdByUserId),
-  ]
+  ],
 );
 
 export const customIntegrationCredential = pgTable(
@@ -1069,31 +1122,47 @@ export const customIntegrationCredential = pgTable(
   (table) => [
     index("custom_cred_user_id_idx").on(table.userId),
     index("custom_cred_integration_id_idx").on(table.customIntegrationId),
-    unique("custom_cred_user_integration_idx").on(table.userId, table.customIntegrationId),
-  ]
+    unique("custom_cred_user_integration_idx").on(
+      table.userId,
+      table.customIntegrationId,
+    ),
+  ],
 );
 
-export const customIntegrationRelations = relations(customIntegration, ({ one, many }) => ({
-  createdBy: one(user, { fields: [customIntegration.createdByUserId], references: [user.id] }),
-  credentials: many(customIntegrationCredential),
-}));
-
-export const customIntegrationCredentialRelations = relations(customIntegrationCredential, ({ one }) => ({
-  user: one(user, { fields: [customIntegrationCredential.userId], references: [user.id] }),
-  customIntegration: one(customIntegration, {
-    fields: [customIntegrationCredential.customIntegrationId],
-    references: [customIntegration.id],
+export const customIntegrationRelations = relations(
+  customIntegration,
+  ({ one, many }) => ({
+    createdBy: one(user, {
+      fields: [customIntegration.createdByUserId],
+      references: [user.id],
+    }),
+    credentials: many(customIntegrationCredential),
   }),
-}));
+);
+
+export const customIntegrationCredentialRelations = relations(
+  customIntegrationCredential,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [customIntegrationCredential.userId],
+      references: [user.id],
+    }),
+    customIntegration: one(customIntegration, {
+      fields: [customIntegrationCredential.customIntegrationId],
+      references: [customIntegration.id],
+    }),
+  }),
+);
 
 export const integrationSkillSourceEnum = pgEnum("integration_skill_source", [
   "official",
   "community",
 ]);
 
-export const integrationSkillVisibilityEnum = pgEnum("integration_skill_visibility", [
-  "public",
-]);
+export const integrationSkillVisibilityEnum = pgEnum(
+  "integration_skill_visibility",
+  ["public"],
+);
 
 export const integrationSkill = pgTable(
   "integration_skill",
@@ -1105,9 +1174,12 @@ export const integrationSkill = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull(),
     source: integrationSkillSourceEnum("source").notNull(),
-    visibility: integrationSkillVisibilityEnum("visibility").default("public").notNull(),
-    createdByUserId: text("created_by_user_id")
-      .references(() => user.id, { onDelete: "set null" }),
+    visibility: integrationSkillVisibilityEnum("visibility")
+      .default("public")
+      .notNull(),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
     isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -1119,7 +1191,7 @@ export const integrationSkill = pgTable(
     index("integration_skill_slug_idx").on(table.slug),
     index("integration_skill_created_by_idx").on(table.createdByUserId),
     index("integration_skill_source_idx").on(table.source),
-  ]
+  ],
 );
 
 export const integrationSkillFile = pgTable(
@@ -1141,7 +1213,7 @@ export const integrationSkillFile = pgTable(
   },
   (table) => [
     index("integration_skill_file_skill_id_idx").on(table.integrationSkillId),
-  ]
+  ],
 );
 
 export const integrationSkillPreference = pgTable(
@@ -1155,8 +1227,10 @@ export const integrationSkillPreference = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     slug: text("slug").notNull(),
     preferredSource: integrationSkillSourceEnum("preferred_source").notNull(),
-    preferredSkillId: text("preferred_skill_id")
-      .references(() => integrationSkill.id, { onDelete: "set null" }),
+    preferredSkillId: text("preferred_skill_id").references(
+      () => integrationSkill.id,
+      { onDelete: "set null" },
+    ),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -1167,34 +1241,43 @@ export const integrationSkillPreference = pgTable(
     index("integration_skill_pref_user_id_idx").on(table.userId),
     index("integration_skill_pref_slug_idx").on(table.slug),
     unique("integration_skill_pref_user_slug_idx").on(table.userId, table.slug),
-  ]
+  ],
 );
 
-export const integrationSkillRelations = relations(integrationSkill, ({ one, many }) => ({
-  createdBy: one(user, {
-    fields: [integrationSkill.createdByUserId],
-    references: [user.id],
+export const integrationSkillRelations = relations(
+  integrationSkill,
+  ({ one, many }) => ({
+    createdBy: one(user, {
+      fields: [integrationSkill.createdByUserId],
+      references: [user.id],
+    }),
+    files: many(integrationSkillFile),
   }),
-  files: many(integrationSkillFile),
-}));
+);
 
-export const integrationSkillFileRelations = relations(integrationSkillFile, ({ one }) => ({
-  integrationSkill: one(integrationSkill, {
-    fields: [integrationSkillFile.integrationSkillId],
-    references: [integrationSkill.id],
+export const integrationSkillFileRelations = relations(
+  integrationSkillFile,
+  ({ one }) => ({
+    integrationSkill: one(integrationSkill, {
+      fields: [integrationSkillFile.integrationSkillId],
+      references: [integrationSkill.id],
+    }),
   }),
-}));
+);
 
-export const integrationSkillPreferenceRelations = relations(integrationSkillPreference, ({ one }) => ({
-  user: one(user, {
-    fields: [integrationSkillPreference.userId],
-    references: [user.id],
+export const integrationSkillPreferenceRelations = relations(
+  integrationSkillPreference,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [integrationSkillPreference.userId],
+      references: [user.id],
+    }),
+    preferredSkill: one(integrationSkill, {
+      fields: [integrationSkillPreference.preferredSkillId],
+      references: [integrationSkill.id],
+    }),
   }),
-  preferredSkill: one(integrationSkill, {
-    fields: [integrationSkillPreference.preferredSkillId],
-    references: [integrationSkill.id],
-  }),
-}));
+);
 
 // ─── WhatsApp ───────────────────────────────────────────────
 
@@ -1205,7 +1288,7 @@ export const whatsappAuthState = pgTable(
     data: text("data").notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("whatsapp_auth_state_updated_at_idx").on(table.updatedAt)]
+  (table) => [index("whatsapp_auth_state_updated_at_idx").on(table.updatedAt)],
 );
 
 export const whatsappUserLink = pgTable(
@@ -1227,15 +1310,18 @@ export const whatsappUserLink = pgTable(
   (table) => [
     uniqueIndex("whatsapp_user_link_wa_jid_idx").on(table.waJid),
     uniqueIndex("whatsapp_user_link_user_id_idx").on(table.userId),
-  ]
+  ],
 );
 
-export const whatsappUserLinkRelations = relations(whatsappUserLink, ({ one }) => ({
-  user: one(user, {
-    fields: [whatsappUserLink.userId],
-    references: [user.id],
+export const whatsappUserLinkRelations = relations(
+  whatsappUserLink,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [whatsappUserLink.userId],
+      references: [user.id],
+    }),
   }),
-}));
+);
 
 export const whatsappLinkCode = pgTable(
   "whatsapp_link_code",
@@ -1254,15 +1340,18 @@ export const whatsappLinkCode = pgTable(
   (table) => [
     uniqueIndex("whatsapp_link_code_code_idx").on(table.code),
     index("whatsapp_link_code_user_id_idx").on(table.userId),
-  ]
+  ],
 );
 
-export const whatsappLinkCodeRelations = relations(whatsappLinkCode, ({ one }) => ({
-  user: one(user, {
-    fields: [whatsappLinkCode.userId],
-    references: [user.id],
+export const whatsappLinkCodeRelations = relations(
+  whatsappLinkCode,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [whatsappLinkCode.userId],
+      references: [user.id],
+    }),
   }),
-}));
+);
 
 export const whatsappConversation = pgTable(
   "whatsapp_conversation",
@@ -1283,19 +1372,22 @@ export const whatsappConversation = pgTable(
     uniqueIndex("whatsapp_conversation_wa_jid_idx").on(table.waJid),
     index("whatsapp_conversation_conversation_id_idx").on(table.conversationId),
     index("whatsapp_conversation_user_id_idx").on(table.userId),
-  ]
+  ],
 );
 
-export const whatsappConversationRelations = relations(whatsappConversation, ({ one }) => ({
-  conversation: one(conversation, {
-    fields: [whatsappConversation.conversationId],
-    references: [conversation.id],
+export const whatsappConversationRelations = relations(
+  whatsappConversation,
+  ({ one }) => ({
+    conversation: one(conversation, {
+      fields: [whatsappConversation.conversationId],
+      references: [conversation.id],
+    }),
+    user: one(user, {
+      fields: [whatsappConversation.userId],
+      references: [user.id],
+    }),
   }),
-  user: one(user, {
-    fields: [whatsappConversation.userId],
-    references: [user.id],
-  }),
-}));
+);
 
 // ─── Slack Bot ───────────────────────────────────────────────
 
@@ -1315,10 +1407,10 @@ export const slackUserLink = pgTable(
   (table) => [
     uniqueIndex("slack_user_link_team_user_idx").on(
       table.slackTeamId,
-      table.slackUserId
+      table.slackUserId,
     ),
     index("slack_user_link_user_id_idx").on(table.userId),
-  ]
+  ],
 );
 
 export const slackUserLinkRelations = relations(slackUserLink, ({ one }) => ({
@@ -1349,10 +1441,10 @@ export const slackConversation = pgTable(
     uniqueIndex("slack_conversation_thread_idx").on(
       table.teamId,
       table.channelId,
-      table.threadTs
+      table.threadTs,
     ),
     index("slack_conversation_conversation_id_idx").on(table.conversationId),
-  ]
+  ],
 );
 
 export const slackConversationRelations = relations(
@@ -1366,7 +1458,7 @@ export const slackConversationRelations = relations(
       fields: [slackConversation.userId],
       references: [user.id],
     }),
-  })
+  }),
 );
 
 // Aggregated schema used by better-auth's drizzle adapter.

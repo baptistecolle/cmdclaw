@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronRight, Check, X, Loader2, ShieldAlert, Code } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Check,
+  X,
+  Loader2,
+  ShieldAlert,
+  Code,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -78,7 +86,7 @@ export function ToolApprovalCard({
         "rounded-lg border bg-card text-card-foreground",
         status === "pending" && "border-amber-500/50 bg-amber-50/10",
         status === "approved" && "border-green-500/50",
-        status === "denied" && "border-red-500/50"
+        status === "denied" && "border-red-500/50",
       )}
     >
       <button

@@ -92,7 +92,7 @@ describe("generationRouter", () => {
       generationRouterAny.getGenerationStatus({
         input: { generationId: "gen-1" },
         context,
-      })
+      }),
     ).rejects.toThrow("Access denied");
   });
 
@@ -108,7 +108,7 @@ describe("generationRouter", () => {
       generationRouterAny.getActiveGeneration({
         input: { conversationId: "conv-1" },
         context,
-      })
+      }),
     ).rejects.toThrow("Access denied");
   });
 
@@ -119,7 +119,9 @@ describe("generationRouter", () => {
       generationStatus: "idle",
       currentGenerationId: null,
     });
-    generationManagerMock.getGenerationForConversation.mockReturnValue("gen-active");
+    generationManagerMock.getGenerationForConversation.mockReturnValue(
+      "gen-active",
+    );
     generationManagerMock.getGenerationStatus.mockResolvedValue({
       status: "running",
       contentParts: [],
@@ -144,7 +146,11 @@ describe("generationRouter", () => {
       context,
     });
     const approvalResult = await generationRouterAny.submitApproval({
-      input: { generationId: "gen-1", toolUseId: "tool-1", decision: "approve" },
+      input: {
+        generationId: "gen-1",
+        toolUseId: "tool-1",
+        decision: "approve",
+      },
       context,
     });
     const authResult = await generationRouterAny.submitAuthResult({
@@ -156,18 +162,21 @@ describe("generationRouter", () => {
     expect(approvalResult).toEqual({ success: true });
     expect(authResult).toEqual({ success: true });
 
-    expect(generationManagerMock.cancelGeneration).toHaveBeenCalledWith("gen-1", "user-1");
+    expect(generationManagerMock.cancelGeneration).toHaveBeenCalledWith(
+      "gen-1",
+      "user-1",
+    );
     expect(generationManagerMock.submitApproval).toHaveBeenCalledWith(
       "gen-1",
       "tool-1",
       "approve",
-      "user-1"
+      "user-1",
     );
     expect(generationManagerMock.submitAuthResult).toHaveBeenCalledWith(
       "gen-1",
       "slack",
       true,
-      "user-1"
+      "user-1",
     );
   });
 });

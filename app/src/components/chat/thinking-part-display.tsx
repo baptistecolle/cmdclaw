@@ -10,12 +10,16 @@ type Props = {
   defaultExpanded?: boolean;
 };
 
-export function ThinkingPartDisplay({ content, isStreaming, defaultExpanded = false }: Props) {
+export function ThinkingPartDisplay({
+  content,
+  isStreaming,
+  defaultExpanded = false,
+}: Props) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   // Preview: first 80 chars or first line
-  const firstLine = content.split('\n')[0];
-  const preview = firstLine.slice(0, 80) + (firstLine.length > 80 ? '...' : '');
+  const firstLine = content.split("\n")[0];
+  const preview = firstLine.slice(0, 80) + (firstLine.length > 80 ? "..." : "");
 
   return (
     <div className="rounded-lg border border-muted-foreground/20 bg-muted/50">
@@ -27,7 +31,7 @@ export function ThinkingPartDisplay({ content, isStreaming, defaultExpanded = fa
         <ChevronRight
           className={cn(
             "h-4 w-4 shrink-0 transition-transform duration-200",
-            isExpanded && "rotate-90"
+            isExpanded && "rotate-90",
           )}
         />
         <Brain className="h-4 w-4 shrink-0" />

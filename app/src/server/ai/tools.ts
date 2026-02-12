@@ -115,7 +115,8 @@ export const searchContentTool: ToolDefinition = {
       },
       path: {
         type: "string",
-        description: "File or directory to search in (default: current directory)",
+        description:
+          "File or directory to search in (default: current directory)",
       },
       include: {
         type: "string",
@@ -188,7 +189,8 @@ export const memoryWriteTool: ToolDefinition = {
       },
       path: {
         type: "string",
-        description: "Optional path override (MEMORY.md or memory/YYYY-MM-DD.md)",
+        description:
+          "Optional path override (MEMORY.md or memory/YYYY-MM-DD.md)",
       },
     },
     required: ["content"],
@@ -206,7 +208,8 @@ export const sendFileTool: ToolDefinition = {
     properties: {
       path: {
         type: "string",
-        description: "Absolute path to the file in the sandbox (e.g., /app/output.pdf)",
+        description:
+          "Absolute path to the file in the sandbox (e.g., /app/output.pdf)",
       },
       description: {
         type: "string",
@@ -242,7 +245,7 @@ export function getDirectModeTools(): ToolDefinition[] {
  */
 export function toolCallToCommand(
   toolName: string,
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
 ): { command: string; isWrite: boolean } | null {
   switch (toolName) {
     case "bash":

@@ -30,7 +30,7 @@ function getAllowedChannels(): Set<string> {
     raw
       .split(",")
       .map((value) => value.trim())
-      .filter(Boolean)
+      .filter(Boolean),
   );
 }
 
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   if (!env.SLACK_BOT_TOKEN) {
     return Response.json(
       { ok: false, error: "Slack bot token not configured" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -72,7 +72,10 @@ export async function POST(request: Request) {
   try {
     payload = (await request.json()) as RelayPayload;
   } catch {
-    return Response.json({ ok: false, error: "Invalid JSON payload" }, { status: 400 });
+    return Response.json(
+      { ok: false, error: "Invalid JSON payload" },
+      { status: 400 },
+    );
   }
 
   const channel = payload.channel?.trim();
@@ -83,7 +86,7 @@ export async function POST(request: Request) {
   if (!channel || !text) {
     return Response.json(
       { ok: false, error: "channel and text are required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -91,16 +94,17 @@ export async function POST(request: Request) {
   if (allowedChannels.size > 0 && !allowedChannels.has(channel)) {
     return Response.json(
       { ok: false, error: `Channel ${channel} is not allowed for relay` },
-      { status: 403 }
+      { status: 403 },
     );
   }
 
   if (conversationId) {
-    const genId = generationManager.getGenerationForConversation(conversationId);
+    const genId =
+      generationManager.getGenerationForConversation(conversationId);
     if (!genId) {
       return Response.json(
         { ok: false, error: "No active generation for conversation" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -108,8 +112,11 @@ export async function POST(request: Request) {
       generationManager.getAllowedIntegrationsForConversation(conversationId);
     if (allowedIntegrations && !allowedIntegrations.includes("slack")) {
       return Response.json(
-        { ok: false, error: "Slack integration is not allowed for this conversation" },
-        { status: 403 }
+        {
+          ok: false,
+          error: "Slack integration is not allowed for this conversation",
+        },
+        { status: 403 },
       );
     }
   }
@@ -118,7 +125,7 @@ export async function POST(request: Request) {
   if (!slackResult.ok) {
     return Response.json(
       { ok: false, error: slackResult.error ?? "Slack API error" },
-      { status: 502 }
+      { status: 502 },
     );
   }
 

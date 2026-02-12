@@ -21,9 +21,18 @@ function getCorsHeaders(origin: string | null) {
   };
 }
 
-const { GET: getHandler, POST: postHandler, PUT: putHandler, PATCH: patchHandler, DELETE: deleteHandler } = toNextJsHandler(auth);
+const {
+  GET: getHandler,
+  POST: postHandler,
+  PUT: putHandler,
+  PATCH: patchHandler,
+  DELETE: deleteHandler,
+} = toNextJsHandler(auth);
 
-async function withCors(request: NextRequest, handler: (req: NextRequest) => Promise<Response>) {
+async function withCors(
+  request: NextRequest,
+  handler: (req: NextRequest) => Promise<Response>,
+) {
   const origin = request.headers.get("origin");
   const response = await handler(request);
   const corsHeaders = getCorsHeaders(origin);

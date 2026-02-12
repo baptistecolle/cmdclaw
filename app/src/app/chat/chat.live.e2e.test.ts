@@ -3,21 +3,26 @@ import { expect, test } from "../../../tests/e2e/live-fixtures";
 import type { Page } from "@playwright/test";
 
 const liveEnabled = process.env.E2E_LIVE === "1";
-const storageStatePath = process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
+const storageStatePath =
+  process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
 const promptText = process.env.E2E_CHAT_PROMPT ?? "hi";
-const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "90000");
+const responseTimeoutMs = Number(
+  process.env.E2E_RESPONSE_TIMEOUT_MS ?? "90000",
+);
 async function selectModel(page: Page, modelId: string): Promise<void> {
   await page.getByTestId("chat-model-selector").click();
   const option = page.getByTestId(`chat-model-option-${modelId}`).first();
 
   await expect(
     option,
-    `Model \"${modelId}\" is unavailable in the model picker. Ensure provider auth is connected for that model.`
+    `Model \"${modelId}\" is unavailable in the model picker. Ensure provider auth is connected for that model.`,
   ).toBeVisible({ timeout: 10_000 });
 
   const expectedLabel = (await option.textContent())?.trim() || modelId;
   await option.click();
-  await expect(page.getByTestId("chat-model-selector")).toContainText(expectedLabel);
+  await expect(page.getByTestId("chat-model-selector")).toContainText(
+    expectedLabel,
+  );
 }
 
 test.describe("@live chat", () => {
@@ -29,7 +34,7 @@ test.describe("@live chat", () => {
 
     if (!existsSync(storageStatePath)) {
       throw new Error(
-        `Missing auth storage state at \"${storageStatePath}\". Generate it first before running @live e2e tests.`
+        `Missing auth storage state at \"${storageStatePath}\". Generate it first before running @live e2e tests.`,
       );
     }
 
@@ -47,35 +52,35 @@ test.describe("@live chat", () => {
     await input.fill(promptText);
     await page.getByTestId("chat-send").click();
 
-    await expect.poll(
-      async () => assistantMessages.count(),
-      {
+    await expect
+      .poll(async () => assistantMessages.count(), {
         timeout: responseTimeoutMs,
         message: "Assistant did not produce a persisted message within timeout",
-      }
-    ).toBeGreaterThan(initialAssistantCount);
+      })
+      .toBeGreaterThan(initialAssistantCount);
 
-    await expect.poll(
-      async () => page.url(),
-      {
+    await expect
+      .poll(async () => page.url(), {
         timeout: responseTimeoutMs,
         message: "Conversation URL was not updated to /chat/:id",
-      }
-    ).toMatch(/\/chat\/[^/?#]+/);
+      })
+      .toMatch(/\/chat\/[^/?#]+/);
 
     const assistantBubble = page.getByTestId("chat-bubble-assistant").last();
 
-    await expect.poll(
-      async () => {
-        const text = (await assistantBubble.textContent())?.trim() ?? "";
-        if (!text) return "empty";
-        if (text.startsWith("Error:")) return "error";
-        return "ok";
-      },
-      {
-        timeout: responseTimeoutMs,
-        message: "Assistant response was empty or an error",
-      }
-    ).toBe("ok");
+    await expect
+      .poll(
+        async () => {
+          const text = (await assistantBubble.textContent())?.trim() ?? "";
+          if (!text) return "empty";
+          if (text.startsWith("Error:")) return "error";
+          return "ok";
+        },
+        {
+          timeout: responseTimeoutMs,
+          message: "Assistant response was empty or an error",
+        },
+      )
+      .toBe("ok");
   });
 });

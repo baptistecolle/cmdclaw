@@ -24,10 +24,14 @@ function normalizeWorkflowName(text: string): string | null {
   return cleaned.slice(0, 128);
 }
 
-export async function generateWorkflowName(context: WorkflowNameContext): Promise<string | null> {
+export async function generateWorkflowName(
+  context: WorkflowNameContext,
+): Promise<string | null> {
   try {
     if (!env.GEMINI_API_KEY) {
-      console.warn("[WorkflowName] No GEMINI_API_KEY, skipping workflow name generation");
+      console.warn(
+        "[WorkflowName] No GEMINI_API_KEY, skipping workflow name generation",
+      );
       return null;
     }
 
@@ -45,7 +49,7 @@ export async function generateWorkflowName(context: WorkflowNameContext): Promis
         promptDont: context.promptDont ?? null,
       },
       null,
-      2
+      2,
     );
 
     const prompt = [
@@ -68,4 +72,3 @@ export async function generateWorkflowName(context: WorkflowNameContext): Promis
     return null;
   }
 }
-

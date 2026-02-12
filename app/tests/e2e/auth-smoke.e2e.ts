@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("redirects unauthenticated /chat to /login with callback", async ({ page }) => {
+test("redirects unauthenticated /chat to /login with callback", async ({
+  page,
+}) => {
   await page.goto("/chat");
   await expect(page).toHaveURL(/\/login\?callbackUrl=%2Fchat$/);
 });
@@ -10,9 +12,15 @@ test("renders login screen controls", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Log in" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue with Apple" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Send magic link" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue with Google" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue with Apple" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Send magic link" }),
+  ).toBeVisible();
 });
 
 test("allows public legal and support routes", async ({ page }) => {

@@ -44,7 +44,13 @@ const PROVIDERS: {
     logoUrl: "/integrations/openai.svg",
     logoAlt: "OpenAI logo",
     logoClassName: "dark:invert",
-    models: ["GPT-5.1 Codex Max", "GPT-5.1 Codex Mini", "GPT-5.2", "GPT-5.2 Codex", "GPT-5.1 Codex"],
+    models: [
+      "GPT-5.1 Codex Max",
+      "GPT-5.1 Codex Mini",
+      "GPT-5.2",
+      "GPT-5.2 Codex",
+      "GPT-5.1 Codex",
+    ],
   },
   {
     id: "google",
@@ -70,7 +76,10 @@ const PROVIDERS: {
 function SearchParamsHandler({
   onNotification,
 }: {
-  onNotification: (notification: { type: "success" | "error"; message: string }) => void;
+  onNotification: (notification: {
+    type: "success" | "error";
+    message: string;
+  }) => void;
 }) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -103,7 +112,8 @@ export default function SubscriptionsPage() {
   const connectProvider = useConnectProvider();
   const disconnectProvider = useDisconnectProvider();
   const setProviderApiKey = useSetProviderApiKey();
-  const [connectingProvider, setConnectingProvider] = useState<ProviderID | null>(null);
+  const [connectingProvider, setConnectingProvider] =
+    useState<ProviderID | null>(null);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
@@ -113,7 +123,7 @@ export default function SubscriptionsPage() {
     (newNotification: { type: "success" | "error"; message: string }) => {
       setNotification(newNotification);
     },
-    []
+    [],
   );
 
   // Auto-dismiss notifications
@@ -135,7 +145,10 @@ export default function SubscriptionsPage() {
       }
 
       try {
-        await setProviderApiKey.mutateAsync({ provider: "kimi", apiKey: apiKey.trim() });
+        await setProviderApiKey.mutateAsync({
+          provider: "kimi",
+          apiKey: apiKey.trim(),
+        });
         setNotification({
           type: "success",
           message: "Kimi connected successfully!",
@@ -144,7 +157,8 @@ export default function SubscriptionsPage() {
         console.error("Failed to save Kimi API key:", error);
         setNotification({
           type: "error",
-          message: "Failed to connect Kimi. Please verify your API key and try again.",
+          message:
+            "Failed to connect Kimi. Please verify your API key and try again.",
         });
       } finally {
         setConnectingProvider(null);
@@ -200,7 +214,8 @@ export default function SubscriptionsPage() {
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Subscriptions</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect your existing AI subscriptions to use additional models in Bap.
+          Connect your existing AI subscriptions to use additional models in
+          Bap.
         </p>
       </div>
 
@@ -210,7 +225,7 @@ export default function SubscriptionsPage() {
             "mb-6 flex items-center gap-2 rounded-lg border p-3 text-sm",
             notification.type === "success"
               ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400"
+              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400",
           )}
         >
           {notification.type === "success" ? (
@@ -229,17 +244,17 @@ export default function SubscriptionsPage() {
           const isDisconnecting = disconnectProvider.isPending;
 
           return (
-            <div
-              key={provider.id}
-              className="rounded-lg border p-5"
-            >
+            <div key={provider.id} className="rounded-lg border p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <img
                       src={provider.logoUrl}
                       alt={provider.logoAlt}
-                      className={cn("h-5 w-auto shrink-0", provider.logoClassName)}
+                      className={cn(
+                        "h-5 w-auto shrink-0",
+                        provider.logoClassName,
+                      )}
                       loading="lazy"
                       decoding="async"
                     />
@@ -255,7 +270,9 @@ export default function SubscriptionsPage() {
                     {provider.description}
                   </p>
                   {provider.authType === "api_key" && provider.apiKeyHelp ? (
-                    <p className="mt-1 text-xs text-muted-foreground">{provider.apiKeyHelp}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {provider.apiKeyHelp}
+                    </p>
                   ) : null}
                 </div>
 
@@ -303,9 +320,9 @@ export default function SubscriptionsPage() {
             decoding="async"
           />
           <p className="text-xs text-muted-foreground">
-            Anthropic models (Claude) are always available through Bap&apos;s platform.
-            Connecting a subscription gives you access to additional models from
-            that provider.
+            Anthropic models (Claude) are always available through Bap&apos;s
+            platform. Connecting a subscription gives you access to additional
+            models from that provider.
           </p>
         </div>
       </div>

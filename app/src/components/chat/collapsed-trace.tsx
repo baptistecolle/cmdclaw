@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Check, AlertCircle, ChevronRight, Eye, StopCircle } from "lucide-react";
+import {
+  Check,
+  AlertCircle,
+  ChevronRight,
+  Eye,
+  StopCircle,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { IntegrationBadges } from "./integration-badges";
@@ -31,7 +37,7 @@ export function CollapsedTrace({
   const hasInterrupted = activityItems.some(
     (item) =>
       item.status === "interrupted" ||
-      (item.type === "system" && item.content === "Interrupted by user")
+      (item.type === "system" && item.content === "Interrupted by user"),
   );
 
   // Handle toggle - use external handler if provided
@@ -43,7 +49,12 @@ export function CollapsedTrace({
   };
 
   return (
-    <div className={cn("rounded-lg border border-border/50 bg-muted/20 overflow-hidden", className)}>
+    <div
+      className={cn(
+        "rounded-lg border border-border/50 bg-muted/20 overflow-hidden",
+        className,
+      )}
+    >
       {/* Header - always visible */}
       <button
         onClick={handleToggle}
@@ -52,7 +63,7 @@ export function CollapsedTrace({
         <ChevronRight
           className={cn(
             "h-4 w-4 text-muted-foreground transition-transform duration-200",
-            isExpanded && "rotate-90"
+            isExpanded && "rotate-90",
           )}
         />
 

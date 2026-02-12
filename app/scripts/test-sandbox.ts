@@ -22,7 +22,13 @@ const TEMPLATE_NAME = process.env.E2B_TEMPLATE || "bap-agent-dev";
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const TEST_USER_EMAIL = "collebaptiste@gmail.com";
 
-type IntegrationType = "gmail" | "slack" | "notion" | "linear" | "github" | "airtable";
+type IntegrationType =
+  | "gmail"
+  | "slack"
+  | "notion"
+  | "linear"
+  | "github"
+  | "airtable";
 
 const ENV_VAR_MAP: Record<IntegrationType, string> = {
   gmail: "GMAIL_ACCESS_TOKEN",
@@ -49,11 +55,15 @@ function normalizeInteractiveCommand(cmd: string): string {
 
 async function runInteractiveCommandWithPty(
   sandbox: Sandbox,
-  cmd: string
+  cmd: string,
 ): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    console.log("[warn] PTY mode requires a TTY; falling back to non-interactive command mode.");
-    const result = await sandbox.commands.run(cmd, { timeoutMs: 60 * 60 * 1000 });
+    console.log(
+      "[warn] PTY mode requires a TTY; falling back to non-interactive command mode.",
+    );
+    const result = await sandbox.commands.run(cmd, {
+      timeoutMs: 60 * 60 * 1000,
+    });
     process.stdout.write(result.stdout);
     process.stderr.write(result.stderr);
     return result.exitCode;
@@ -98,7 +108,11 @@ async function runInteractiveCommandWithPty(
           while (
             j < merged.length &&
             merged[j] !== 0x07 &&
-            !(merged[j] === 0x1b && j + 1 < merged.length && merged[j + 1] === 0x5c)
+            !(
+              merged[j] === 0x1b &&
+              j + 1 < merged.length &&
+              merged[j + 1] === 0x5c
+            )
           ) {
             j += 1;
           }
@@ -135,7 +149,11 @@ async function runInteractiveCommandWithPty(
           const finalByte = merged[j];
           const csiBody = decoder.decode(merged.slice(i + 2, j));
 
-          if (finalByte === 0x79 && csiBody.startsWith("?") && csiBody.includes("$")) {
+          if (
+            finalByte === 0x79 &&
+            csiBody.startsWith("?") &&
+            csiBody.includes("$")
+          ) {
             i = j + 1;
             continue;
           }
@@ -166,7 +184,8 @@ async function runInteractiveCommandWithPty(
       }
     }
 
-    const rawInput = typeof chunk === "string" ? encoder.encode(chunk) : new Uint8Array(chunk);
+    const rawInput =
+      typeof chunk === "string" ? encoder.encode(chunk) : new Uint8Array(chunk);
     const filteredInput = filterProbeResponses(rawInput);
     if (filteredInput.length === 0) return;
     sandbox.pty.sendInput(ptyHandle.pid, filteredInput).catch(() => {});
@@ -175,7 +194,9 @@ async function runInteractiveCommandWithPty(
   const resizeHandler = () => {
     const nextCols = process.stdout.columns ?? cols;
     const nextRows = process.stdout.rows ?? rows;
-    sandbox.pty.resize(ptyHandle.pid, { cols: nextCols, rows: nextRows }).catch(() => {});
+    sandbox.pty
+      .resize(ptyHandle.pid, { cols: nextCols, rows: nextRows })
+      .catch(() => {});
   };
 
   try {
@@ -188,7 +209,10 @@ async function runInteractiveCommandWithPty(
     process.stdout.on("resize", resizeHandler);
 
     const normalizedCommand = normalizeInteractiveCommand(cmd);
-    await sandbox.pty.sendInput(ptyHandle.pid, encoder.encode(`exec env ${normalizedCommand}\n`));
+    await sandbox.pty.sendInput(
+      ptyHandle.pid,
+      encoder.encode(`exec env ${normalizedCommand}\n`),
+    );
     const result = await ptyHandle.wait();
     return result.exitCode;
   } catch (error) {
@@ -203,7 +227,9 @@ async function runInteractiveCommandWithPty(
   }
 }
 
-async function getIntegrationTokens(userEmail: string): Promise<Record<string, string>> {
+async function getIntegrationTokens(
+  userEmail: string,
+): Promise<Record<string, string>> {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const db = drizzle(pool, { schema });
 
@@ -229,13 +255,13 @@ async function getIntegrationTokens(userEmail: string): Promise<Record<string, s
       .from(schema.integration)
       .innerJoin(
         schema.integrationToken,
-        eq(schema.integration.id, schema.integrationToken.integrationId)
+        eq(schema.integration.id, schema.integrationToken.integrationId),
       )
       .where(
         and(
           eq(schema.integration.userId, foundUser.id),
-          eq(schema.integration.enabled, true)
-        )
+          eq(schema.integration.enabled, true),
+        ),
       );
 
     const envVars: Record<string, string> = {};
@@ -370,8 +396,12 @@ Commands:
         } else {
           const result = await sandbox.commands.run(cmd, {
             timeoutMs: 60000,
-            onStdout: (data) => { process.stdout.write(data); },
-            onStderr: (data) => { process.stderr.write(data); },
+            onStdout: (data) => {
+              process.stdout.write(data);
+            },
+            onStderr: (data) => {
+              process.stderr.write(data);
+            },
           });
 
           if (result.exitCode !== 0) {

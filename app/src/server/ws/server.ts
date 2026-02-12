@@ -13,7 +13,11 @@ import { db } from "@/server/db/client";
 import { device } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyDeviceToken } from "@/server/services/device-auth";
-import type { DaemonMessage, DaemonResponse, DeviceCapabilities } from "@/server/sandbox/types";
+import type {
+  DaemonMessage,
+  DaemonResponse,
+  DeviceCapabilities,
+} from "@/server/sandbox/types";
 
 interface DeviceConnection {
   ws: ServerWebSocket<WebSocketData>;
@@ -49,7 +53,10 @@ const REQUEST_TIMEOUT_MS = 120_000; // 2 minutes for command execution
 /**
  * Send a message to a connected device.
  */
-export function sendToDevice(deviceId: string, message: DaemonMessage): boolean {
+export function sendToDevice(
+  deviceId: string,
+  message: DaemonMessage,
+): boolean {
   const conn = connections.get(deviceId);
   if (!conn) return false;
 
@@ -67,7 +74,7 @@ export function sendToDevice(deviceId: string, message: DaemonMessage): boolean 
 export function waitForResponse(
   deviceId: string,
   message: DaemonMessage & { id: string },
-  timeoutMs = REQUEST_TIMEOUT_MS
+  timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<DaemonResponse> {
   return new Promise((resolve, reject) => {
     const sent = sendToDevice(deviceId, message);
@@ -95,7 +102,9 @@ export function isDeviceOnline(deviceId: string): boolean {
 /**
  * Get the WebSocket for a connected device.
  */
-export function getDeviceSocket(deviceId: string): ServerWebSocket<WebSocketData> | undefined {
+export function getDeviceSocket(
+  deviceId: string,
+): ServerWebSocket<WebSocketData> | undefined {
   return connections.get(deviceId)?.ws;
 }
 
@@ -115,7 +124,7 @@ export function getOnlineDevicesForUser(userId: string): string[] {
 async function handleAuthentication(
   ws: ServerWebSocket<WebSocketData>,
   token: string,
-  deviceId: string
+  deviceId: string,
 ): Promise<boolean> {
   const result = await verifyDeviceToken(token, deviceId);
   if (!result) {
@@ -142,11 +151,15 @@ async function handleAuthentication(
     .where(eq(device.id, result.deviceId));
 
   ws.send(JSON.stringify({ type: "authenticated", deviceId: result.deviceId }));
-  console.log(`[WS] Device ${result.deviceId} connected (user: ${result.userId})`);
+  console.log(
+    `[WS] Device ${result.deviceId} connected (user: ${result.userId})`,
+  );
   return true;
 }
 
-async function handleDisconnect(ws: ServerWebSocket<WebSocketData>): Promise<void> {
+async function handleDisconnect(
+  ws: ServerWebSocket<WebSocketData>,
+): Promise<void> {
   const { deviceId } = ws.data;
   if (!deviceId) return;
 
@@ -229,7 +242,7 @@ export function startWebSocketServer(port: number = 4097): void {
             status: "ok",
             connections: connections.size,
           }),
-          { headers: { "Content-Type": "application/json" } }
+          { headers: { "Content-Type": "application/json" } },
         );
       }
 
@@ -273,10 +286,17 @@ export function startWebSocketServer(port: number = 4097): void {
 
       message(ws, message) {
         if (!ws.data.authenticated) {
-          ws.send(JSON.stringify({ type: "error", error: "Not authenticated" }));
+          ws.send(
+            JSON.stringify({ type: "error", error: "Not authenticated" }),
+          );
           return;
         }
-        handleMessage(ws, typeof message === "string" ? message : new TextDecoder().decode(message));
+        handleMessage(
+          ws,
+          typeof message === "string"
+            ? message
+            : new TextDecoder().decode(message),
+        );
       },
 
       close(ws) {

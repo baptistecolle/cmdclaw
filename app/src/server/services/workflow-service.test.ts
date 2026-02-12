@@ -110,7 +110,7 @@ describe("triggerWorkflowRun", () => {
     workflowFindFirstMock.mockResolvedValue(null);
 
     await expect(
-      triggerWorkflowRun({ workflowId: "missing", triggerPayload: {} })
+      triggerWorkflowRun({ workflowId: "missing", triggerPayload: {} }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -128,7 +128,7 @@ describe("triggerWorkflowRun", () => {
     });
 
     await expect(
-      triggerWorkflowRun({ workflowId: "wf-1", triggerPayload: {} })
+      triggerWorkflowRun({ workflowId: "wf-1", triggerPayload: {} }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -145,7 +145,7 @@ describe("triggerWorkflowRun", () => {
         triggerPayload: { source: "manual" },
         userId: "user-1",
         userRole: "member",
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -176,7 +176,7 @@ describe("triggerWorkflowRun", () => {
         userId: "user-1",
         allowedIntegrations: ["slack"],
         allowedCustomIntegrations: ["custom-crm"],
-      })
+      }),
     );
   });
 
@@ -189,14 +189,14 @@ describe("triggerWorkflowRun", () => {
         triggerPayload: { source: "manual" },
         userId: "user-1",
         userRole: "admin",
-      })
+      }),
     ).rejects.toThrow("start failed");
 
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "error",
         errorMessage: "start failed",
-      })
+      }),
     );
 
     const errorEventCall = insertValuesMock.mock.calls.find(
@@ -204,7 +204,7 @@ describe("triggerWorkflowRun", () => {
         call[0] &&
         typeof call[0] === "object" &&
         "type" in (call[0] as Record<string, unknown>) &&
-        (call[0] as Record<string, unknown>).type === "error"
+        (call[0] as Record<string, unknown>).type === "error",
     );
 
     expect(errorEventCall?.[0]).toEqual(
@@ -212,7 +212,7 @@ describe("triggerWorkflowRun", () => {
         workflowRunId: "run-1",
         type: "error",
         payload: expect.objectContaining({ stage: "start_generation" }),
-      })
+      }),
     );
   });
 
@@ -257,13 +257,13 @@ describe("triggerWorkflowRun", () => {
       expect.objectContaining({
         status: "error",
         errorMessage: "Workflow run failed before generation could start.",
-      })
+      }),
     );
 
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "completed",
-      })
+      }),
     );
   });
 });

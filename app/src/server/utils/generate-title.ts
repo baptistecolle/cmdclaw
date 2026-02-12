@@ -6,7 +6,7 @@ import { env } from "@/env";
  */
 export async function generateConversationTitle(
   userMessage: string,
-  assistantMessage: string
+  assistantMessage: string,
 ): Promise<string | null> {
   try {
     if (!env.GEMINI_API_KEY) {

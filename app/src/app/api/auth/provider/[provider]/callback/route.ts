@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ provider: string }> }
+  { params }: { params: Promise<{ provider: string }> },
 ) {
   const { provider } = await params;
   const searchParams = request.nextUrl.searchParams;
@@ -25,7 +25,10 @@ export async function GET(
   // Handle OAuth errors
   if (error) {
     const errorDescription = searchParams.get("error_description");
-    console.error(`[ProviderAuth] OAuth error for ${provider}:`, errorDescription || error);
+    console.error(
+      `[ProviderAuth] OAuth error for ${provider}:`,
+      errorDescription || error,
+    );
     settingsUrl.searchParams.set("provider_error", error);
     return NextResponse.redirect(settingsUrl);
   }
@@ -41,7 +44,8 @@ export async function GET(
     return NextResponse.redirect(settingsUrl);
   }
 
-  const providerConfig = SUBSCRIPTION_PROVIDERS[provider as SubscriptionProviderID];
+  const providerConfig =
+    SUBSCRIPTION_PROVIDERS[provider as SubscriptionProviderID];
   if (!isOAuthProviderConfig(providerConfig)) {
     settingsUrl.searchParams.set("provider_error", "invalid_provider");
     return NextResponse.redirect(settingsUrl);
@@ -88,7 +92,10 @@ export async function GET(
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error(`[ProviderAuth] Token exchange failed for ${provider}:`, errorText);
+      console.error(
+        `[ProviderAuth] Token exchange failed for ${provider}:`,
+        errorText,
+      );
       settingsUrl.searchParams.set("provider_error", "token_exchange_failed");
       return NextResponse.redirect(settingsUrl);
     }

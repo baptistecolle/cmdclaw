@@ -1,5 +1,9 @@
 import { db } from "@/server/db/client";
-import { integration, customIntegration, customIntegrationCredential } from "@/server/db/schema";
+import {
+  integration,
+  customIntegration,
+  customIntegrationCredential,
+} from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
 import type { IntegrationType } from "@/server/oauth/config";
@@ -24,7 +28,9 @@ const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
   twitter: "TWITTER_ACCESS_TOKEN",
 };
 
-export async function getCliEnvForUser(userId: string): Promise<Record<string, string>> {
+export async function getCliEnvForUser(
+  userId: string,
+): Promise<Record<string, string>> {
   const cliEnv: Record<string, string> = {};
 
   // Get valid tokens, refreshing any that are expired or about to expire
@@ -43,7 +49,7 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
     where: and(
       eq(integration.userId, userId),
       eq(integration.type, "linkedin"),
-      eq(integration.enabled, true)
+      eq(integration.enabled, true),
     ),
   });
 
@@ -58,7 +64,7 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
     where: and(
       eq(integration.userId, userId),
       eq(integration.type, "salesforce"),
-      eq(integration.enabled, true)
+      eq(integration.enabled, true),
     ),
   });
 
@@ -92,7 +98,7 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
     const customCreds = await db.query.customIntegrationCredential.findMany({
       where: and(
         eq(customIntegrationCredential.userId, userId),
-        eq(customIntegrationCredential.enabled, true)
+        eq(customIntegrationCredential.enabled, true),
       ),
       with: {
         customIntegration: true,
@@ -122,13 +128,19 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
             }
           }
         } catch (e) {
-          console.error(`Failed to decrypt API key for custom integration ${integ.slug}:`, e);
+          console.error(
+            `Failed to decrypt API key for custom integration ${integ.slug}:`,
+            e,
+          );
         }
       } else if (integ.authType === "bearer_token" && cred.apiKey) {
         try {
           cliEnv[`${slug}_ACCESS_TOKEN`] = decrypt(cred.apiKey);
         } catch (e) {
-          console.error(`Failed to decrypt bearer token for custom integration ${integ.slug}:`, e);
+          console.error(
+            `Failed to decrypt bearer token for custom integration ${integ.slug}:`,
+            e,
+          );
         }
       } else if (integ.authType === "oauth2") {
         // Use refreshed token if available, otherwise use stored token
@@ -149,7 +161,7 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
 
 export async function getCliInstructionsWithCustom(
   connectedIntegrations: IntegrationType[],
-  userId: string
+  userId: string,
 ): Promise<string> {
   const base = getCliInstructions(connectedIntegrations);
 
@@ -157,7 +169,7 @@ export async function getCliInstructionsWithCustom(
     const customCreds = await db.query.customIntegrationCredential.findMany({
       where: and(
         eq(customIntegrationCredential.userId, userId),
-        eq(customIntegrationCredential.enabled, true)
+        eq(customIntegrationCredential.enabled, true),
       ),
       with: {
         customIntegration: true,
@@ -177,7 +189,9 @@ export async function getCliInstructionsWithCustom(
   }
 }
 
-export function getCliInstructions(connectedIntegrations: IntegrationType[]): string {
+export function getCliInstructions(
+  connectedIntegrations: IntegrationType[],
+): string {
   // Helper to show connection status
   const statusTag = (type: IntegrationType) =>
     connectedIntegrations.includes(type) ? "✓ Connected" : "⚡ Auth Required";
@@ -476,7 +490,9 @@ ${instructions}
 `;
 }
 
-export async function getEnabledIntegrationTypes(userId: string): Promise<IntegrationType[]> {
+export async function getEnabledIntegrationTypes(
+  userId: string,
+): Promise<IntegrationType[]> {
   const results = await db
     .select({ type: integration.type })
     .from(integration)
@@ -491,7 +507,7 @@ export async function getEnabledIntegrationTypes(userId: string): Promise<Integr
  */
 export async function getTokensForIntegrations(
   userId: string,
-  integrationTypes: string[]
+  integrationTypes: string[],
 ): Promise<Record<string, string>> {
   const tokens: Record<string, string> = {};
 
@@ -513,7 +529,7 @@ export async function getTokensForIntegrations(
       where: and(
         eq(integration.userId, userId),
         eq(integration.type, "linkedin"),
-        eq(integration.enabled, true)
+        eq(integration.enabled, true),
       ),
     });
 
@@ -530,12 +546,15 @@ export async function getTokensForIntegrations(
       where: and(
         eq(integration.userId, userId),
         eq(integration.type, "salesforce"),
-        eq(integration.enabled, true)
+        eq(integration.enabled, true),
       ),
     });
 
     if (salesforceIntegration && salesforceIntegration.metadata) {
-      const metadata = salesforceIntegration.metadata as Record<string, unknown>;
+      const metadata = salesforceIntegration.metadata as Record<
+        string,
+        unknown
+      >;
       if (metadata.instanceUrl) {
         tokens.SALESFORCE_INSTANCE_URL = metadata.instanceUrl as string;
       }

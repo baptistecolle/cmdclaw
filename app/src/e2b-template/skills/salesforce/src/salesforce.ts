@@ -18,7 +18,7 @@ if (!TOKEN || !INSTANCE_URL) {
         integration: "salesforce",
         message: "Salesforce authentication required",
       },
-    })
+    }),
   );
   process.exit(1);
 }
@@ -43,7 +43,7 @@ async function sfFetch(path: string, options: RequestInit = {}) {
           integration: "salesforce",
           message: "Salesforce session expired, please reconnect",
         },
-      })
+      }),
     );
     process.exit(1);
   }
@@ -98,7 +98,7 @@ const commands = {
   async update(
     objectType: string,
     recordId: string,
-    data: Record<string, unknown>
+    data: Record<string, unknown>,
   ) {
     await sfFetch(`/sobjects/${objectType}/${recordId}`, {
       method: "PATCH",
@@ -141,7 +141,7 @@ const commands = {
           updateable: f.updateable,
           picklistValues: f.picklistValues?.filter((p) => p.active),
           referenceTo: f.referenceTo,
-        })
+        }),
       ),
     };
   },
@@ -163,7 +163,7 @@ const commands = {
     const sobjects = result.sobjects
       .filter(
         (o: { queryable: boolean; createable: boolean }) =>
-          o.queryable && o.createable
+          o.queryable && o.createable,
       )
       .map((o: { name: string; label: string; custom: boolean }) => ({
         name: o.name,
@@ -173,7 +173,7 @@ const commands = {
       .sort(
         (
           a: { name: string; custom: boolean },
-          b: { name: string; custom: boolean }
+          b: { name: string; custom: boolean },
         ) => {
           const aCommon = commonObjects.indexOf(a.name);
           const bCommon = commonObjects.indexOf(b.name);
@@ -182,14 +182,14 @@ const commands = {
           if (bCommon !== -1) return 1;
           if (a.custom !== b.custom) return a.custom ? 1 : -1;
           return a.name.localeCompare(b.name);
-        }
+        },
       );
 
     return {
       totalSize: sobjects.length,
       commonObjects: sobjects.filter(
         (o: { name: string }) =>
-          commonObjects.includes(o.name) || o.name.endsWith("__c")
+          commonObjects.includes(o.name) || o.name.endsWith("__c"),
       ),
       allObjects: sobjects,
     };
@@ -222,7 +222,7 @@ async function main() {
         const [, objectType, recordId, ...fieldArgs] = args;
         if (!objectType || !recordId) {
           throw new Error(
-            "Usage: salesforce get <ObjectType> <RecordId> [field1,field2,...]"
+            "Usage: salesforce get <ObjectType> <RecordId> [field1,field2,...]",
           );
         }
         const fields = fieldArgs[0]?.split(",");
@@ -234,7 +234,7 @@ async function main() {
         const [, objectType, jsonData] = args;
         if (!objectType || !jsonData) {
           throw new Error(
-            'Usage: salesforce create <ObjectType> \'{"Field": "Value"}\''
+            'Usage: salesforce create <ObjectType> \'{"Field": "Value"}\'',
           );
         }
         result = await commands.create(objectType, JSON.parse(jsonData));
@@ -245,13 +245,13 @@ async function main() {
         const [, objectType, recordId, jsonData] = args;
         if (!objectType || !recordId || !jsonData) {
           throw new Error(
-            'Usage: salesforce update <ObjectType> <RecordId> \'{"Field": "Value"}\''
+            'Usage: salesforce update <ObjectType> <RecordId> \'{"Field": "Value"}\'',
           );
         }
         result = await commands.update(
           objectType,
           recordId,
-          JSON.parse(jsonData)
+          JSON.parse(jsonData),
         );
         break;
       }
@@ -289,7 +289,7 @@ async function main() {
               "objects            - List available objects",
               "search <SOSL>      - Cross-object search",
             ],
-          })
+          }),
         );
         process.exit(1);
     }
@@ -299,7 +299,7 @@ async function main() {
     console.log(
       JSON.stringify({
         error: error instanceof Error ? error.message : "Unknown error",
-      })
+      }),
     );
     process.exit(1);
   }

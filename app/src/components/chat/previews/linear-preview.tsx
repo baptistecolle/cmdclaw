@@ -16,19 +16,28 @@ export function LinearPreview({
     case "create":
       return <LinearCreatePreview args={args} />;
     case "update":
-      return <LinearUpdatePreview args={args} positionalArgs={positionalArgs} />;
+      return (
+        <LinearUpdatePreview args={args} positionalArgs={positionalArgs} />
+      );
     default:
       return null;
   }
 }
 
-function LinearCreatePreview({ args }: { args: Record<string, string | undefined> }) {
+function LinearCreatePreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const team = args.team || args.t;
   const title = args.title;
   const description = args.d || args.description;
   const priority = args.p || args.priority;
 
-  const priorityLabels: Record<string, { label: string; variant: "default" | "warning" | "danger" }> = {
+  const priorityLabels: Record<
+    string,
+    { label: string; variant: "default" | "warning" | "danger" }
+  > = {
     "0": { label: "No Priority", variant: "default" },
     "1": { label: "Urgent", variant: "danger" },
     "2": { label: "High", variant: "warning" },

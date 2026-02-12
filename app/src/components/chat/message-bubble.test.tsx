@@ -30,10 +30,12 @@ describe("MessageBubble", () => {
         content="Saved output to /app/report.pdf"
         sandboxFiles={[file]}
         onFileClick={onFileClick}
-      />
+      />,
     );
 
-    const fileButton = screen.getByRole("button", { name: /\/app\/report\.pdf/i });
+    const fileButton = screen.getByRole("button", {
+      name: /\/app\/report\.pdf/i,
+    });
     fireEvent.click(fileButton);
 
     expect(onFileClick).toHaveBeenCalledTimes(1);

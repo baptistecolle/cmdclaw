@@ -149,10 +149,16 @@ import {
   readSandboxFileAsBuffer,
 } from "@/server/services/sandbox-file-service";
 import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integration-skill-service";
-import { syncMemoryToSandbox, buildMemorySystemPrompt } from "@/server/services/memory-service";
+import {
+  syncMemoryToSandbox,
+  buildMemorySystemPrompt,
+} from "@/server/services/memory-service";
 import { getSandboxBackend } from "@/server/sandbox/factory";
 import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
-import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
+import {
+  checkToolPermissions,
+  parseBashCommand,
+} from "@/server/ai/permission-checker";
 
 function createCtx(overrides: Partial<Record<string, any>> = {}) {
   const ctx: any = {
@@ -203,7 +209,9 @@ describe("generationManager transitions", () => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
     updateWhereMock.mockResolvedValue(undefined);
-    insertValuesMock.mockImplementation(() => ({ returning: insertReturningMock }));
+    insertValuesMock.mockImplementation(() => ({
+      returning: insertReturningMock,
+    }));
     insertReturningMock.mockResolvedValue([]);
     generationFindFirstMock.mockResolvedValue(null);
     conversationFindFirstMock.mockResolvedValue(null);
@@ -218,7 +226,9 @@ describe("generationManager transitions", () => {
     const mgr = generationManager as any;
     mgr.activeGenerations.set(ctx.id, ctx);
 
-    const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
+    const finishSpy = vi
+      .spyOn(mgr, "finishGeneration")
+      .mockResolvedValue(undefined);
 
     const result = await generationManager.cancelGeneration(ctx.id, ctx.userId);
 
@@ -244,7 +254,12 @@ describe("generationManager transitions", () => {
     const mgr = generationManager as any;
     mgr.activeGenerations.set(ctx.id, ctx);
 
-    const result = await generationManager.submitApproval(ctx.id, "tool-1", "approve", ctx.userId);
+    const result = await generationManager.submitApproval(
+      ctx.id,
+      "tool-1",
+      "approve",
+      ctx.userId,
+    );
 
     expect(result).toBe(true);
     expect(ctx.pendingApproval).toBeNull();
@@ -254,7 +269,7 @@ describe("generationManager transitions", () => {
       expect.objectContaining({
         status: "running",
         pendingApproval: null,
-      })
+      }),
     );
 
     expect(callback).toHaveBeenCalledWith({
@@ -266,8 +281,12 @@ describe("generationManager transitions", () => {
 
   it("submits question approval and replies to OpenCode with default answers", async () => {
     const callback = vi.fn();
-    const questionReplyMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
-    const questionRejectMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+    const questionReplyMock = vi
+      .fn()
+      .mockResolvedValue({ data: true, error: undefined });
+    const questionRejectMock = vi
+      .fn()
+      .mockResolvedValue({ data: true, error: undefined });
 
     const ctx = createCtx({
       status: "awaiting_approval",
@@ -313,7 +332,12 @@ describe("generationManager transitions", () => {
     const mgr = generationManager as any;
     mgr.activeGenerations.set(ctx.id, ctx);
 
-    const result = await generationManager.submitApproval(ctx.id, "question-1", "approve", ctx.userId);
+    const result = await generationManager.submitApproval(
+      ctx.id,
+      "question-1",
+      "approve",
+      ctx.userId,
+    );
 
     expect(result).toBe(true);
     expect(questionReplyMock).toHaveBeenCalledWith({
@@ -332,8 +356,12 @@ describe("generationManager transitions", () => {
 
   it("submits denied question approval and rejects OpenCode question", async () => {
     const callback = vi.fn();
-    const questionReplyMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
-    const questionRejectMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+    const questionReplyMock = vi
+      .fn()
+      .mockResolvedValue({ data: true, error: undefined });
+    const questionRejectMock = vi
+      .fn()
+      .mockResolvedValue({ data: true, error: undefined });
 
     const ctx = createCtx({
       status: "awaiting_approval",
@@ -376,7 +404,12 @@ describe("generationManager transitions", () => {
     const mgr = generationManager as any;
     mgr.activeGenerations.set(ctx.id, ctx);
 
-    const result = await generationManager.submitApproval(ctx.id, "question-2", "deny", ctx.userId);
+    const result = await generationManager.submitApproval(
+      ctx.id,
+      "question-2",
+      "deny",
+      ctx.userId,
+    );
 
     expect(result).toBe(true);
     expect(questionReplyMock).not.toHaveBeenCalled();
@@ -394,7 +427,9 @@ describe("generationManager transitions", () => {
 
   it("submits permission approval and replies to OpenCode permission request", async () => {
     const callback = vi.fn();
-    const permissionReplyMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+    const permissionReplyMock = vi
+      .fn()
+      .mockResolvedValue({ data: true, error: undefined });
 
     const ctx = createCtx({
       status: "awaiting_approval",
@@ -432,7 +467,7 @@ describe("generationManager transitions", () => {
       ctx.id,
       "permission-1",
       "approve",
-      ctx.userId
+      ctx.userId,
     );
 
     expect(result).toBe(true);
@@ -475,11 +510,11 @@ describe("generationManager transitions", () => {
       expect.objectContaining({
         status: "paused",
         isPaused: true,
-      })
+      }),
     );
 
     expect(callback).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "status_change", status: "paused" })
+      expect.objectContaining({ type: "status_change", status: "paused" }),
     );
   });
 
@@ -498,12 +533,22 @@ describe("generationManager transitions", () => {
     const mgr = generationManager as any;
     mgr.activeGenerations.set(ctx.id, ctx);
 
-    const first = await generationManager.submitAuthResult(ctx.id, "slack", true, ctx.userId);
+    const first = await generationManager.submitAuthResult(
+      ctx.id,
+      "slack",
+      true,
+      ctx.userId,
+    );
     expect(first).toBe(true);
     expect(ctx.status).toBe("awaiting_auth");
     expect(ctx.pendingAuth?.connectedIntegrations).toEqual(["slack"]);
 
-    const second = await generationManager.submitAuthResult(ctx.id, "github", true, ctx.userId);
+    const second = await generationManager.submitAuthResult(
+      ctx.id,
+      "github",
+      true,
+      ctx.userId,
+    );
     expect(second).toBe(true);
     expect(ctx.status).toBe("running");
     expect(ctx.pendingAuth).toBeNull();
@@ -512,7 +557,7 @@ describe("generationManager transitions", () => {
       expect.objectContaining({
         status: "running",
         pendingAuth: null,
-      })
+      }),
     );
 
     expect(callback).toHaveBeenCalledWith(
@@ -520,7 +565,7 @@ describe("generationManager transitions", () => {
         type: "auth_result",
         success: true,
         integrations: ["slack", "github"],
-      })
+      }),
     );
   });
 
@@ -529,7 +574,9 @@ describe("generationManager transitions", () => {
     const mgr = generationManager as any;
     mgr.activeGenerations.set(ctx.id, ctx);
 
-    const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
+    const finishSpy = vi
+      .spyOn(mgr, "finishGeneration")
+      .mockResolvedValue(undefined);
 
     const authPromise = generationManager.waitForAuth(ctx.id, {
       integration: "slack",
@@ -580,7 +627,10 @@ describe("generationManager transitions", () => {
 
   it("rejects startGeneration when an active running generation already exists", async () => {
     const mgr = generationManager as any;
-    mgr.activeGenerations.set("gen-existing", createCtx({ id: "gen-existing", status: "running" }));
+    mgr.activeGenerations.set(
+      "gen-existing",
+      createCtx({ id: "gen-existing", status: "running" }),
+    );
     mgr.conversationToGeneration.set("conv-existing", "gen-existing");
 
     await expect(
@@ -588,7 +638,7 @@ describe("generationManager transitions", () => {
         conversationId: "conv-existing",
         content: "hello",
         userId: "user-1",
-      })
+      }),
     ).rejects.toThrow("Generation already in progress for this conversation");
   });
 
@@ -605,7 +655,7 @@ describe("generationManager transitions", () => {
         conversationId: "conv-1",
         content: "hello",
         userId: "user-1",
-      })
+      }),
     ).rejects.toThrow("Access denied");
   });
 
@@ -725,7 +775,9 @@ describe("generationManager transitions", () => {
       ],
     });
 
-    const events = await collectEvents(generationManager.subscribeToGeneration("gen-db", "user-1"));
+    const events = await collectEvents(
+      generationManager.subscribeToGeneration("gen-db", "user-1"),
+    );
 
     expect(events).toEqual([
       { type: "text", content: "hi" },
@@ -757,7 +809,12 @@ describe("generationManager transitions", () => {
       agentInitFailedAt: Date.now(),
       contentParts: [
         { type: "text", text: "hi" },
-        { type: "tool_use", id: "tool-1", name: "bash", input: { command: "ls" } },
+        {
+          type: "tool_use",
+          id: "tool-1",
+          name: "bash",
+          input: { command: "ls" },
+        },
         { type: "tool_result", tool_use_id: "tool-1", content: "ok" },
       ],
       pendingApproval: {
@@ -780,12 +837,19 @@ describe("generationManager transitions", () => {
     const mgr = generationManager as any;
     mgr.activeGenerations.set(ctx.id, ctx);
 
-    const events = await collectEvents(generationManager.subscribeToGeneration(ctx.id, ctx.userId));
+    const events = await collectEvents(
+      generationManager.subscribeToGeneration(ctx.id, ctx.userId),
+    );
 
     expect(events).toEqual(
       expect.arrayContaining([
         { type: "text", content: "hi" },
-        { type: "tool_use", toolName: "bash", toolInput: { command: "ls" }, toolUseId: "tool-1" },
+        {
+          type: "tool_use",
+          toolName: "bash",
+          toolInput: { command: "ls" },
+          toolUseId: "tool-1",
+        },
         { type: "tool_result", toolName: "bash", result: "ok" },
         { type: "status_change", status: "agent_init_started" },
         { type: "status_change", status: "agent_init_ready" },
@@ -808,19 +872,31 @@ describe("generationManager transitions", () => {
           integrations: ["slack"],
           reason: "Need Slack",
         },
-      ])
+      ]),
     );
   });
 
   it("dispatches runGeneration to session reset, direct backend, and opencode backend", async () => {
     const mgr = generationManager as any;
-    const resetSpy = vi.spyOn(mgr, "handleSessionReset").mockResolvedValue(undefined);
-    const directSpy = vi.spyOn(mgr, "runDirectGeneration").mockResolvedValue(undefined);
-    const opencodeSpy = vi.spyOn(mgr, "runOpenCodeGeneration").mockResolvedValue(undefined);
+    const resetSpy = vi
+      .spyOn(mgr, "handleSessionReset")
+      .mockResolvedValue(undefined);
+    const directSpy = vi
+      .spyOn(mgr, "runDirectGeneration")
+      .mockResolvedValue(undefined);
+    const opencodeSpy = vi
+      .spyOn(mgr, "runOpenCodeGeneration")
+      .mockResolvedValue(undefined);
 
-    await mgr.runGeneration(createCtx({ userMessageContent: " /new ", backendType: "opencode" }));
-    await mgr.runGeneration(createCtx({ userMessageContent: "hello", backendType: "direct" }));
-    await mgr.runGeneration(createCtx({ userMessageContent: "hello", backendType: "opencode" }));
+    await mgr.runGeneration(
+      createCtx({ userMessageContent: " /new ", backendType: "opencode" }),
+    );
+    await mgr.runGeneration(
+      createCtx({ userMessageContent: "hello", backendType: "direct" }),
+    );
+    await mgr.runGeneration(
+      createCtx({ userMessageContent: "hello", backendType: "opencode" }),
+    );
 
     expect(resetSpy).toHaveBeenCalledTimes(1);
     expect(directSpy).toHaveBeenCalledTimes(1);
@@ -875,9 +951,11 @@ describe("generationManager transitions", () => {
     await mgr.finishGeneration(ctx, "cancelled");
 
     expect(ctx.status).toBe("cancelled");
-    expect(ctx.contentParts.some((p: any) => p.type === "system" && p.content === "Interrupted by user")).toBe(
-      true
-    );
+    expect(
+      ctx.contentParts.some(
+        (p: any) => p.type === "system" && p.content === "Interrupted by user",
+      ),
+    ).toBe(true);
     expect(callback).toHaveBeenCalledWith({
       type: "cancelled",
       generationId: ctx.id,
@@ -887,7 +965,12 @@ describe("generationManager transitions", () => {
   });
 
   it("handles submitApproval guard paths (missing context, access denied, mismatched toolUseId)", async () => {
-    const missing = await generationManager.submitApproval("missing", "tool-1", "approve", "user-1");
+    const missing = await generationManager.submitApproval(
+      "missing",
+      "tool-1",
+      "approve",
+      "user-1",
+    );
     expect(missing).toBe(false);
 
     const deniedCtx = createCtx({
@@ -902,31 +985,46 @@ describe("generationManager transitions", () => {
     mgr.activeGenerations.set("gen-denied", deniedCtx);
 
     await expect(
-      generationManager.submitApproval("gen-denied", "tool-1", "approve", "other-user")
+      generationManager.submitApproval(
+        "gen-denied",
+        "tool-1",
+        "approve",
+        "other-user",
+      ),
     ).rejects.toThrow("Access denied");
 
     const mismatch = await generationManager.submitApproval(
       "gen-denied",
       "tool-does-not-match",
       "approve",
-      deniedCtx.userId
+      deniedCtx.userId,
     );
     expect(mismatch).toBe(false);
   });
 
   it("handles submitAuthResult guard paths and cancellation path", async () => {
-    const missing = await generationManager.submitAuthResult("missing", "slack", true, "user-1");
+    const missing = await generationManager.submitAuthResult(
+      "missing",
+      "slack",
+      true,
+      "user-1",
+    );
     expect(missing).toBe(false);
 
     const mgr = generationManager as any;
     const ctx = createCtx({ pendingAuth: null });
     mgr.activeGenerations.set(ctx.id, ctx);
 
-    await expect(generationManager.submitAuthResult(ctx.id, "slack", true, "other-user")).rejects.toThrow(
-      "Access denied"
-    );
+    await expect(
+      generationManager.submitAuthResult(ctx.id, "slack", true, "other-user"),
+    ).rejects.toThrow("Access denied");
 
-    const noPending = await generationManager.submitAuthResult(ctx.id, "slack", true, ctx.userId);
+    const noPending = await generationManager.submitAuthResult(
+      ctx.id,
+      "slack",
+      true,
+      ctx.userId,
+    );
     expect(noPending).toBe(false);
 
     const ctxWithPendingAuth = createCtx({
@@ -938,13 +1036,15 @@ describe("generationManager transitions", () => {
       },
     });
     mgr.activeGenerations.set(ctxWithPendingAuth.id, ctxWithPendingAuth);
-    const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
+    const finishSpy = vi
+      .spyOn(mgr, "finishGeneration")
+      .mockResolvedValue(undefined);
 
     const cancelled = await generationManager.submitAuthResult(
       ctxWithPendingAuth.id,
       "slack",
       false,
-      ctxWithPendingAuth.userId
+      ctxWithPendingAuth.userId,
     );
     expect(cancelled).toBe(true);
     expect(finishSpy).toHaveBeenCalledWith(ctxWithPendingAuth, "cancelled");
@@ -957,13 +1057,13 @@ describe("generationManager transitions", () => {
         integration: "slack",
         operation: "send",
         command: "slack send",
-      })
+      }),
     ).resolves.toBe("deny");
 
     await expect(
       generationManager.waitForAuth("missing", {
         integration: "slack",
-      })
+      }),
     ).resolves.toEqual({ success: false });
 
     const ctx = createCtx({ autoApprove: true });
@@ -976,7 +1076,7 @@ describe("generationManager transitions", () => {
         integration: "slack",
         operation: "send",
         command: "slack send",
-      })
+      }),
     ).resolves.toBe("allow");
   });
 
@@ -990,17 +1090,22 @@ describe("generationManager transitions", () => {
     mgr.activeGenerations.set(ctx.id, ctx);
     mgr.conversationToGeneration.set(ctx.conversationId, ctx.id);
 
-    expect(generationManager.getAllowedIntegrationsForConversation("conv-allowed")).toEqual([
-      "slack",
-      "github",
-    ]);
-    expect(generationManager.getAllowedIntegrationsForConversation("missing-conv")).toBeNull();
+    expect(
+      generationManager.getAllowedIntegrationsForConversation("conv-allowed"),
+    ).toEqual(["slack", "github"]);
+    expect(
+      generationManager.getAllowedIntegrationsForConversation("missing-conv"),
+    ).toBeNull();
   });
 
   it("builds workflow prompt sections only when workflow context is present", () => {
     const mgr = generationManager as any;
 
-    expect(mgr.buildWorkflowPrompt(createCtx({ workflowPrompt: undefined, triggerPayload: undefined }))).toBeNull();
+    expect(
+      mgr.buildWorkflowPrompt(
+        createCtx({ workflowPrompt: undefined, triggerPayload: undefined }),
+      ),
+    ).toBeNull();
 
     const prompt = mgr.buildWorkflowPrompt(
       createCtx({
@@ -1008,7 +1113,7 @@ describe("generationManager transitions", () => {
         workflowPromptDo: "Do this",
         workflowPromptDont: "Do not do that",
         triggerPayload: { event: "cron" },
-      })
+      }),
     );
 
     expect(prompt).toContain("## Workflow Instructions");
@@ -1025,12 +1130,21 @@ describe("generationManager transitions", () => {
       GITHUB_ACCESS_TOKEN: "gh-token",
       SLACK_ACCESS_TOKEN: "slack-token",
     } as any);
-    vi.mocked(getEnabledIntegrationTypes).mockResolvedValue(["github", "slack"] as any);
-    vi.mocked(getCliInstructionsWithCustom).mockResolvedValue("cli instructions");
+    vi.mocked(getEnabledIntegrationTypes).mockResolvedValue([
+      "github",
+      "slack",
+    ] as any);
+    vi.mocked(getCliInstructionsWithCustom).mockResolvedValue(
+      "cli instructions",
+    );
     vi.mocked(writeSkillsToSandbox).mockResolvedValue(["base-skill"]);
     vi.mocked(getSkillsSystemPrompt).mockReturnValue("skills prompt");
-    vi.mocked(writeResolvedIntegrationSkillsToSandbox).mockResolvedValue(["github"]);
-    vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("integration skills prompt");
+    vi.mocked(writeResolvedIntegrationSkillsToSandbox).mockResolvedValue([
+      "github",
+    ]);
+    vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue(
+      "integration skills prompt",
+    );
     vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
     vi.mocked(buildMemorySystemPrompt).mockReturnValue("memory prompt");
     vi.mocked(collectNewE2BFiles).mockResolvedValue([
@@ -1074,10 +1188,16 @@ describe("generationManager transitions", () => {
     } as any);
 
     const mgr = generationManager as any;
-    const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
-    vi.spyOn(mgr, "importIntegrationSkillDraftsFromE2B").mockResolvedValue(undefined);
+    const finishSpy = vi
+      .spyOn(mgr, "finishGeneration")
+      .mockResolvedValue(undefined);
+    vi.spyOn(mgr, "importIntegrationSkillDraftsFromE2B").mockResolvedValue(
+      undefined,
+    );
     vi.spyOn(mgr, "processOpencodeEvent").mockResolvedValue(undefined);
-    vi.spyOn(mgr, "handleOpenCodeActionableEvent").mockResolvedValue({ type: "none" });
+    vi.spyOn(mgr, "handleOpenCodeActionableEvent").mockResolvedValue({
+      type: "none",
+    });
 
     const ctx = createCtx({
       id: "gen-opencode",
@@ -1087,8 +1207,16 @@ describe("generationManager transitions", () => {
       allowedIntegrations: ["github"],
       userMessageContent: "Process these files",
       attachments: [
-        { name: "image.png", mimeType: "image/png", dataUrl: "data:image/png;base64,aGVsbG8=" },
-        { name: "notes.txt", mimeType: "text/plain", dataUrl: "data:text/plain;base64,aGVsbG8=" },
+        {
+          name: "image.png",
+          mimeType: "image/png",
+          dataUrl: "data:image/png;base64,aGVsbG8=",
+        },
+        {
+          name: "notes.txt",
+          mimeType: "text/plain",
+          dataUrl: "data:text/plain;base64,aGVsbG8=",
+        },
       ],
       uploadedSandboxFileIds: new Set(),
     });
@@ -1112,7 +1240,9 @@ describe("generationManager transitions", () => {
         ],
       },
     ] as any);
-    vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("integration skills prompt");
+    vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue(
+      "integration skills prompt",
+    );
     vi.mocked(buildMemorySystemPrompt).mockReturnValue("memory prompt");
     vi.mocked(getDirectModeTools).mockReturnValue([{ name: "bash" }] as any);
     vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
@@ -1145,7 +1275,9 @@ describe("generationManager transitions", () => {
         needsAuth: false,
       } as any;
     });
-    vi.mocked(readSandboxFileAsBuffer).mockResolvedValue(Buffer.from("file-content"));
+    vi.mocked(readSandboxFileAsBuffer).mockResolvedValue(
+      Buffer.from("file-content"),
+    );
     vi.mocked(uploadSandboxFile).mockResolvedValue({
       id: "uploaded-send-file-1",
       filename: "report.txt",
@@ -1177,25 +1309,25 @@ describe("generationManager transitions", () => {
     const firstStream = asAsyncIterable([
       { type: "text_delta", text: "Hello " },
       { type: "tool_use_start", toolUseId: "m1", toolName: "memory_write" },
-      { type: "tool_use_delta", jsonDelta: "{\"content\":\"note\"}" },
+      { type: "tool_use_delta", jsonDelta: '{"content":"note"}' },
       { type: "tool_use_end" },
       { type: "tool_use_start", toolUseId: "b1", toolName: "bash" },
-      { type: "tool_use_delta", jsonDelta: "{\"command\":\"slack forbidden\"}" },
+      { type: "tool_use_delta", jsonDelta: '{"command":"slack forbidden"}' },
       { type: "tool_use_end" },
       { type: "tool_use_start", toolUseId: "a1", toolName: "auth_tool" },
       { type: "tool_use_delta", jsonDelta: "{}" },
       { type: "tool_use_end" },
       { type: "tool_use_start", toolUseId: "ap1", toolName: "approve_tool" },
-      { type: "tool_use_delta", jsonDelta: "{\"command\":\"write\"}" },
+      { type: "tool_use_delta", jsonDelta: '{"command":"write"}' },
       { type: "tool_use_end" },
       { type: "tool_use_start", toolUseId: "sf1", toolName: "send_file" },
-      { type: "tool_use_delta", jsonDelta: "{\"path\":\"/tmp/report.txt\"}" },
+      { type: "tool_use_delta", jsonDelta: '{"path":"/tmp/report.txt"}' },
       { type: "tool_use_end" },
       { type: "tool_use_start", toolUseId: "e1", toolName: "bash_exec" },
-      { type: "tool_use_delta", jsonDelta: "{\"command\":\"echo hi\"}" },
+      { type: "tool_use_delta", jsonDelta: '{"command":"echo hi"}' },
       { type: "tool_use_end" },
       { type: "tool_use_start", toolUseId: "e2", toolName: "bash_fail" },
-      { type: "tool_use_delta", jsonDelta: "{\"command\":\"bad\"}" },
+      { type: "tool_use_delta", jsonDelta: '{"command":"bad"}' },
       { type: "tool_use_end" },
       { type: "tool_use_start", toolUseId: "u1", toolName: "unknown_tool" },
       { type: "tool_use_delta", jsonDelta: "{}" },
@@ -1214,11 +1346,18 @@ describe("generationManager transitions", () => {
     };
 
     const mgr = generationManager as any;
-    const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
+    const finishSpy = vi
+      .spyOn(mgr, "finishGeneration")
+      .mockResolvedValue(undefined);
     vi.spyOn(mgr, "getLLMBackend").mockResolvedValue(llm as any);
     vi.spyOn(mgr, "buildMessageHistory").mockResolvedValue([]);
-    vi.spyOn(mgr, "executeMemoryTool").mockResolvedValue({ content: "memory ok", isError: false });
-    vi.spyOn(mgr, "importIntegrationSkillDraftsFromSandbox").mockResolvedValue(undefined);
+    vi.spyOn(mgr, "executeMemoryTool").mockResolvedValue({
+      content: "memory ok",
+      isError: false,
+    });
+    vi.spyOn(mgr, "importIntegrationSkillDraftsFromSandbox").mockResolvedValue(
+      undefined,
+    );
     vi.spyOn(mgr, "waitForAuth").mockResolvedValue({ success: false });
     vi.spyOn(mgr, "waitForApproval").mockResolvedValue("deny");
 

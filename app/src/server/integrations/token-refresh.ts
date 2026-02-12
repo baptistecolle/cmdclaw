@@ -1,5 +1,9 @@
 import { db } from "@/server/db/client";
-import { integration, integrationToken, customIntegrationCredential } from "@/server/db/schema";
+import {
+  integration,
+  integrationToken,
+  customIntegrationCredential,
+} from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 import { decrypt } from "@/server/lib/encryption";
@@ -53,9 +57,13 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
   };
 
   // Notion, Airtable, and Reddit require Basic auth header for token refresh
-  if (token.type === "notion" || token.type === "airtable" || token.type === "reddit") {
+  if (
+    token.type === "notion" ||
+    token.type === "airtable" ||
+    token.type === "reddit"
+  ) {
     headers["Authorization"] = `Basic ${Buffer.from(
-      `${config.clientId}:${config.clientSecret}`
+      `${config.clientId}:${config.clientSecret}`,
     ).toString("base64")}`;
     tokenBody.delete("client_id");
     tokenBody.delete("client_secret");
@@ -70,12 +78,18 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
   // (handled in the response processing below)
 
   const now = new Date();
-  const tokenAge = token.expiresAt ? Math.round((now.getTime() - token.expiresAt.getTime()) / 1000 / 60) : 'unknown';
+  const tokenAge = token.expiresAt
+    ? Math.round((now.getTime() - token.expiresAt.getTime()) / 1000 / 60)
+    : "unknown";
   console.log(`[Token Refresh] Refreshing ${token.type} token...`);
   console.log(`[Token Refresh] Integration ID: ${token.integrationId}`);
-  console.log(`[Token Refresh] Token expired at: ${token.expiresAt?.toISOString() ?? 'no expiry'}`);
+  console.log(
+    `[Token Refresh] Token expired at: ${token.expiresAt?.toISOString() ?? "no expiry"}`,
+  );
   console.log(`[Token Refresh] Token age (mins past expiry): ${tokenAge}`);
-  console.log(`[Token Refresh] Refresh token present: ${!!token.refreshToken} (length: ${token.refreshToken?.length ?? 0})`);
+  console.log(
+    `[Token Refresh] Refresh token present: ${!!token.refreshToken} (length: ${token.refreshToken?.length ?? 0})`,
+  );
 
   const response = await fetch(config.tokenUrl, {
     method: "POST",
@@ -85,7 +99,10 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
 
   if (!response.ok) {
     const error = await response.text();
-    console.error(`[Token Refresh] Failed to refresh ${token.type} token:`, error);
+    console.error(
+      `[Token Refresh] Failed to refresh ${token.type} token:`,
+      error,
+    );
     throw new Error(`Failed to refresh ${token.type} token: ${error}`);
   }
 
@@ -118,7 +135,9 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
 /**
  * Get a valid access token for an integration, refreshing if necessary
  */
-export async function getValidAccessToken(token: TokenWithMetadata): Promise<string> {
+export async function getValidAccessToken(
+  token: TokenWithMetadata,
+): Promise<string> {
   if (!needsRefresh(token)) {
     return token.accessToken;
   }
@@ -138,7 +157,7 @@ export async function getValidAccessToken(token: TokenWithMetadata): Promise<str
  * refreshing any that are expired or about to expire
  */
 export async function getValidTokensForUser(
-  userId: string
+  userId: string,
 ): Promise<Map<IntegrationType, string>> {
   const results = await db
     .select({
@@ -150,7 +169,10 @@ export async function getValidTokensForUser(
       enabled: integration.enabled,
     })
     .from(integration)
-    .innerJoin(integrationToken, eq(integration.id, integrationToken.integrationId))
+    .innerJoin(
+      integrationToken,
+      eq(integration.id, integrationToken.integrationId),
+    )
     .where(eq(integration.userId, userId));
 
   const tokens = new Map<IntegrationType, string>();
@@ -169,7 +191,7 @@ export async function getValidTokensForUser(
         });
 
         tokens.set(row.type, validToken);
-      })
+      }),
   );
 
   return tokens;
@@ -184,7 +206,7 @@ async function refreshCustomToken(
   refreshToken: string,
   oauthConfig: { tokenUrl: string; authStyle?: "header" | "params" },
   encryptedClientId: string,
-  encryptedClientSecret: string
+  encryptedClientSecret: string,
 ): Promise<string> {
   const clientId = decrypt(encryptedClientId);
   const clientSecret = decrypt(encryptedClientSecret);
@@ -199,7 +221,8 @@ async function refreshCustomToken(
   };
 
   if (oauthConfig.authStyle === "header") {
-    headers["Authorization"] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+    headers["Authorization"] =
+      `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
   } else {
     tokenBody.set("client_id", clientId);
     tokenBody.set("client_secret", clientSecret);
@@ -226,7 +249,9 @@ async function refreshCustomToken(
     .set({
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
+      expiresAt: tokens.expires_in
+        ? new Date(Date.now() + tokens.expires_in * 1000)
+        : null,
     })
     .where(eq(customIntegrationCredential.id, credId));
 
@@ -237,13 +262,15 @@ async function refreshCustomToken(
  * Get valid tokens for all custom OAuth integrations, refreshing as needed
  * Returns Map<credentialId, accessToken>
  */
-export async function getValidCustomTokens(userId: string): Promise<Map<string, string>> {
+export async function getValidCustomTokens(
+  userId: string,
+): Promise<Map<string, string>> {
   const tokens = new Map<string, string>();
 
   const creds = await db.query.customIntegrationCredential.findMany({
     where: and(
       eq(customIntegrationCredential.userId, userId),
-      eq(customIntegrationCredential.enabled, true)
+      eq(customIntegrationCredential.enabled, true),
     ),
     with: {
       customIntegration: true,
@@ -261,7 +288,10 @@ export async function getValidCustomTokens(userId: string): Promise<Map<string, 
         }
 
         // Check if needs refresh
-        if (c.expiresAt && Date.now() >= c.expiresAt.getTime() - EXPIRY_BUFFER_MS) {
+        if (
+          c.expiresAt &&
+          Date.now() >= c.expiresAt.getTime() - EXPIRY_BUFFER_MS
+        ) {
           try {
             const newToken = await refreshCustomToken(
               c.id,
@@ -269,7 +299,7 @@ export async function getValidCustomTokens(userId: string): Promise<Map<string, 
               c.refreshToken,
               oauth,
               c.clientId,
-              c.clientSecret
+              c.clientSecret,
             );
             tokens.set(c.id, newToken);
           } catch {
@@ -278,7 +308,7 @@ export async function getValidCustomTokens(userId: string): Promise<Map<string, 
         } else if (c.accessToken) {
           tokens.set(c.id, c.accessToken);
         }
-      })
+      }),
   );
 
   return tokens;

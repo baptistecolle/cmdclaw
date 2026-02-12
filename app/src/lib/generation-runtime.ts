@@ -1,4 +1,9 @@
-export type TraceStatus = "streaming" | "complete" | "error" | "waiting_approval" | "waiting_auth";
+export type TraceStatus =
+  | "streaming"
+  | "complete"
+  | "error"
+  | "waiting_approval"
+  | "waiting_auth";
 
 export type RuntimeMessagePart =
   | { type: "text"; content: string }
@@ -133,7 +138,11 @@ export type RuntimeServerEvent =
       operation: string;
       command?: string;
     }
-  | { type: "approval_result"; toolUseId: string; decision: "approved" | "denied" }
+  | {
+      type: "approval_result";
+      toolUseId: string;
+      decision: "approved" | "denied";
+    }
   | {
       type: "auth_needed";
       generationId: string;
@@ -143,10 +152,27 @@ export type RuntimeServerEvent =
     }
   | { type: "auth_progress"; connected: string; remaining: string[] }
   | { type: "auth_result"; success: boolean }
-  | { type: "sandbox_file"; fileId: string; path: string; filename: string; mimeType: string; sizeBytes: number | null }
-  | { type: "done"; generationId: string; conversationId: string; messageId: string }
+  | {
+      type: "sandbox_file";
+      fileId: string;
+      path: string;
+      filename: string;
+      mimeType: string;
+      sizeBytes: number | null;
+    }
+  | {
+      type: "done";
+      generationId: string;
+      conversationId: string;
+      messageId: string;
+    }
   | { type: "error"; message: string }
-  | { type: "cancelled"; generationId: string; conversationId: string; messageId?: string };
+  | {
+      type: "cancelled";
+      generationId: string;
+      conversationId: string;
+      messageId?: string;
+    };
 
 export type RuntimeSnapshot = {
   parts: RuntimeMessagePart[];
@@ -184,7 +210,11 @@ export class GenerationRuntime {
         items: seg.items.map((item) => ({ ...item })),
         approval: seg.approval ? { ...seg.approval } : undefined,
         auth: seg.auth
-          ? { ...seg.auth, integrations: [...seg.auth.integrations], connectedIntegrations: [...seg.auth.connectedIntegrations] }
+          ? {
+              ...seg.auth,
+              integrations: [...seg.auth.integrations],
+              connectedIntegrations: [...seg.auth.connectedIntegrations],
+            }
           : undefined,
         isExpanded: idx === this.segments.length - 1 ? seg.isExpanded : false,
       })),
@@ -199,7 +229,10 @@ export class GenerationRuntime {
   }
 
   getCurrentIds(): { generationId?: string; conversationId?: string } {
-    return { generationId: this.currentGenerationId, conversationId: this.currentConversationId };
+    return {
+      generationId: this.currentGenerationId,
+      conversationId: this.currentConversationId,
+    };
   }
 
   handleText(text: string): void {
@@ -272,7 +305,11 @@ export class GenerationRuntime {
   handleToolResult(toolName: string, result: unknown): void {
     for (let i = this.parts.length - 1; i >= 0; i -= 1) {
       const part = this.parts[i];
-      if (part.type === "tool_call" && part.name === toolName && part.result === undefined) {
+      if (
+        part.type === "tool_call" &&
+        part.name === toolName &&
+        part.result === undefined
+      ) {
         part.result = result;
         break;
       }
@@ -280,9 +317,14 @@ export class GenerationRuntime {
 
     for (let i = this.segments.length - 1; i >= 0; i -= 1) {
       const seg = this.segments[i];
-      const toolItem = [...seg.items].reverse().find(
-        (item) => item.type === "tool_call" && item.content === toolName && item.status === "running"
-      );
+      const toolItem = [...seg.items]
+        .reverse()
+        .find(
+          (item) =>
+            item.type === "tool_call" &&
+            item.content === toolName &&
+            item.status === "running",
+        );
       if (toolItem) {
         toolItem.status = "complete";
         toolItem.result = result;
@@ -319,7 +361,9 @@ export class GenerationRuntime {
     for (const seg of this.segments) {
       if (seg.approval?.toolUseId === toolUseId) {
         seg.approval.status = status;
-        const toolItem = seg.items.find((item) => item.type === "tool_call" && item.status === "running");
+        const toolItem = seg.items.find(
+          (item) => item.type === "tool_call" && item.status === "running",
+        );
         if (toolItem) {
           toolItem.status = status === "approved" ? "complete" : "error";
         }
@@ -328,7 +372,10 @@ export class GenerationRuntime {
     }
   }
 
-  handleApprovalResult(toolUseId: string, decision: "approved" | "denied"): void {
+  handleApprovalResult(
+    toolUseId: string,
+    decision: "approved" | "denied",
+  ): void {
     this.setApprovalStatus(toolUseId, decision);
     this.traceStatus = "streaming";
   }
@@ -374,7 +421,10 @@ export class GenerationRuntime {
 
   setAuthCancelled(): void {
     for (const seg of this.segments) {
-      if (seg.auth && (seg.auth.status === "pending" || seg.auth.status === "connecting")) {
+      if (
+        seg.auth &&
+        (seg.auth.status === "pending" || seg.auth.status === "connecting")
+      ) {
         seg.auth.status = "cancelled";
         break;
       }
@@ -383,7 +433,10 @@ export class GenerationRuntime {
 
   handleAuthProgress(connected: string, remaining: string[]): void {
     for (const seg of this.segments) {
-      if (seg.auth && (seg.auth.status === "pending" || seg.auth.status === "connecting")) {
+      if (
+        seg.auth &&
+        (seg.auth.status === "pending" || seg.auth.status === "connecting")
+      ) {
         if (!seg.auth.connectedIntegrations.includes(connected)) {
           seg.auth.connectedIntegrations.push(connected);
         }
@@ -421,7 +474,10 @@ export class GenerationRuntime {
     this.traceStatus = "error";
   }
 
-  handleCancelled(data?: { generationId?: string; conversationId?: string }): void {
+  handleCancelled(data?: {
+    generationId?: string;
+    conversationId?: string;
+  }): void {
     if (data?.generationId) {
       this.currentGenerationId = data.generationId;
     }
@@ -441,7 +497,7 @@ export class GenerationRuntime {
     const interruptionText = "Interrupted by user";
     const hasSystemPart = this.parts.some(
       (part): part is RuntimeMessagePart & { type: "system" } =>
-        part.type === "system" && part.content === interruptionText
+        part.type === "system" && part.content === interruptionText,
     );
     if (!hasSystemPart) {
       this.parts.push({ type: "system", content: interruptionText });
@@ -449,7 +505,7 @@ export class GenerationRuntime {
 
     const currentSegment = this.getCurrentSegment();
     const hasSystemItem = currentSegment.items.some(
-      (item) => item.type === "system" && item.content === interruptionText
+      (item) => item.type === "system" && item.content === interruptionText,
     );
     if (!hasSystemItem) {
       currentSegment.items.push({
@@ -467,7 +523,10 @@ export class GenerationRuntime {
         this.handleText(event.content);
         return;
       case "thinking":
-        this.handleThinking({ content: event.content, thinkingId: event.thinkingId });
+        this.handleThinking({
+          content: event.content,
+          thinkingId: event.thinkingId,
+        });
         return;
       case "tool_use":
         this.handleToolUse({
@@ -516,11 +575,16 @@ export class GenerationRuntime {
 
   buildAssistantMessage(): RuntimeAssistantMessage {
     const content = this.parts
-      .filter((p): p is RuntimeMessagePart & { type: "text" } => p.type === "text")
+      .filter(
+        (p): p is RuntimeMessagePart & { type: "text" } => p.type === "text",
+      )
       .map((p) => p.content)
       .join("");
 
-    const approvalMap = new Map<string, RuntimeMessagePart & { type: "approval" }>();
+    const approvalMap = new Map<
+      string,
+      RuntimeMessagePart & { type: "approval" }
+    >();
     for (const seg of this.segments) {
       if (!seg.approval || seg.approval.status === "pending") {
         continue;
@@ -556,9 +620,13 @@ export class GenerationRuntime {
 
     return {
       content,
-      parts: partsWithApprovals.length > 0 ? partsWithApprovals : this.parts.map((p) => ({ ...p })),
+      parts:
+        partsWithApprovals.length > 0
+          ? partsWithApprovals
+          : this.parts.map((p) => ({ ...p })),
       integrationsUsed: [...this.integrationsUsed],
-      sandboxFiles: this.sandboxFiles.length > 0 ? [...this.sandboxFiles] : undefined,
+      sandboxFiles:
+        this.sandboxFiles.length > 0 ? [...this.sandboxFiles] : undefined,
     };
   }
 

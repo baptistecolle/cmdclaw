@@ -29,21 +29,31 @@ const { positionals, values } = parseArgs({
 const [command, ...args] = positionals;
 
 async function search() {
-  const body: Record<string, unknown> = { query: values.query || "", page_size: parseInt(values.limit || "10") };
+  const body: Record<string, unknown> = {
+    query: values.query || "",
+    page_size: parseInt(values.limit || "10"),
+  };
   if (values.type === "page" || values.type === "database") {
     body.filter = { value: values.type, property: "object" };
   }
 
-  const res = await fetch("https://api.notion.com/v1/search", { method: "POST", headers, body: JSON.stringify(body) });
+  const res = await fetch("https://api.notion.com/v1/search", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
   if (!res.ok) throw new Error(await res.text());
 
   const { results } = await res.json();
   const items = results.map((item: any) => ({
     id: item.id,
     type: item.object,
-    title: item.object === "page"
-      ? item.properties?.title?.title?.[0]?.plain_text || item.properties?.Name?.title?.[0]?.plain_text || "Untitled"
-      : item.title?.[0]?.plain_text || "Untitled",
+    title:
+      item.object === "page"
+        ? item.properties?.title?.title?.[0]?.plain_text ||
+          item.properties?.Name?.title?.[0]?.plain_text ||
+          "Untitled"
+        : item.title?.[0]?.plain_text || "Untitled",
     url: item.url,
   }));
 
@@ -53,7 +63,9 @@ async function search() {
 async function getPage(pageId: string) {
   const [pageRes, blocksRes] = await Promise.all([
     fetch(`https://api.notion.com/v1/pages/${pageId}`, { headers }),
-    fetch(`https://api.notion.com/v1/blocks/${pageId}/children?page_size=100`, { headers }),
+    fetch(`https://api.notion.com/v1/blocks/${pageId}/children?page_size=100`, {
+      headers,
+    }),
   ]);
 
   if (!pageRes.ok) throw new Error(await pageRes.text());
@@ -65,30 +77,45 @@ async function getPage(pageId: string) {
     text: b[b.type]?.rich_text?.map((t: any) => t.plain_text).join("") || "",
   }));
 
-  console.log(JSON.stringify({ id: page.id, url: page.url, properties: page.properties, content }, null, 2));
+  console.log(
+    JSON.stringify(
+      { id: page.id, url: page.url, properties: page.properties, content },
+      null,
+      2,
+    ),
+  );
 }
 
 async function createPage() {
   if (!values.parent || !values.title) {
-    console.error("Required: --parent <id> --title <title> [--content <text>] [--type page|database]");
+    console.error(
+      "Required: --parent <id> --title <title> [--content <text>] [--type page|database]",
+    );
     process.exit(1);
   }
 
   const parentType = values.type === "database" ? "database_id" : "page_id";
-  const properties = values.type === "database"
-    ? { Name: { title: [{ text: { content: values.title } }] } }
-    : { title: { title: [{ text: { content: values.title } }] } };
+  const properties =
+    values.type === "database"
+      ? { Name: { title: [{ text: { content: values.title } }] } }
+      : { title: { title: [{ text: { content: values.title } }] } };
 
   const children = values.content
     ? values.content.split("\\n").map((line) => ({
-        object: "block", type: "paragraph",
+        object: "block",
+        type: "paragraph",
         paragraph: { rich_text: [{ type: "text", text: { content: line } }] },
       }))
     : [];
 
   const res = await fetch("https://api.notion.com/v1/pages", {
-    method: "POST", headers,
-    body: JSON.stringify({ parent: { [parentType]: values.parent }, properties, children }),
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      parent: { [parentType]: values.parent },
+      properties,
+      children,
+    }),
   });
 
   if (!res.ok) throw new Error(await res.text());
@@ -103,13 +130,19 @@ async function appendContent(pageId: string) {
   }
 
   const children = values.content.split("\\n").map((line) => ({
-    object: "block", type: "paragraph",
+    object: "block",
+    type: "paragraph",
     paragraph: { rich_text: [{ type: "text", text: { content: line } }] },
   }));
 
-  const res = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
-    method: "PATCH", headers, body: JSON.stringify({ children }),
-  });
+  const res = await fetch(
+    `https://api.notion.com/v1/blocks/${pageId}/children`,
+    {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ children }),
+    },
+  );
 
   if (!res.ok) throw new Error(await res.text());
   console.log("Content appended successfully.");
@@ -117,8 +150,12 @@ async function appendContent(pageId: string) {
 
 async function listDatabases() {
   const res = await fetch("https://api.notion.com/v1/search", {
-    method: "POST", headers,
-    body: JSON.stringify({ filter: { value: "database", property: "object" }, page_size: 100 }),
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      filter: { value: "database", property: "object" },
+      page_size: 100,
+    }),
   });
 
   if (!res.ok) throw new Error(await res.text());
@@ -135,10 +172,14 @@ async function listDatabases() {
 }
 
 async function queryDatabase(databaseId: string) {
-  const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
-    method: "POST", headers,
-    body: JSON.stringify({ page_size: parseInt(values.limit || "10") }),
-  });
+  const res = await fetch(
+    `https://api.notion.com/v1/databases/${databaseId}/query`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ page_size: parseInt(values.limit || "10") }),
+    },
+  );
 
   if (!res.ok) throw new Error(await res.text());
   const { results } = await res.json();
@@ -182,12 +223,24 @@ async function main() {
 
   try {
     switch (command) {
-      case "search": await search(); break;
-      case "get": await getPage(args[0]); break;
-      case "create": await createPage(); break;
-      case "append": await appendContent(args[0]); break;
-      case "databases": await listDatabases(); break;
-      case "query": await queryDatabase(args[0]); break;
+      case "search":
+        await search();
+        break;
+      case "get":
+        await getPage(args[0]);
+        break;
+      case "create":
+        await createPage();
+        break;
+      case "append":
+        await appendContent(args[0]);
+        break;
+      case "databases":
+        await listDatabases();
+        break;
+      case "query":
+        await queryDatabase(args[0]);
+        break;
       default:
         showHelp();
     }

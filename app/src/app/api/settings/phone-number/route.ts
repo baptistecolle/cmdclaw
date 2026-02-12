@@ -11,7 +11,10 @@ export async function DELETE(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  await db.update(user).set({ phoneNumber: null }).where(eq(user.id, currentUser.id));
+  await db
+    .update(user)
+    .set({ phoneNumber: null })
+    .where(eq(user.id, currentUser.id));
 
   return Response.json({ status: true });
 }

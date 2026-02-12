@@ -23,7 +23,9 @@ function getPhoneNumber(user: unknown): string {
 
 export default function SettingsPage() {
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -68,7 +70,9 @@ export default function SettingsPage() {
     setSaving(true);
 
     try {
-      const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+      const fullName = [firstName.trim(), lastName.trim()]
+        .filter(Boolean)
+        .join(" ");
       await authClient.updateUser({
         name: fullName,
         phoneNumber: phoneNumber || undefined,
@@ -92,10 +96,16 @@ export default function SettingsPage() {
       const data = (await res.json()) as { code: string; expiresAt: string };
       setLinkCode(data.code);
       setLinkExpiresAt(data.expiresAt);
-      setNotification({ type: "success", message: "WhatsApp link code generated" });
+      setNotification({
+        type: "success",
+        message: "WhatsApp link code generated",
+      });
     } catch (error) {
       console.error("Failed to generate link code:", error);
-      setNotification({ type: "error", message: "Failed to generate link code" });
+      setNotification({
+        type: "error",
+        message: "Failed to generate link code",
+      });
     } finally {
       setLinkLoading(false);
     }
@@ -104,7 +114,9 @@ export default function SettingsPage() {
   const handleRemovePhoneNumber = async () => {
     setRemovingPhone(true);
     try {
-      const res = await fetch("/api/settings/phone-number", { method: "DELETE" });
+      const res = await fetch("/api/settings/phone-number", {
+        method: "DELETE",
+      });
       if (!res.ok) {
         throw new Error("Failed to remove phone number");
       }
@@ -123,7 +135,10 @@ export default function SettingsPage() {
       setNotification({ type: "success", message: "Phone number removed" });
     } catch (error) {
       console.error("Failed to remove phone number:", error);
-      setNotification({ type: "error", message: "Failed to remove phone number" });
+      setNotification({
+        type: "error",
+        message: "Failed to remove phone number",
+      });
     } finally {
       setRemovingPhone(false);
     }
@@ -162,7 +177,7 @@ export default function SettingsPage() {
             "mb-6 flex items-center gap-2 rounded-lg border p-3 text-sm",
             notification.type === "success"
               ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400"
+              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400",
           )}
         >
           <CheckCircle2 className="h-4 w-4" />
@@ -187,7 +202,9 @@ export default function SettingsPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm font-medium">First name</label>
+              <label className="mb-2 block text-sm font-medium">
+                First name
+              </label>
               <Input
                 type="text"
                 value={firstName}
@@ -197,7 +214,9 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">Last name</label>
+              <label className="mb-2 block text-sm font-medium">
+                Last name
+              </label>
               <Input
                 type="text"
                 value={lastName}
@@ -208,7 +227,9 @@ export default function SettingsPage() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium">Phone number</label>
+            <label className="mb-2 block text-sm font-medium">
+              Phone number
+            </label>
             <PhoneInput
               defaultCountry="US"
               international
@@ -257,7 +278,8 @@ export default function SettingsPage() {
       <div className="mt-10 border-t pt-6">
         <h3 className="text-lg font-semibold">WhatsApp Linking</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Generate a link code, then send it from your WhatsApp number to connect.
+          Generate a link code, then send it from your WhatsApp number to
+          connect.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Button onClick={handleGenerateLinkCode} disabled={linkLoading}>

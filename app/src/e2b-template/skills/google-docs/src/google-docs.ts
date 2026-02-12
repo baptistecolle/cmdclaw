@@ -2,7 +2,9 @@ import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_DOCS_ACCESS_TOKEN;
 if (!TOKEN) {
-  console.error("Error: GOOGLE_DOCS_ACCESS_TOKEN environment variable required");
+  console.error(
+    "Error: GOOGLE_DOCS_ACCESS_TOKEN environment variable required",
+  );
   process.exit(1);
 }
 
@@ -29,9 +31,10 @@ function extractTextFromContent(content: any[]): string {
 
   for (const element of content) {
     if (element.paragraph) {
-      const paragraphText = element.paragraph.elements
-        ?.map((el: any) => el.textRun?.content || "")
-        .join("") || "";
+      const paragraphText =
+        element.paragraph.elements
+          ?.map((el: any) => el.textRun?.content || "")
+          .join("") || "";
       textParts.push(paragraphText);
     } else if (element.table) {
       for (const row of element.table.tableRows || []) {
@@ -57,12 +60,18 @@ async function getDocument(documentId: string) {
   const doc = await res.json();
   const text = extractTextFromContent(doc.body?.content || []);
 
-  console.log(JSON.stringify({
-    documentId: doc.documentId,
-    title: doc.title,
-    content: text.slice(0, 50000),
-    revisionId: doc.revisionId,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        documentId: doc.documentId,
+        title: doc.title,
+        content: text.slice(0, 50000),
+        revisionId: doc.revisionId,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function createDocument() {
@@ -86,18 +95,22 @@ async function createDocument() {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({
-        requests: [{
-          insertText: {
-            location: { index: 1 },
-            text: values.content,
+        requests: [
+          {
+            insertText: {
+              location: { index: 1 },
+              text: values.content,
+            },
           },
-        }],
+        ],
       }),
     });
     if (!updateRes.ok) throw new Error(await updateRes.text());
   }
 
-  console.log(`Document created: https://docs.google.com/document/d/${doc.documentId}/edit`);
+  console.log(
+    `Document created: https://docs.google.com/document/d/${doc.documentId}/edit`,
+  );
 }
 
 async function appendText(documentId: string) {
@@ -118,12 +131,14 @@ async function appendText(documentId: string) {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
     body: JSON.stringify({
-      requests: [{
-        insertText: {
-          location: { index: insertIndex },
-          text: "\n" + values.text,
+      requests: [
+        {
+          insertText: {
+            location: { index: insertIndex },
+            text: "\n" + values.text,
+          },
         },
-      }],
+      ],
     }),
   });
 
@@ -203,11 +218,21 @@ async function main() {
 
   try {
     switch (command) {
-      case "get": await getDocument(args[0]); break;
-      case "create": await createDocument(); break;
-      case "append": await appendText(args[0]); break;
-      case "list": await listDocuments(); break;
-      case "search": await searchDocuments(); break;
+      case "get":
+        await getDocument(args[0]);
+        break;
+      case "create":
+        await createDocument();
+        break;
+      case "append":
+        await appendText(args[0]);
+        break;
+      case "list":
+        await listDocuments();
+        break;
+      case "search":
+        await searchDocuments();
+        break;
       default:
         showHelp();
     }

@@ -28,7 +28,9 @@ export function IconDisplay({
   className?: string;
 }) {
   if (!icon) {
-    return <FileText className={cn("h-5 w-5 text-muted-foreground", className)} />;
+    return (
+      <FileText className={cn("h-5 w-5 text-muted-foreground", className)} />
+    );
   }
 
   return <span className={cn("text-lg leading-none", className)}>{icon}</span>;

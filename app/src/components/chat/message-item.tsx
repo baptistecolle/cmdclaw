@@ -5,7 +5,11 @@ import { Paperclip, Download, FileIcon, Eye } from "lucide-react";
 import { MessageBubble } from "./message-bubble";
 import { CollapsedTrace } from "./collapsed-trace";
 import { ToolApprovalCard } from "./tool-approval-card";
-import type { MessagePart, AttachmentData, SandboxFileData } from "./message-list";
+import type {
+  MessagePart,
+  AttachmentData,
+  SandboxFileData,
+} from "./message-list";
 import type { IntegrationType } from "@/lib/integration-icons";
 import type { ActivityItemData } from "./activity-item";
 import { useDownloadAttachment, useDownloadSandboxFile } from "@/orpc/hooks";
@@ -35,13 +39,25 @@ type Props = {
   sandboxFiles?: SandboxFileData[];
 };
 
-export function MessageItem({ id, role, content, parts, integrationsUsed, attachments, sandboxFiles }: Props) {
+export function MessageItem({
+  id,
+  role,
+  content,
+  parts,
+  integrationsUsed,
+  attachments,
+  sandboxFiles,
+}: Props) {
   // Track expanded state for each segment
-  const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
+  const [expandedSegments, setExpandedSegments] = useState<Set<string>>(
+    new Set(),
+  );
   const { mutateAsync: downloadAttachment } = useDownloadAttachment();
   const { mutateAsync: downloadSandboxFile } = useDownloadSandboxFile();
 
-  const getAttachmentUrl = async (attachment: AttachmentData): Promise<string | null> => {
+  const getAttachmentUrl = async (
+    attachment: AttachmentData,
+  ): Promise<string | null> => {
     if (attachment.id) {
       const result = await downloadAttachment(attachment.id);
       return result.url;
@@ -107,7 +123,10 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
                   />
                   {(a.id || a.dataUrl) && (
                     <div className="absolute top-1 right-1 flex items-center gap-1 rounded-md bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                      <button type="button" onClick={() => handleViewAttachment(a)}>
+                      <button
+                        type="button"
+                        onClick={() => handleViewAttachment(a)}
+                      >
                         <Eye className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => handleDownload(a)}>
@@ -117,7 +136,10 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
                   )}
                 </div>
               ) : (
-                <div key={i} className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs">
+                <div
+                  key={i}
+                  className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs"
+                >
                   <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="max-w-[200px] truncate">{a.name}</span>
                   <button
@@ -137,7 +159,7 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
                     <span>Download</span>
                   </button>
                 </div>
-              )
+              ),
             )}
           </div>
         )}
@@ -147,8 +169,11 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
   }
 
   const hasInterruptedMarker = useMemo(
-    () => !!parts?.some((p) => p.type === "system" && p.content === "Interrupted by user"),
-    [parts]
+    () =>
+      !!parts?.some(
+        (p) => p.type === "system" && p.content === "Interrupted by user",
+      ),
+    [parts],
   );
 
   // Parse message parts into segments based on approval parts
@@ -156,7 +181,11 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
     if (!parts) return [];
 
     const result: DisplaySegment[] = [];
-    let currentSegment: DisplaySegment = { id: "seg-0", items: [], approval: null };
+    let currentSegment: DisplaySegment = {
+      id: "seg-0",
+      items: [],
+      approval: null,
+    };
     let segmentIndex = 0;
     let activityIndex = 0;
 
@@ -176,7 +205,11 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
         };
         result.push(currentSegment);
         segmentIndex++;
-        currentSegment = { id: `seg-${segmentIndex}`, items: [], approval: null };
+        currentSegment = {
+          id: `seg-${segmentIndex}`,
+          items: [],
+          approval: null,
+        };
       } else if (part.type === "tool_call") {
         // Add tool call to current segment's items
         currentSegment.items.push({
@@ -187,7 +220,12 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
           toolName: part.name,
           integration: part.integration as IntegrationType | undefined,
           operation: part.operation,
-          status: part.result !== undefined ? "complete" : hasInterruptedMarker ? "interrupted" : "running",
+          status:
+            part.result !== undefined
+              ? "complete"
+              : hasInterruptedMarker
+                ? "interrupted"
+                : "running",
           input: part.input,
           result: part.result,
         });
@@ -228,9 +266,15 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
   }, [hasInterruptedMarker, parts]);
 
   // Check if there were any text, tool calls or thinking (need to show trace)
-  const hasTrace = parts && parts.some(
-    (p) => p.type === "text" || p.type === "thinking" || p.type === "tool_call" || p.type === "system"
-  );
+  const hasTrace =
+    parts &&
+    parts.some(
+      (p) =>
+        p.type === "text" ||
+        p.type === "thinking" ||
+        p.type === "tool_call" ||
+        p.type === "system",
+    );
 
   // Check if there was an error
   const hasError = content.startsWith("Error:");
@@ -242,7 +286,9 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
     }
 
     // Find the last text part to display after the trace
-    const textParts = parts.filter((p): p is MessagePart & { type: "text" } => p.type === "text");
+    const textParts = parts.filter(
+      (p): p is MessagePart & { type: "text" } => p.type === "text",
+    );
     if (textParts.length === 0) {
       return "";
     }
@@ -274,8 +320,9 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
       className="py-4 space-y-3"
     >
       {/* Show segmented trace if there are approvals, otherwise show collapsed trace */}
-      {hasTrace && segments.length > 0 && (
-        hasApprovals ? (
+      {hasTrace &&
+        segments.length > 0 &&
+        (hasApprovals ? (
           // Segmented display with approvals between segments
           <div className="space-y-3">
             {segments.map((segment, index) => {
@@ -284,8 +331,8 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
                 new Set(
                   segment.items
                     .filter((item) => item.integration)
-                    .map((item) => item.integration as IntegrationType)
-                )
+                    .map((item) => item.integration as IntegrationType),
+                ),
               );
 
               // Only last segment is expanded by default
@@ -336,16 +383,15 @@ export function MessageItem({ id, role, content, parts, integrationsUsed, attach
                       segments.flatMap((seg) =>
                         seg.items
                           .filter((item) => item.integration)
-                          .map((item) => item.integration as IntegrationType)
-                      )
-                    )
+                          .map((item) => item.integration as IntegrationType),
+                      ),
+                    ),
                   )
             }
             hasError={hasError}
             activityItems={segments.flatMap((seg) => seg.items)}
           />
-        )
-      )}
+        ))}
 
       {/* Show message bubble if there's text content */}
       {textContent && (

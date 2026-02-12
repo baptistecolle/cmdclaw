@@ -13,7 +13,9 @@ import { env } from "@/env";
 function verifyPluginSecret(authHeader: string | undefined): boolean {
   if (!env.BAP_SERVER_SECRET) {
     if (process.env.NODE_ENV !== "production") {
-      console.warn("[Internal] BAP_SERVER_SECRET not configured, allowing internal plugin request in development");
+      console.warn(
+        "[Internal] BAP_SERVER_SECRET not configured, allowing internal plugin request in development",
+      );
       return true;
     }
     console.warn("[Internal] BAP_SERVER_SECRET not configured");
@@ -37,12 +39,12 @@ const approvalRequest = baseProcedure
       command: z.string(),
       toolInput: z.unknown(),
       authHeader: z.string().optional(),
-    })
+    }),
   )
   .output(
     z.object({
       decision: z.enum(["allow", "deny"]),
-    })
+    }),
   )
   .handler(async ({ input }) => {
     console.log("[Internal] approvalRequest received:", {
@@ -59,18 +61,33 @@ const approvalRequest = baseProcedure
     }
 
     // Find the active generation for this conversation
-    const genId = generationManager.getGenerationForConversation(input.conversationId);
-    console.log("[Internal] Generation lookup:", { conversationId: input.conversationId, genId: genId ?? "NOT FOUND" });
+    const genId = generationManager.getGenerationForConversation(
+      input.conversationId,
+    );
+    console.log("[Internal] Generation lookup:", {
+      conversationId: input.conversationId,
+      genId: genId ?? "NOT FOUND",
+    });
     if (!genId) {
-      console.error("[Internal] No active generation for conversation:", input.conversationId);
+      console.error(
+        "[Internal] No active generation for conversation:",
+        input.conversationId,
+      );
       return { decision: "deny" as const };
     }
 
-    const allowedIntegrations = generationManager.getAllowedIntegrationsForConversation(
-      input.conversationId
-    );
-    if (allowedIntegrations && !allowedIntegrations.includes(input.integration as any)) {
-      console.warn("[Internal] Integration not allowed for workflow:", input.integration);
+    const allowedIntegrations =
+      generationManager.getAllowedIntegrationsForConversation(
+        input.conversationId,
+      );
+    if (
+      allowedIntegrations &&
+      !allowedIntegrations.includes(input.integration as any)
+    ) {
+      console.warn(
+        "[Internal] Integration not allowed for workflow:",
+        input.integration,
+      );
       return { decision: "deny" as const };
     }
 
@@ -96,13 +113,13 @@ const authRequest = baseProcedure
       integration: z.string(),
       reason: z.string().optional(),
       authHeader: z.string().optional(),
-    })
+    }),
   )
   .output(
     z.object({
       success: z.boolean(),
       tokens: z.record(z.string(), z.string()).optional(),
-    })
+    }),
   )
   .handler(async ({ input }) => {
     // Verify auth
@@ -118,17 +135,29 @@ const authRequest = baseProcedure
     });
 
     // Find the active generation for this conversation
-    const genId = generationManager.getGenerationForConversation(input.conversationId);
+    const genId = generationManager.getGenerationForConversation(
+      input.conversationId,
+    );
     if (!genId) {
-      console.error("[Internal] No active generation for conversation:", input.conversationId);
+      console.error(
+        "[Internal] No active generation for conversation:",
+        input.conversationId,
+      );
       return { success: false };
     }
 
-    const allowedIntegrations = generationManager.getAllowedIntegrationsForConversation(
-      input.conversationId
-    );
-    if (allowedIntegrations && !allowedIntegrations.includes(input.integration as any)) {
-      console.warn("[Internal] Integration not allowed for workflow:", input.integration);
+    const allowedIntegrations =
+      generationManager.getAllowedIntegrationsForConversation(
+        input.conversationId,
+      );
+    if (
+      allowedIntegrations &&
+      !allowedIntegrations.includes(input.integration as any)
+    ) {
+      console.warn(
+        "[Internal] Integration not allowed for workflow:",
+        input.integration,
+      );
       return { success: false };
     }
 
@@ -143,7 +172,9 @@ const authRequest = baseProcedure
     }
 
     // Fetch fresh tokens for the integration
-    const tokens = await getTokensForIntegrations(result.userId, [input.integration]);
+    const tokens = await getTokensForIntegrations(result.userId, [
+      input.integration,
+    ]);
 
     return { success: true, tokens };
   });

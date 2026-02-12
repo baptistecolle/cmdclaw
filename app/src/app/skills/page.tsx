@@ -113,7 +113,7 @@ function SkillsPageContent() {
             "mb-6 flex items-center gap-2 rounded-lg border p-4",
             notification.type === "success"
               ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400"
+              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400",
           )}
         >
           {notification.type === "success" ? (

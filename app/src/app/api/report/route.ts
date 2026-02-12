@@ -17,7 +17,7 @@ type SlackChannelLookupResult =
   | { ok: false; error: string };
 
 async function lookupSlackChannelIdByName(
-  channelName: string
+  channelName: string,
 ): Promise<SlackChannelLookupResult> {
   const targetName = normalizeSlackChannelName(channelName);
   let cursor: string | undefined;
@@ -37,7 +37,7 @@ async function lookupSlackChannelIdByName(
         headers: {
           Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`,
         },
-      }
+      },
     );
 
     const result = (await response.json()) as {
@@ -114,7 +114,7 @@ async function slackApiFormData(method: string, formData: FormData) {
 async function uploadAttachmentToSlack(
   channelId: string,
   file: File,
-  initialComment: string
+  initialComment: string,
 ) {
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -124,9 +124,13 @@ async function uploadAttachmentToSlack(
 
   const uploadUrlResult = await slackApiFormData(
     "files.getUploadURLExternal",
-    getUploadData
+    getUploadData,
   );
-  if (!uploadUrlResult.ok || !uploadUrlResult.upload_url || !uploadUrlResult.file_id) {
+  if (
+    !uploadUrlResult.ok ||
+    !uploadUrlResult.upload_url ||
+    !uploadUrlResult.file_id
+  ) {
     return {
       ok: false,
       error: uploadUrlResult.error ?? "Could not get Slack upload URL",
@@ -151,11 +155,13 @@ async function uploadAttachmentToSlack(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        files: [{ id: uploadUrlResult.file_id, title: file.name || "attachment" }],
+        files: [
+          { id: uploadUrlResult.file_id, title: file.name || "attachment" },
+        ],
         channel_id: channelId,
         initial_comment: initialComment,
       }),
-    }
+    },
   );
 
   return completeResponse.json() as Promise<{ ok: boolean; error?: string }>;
@@ -170,7 +176,7 @@ export async function POST(request: Request) {
   if (!env.SLACK_BOT_TOKEN) {
     return Response.json(
       { error: "Slack reporting is not configured" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -213,13 +219,17 @@ export async function POST(request: Request) {
   ].join("\n");
 
   const slackResult = attachment
-    ? await uploadAttachmentToSlack(channelResult.channelId, attachment, reportText)
+    ? await uploadAttachmentToSlack(
+        channelResult.channelId,
+        attachment,
+        reportText,
+      )
     : await postSlackMessage(channelResult.channelId, reportText);
 
   if (!slackResult.ok) {
     return Response.json(
       { error: slackResult.error ?? "Failed to send report to Slack" },
-      { status: 502 }
+      { status: 502 },
     );
   }
 

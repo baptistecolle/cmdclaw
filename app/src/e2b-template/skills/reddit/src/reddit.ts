@@ -70,11 +70,14 @@ function formatComment(comment: any): any {
     author: data.author,
     body: data.body,
     score: data.score,
-    created: data.created_utc ? new Date(data.created_utc * 1000).toISOString() : undefined,
-    replies: data.replies?.data?.children
-      ?.map(formatComment)
-      .filter(Boolean)
-      .slice(0, 3) || [],
+    created: data.created_utc
+      ? new Date(data.created_utc * 1000).toISOString()
+      : undefined,
+    replies:
+      data.replies?.data?.children
+        ?.map(formatComment)
+        .filter(Boolean)
+        .slice(0, 3) || [],
   };
 }
 
@@ -109,9 +112,7 @@ async function getPost(id: string) {
 
   const data = await api(`/comments/${postId}?limit=${limit}`);
   const post = formatPost(data[0].data.children[0]);
-  const comments = data[1].data.children
-    .map(formatComment)
-    .filter(Boolean);
+  const comments = data[1].data.children.map(formatComment).filter(Boolean);
 
   console.log(JSON.stringify({ post, comments }, null, 2));
 }
@@ -124,28 +125,35 @@ async function getUser(username: string) {
   ]);
 
   const userData = about.data;
-  console.log(JSON.stringify({
-    username: userData.name,
-    id: userData.id,
-    karma: {
-      total: userData.total_karma,
-      post: userData.link_karma,
-      comment: userData.comment_karma,
-    },
-    created: new Date(userData.created_utc * 1000).toISOString(),
-    recentPosts: posts.data.children.map(formatPost),
-    recentComments: comments.data.children.map((c: any) => ({
-      id: c.data.name,
-      body: c.data.body?.substring(0, 200),
-      subreddit: c.data.subreddit,
-      score: c.data.score,
-    })),
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        username: userData.name,
+        id: userData.id,
+        karma: {
+          total: userData.total_karma,
+          post: userData.link_karma,
+          comment: userData.comment_karma,
+        },
+        created: new Date(userData.created_utc * 1000).toISOString(),
+        recentPosts: posts.data.children.map(formatPost),
+        recentComments: comments.data.children.map((c: any) => ({
+          id: c.data.name,
+          body: c.data.body?.substring(0, 200),
+          subreddit: c.data.subreddit,
+          score: c.data.score,
+        })),
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function search() {
   if (!values.query) {
-    console.error("Required: --query <search>"); process.exit(1);
+    console.error("Required: --query <search>");
+    process.exit(1);
   }
 
   const params = new URLSearchParams({
@@ -175,7 +183,8 @@ async function vote(thingId: string) {
   const directionMap: Record<string, number> = { up: 1, down: -1, none: 0 };
   const dir = directionMap[values.direction || "up"];
   if (dir === undefined) {
-    console.error("Invalid direction. Use: up, down, or none"); process.exit(1);
+    console.error("Invalid direction. Use: up, down, or none");
+    process.exit(1);
   }
 
   // Ensure proper prefix
@@ -196,7 +205,8 @@ async function vote(thingId: string) {
 
 async function comment(postId: string) {
   if (!values.text) {
-    console.error("Required: --text <comment>"); process.exit(1);
+    console.error("Required: --text <comment>");
+    process.exit(1);
   }
 
   // Ensure proper prefix
@@ -215,16 +225,23 @@ async function comment(postId: string) {
   });
 
   const comment = result.json.data.things[0].data;
-  console.log(JSON.stringify({
-    id: comment.name,
-    body: comment.body,
-    permalink: `https://reddit.com${comment.permalink}`,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        id: comment.name,
+        body: comment.body,
+        permalink: `https://reddit.com${comment.permalink}`,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function reply(commentId: string) {
   if (!values.text) {
-    console.error("Required: --text <reply>"); process.exit(1);
+    console.error("Required: --text <reply>");
+    process.exit(1);
   }
 
   // Ensure proper prefix
@@ -243,10 +260,16 @@ async function reply(commentId: string) {
   });
 
   const replyData = result.json.data.things[0].data;
-  console.log(JSON.stringify({
-    id: replyData.name,
-    body: replyData.body,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        id: replyData.name,
+        body: replyData.body,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function save(id: string) {
@@ -271,7 +294,8 @@ async function unsave(id: string) {
 
 async function submit(subreddit: string) {
   if (!values.title) {
-    console.error("Required: --title <title>"); process.exit(1);
+    console.error("Required: --title <title>");
+    process.exit(1);
   }
 
   const params: Record<string, string> = {
@@ -292,11 +316,17 @@ async function submit(subreddit: string) {
     body: new URLSearchParams(params),
   });
 
-  console.log(JSON.stringify({
-    success: true,
-    url: result.json.data.url,
-    id: result.json.data.name,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        success: true,
+        url: result.json.data.url,
+        id: result.json.data.name,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function deleteContent(id: string) {
@@ -310,7 +340,8 @@ async function deleteContent(id: string) {
 
 async function edit(id: string) {
   if (!values.text) {
-    console.error("Required: --text <newText>"); process.exit(1);
+    console.error("Required: --text <newText>");
+    process.exit(1);
   }
 
   const result = await api("/api/editusertext", {
@@ -322,10 +353,16 @@ async function edit(id: string) {
     }),
   });
 
-  console.log(JSON.stringify({
-    success: true,
-    id: result.json.data.things[0].data.name,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        success: true,
+        id: result.json.data.things[0].data.name,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 // ===== MESSAGING =====
@@ -349,7 +386,8 @@ async function inbox() {
 
 async function sendMessage(username: string) {
   if (!values.subject || !values.text) {
-    console.error("Required: -s <subject> --text <body>"); process.exit(1);
+    console.error("Required: -s <subject> --text <body>");
+    process.exit(1);
   }
 
   await api("/api/compose", {
@@ -484,34 +522,74 @@ async function main() {
   try {
     switch (command) {
       // Reading
-      case "feed": await getFeed(); break;
-      case "subreddit": await getSubreddit(args[0]); break;
-      case "post": await getPost(args[0]); break;
-      case "user": await getUser(args[0]); break;
-      case "search": await search(); break;
-      case "multireddit": await getMultireddit(args[0], args[1]); break;
+      case "feed":
+        await getFeed();
+        break;
+      case "subreddit":
+        await getSubreddit(args[0]);
+        break;
+      case "post":
+        await getPost(args[0]);
+        break;
+      case "user":
+        await getUser(args[0]);
+        break;
+      case "search":
+        await search();
+        break;
+      case "multireddit":
+        await getMultireddit(args[0], args[1]);
+        break;
 
       // Engagement
-      case "vote": await vote(args[0]); break;
-      case "comment": await comment(args[0]); break;
-      case "reply": await reply(args[0]); break;
-      case "save": await save(args[0]); break;
-      case "unsave": await unsave(args[0]); break;
+      case "vote":
+        await vote(args[0]);
+        break;
+      case "comment":
+        await comment(args[0]);
+        break;
+      case "reply":
+        await reply(args[0]);
+        break;
+      case "save":
+        await save(args[0]);
+        break;
+      case "unsave":
+        await unsave(args[0]);
+        break;
 
       // Creating
-      case "submit": await submit(args[0]); break;
-      case "delete": await deleteContent(args[0]); break;
-      case "edit": await edit(args[0]); break;
+      case "submit":
+        await submit(args[0]);
+        break;
+      case "delete":
+        await deleteContent(args[0]);
+        break;
+      case "edit":
+        await edit(args[0]);
+        break;
 
       // Messaging
-      case "inbox": await inbox(); break;
-      case "message": await sendMessage(args[0]); break;
-      case "read": await markRead(args[0]); break;
+      case "inbox":
+        await inbox();
+        break;
+      case "message":
+        await sendMessage(args[0]);
+        break;
+      case "read":
+        await markRead(args[0]);
+        break;
 
       // Subscriptions
-      case "subscriptions": await subscriptions(); break;
-      case "subscribe": await subscribe(args[0]); break;
-      case "unsubscribe": await unsubscribe(args[0]); break;
+      case "subscriptions":
+        await subscriptions();
+        break;
+      case "subscribe":
+        await subscribe(args[0]);
+        break;
+      case "unsubscribe":
+        await unsubscribe(args[0]);
+        break;
 
       default:
         showHelp();

@@ -25,7 +25,10 @@ import {
   getCliInstructionsWithCustom,
   getEnabledIntegrationTypes,
 } from "@/server/integrations/cli-env";
-import { customIntegration, customIntegrationCredential } from "@/server/db/schema";
+import {
+  customIntegration,
+  customIntegrationCredential,
+} from "@/server/db/schema";
 import { and } from "drizzle-orm";
 import { generateConversationTitle } from "@/server/utils/generate-title";
 import { env } from "@/env";
@@ -34,9 +37,17 @@ import type { SandboxBackend } from "@/server/sandbox/types";
 import { AnthropicBackend } from "@/server/ai/anthropic-backend";
 import { OpenAIBackend } from "@/server/ai/openai-backend";
 import { LocalLLMBackend } from "@/server/ai/local-backend";
-import type { LLMBackend, ChatMessage, ContentBlock, StreamEvent } from "@/server/ai/llm-backend";
+import type {
+  LLMBackend,
+  ChatMessage,
+  ContentBlock,
+  StreamEvent,
+} from "@/server/ai/llm-backend";
 import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
-import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
+import {
+  checkToolPermissions,
+  parseBashCommand,
+} from "@/server/ai/permission-checker";
 import type { IntegrationType } from "@/server/oauth/config";
 import {
   buildMemorySystemPrompt,
@@ -46,7 +57,10 @@ import {
   writeMemoryEntry,
   writeSessionTranscriptFromConversation,
 } from "@/server/services/memory-service";
-import { COMPACTION_SUMMARY_PREFIX, SESSION_BOUNDARY_PREFIX } from "@/server/services/session-constants";
+import {
+  COMPACTION_SUMMARY_PREFIX,
+  SESSION_BOUNDARY_PREFIX,
+} from "@/server/services/session-constants";
 import {
   uploadSandboxFile,
   collectNewSandboxFiles,
@@ -57,10 +71,7 @@ import {
   createCommunityIntegrationSkill,
   resolvePreferredCommunitySkillsForUser,
 } from "@/server/services/integration-skill-service";
-import {
-  createTraceId,
-  logServerEvent,
-} from "@/server/utils/observability";
+import { createTraceId, logServerEvent } from "@/server/utils/observability";
 import { isOpencodeFreeModel } from "@/server/ai/opencode-models";
 import path from "path";
 import type { Sandbox } from "e2b";
@@ -98,7 +109,11 @@ export type GenerationEvent =
       operation: string;
       command?: string;
     }
-  | { type: "approval_result"; toolUseId: string; decision: "approved" | "denied" }
+  | {
+      type: "approval_result";
+      toolUseId: string;
+      decision: "approved" | "denied";
+    }
   | {
       type: "auth_needed";
       generationId: string;
@@ -125,10 +140,19 @@ export type GenerationEvent =
       generationId: string;
       conversationId: string;
       messageId: string;
-      usage: { inputTokens: number; outputTokens: number; totalCostUsd: number };
+      usage: {
+        inputTokens: number;
+        outputTokens: number;
+        totalCostUsd: number;
+      };
     }
   | { type: "error"; message: string }
-  | { type: "cancelled"; generationId: string; conversationId: string; messageId?: string }
+  | {
+      type: "cancelled";
+      generationId: string;
+      conversationId: string;
+      messageId?: string;
+    }
   | { type: "status_change"; status: string };
 
 type GenerationStatus =
@@ -148,7 +172,13 @@ interface Subscriber {
 type BackendType = "opencode" | "direct";
 type OpenCodeTrackedEvent = Extract<
   OpencodeEvent,
-  { type: "message.updated" | "message.part.updated" | "session.updated" | "session.status" }
+  {
+    type:
+      | "message.updated"
+      | "message.part.updated"
+      | "session.updated"
+      | "session.status";
+  }
 >;
 type OpenCodeActionableEvent = Extract<
   OpencodeEvent,
@@ -255,7 +285,7 @@ function normalizePermissionPattern(pattern: string): string {
 
 function shouldAutoApproveOpenCodePermission(
   permissionType: string,
-  patterns: string[] | undefined
+  patterns: string[] | undefined,
 ): boolean {
   if (!patterns?.length) return false;
 
@@ -266,7 +296,11 @@ function shouldAutoApproveOpenCodePermission(
     if (normalized.startsWith("/home/user/uploads")) return true;
 
     // OpenCode may ask external_directory for user files directly in /home/user.
-    if (permissionType === "external_directory" && normalized.startsWith("/home/user")) return true;
+    if (
+      permissionType === "external_directory" &&
+      normalized.startsWith("/home/user")
+    )
+      return true;
 
     return false;
   });
@@ -276,7 +310,9 @@ function assertNever(x: never): never {
   throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
 }
 
-function isOpenCodeTrackedEvent(event: OpencodeEvent): event is OpenCodeTrackedEvent {
+function isOpenCodeTrackedEvent(
+  event: OpencodeEvent,
+): event is OpenCodeTrackedEvent {
   return (
     event.type === "message.updated" ||
     event.type === "message.part.updated" ||
@@ -285,7 +321,9 @@ function isOpenCodeTrackedEvent(event: OpencodeEvent): event is OpenCodeTrackedE
   );
 }
 
-function isOpenCodeActionableEvent(event: OpencodeEvent): event is OpenCodeActionableEvent {
+function isOpenCodeActionableEvent(
+  event: OpencodeEvent,
+): event is OpenCodeActionableEvent {
   return (
     event.type === "message.part.updated" ||
     event.type === "permission.asked" ||
@@ -309,7 +347,9 @@ function buildDefaultQuestionAnswers(request: QuestionRequest): string[][] {
 function buildQuestionCommand(request: QuestionRequest): string {
   return request.questions
     .map((question) => {
-      const options = question.options.map((option) => option.label).filter(Boolean);
+      const options = question.options
+        .map((option) => option.label)
+        .filter(Boolean);
       const optionsText = options.length > 0 ? ` [${options.join(" | ")}]` : "";
       return `${question.header}: ${question.question}${optionsText}`;
     })
@@ -325,7 +365,7 @@ function estimateTokensFromText(text: string): number {
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
-  message: string
+  message: string,
 ): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -340,7 +380,9 @@ async function withTimeout<T>(
   }
 }
 
-function estimateTokensFromContentParts(parts: ContentPart[] | null | undefined): number {
+function estimateTokensFromContentParts(
+  parts: ContentPart[] | null | undefined,
+): number {
   if (!parts || parts.length === 0) return 0;
   let total = 0;
   for (const part of parts) {
@@ -353,7 +395,9 @@ function estimateTokensFromContentParts(parts: ContentPart[] | null | undefined)
         break;
       case "tool_result":
         total += estimateTokensFromText(
-          typeof part.content === "string" ? part.content : JSON.stringify(part.content ?? {})
+          typeof part.content === "string"
+            ? part.content
+            : JSON.stringify(part.content ?? {}),
         );
         break;
       case "thinking":
@@ -366,7 +410,9 @@ function estimateTokensFromContentParts(parts: ContentPart[] | null | undefined)
 
 function estimateTokensForMessageRow(m: MessageRow): number {
   const contentTokens = estimateTokensFromText(m.content || "");
-  const partsTokens = estimateTokensFromContentParts(m.contentParts as ContentPart[] | undefined);
+  const partsTokens = estimateTokensFromContentParts(
+    m.contentParts as ContentPart[] | undefined,
+  );
   return Math.max(contentTokens, partsTokens);
 }
 
@@ -410,24 +456,31 @@ class GenerationManager {
         hasAllowedIntegrations: params.allowedIntegrations !== undefined,
         attachmentsCount: params.attachments?.length ?? 0,
       },
-      logContext
+      logContext,
     );
 
     // Check for existing active generation on this conversation
     if (params.conversationId) {
-      const existingGenId = this.conversationToGeneration.get(params.conversationId);
+      const existingGenId = this.conversationToGeneration.get(
+        params.conversationId,
+      );
       if (existingGenId) {
         const existing = this.activeGenerations.get(existingGenId);
         if (existing && existing.status === "running") {
-          throw new Error("Generation already in progress for this conversation");
+          throw new Error(
+            "Generation already in progress for this conversation",
+          );
         }
       }
     }
     logServerEvent(
       "info",
       "START_GENERATION_PHASE_DONE",
-      { phase: "active_generation_check", elapsedMs: Date.now() - startGenerationStartedAt },
-      logContext
+      {
+        phase: "active_generation_check",
+        elapsedMs: Date.now() - startGenerationStartedAt,
+      },
+      logContext,
     );
 
     // Get or create conversation
@@ -469,15 +522,18 @@ class GenerationManager {
         resolvedConversationId: conv.id,
         isNewConversation,
       },
-      { ...logContext, conversationId: conv.id }
+      { ...logContext, conversationId: conv.id },
     );
 
     // Save user message
-    const [userMsg] = await db.insert(message).values({
-      conversationId: conv.id,
-      role: "user",
-      content,
-    }).returning();
+    const [userMsg] = await db
+      .insert(message)
+      .values({
+        conversationId: conv.id,
+        role: "user",
+        content,
+      })
+      .returning();
     logServerEvent(
       "info",
       "START_GENERATION_PHASE_DONE",
@@ -486,13 +542,14 @@ class GenerationManager {
         elapsedMs: Date.now() - startGenerationStartedAt,
         messageId: userMsg.id,
       },
-      { ...logContext, conversationId: conv.id }
+      { ...logContext, conversationId: conv.id },
     );
 
     // Upload attachments to S3 and save metadata
     if (params.attachments && params.attachments.length > 0) {
       try {
-        const { uploadToS3, ensureBucket } = await import("@/server/storage/s3-client");
+        const { uploadToS3, ensureBucket } =
+          await import("@/server/storage/s3-client");
         await ensureBucket();
         for (const a of params.attachments) {
           const base64Data = a.dataUrl.split(",")[1] || "";
@@ -516,7 +573,7 @@ class GenerationManager {
             elapsedMs: Date.now() - startGenerationStartedAt,
             attachmentsCount: params.attachments.length,
           },
-          { ...logContext, conversationId: conv.id }
+          { ...logContext, conversationId: conv.id },
         );
       } catch (err) {
         logServerEvent(
@@ -526,7 +583,7 @@ class GenerationManager {
             elapsedMs: Date.now() - startGenerationStartedAt,
             error: formatErrorMessage(err),
           },
-          { ...logContext, conversationId: conv.id }
+          { ...logContext, conversationId: conv.id },
         );
       }
     }
@@ -550,7 +607,7 @@ class GenerationManager {
         elapsedMs: Date.now() - startGenerationStartedAt,
         generationId: genRecord.id,
       },
-      { ...logContext, conversationId: conv.id, generationId: genRecord.id }
+      { ...logContext, conversationId: conv.id, generationId: genRecord.id },
     );
 
     // Update conversation status
@@ -568,7 +625,7 @@ class GenerationManager {
         phase: "conversation_status_updated",
         elapsedMs: Date.now() - startGenerationStartedAt,
       },
-      { ...logContext, conversationId: conv.id, generationId: genRecord.id }
+      { ...logContext, conversationId: conv.id, generationId: genRecord.id },
     );
 
     // Determine backend type: if deviceId is provided, use direct mode
@@ -620,7 +677,7 @@ class GenerationManager {
         generationId: ctx.id,
         conversationId: ctx.conversationId,
         userId: ctx.userId,
-      }
+      },
     );
     logServerEvent(
       "info",
@@ -635,7 +692,7 @@ class GenerationManager {
         generationId: ctx.id,
         conversationId: ctx.conversationId,
         userId: ctx.userId,
-      }
+      },
     );
 
     // Start the generation in the background
@@ -753,7 +810,7 @@ class GenerationManager {
         generationId: ctx.id,
         conversationId: ctx.conversationId,
         userId: ctx.userId,
-      }
+      },
     );
 
     this.runGeneration(ctx).catch((err) => {
@@ -771,11 +828,13 @@ class GenerationManager {
    */
   async *subscribeToGeneration(
     generationId: string,
-    userId: string
+    userId: string,
   ): AsyncGenerator<GenerationEvent, void, unknown> {
     const ctx = this.activeGenerations.get(generationId);
 
-    const buildTerminalEvents = (genRecord: typeof generation.$inferSelect): GenerationEvent[] => {
+    const buildTerminalEvents = (
+      genRecord: typeof generation.$inferSelect,
+    ): GenerationEvent[] => {
       const events: GenerationEvent[] = [];
 
       if (genRecord.contentParts) {
@@ -794,7 +853,7 @@ class GenerationManager {
           } else if (part.type === "tool_result") {
             const toolUse = genRecord.contentParts?.find(
               (p): p is ContentPart & { type: "tool_use" } =>
-                p.type === "tool_use" && p.id === part.tool_use_id
+                p.type === "tool_use" && p.id === part.tool_use_id,
             );
             events.push({
               type: "tool_result",
@@ -802,7 +861,11 @@ class GenerationManager {
               result: part.content,
             });
           } else if (part.type === "thinking") {
-            events.push({ type: "thinking", content: part.content, thinkingId: part.id });
+            events.push({
+              type: "thinking",
+              content: part.content,
+              thinkingId: part.id,
+            });
           }
         }
       }
@@ -827,7 +890,10 @@ class GenerationManager {
           messageId: genRecord.messageId ?? undefined,
         });
       } else if (genRecord.status === "error") {
-        events.push({ type: "error", message: genRecord.errorMessage || "Unknown error" });
+        events.push({
+          type: "error",
+          message: genRecord.errorMessage || "Unknown error",
+        });
       }
 
       return events;
@@ -886,20 +952,24 @@ class GenerationManager {
             generationId: genRecord.id,
             conversationId: genRecord.conversationId,
             userId,
-          }
+          },
         );
 
         const pollIntervalMs = 500;
         const heartbeatIntervalMs = 10_000;
-        const maxWaitMs = genRecord.conversation.type === "workflow" ? 10 * 60 * 1000 : 30_000;
+        const maxWaitMs =
+          genRecord.conversation.type === "workflow" ? 10 * 60 * 1000 : 30_000;
         const startedAt = Date.now();
         let lastHeartbeatAt = 0;
-        let lastStatus: typeof generation.$inferSelect.status = genRecord.status;
+        let lastStatus: typeof generation.$inferSelect.status =
+          genRecord.status;
 
         yield { type: "status_change", status: genRecord.status };
 
         while (Date.now() - startedAt < maxWaitMs) {
-          await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, pollIntervalMs),
+          );
 
           const latest = await db.query.generation.findFirst({
             where: eq(generation.id, generationId),
@@ -945,7 +1015,7 @@ class GenerationManager {
             generationId: genRecord.id,
             conversationId: genRecord.conversationId,
             userId,
-          }
+          },
         );
 
         yield { type: "error", message: errorMessage };
@@ -993,7 +1063,7 @@ class GenerationManager {
       } else if (part.type === "tool_result") {
         const toolUse = ctx.contentParts.find(
           (p): p is ContentPart & { type: "tool_use" } =>
-            p.type === "tool_use" && p.id === part.tool_use_id
+            p.type === "tool_use" && p.id === part.tool_use_id,
         );
         eventQueue.push({
           type: "tool_result",
@@ -1001,7 +1071,11 @@ class GenerationManager {
           result: part.content,
         });
       } else if (part.type === "thinking") {
-        eventQueue.push({ type: "thinking", content: part.content, thinkingId: part.id });
+        eventQueue.push({
+          type: "thinking",
+          content: part.content,
+          thinkingId: part.id,
+        });
       }
     }
 
@@ -1052,7 +1126,11 @@ class GenerationManager {
           yield event;
 
           // Check for terminal events
-          if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
+          if (
+            event.type === "done" ||
+            event.type === "error" ||
+            event.type === "cancelled"
+          ) {
             isUnsubscribed = true;
             break;
           }
@@ -1083,7 +1161,10 @@ class GenerationManager {
   /**
    * Cancel a generation
    */
-  async cancelGeneration(generationId: string, userId: string): Promise<boolean> {
+  async cancelGeneration(
+    generationId: string,
+    userId: string,
+  ): Promise<boolean> {
     const ctx = this.activeGenerations.get(generationId);
     if (!ctx) {
       return false;
@@ -1105,7 +1186,7 @@ class GenerationManager {
     generationId: string,
     toolUseId: string,
     decision: "approve" | "deny",
-    userId: string
+    userId: string,
   ): Promise<boolean> {
     const ctx = this.activeGenerations.get(generationId);
     if (!ctx) {
@@ -1144,7 +1225,7 @@ class GenerationManager {
             console.log(
               "[GenerationManager] OpenCode permission",
               decision === "approve" ? "approved" : "denied",
-              ctx.opencodePendingApprovalRequest.request.id
+              ctx.opencodePendingApprovalRequest.request.id,
             );
             break;
           }
@@ -1162,7 +1243,7 @@ class GenerationManager {
             console.log(
               "[GenerationManager] OpenCode question",
               decision === "approve" ? "answered" : "rejected",
-              ctx.opencodePendingApprovalRequest.request.id
+              ctx.opencodePendingApprovalRequest.request.id,
             );
             break;
           }
@@ -1170,7 +1251,10 @@ class GenerationManager {
             assertNever(ctx.opencodePendingApprovalRequest);
         }
       } catch (err) {
-        console.error("[GenerationManager] Failed to submit OpenCode approval:", err);
+        console.error(
+          "[GenerationManager] Failed to submit OpenCode approval:",
+          err,
+        );
       }
       ctx.opencodePendingApprovalRequest = undefined;
       ctx.opencodeClient = undefined;
@@ -1221,7 +1305,9 @@ class GenerationManager {
   /**
    * Get allowed integrations for a conversation (if restricted).
    */
-  getAllowedIntegrationsForConversation(conversationId: string): IntegrationType[] | null {
+  getAllowedIntegrationsForConversation(
+    conversationId: string,
+  ): IntegrationType[] | null {
     const genId = this.conversationToGeneration.get(conversationId);
     if (!genId) return null;
     const ctx = this.activeGenerations.get(genId);
@@ -1244,7 +1330,10 @@ class GenerationManager {
         status: ctx.status,
         contentParts: ctx.contentParts,
         pendingApproval: ctx.pendingApproval,
-        usage: { inputTokens: ctx.usage.inputTokens, outputTokens: ctx.usage.outputTokens },
+        usage: {
+          inputTokens: ctx.usage.inputTokens,
+          outputTokens: ctx.usage.outputTokens,
+        },
       };
     }
 
@@ -1260,7 +1349,10 @@ class GenerationManager {
       status: genRecord.status as GenerationStatus,
       contentParts: genRecord.contentParts ?? [],
       pendingApproval: genRecord.pendingApproval ?? null,
-      usage: { inputTokens: genRecord.inputTokens, outputTokens: genRecord.outputTokens },
+      usage: {
+        inputTokens: genRecord.inputTokens,
+        outputTokens: genRecord.outputTokens,
+      },
     };
   }
 
@@ -1291,7 +1383,10 @@ class GenerationManager {
         excludeUserMessages: Array.from(SESSION_RESET_COMMANDS),
       });
     } catch (err) {
-      console.error("[GenerationManager] Failed to write session transcript:", err);
+      console.error(
+        "[GenerationManager] Failed to write session transcript:",
+        err,
+      );
     }
 
     await db.insert(message).values({
@@ -1329,9 +1424,13 @@ class GenerationManager {
         getEnabledIntegrationTypes(ctx.userId),
       ]);
 
-      const allowedIntegrations = ctx.allowedIntegrations ?? enabledIntegrations;
+      const allowedIntegrations =
+        ctx.allowedIntegrations ?? enabledIntegrations;
 
-      const cliInstructions = await getCliInstructionsWithCustom(allowedIntegrations, ctx.userId);
+      const cliInstructions = await getCliInstructionsWithCustom(
+        allowedIntegrations,
+        ctx.userId,
+      );
       const filteredCliEnv =
         ctx.allowedIntegrations !== undefined
           ? Object.fromEntries(
@@ -1354,8 +1453,10 @@ class GenerationManager {
                   UNIPILE_DSN: "linkedin",
                 };
                 const integration = envToIntegration[key];
-                return integration ? ctx.allowedIntegrations!.includes(integration) : true;
-              })
+                return integration
+                  ? ctx.allowedIntegrations!.includes(integration)
+                  : true;
+              }),
             )
           : cliEnv;
 
@@ -1377,7 +1478,10 @@ class GenerationManager {
       ctx.agentInitStartedAt = agentInitStartedAt;
       ctx.agentInitReadyAt = undefined;
       ctx.agentInitFailedAt = undefined;
-      this.broadcast(ctx, { type: "status_change", status: "agent_init_started" });
+      this.broadcast(ctx, {
+        type: "status_change",
+        status: "agent_init_started",
+      });
       logServerEvent(
         "info",
         "AGENT_INIT_STARTED",
@@ -1388,7 +1492,7 @@ class GenerationManager {
           generationId: ctx.id,
           conversationId: ctx.conversationId,
           userId: ctx.userId,
-        }
+        },
       );
       const agentInitWarnTimer = setTimeout(() => {
         const elapsedMs = Date.now() - agentInitStartedAt;
@@ -1402,7 +1506,7 @@ class GenerationManager {
             generationId: ctx.id,
             conversationId: ctx.conversationId,
             userId: ctx.userId,
-          }
+          },
         );
       }, agentInitWarnAfterMs);
 
@@ -1432,29 +1536,27 @@ class GenerationManager {
                 const status = `agent_init_${stage}`;
                 this.broadcast(ctx, { type: "status_change", status });
                 const lifecycleEvent = status.toUpperCase();
-                logServerEvent(
-                  "info",
-                  lifecycleEvent,
-                  details ?? {},
-                  {
-                    source: "generation-manager",
-                    traceId: ctx.traceId,
-                    generationId: ctx.id,
-                    conversationId: ctx.conversationId,
-                    userId: ctx.userId,
-                  }
-                );
+                logServerEvent("info", lifecycleEvent, details ?? {}, {
+                  source: "generation-manager",
+                  traceId: ctx.traceId,
+                  generationId: ctx.id,
+                  conversationId: ctx.conversationId,
+                  userId: ctx.userId,
+                });
               },
-            }
+            },
           ),
           AGENT_PREPARING_TIMEOUT_MS,
-          `Agent preparation timed out after ${Math.round(AGENT_PREPARING_TIMEOUT_MS / 1000)} seconds.`
+          `Agent preparation timed out after ${Math.round(AGENT_PREPARING_TIMEOUT_MS / 1000)} seconds.`,
         );
         client = session.client;
         sessionId = session.sessionId;
         sandbox = session.sandbox;
         ctx.agentInitReadyAt = Date.now();
-        this.broadcast(ctx, { type: "status_change", status: "agent_init_ready" });
+        this.broadcast(ctx, {
+          type: "status_change",
+          status: "agent_init_ready",
+        });
         const durationMs = ctx.agentInitReadyAt - agentInitStartedAt;
         logServerEvent(
           "info",
@@ -1468,18 +1570,24 @@ class GenerationManager {
             userId: ctx.userId,
             sessionId,
             sandboxId: sandbox.sandboxId,
-          }
+          },
         );
       } catch (error) {
         ctx.agentInitFailedAt = Date.now();
-        this.broadcast(ctx, { type: "status_change", status: "agent_init_failed" });
+        this.broadcast(ctx, {
+          type: "status_change",
+          status: "agent_init_failed",
+        });
         const durationMs = ctx.agentInitFailedAt - agentInitStartedAt;
         logServerEvent(
           "error",
           "AGENT_INIT_FAILED",
           {
             durationMs,
-            error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+            error:
+              error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error),
           },
           {
             source: "generation-manager",
@@ -1487,7 +1595,7 @@ class GenerationManager {
             generationId: ctx.id,
             conversationId: ctx.conversationId,
             userId: ctx.userId,
-          }
+          },
         );
         throw error;
       } finally {
@@ -1517,29 +1625,38 @@ class GenerationManager {
           },
           async (dir) => {
             await sandbox.commands.run(`mkdir -p "${dir}"`);
-          }
+          },
         );
       } catch (err) {
-        console.error("[GenerationManager] Failed to sync memory to sandbox:", err);
+        console.error(
+          "[GenerationManager] Failed to sync memory to sandbox:",
+          err,
+        );
         memoryInstructions = buildMemorySystemPrompt();
       }
 
       // Write custom integration CLI code to sandbox
       try {
-        const customCreds = await db.query.customIntegrationCredential.findMany({
-          where: and(
-            eq(customIntegrationCredential.userId, ctx.userId),
-            eq(customIntegrationCredential.enabled, true)
-          ),
-          with: { customIntegration: true },
-        });
+        const customCreds = await db.query.customIntegrationCredential.findMany(
+          {
+            where: and(
+              eq(customIntegrationCredential.userId, ctx.userId),
+              eq(customIntegrationCredential.enabled, true),
+            ),
+            with: { customIntegration: true },
+          },
+        );
 
-        const customPerms: Record<string, { read: string[]; write: string[] }> = {};
+        const customPerms: Record<string, { read: string[]; write: string[] }> =
+          {};
 
         for (const cred of customCreds) {
           const integ = cred.customIntegration;
           // Filter by allowed custom integrations if set
-          if (ctx.allowedCustomIntegrations && !ctx.allowedCustomIntegrations.includes(integ.slug)) {
+          if (
+            ctx.allowedCustomIntegrations &&
+            !ctx.allowedCustomIntegrations.includes(integ.slug)
+          ) {
             continue;
           }
           // Write CLI code to sandbox
@@ -1555,27 +1672,36 @@ class GenerationManager {
         if (Object.keys(customPerms).length > 0) {
           // Set the permissions env var on the sandbox
           await sandbox.commands.run(
-            `echo 'export CUSTOM_INTEGRATION_PERMISSIONS=${JSON.stringify(JSON.stringify(customPerms)).slice(1, -1)}' >> ~/.bashrc`
+            `echo 'export CUSTOM_INTEGRATION_PERMISSIONS=${JSON.stringify(JSON.stringify(customPerms)).slice(1, -1)}' >> ~/.bashrc`,
           );
         }
 
         const allowedSkillSlugs = new Set<string>(allowedIntegrations);
         for (const cred of customCreds) {
           const slug = cred.customIntegration.slug;
-          if (ctx.allowedCustomIntegrations && !ctx.allowedCustomIntegrations.includes(slug)) {
+          if (
+            ctx.allowedCustomIntegrations &&
+            !ctx.allowedCustomIntegrations.includes(slug)
+          ) {
             continue;
           }
           allowedSkillSlugs.add(slug);
         }
 
-        const writtenIntegrationSkills = await writeResolvedIntegrationSkillsToSandbox(
-          sandbox,
-          ctx.userId,
-          Array.from(allowedSkillSlugs)
+        const writtenIntegrationSkills =
+          await writeResolvedIntegrationSkillsToSandbox(
+            sandbox,
+            ctx.userId,
+            Array.from(allowedSkillSlugs),
+          );
+        integrationSkillsInstructions = getIntegrationSkillsSystemPrompt(
+          writtenIntegrationSkills,
         );
-        integrationSkillsInstructions = getIntegrationSkillsSystemPrompt(writtenIntegrationSkills);
       } catch (e) {
-        console.error("[Generation] Failed to write custom integration CLI code:", e);
+        console.error(
+          "[Generation] Failed to write custom integration CLI code:",
+          e,
+        );
       }
 
       // Build system prompt
@@ -1587,7 +1713,8 @@ class GenerationManager {
         "be made available for download in the chat interface.",
       ].join("");
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
-      const integrationSkillDraftInstructions = this.getIntegrationSkillDraftInstructions();
+      const integrationSkillDraftInstructions =
+        this.getIntegrationSkillDraftInstructions();
       const systemPromptParts = [
         baseSystemPrompt,
         fileShareInstructions,
@@ -1597,14 +1724,13 @@ class GenerationManager {
         integrationSkillDraftInstructions,
         memoryInstructions,
         workflowPrompt,
-      ].filter(
-        Boolean
-      );
+      ].filter(Boolean);
       const systemPrompt = systemPromptParts.join("\n\n");
 
       let currentTextPart: { type: "text"; text: string } | null = null;
       let currentTextPartId: string | null = null;
-      const verboseOpenCodeEventLogs = process.env.OPENCODE_VERBOSE_EVENTS === "1";
+      const verboseOpenCodeEventLogs =
+        process.env.OPENCODE_VERBOSE_EVENTS === "1";
       let opencodeEventCount = 0;
       let opencodeToolCallCount = 0;
       let opencodePermissionCount = 0;
@@ -1625,20 +1751,35 @@ class GenerationManager {
       // Build prompt parts (text + file attachments)
       // For non-image files, write them to the sandbox so the LLM can process them
       // via sandbox tools, rather than passing unsupported media types directly.
-      const promptParts: Array<{ type: string; text?: string; mime?: string; url?: string; filename?: string }> = [
-        { type: "text", text: ctx.userMessageContent },
-      ];
+      const promptParts: Array<{
+        type: string;
+        text?: string;
+        mime?: string;
+        url?: string;
+        filename?: string;
+      }> = [{ type: "text", text: ctx.userMessageContent }];
       if (ctx.attachments && ctx.attachments.length > 0) {
         for (const a of ctx.attachments) {
           if (a.mimeType.startsWith("image/")) {
-            promptParts.push({ type: "file", mime: a.mimeType, url: a.dataUrl, filename: a.name });
+            promptParts.push({
+              type: "file",
+              mime: a.mimeType,
+              url: a.dataUrl,
+              filename: a.name,
+            });
           } else {
             // Write non-image file to sandbox and tell the LLM where it is
             const sandboxPath = `/home/user/uploads/${a.name}`;
             try {
               const base64Data = a.dataUrl.split(",")[1] || "";
               const buffer = Buffer.from(base64Data, "base64");
-              await sandbox.files.write(sandboxPath, buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer);
+              await sandbox.files.write(
+                sandboxPath,
+                buffer.buffer.slice(
+                  buffer.byteOffset,
+                  buffer.byteOffset + buffer.byteLength,
+                ) as ArrayBuffer,
+              );
               promptParts.push({
                 type: "text",
                 text: `The user uploaded a file: ${sandboxPath} (${a.mimeType}). You can read and process it using the sandbox tools.`,
@@ -1646,7 +1787,10 @@ class GenerationManager {
               stagedUploadCount += 1;
             } catch (err) {
               stagedUploadFailureCount += 1;
-              console.error(`[GenerationManager] Failed to write file to sandbox: ${sandboxPath}`, err);
+              console.error(
+                `[GenerationManager] Failed to write file to sandbox: ${sandboxPath}`,
+                err,
+              );
               promptParts.push({
                 type: "text",
                 text: `The user tried to upload a file "${a.name}" but it could not be written to the sandbox.`,
@@ -1656,19 +1800,19 @@ class GenerationManager {
         }
       }
       if (stagedUploadCount > 0 || stagedUploadFailureCount > 0) {
-      logServerEvent(
-        "info",
-        "ATTACHMENTS_STAGED",
-        { stagedUploadCount, stagedUploadFailureCount },
-        {
-          source: "generation-manager",
-          traceId: ctx.traceId,
-          generationId: ctx.id,
-          conversationId: ctx.conversationId,
-          userId: ctx.userId,
-          sessionId,
-        }
-      );
+        logServerEvent(
+          "info",
+          "ATTACHMENTS_STAGED",
+          { stagedUploadCount, stagedUploadFailureCount },
+          {
+            source: "generation-manager",
+            traceId: ctx.traceId,
+            generationId: ctx.id,
+            conversationId: ctx.conversationId,
+            userId: ctx.userId,
+            sessionId,
+          },
+        );
       }
 
       // Send the prompt to OpenCode
@@ -1683,7 +1827,7 @@ class GenerationManager {
           conversationId: ctx.conversationId,
           userId: ctx.userId,
           sessionId,
-        }
+        },
       );
       const promptPromise = client.session.prompt({
         sessionID: sessionId,
@@ -1717,20 +1861,30 @@ class GenerationManager {
           event.type === "session.idle"
         ) {
           console.info(
-            `[OpenCode][EVENT] type=${event.type} generationId=${ctx.id} conversationId=${ctx.conversationId}`
+            `[OpenCode][EVENT] type=${event.type} generationId=${ctx.id} conversationId=${ctx.conversationId}`,
           );
         }
 
         // Transform tracked OpenCode events to GenerationEvents
         if (isOpenCodeTrackedEvent(event)) {
-          await this.processOpencodeEvent(ctx, event, currentTextPart, currentTextPartId, (part, partId) => {
-            currentTextPart = part;
-            currentTextPartId = partId;
-          });
+          await this.processOpencodeEvent(
+            ctx,
+            event,
+            currentTextPart,
+            currentTextPartId,
+            (part, partId) => {
+              currentTextPart = part;
+              currentTextPartId = partId;
+            },
+          );
         }
 
         if (isOpenCodeActionableEvent(event)) {
-          const actionableResult = await this.handleOpenCodeActionableEvent(ctx, client, event);
+          const actionableResult = await this.handleOpenCodeActionableEvent(
+            ctx,
+            client,
+            event,
+          );
           if (actionableResult.type === "permission") {
             opencodePermissionCount += 1;
           } else if (actionableResult.type === "question") {
@@ -1747,7 +1901,10 @@ class GenerationManager {
         // Check for session error
         if (event.type === "session.error") {
           const error = (event.properties as any)?.error || "Unknown error";
-          const errorMessage = typeof error === 'string' ? error : (error?.data?.message || error?.message || JSON.stringify(error));
+          const errorMessage =
+            typeof error === "string"
+              ? error
+              : error?.data?.message || error?.message || JSON.stringify(error);
           throw new Error(errorMessage);
         }
       }
@@ -1759,7 +1916,10 @@ class GenerationManager {
         try {
           await this.importIntegrationSkillDraftsFromE2B(ctx, ctx.e2bSandbox);
         } catch (error) {
-          console.error("[GenerationManager] Failed to import integration skill drafts from E2B:", error);
+          console.error(
+            "[GenerationManager] Failed to import integration skill drafts from E2B:",
+            error,
+          );
         }
       }
 
@@ -1770,10 +1930,12 @@ class GenerationManager {
           const newFiles = await collectNewE2BFiles(
             ctx.e2bSandbox,
             ctx.generationMarkerTime,
-            Array.from(ctx.sentFilePaths || [])
+            Array.from(ctx.sentFilePaths || []),
           );
 
-          console.log(`[GenerationManager] Found ${newFiles.length} new files in E2B sandbox`);
+          console.log(
+            `[GenerationManager] Found ${newFiles.length} new files in E2B sandbox`,
+          );
 
           for (const file of newFiles) {
             try {
@@ -1796,18 +1958,24 @@ class GenerationManager {
 
               uploadedSandboxFileCount += 1;
             } catch (err) {
-              console.error(`[GenerationManager] Failed to upload sandbox file ${file.path}:`, err);
+              console.error(
+                `[GenerationManager] Failed to upload sandbox file ${file.path}:`,
+                err,
+              );
             }
           }
         } catch (err) {
-          console.error("[GenerationManager] Failed to collect sandbox files:", err);
+          console.error(
+            "[GenerationManager] Failed to collect sandbox files:",
+            err,
+          );
         }
       }
 
       // Check if aborted
       if (ctx.abortController.signal.aborted) {
         console.info(
-          `[GenerationManager][SUMMARY] status=cancelled generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} questions=${opencodeQuestionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`
+          `[GenerationManager][SUMMARY] status=cancelled generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} questions=${opencodeQuestionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`,
         );
         await this.finishGeneration(ctx, "cancelled");
         return;
@@ -1815,14 +1983,15 @@ class GenerationManager {
 
       // Complete the generation
       console.info(
-        `[GenerationManager][SUMMARY] status=completed generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} questions=${opencodeQuestionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`
+        `[GenerationManager][SUMMARY] status=completed generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} opencodeEvents=${opencodeEventCount} toolCalls=${opencodeToolCallCount} permissions=${opencodePermissionCount} questions=${opencodeQuestionCount} stagedUploads=${stagedUploadCount} uploadedFiles=${uploadedSandboxFileCount}`,
       );
       await this.finishGeneration(ctx, "completed");
     } catch (error) {
       console.error("[GenerationManager] Error:", error);
-      ctx.errorMessage = error instanceof Error ? error.message : "Unknown error";
+      ctx.errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.info(
-        `[GenerationManager][SUMMARY] status=error generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} error=${JSON.stringify(ctx.errorMessage)}`
+        `[GenerationManager][SUMMARY] status=error generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} error=${JSON.stringify(ctx.errorMessage)}`,
       );
       await this.finishGeneration(ctx, "error");
     }
@@ -1861,10 +2030,13 @@ class GenerationManager {
           },
           async (dir) => {
             await sandbox!.execute(`mkdir -p "${dir}"`);
-          }
+          },
         );
       } catch (err) {
-        console.error("[GenerationManager] Failed to sync memory to sandbox:", err);
+        console.error(
+          "[GenerationManager] Failed to sync memory to sandbox:",
+          err,
+        );
       }
 
       // 2. Get LLM backend
@@ -1872,12 +2044,14 @@ class GenerationManager {
 
       // 3. Get integration environment and build system prompt
       const enabledIntegrations = await getEnabledIntegrationTypes(ctx.userId);
-      const allowedIntegrations = ctx.allowedIntegrations ?? enabledIntegrations;
+      const allowedIntegrations =
+        ctx.allowedIntegrations ?? enabledIntegrations;
       const cliInstructions = getCliInstructions(allowedIntegrations);
-      const resolvedCommunityIntegrationSkills = await resolvePreferredCommunitySkillsForUser(
-        ctx.userId,
-        allowedIntegrations
-      );
+      const resolvedCommunityIntegrationSkills =
+        await resolvePreferredCommunitySkillsForUser(
+          ctx.userId,
+          allowedIntegrations,
+        );
       if (resolvedCommunityIntegrationSkills.length > 0) {
         await sandbox.execute('mkdir -p "/app/.opencode/integration-skills"');
         for (const skill of resolvedCommunityIntegrationSkills) {
@@ -1894,13 +2068,14 @@ class GenerationManager {
         }
       }
       const integrationSkillsPrompt = getIntegrationSkillsSystemPrompt(
-        resolvedCommunityIntegrationSkills.map((skill) => skill.slug)
+        resolvedCommunityIntegrationSkills.map((skill) => skill.slug),
       );
 
       const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
       const memoryPrompt = buildMemorySystemPrompt();
-      const integrationSkillDraftInstructions = this.getIntegrationSkillDraftInstructions();
+      const integrationSkillDraftInstructions =
+        this.getIntegrationSkillDraftInstructions();
       const systemPromptParts = [
         baseSystemPrompt,
         cliInstructions,
@@ -1912,7 +2087,10 @@ class GenerationManager {
       const systemPrompt = systemPromptParts.join("\n\n");
 
       // 4. Build message history from DB
-      const chatMessages = await this.buildMessageHistory(ctx, { sandbox, llm });
+      const chatMessages = await this.buildMessageHistory(ctx, {
+        sandbox,
+        llm,
+      });
 
       // 5. Get tool definitions
       const tools = getDirectModeTools();
@@ -1963,7 +2141,8 @@ class GenerationManager {
               }
 
               // Also accumulate for the response blocks
-              const lastBlock = assistantContentBlocks[assistantContentBlocks.length - 1];
+              const lastBlock =
+                assistantContentBlocks[assistantContentBlocks.length - 1];
               if (lastBlock && lastBlock.type === "text") {
                 lastBlock.text += event.text;
               } else {
@@ -2064,7 +2243,11 @@ class GenerationManager {
             if (block.type !== "tool_use") continue;
 
             if (block.name.startsWith("memory_")) {
-              const memoryResult = await this.executeMemoryTool(ctx, sandbox!, block);
+              const memoryResult = await this.executeMemoryTool(
+                ctx,
+                sandbox!,
+                block,
+              );
               toolResults.push({
                 type: "tool_result",
                 tool_use_id: block.id,
@@ -2088,10 +2271,18 @@ class GenerationManager {
               continue;
             }
 
-            if (ctx.allowedIntegrations !== undefined && block.name === "bash") {
+            if (
+              ctx.allowedIntegrations !== undefined &&
+              block.name === "bash"
+            ) {
               const command = (block.input.command as string) || "";
               const parsed = parseBashCommand(command);
-              if (parsed && !ctx.allowedIntegrations.includes(parsed.integration as IntegrationType)) {
+              if (
+                parsed &&
+                !ctx.allowedIntegrations.includes(
+                  parsed.integration as IntegrationType,
+                )
+              ) {
                 toolResults.push({
                   type: "tool_result",
                   tool_use_id: block.id,
@@ -2119,7 +2310,7 @@ class GenerationManager {
             const permCheck = checkToolPermissions(
               block.name,
               block.input,
-              allowedIntegrations
+              allowedIntegrations,
             );
 
             if (permCheck.needsAuth) {
@@ -2193,7 +2384,10 @@ class GenerationManager {
               let isError = false;
 
               try {
-                const content = await readSandboxFileAsBuffer(sandbox!, filePath);
+                const content = await readSandboxFileAsBuffer(
+                  sandbox!,
+                  filePath,
+                );
                 if (content.length === 0) {
                   throw new Error("File not found or empty");
                 }
@@ -2259,7 +2453,8 @@ class GenerationManager {
                   timeout: (block.input.timeout as number) || 120_000,
                 });
 
-                resultContent = execResult.stdout || execResult.stderr || "(no output)";
+                resultContent =
+                  execResult.stdout || execResult.stderr || "(no output)";
                 if (execResult.exitCode !== 0 && execResult.stderr) {
                   resultContent = `Exit code: ${execResult.exitCode}\n${execResult.stderr}\n${execResult.stdout}`;
                   isError = true;
@@ -2275,7 +2470,8 @@ class GenerationManager {
 
             // Truncate very long outputs
             if (resultContent.length > 100_000) {
-              resultContent = resultContent.slice(0, 100_000) + "\n... (output truncated)";
+              resultContent =
+                resultContent.slice(0, 100_000) + "\n... (output truncated)";
             }
 
             toolResults.push({
@@ -2316,7 +2512,10 @@ class GenerationManager {
         try {
           await this.importIntegrationSkillDraftsFromSandbox(ctx, sandbox);
         } catch (error) {
-          console.error("[GenerationManager] Failed to import integration skill drafts:", error);
+          console.error(
+            "[GenerationManager] Failed to import integration skill drafts:",
+            error,
+          );
         }
       }
 
@@ -2324,13 +2523,16 @@ class GenerationManager {
       await this.finishGeneration(ctx, "completed");
     } catch (error) {
       console.error("[GenerationManager] Direct generation error:", error);
-      ctx.errorMessage = error instanceof Error ? error.message : "Unknown error";
+      ctx.errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       await this.finishGeneration(ctx, "error");
     } finally {
       if (sandbox) {
-        sandbox.teardown().catch((err) =>
-          console.error("[GenerationManager] Sandbox teardown error:", err)
-        );
+        sandbox
+          .teardown()
+          .catch((err) =>
+            console.error("[GenerationManager] Sandbox teardown error:", err),
+          );
       }
     }
   }
@@ -2338,7 +2540,7 @@ class GenerationManager {
   private async executeMemoryTool(
     ctx: GenerationContext,
     sandbox: SandboxBackend,
-    block: Extract<ContentBlock, { type: "tool_use" }>
+    block: Extract<ContentBlock, { type: "tool_use" }>,
   ): Promise<{ content: string; isError?: boolean }> {
     try {
       const input = block.input as Record<string, unknown>;
@@ -2347,7 +2549,10 @@ class GenerationManager {
         case "memory_search": {
           const query = String(input.query || "").trim();
           if (!query) {
-            return { content: "Error: memory_search requires a query", isError: true };
+            return {
+              content: "Error: memory_search requires a query",
+              isError: true,
+            };
           }
           const results = await searchMemoryWithSessions({
             userId: ctx.userId,
@@ -2362,11 +2567,16 @@ class GenerationManager {
         case "memory_get": {
           const path = String(input.path || "").trim();
           if (!path) {
-            return { content: "Error: memory_get requires a path", isError: true };
+            return {
+              content: "Error: memory_get requires a path",
+              isError: true,
+            };
           }
-          const { readSessionTranscriptByPath } = await import("@/server/services/memory-service");
-          const result = await readSessionTranscriptByPath({ userId: ctx.userId, path })
-            ?? await readMemoryFile({ userId: ctx.userId, path });
+          const { readSessionTranscriptByPath } =
+            await import("@/server/services/memory-service");
+          const result =
+            (await readSessionTranscriptByPath({ userId: ctx.userId, path })) ??
+            (await readMemoryFile({ userId: ctx.userId, path }));
           if (!result) {
             return { content: "Error: memory file not found", isError: true };
           }
@@ -2376,7 +2586,10 @@ class GenerationManager {
         case "memory_write": {
           const content = String(input.content || "").trim();
           if (!content) {
-            return { content: "Error: memory_write requires content", isError: true };
+            return {
+              content: "Error: memory_write requires content",
+              isError: true,
+            };
           }
           const entry = await writeMemoryEntry({
             userId: ctx.userId,
@@ -2395,14 +2608,23 @@ class GenerationManager {
             },
             async (dir) => {
               await sandbox.execute(`mkdir -p "${dir}"`);
-            }
+            },
           );
 
-          return { content: JSON.stringify({ success: true, entryId: entry.id }, null, 2) };
+          return {
+            content: JSON.stringify(
+              { success: true, entryId: entry.id },
+              null,
+              2,
+            ),
+          };
         }
 
         default:
-          return { content: `Unknown memory tool: ${block.name}`, isError: true };
+          return {
+            content: `Unknown memory tool: ${block.name}`,
+            isError: true,
+          };
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -2427,7 +2649,7 @@ class GenerationManager {
         const auth = await db.query.providerAuth.findFirst({
           where: and(
             eq(providerAuth.userId, ctx.userId),
-            eq(providerAuth.provider, "openai")
+            eq(providerAuth.provider, "openai"),
           ),
         });
         if (auth) {
@@ -2446,13 +2668,13 @@ class GenerationManager {
         const auth = await db.query.providerAuth.findFirst({
           where: and(
             eq(providerAuth.userId, ctx.userId),
-            eq(providerAuth.provider, "kimi")
+            eq(providerAuth.provider, "kimi"),
           ),
         });
         if (auth) {
           return new AnthropicBackend(
             decrypt(auth.accessToken),
-            "https://api.kimi.com/coding/v1"
+            "https://api.kimi.com/coding/v1",
           );
         }
         throw new Error("No Kimi API key available");
@@ -2473,18 +2695,15 @@ class GenerationManager {
    */
   private async buildMessageHistory(
     ctx: GenerationContext,
-    options?: { sandbox?: SandboxBackend; llm?: LLMBackend }
+    options?: { sandbox?: SandboxBackend; llm?: LLMBackend },
   ): Promise<ChatMessage[]> {
     const messages = await db.query.message.findMany({
       where: eq(message.conversationId, ctx.conversationId),
       orderBy: asc(message.createdAt),
     });
 
-    const { summaryText, sessionMessages } = await this.maybeCompactConversation(
-      ctx,
-      messages,
-      options
-    );
+    const { summaryText, sessionMessages } =
+      await this.maybeCompactConversation(ctx, messages, options);
 
     const chatMessages: ChatMessage[] = [];
 
@@ -2497,7 +2716,8 @@ class GenerationManager {
 
     const lastMessage = sessionMessages[sessionMessages.length - 1];
     const skipLastUser =
-      lastMessage?.role === "user" && lastMessage.content === ctx.userMessageContent;
+      lastMessage?.role === "user" &&
+      lastMessage.content === ctx.userMessageContent;
 
     const messagesToRender = skipLastUser
       ? sessionMessages.slice(0, -1)
@@ -2508,24 +2728,38 @@ class GenerationManager {
         chatMessages.push({ role: "user", content: m.content });
       } else if (m.role === "assistant") {
         if (m.contentParts && m.contentParts.length > 0) {
-          const blocks: ContentBlock[] = m.contentParts.map((p): ContentBlock => {
-            switch (p.type) {
-              case "text":
-                return { type: "text", text: p.text };
-              case "tool_use":
-                return { type: "tool_use", id: p.id, name: p.name, input: p.input };
-              case "tool_result":
-                return {
-                  type: "tool_result",
-                  tool_use_id: p.tool_use_id,
-                  content: typeof p.content === "string" ? p.content : JSON.stringify(p.content),
-                };
-              case "thinking":
-                return { type: "thinking", thinking: p.content, signature: "" };
-              default:
-                return { type: "text", text: "" };
-            }
-          });
+          const blocks: ContentBlock[] = m.contentParts.map(
+            (p): ContentBlock => {
+              switch (p.type) {
+                case "text":
+                  return { type: "text", text: p.text };
+                case "tool_use":
+                  return {
+                    type: "tool_use",
+                    id: p.id,
+                    name: p.name,
+                    input: p.input,
+                  };
+                case "tool_result":
+                  return {
+                    type: "tool_result",
+                    tool_use_id: p.tool_use_id,
+                    content:
+                      typeof p.content === "string"
+                        ? p.content
+                        : JSON.stringify(p.content),
+                  };
+                case "thinking":
+                  return {
+                    type: "thinking",
+                    thinking: p.content,
+                    signature: "",
+                  };
+                default:
+                  return { type: "text", text: "" };
+              }
+            },
+          );
           chatMessages.push({ role: "assistant", content: blocks });
         } else {
           chatMessages.push({ role: "assistant", content: m.content });
@@ -2534,7 +2768,9 @@ class GenerationManager {
     }
 
     if (ctx.attachments && ctx.attachments.length > 0) {
-      const blocks: ContentBlock[] = [{ type: "text", text: ctx.userMessageContent }];
+      const blocks: ContentBlock[] = [
+        { type: "text", text: ctx.userMessageContent },
+      ];
       for (const a of ctx.attachments) {
         if (a.mimeType.startsWith("image/")) {
           const base64Data = a.dataUrl.split(",")[1] || "";
@@ -2542,14 +2778,23 @@ class GenerationManager {
             type: "image",
             source: {
               type: "base64",
-              media_type: a.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+              media_type: a.mimeType as
+                | "image/png"
+                | "image/jpeg"
+                | "image/gif"
+                | "image/webp",
               data: base64Data,
             },
           });
         } else {
           const base64Data = a.dataUrl.split(",")[1] || "";
-          const textContent = Buffer.from(base64Data, "base64").toString("utf-8");
-          blocks.push({ type: "text", text: `[File: ${a.name}]\n${textContent}` });
+          const textContent = Buffer.from(base64Data, "base64").toString(
+            "utf-8",
+          );
+          blocks.push({
+            type: "text",
+            text: `[File: ${a.name}]\n${textContent}`,
+          });
         }
       }
       chatMessages.push({ role: "user", content: blocks });
@@ -2563,38 +2808,49 @@ class GenerationManager {
   private async maybeCompactConversation(
     ctx: GenerationContext,
     messages: MessageRow[],
-    options?: { sandbox?: SandboxBackend; llm?: LLMBackend }
+    options?: { sandbox?: SandboxBackend; llm?: LLMBackend },
   ): Promise<{ summaryText: string | null; sessionMessages: MessageRow[] }> {
     const boundaryIndex = messages
-      .map((m, idx) => (m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX) ? idx : -1))
+      .map((m, idx) =>
+        m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX)
+          ? idx
+          : -1,
+      )
       .filter((idx) => idx >= 0)
       .pop();
 
-    const sessionMessages = boundaryIndex !== undefined
-      ? messages.slice(boundaryIndex + 1)
-      : messages;
+    const sessionMessages =
+      boundaryIndex !== undefined
+        ? messages.slice(boundaryIndex + 1)
+        : messages;
 
     const summaryIndex = sessionMessages
-      .map((m, idx) => (m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX) ? idx : -1))
+      .map((m, idx) =>
+        m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX)
+          ? idx
+          : -1,
+      )
       .filter((idx) => idx >= 0)
       .pop();
 
-    const summaryMessage = summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
+    const summaryMessage =
+      summaryIndex !== undefined ? sessionMessages[summaryIndex] : undefined;
     const summaryText = summaryMessage
       ? summaryMessage.content.replace(COMPACTION_SUMMARY_PREFIX, "").trim()
       : null;
 
-    const messagesAfterSummary = summaryIndex !== undefined
-      ? sessionMessages.slice(summaryIndex + 1)
-      : sessionMessages;
+    const messagesAfterSummary =
+      summaryIndex !== undefined
+        ? sessionMessages.slice(summaryIndex + 1)
+        : sessionMessages;
 
     const conversationMessages = messagesAfterSummary.filter(
-      (m) => m.role === "user" || m.role === "assistant"
+      (m) => m.role === "user" || m.role === "assistant",
     );
 
     const tokenEstimate = conversationMessages.reduce(
       (sum, m) => sum + estimateTokensForMessageRow(m),
-      0
+      0,
     );
 
     if (
@@ -2605,22 +2861,32 @@ class GenerationManager {
       return { summaryText, sessionMessages: conversationMessages };
     }
 
-    const messagesToSummarize = conversationMessages.slice(0, -COMPACTION_KEEP_LAST_MESSAGES);
-    const messagesToKeep = conversationMessages.slice(-COMPACTION_KEEP_LAST_MESSAGES);
+    const messagesToSummarize = conversationMessages.slice(
+      0,
+      -COMPACTION_KEEP_LAST_MESSAGES,
+    );
+    const messagesToKeep = conversationMessages.slice(
+      -COMPACTION_KEEP_LAST_MESSAGES,
+    );
 
     if (messagesToSummarize.length < COMPACTION_MIN_MESSAGES) {
       return { summaryText, sessionMessages: conversationMessages };
     }
 
     if (tokenEstimate > MEMORY_FLUSH_TRIGGER_TOKENS && options?.sandbox) {
-      await this.runMemoryFlush(ctx, options.llm, options.sandbox, conversationMessages);
+      await this.runMemoryFlush(
+        ctx,
+        options.llm,
+        options.sandbox,
+        conversationMessages,
+      );
     }
 
     const newSummary = await this.generateCompactionSummary(
       options.llm,
       ctx.model,
       messagesToSummarize,
-      summaryText
+      summaryText,
     );
 
     if (newSummary) {
@@ -2634,12 +2900,15 @@ class GenerationManager {
       });
     }
 
-    return { summaryText: newSummary ?? summaryText, sessionMessages: messagesToKeep };
+    return {
+      summaryText: newSummary ?? summaryText,
+      sessionMessages: messagesToKeep,
+    };
   }
 
   private buildSummaryInput(
     messages: MessageRow[],
-    previousSummary: string | null
+    previousSummary: string | null,
   ): string {
     const parts: string[] = [];
     if (previousSummary) {
@@ -2648,9 +2917,16 @@ class GenerationManager {
 
     const transcript = messages
       .map((m) => {
-        if (m.role === "assistant" && m.contentParts && m.contentParts.length > 0) {
+        if (
+          m.role === "assistant" &&
+          m.contentParts &&
+          m.contentParts.length > 0
+        ) {
           const textParts = m.contentParts
-            .filter((p): p is Extract<ContentPart, { type: "text" }> => p.type === "text")
+            .filter(
+              (p): p is Extract<ContentPart, { type: "text" }> =>
+                p.type === "text",
+            )
             .map((p) => p.text)
             .join("");
           return `${m.role}: ${textParts || m.content}`;
@@ -2667,7 +2943,7 @@ class GenerationManager {
     llm: LLMBackend,
     model: string,
     messages: MessageRow[],
-    previousSummary: string | null
+    previousSummary: string | null,
   ): Promise<string | null> {
     const input = this.buildSummaryInput(messages, previousSummary);
     let summary = "";
@@ -2697,9 +2973,11 @@ class GenerationManager {
     ctx: GenerationContext,
     llm: LLMBackend,
     sandbox: SandboxBackend,
-    messages: MessageRow[]
+    messages: MessageRow[],
   ): Promise<void> {
-    const tools = getDirectModeTools().filter((tool) => tool.name.startsWith("memory_"));
+    const tools = getDirectModeTools().filter((tool) =>
+      tool.name.startsWith("memory_"),
+    );
     let loopMessages: ChatMessage[] = [
       { role: "user", content: this.buildSummaryInput(messages, null) },
     ];
@@ -2782,7 +3060,7 @@ class GenerationManager {
   private async handleOpenCodeActionableEvent(
     ctx: GenerationContext,
     client: OpencodeClient,
-    event: OpenCodeActionableEvent
+    event: OpenCodeActionableEvent,
   ): Promise<{ type: "none" | "permission" | "question" }> {
     switch (event.type) {
       case "message.part.updated": {
@@ -2822,14 +3100,22 @@ class GenerationManager {
   private async handleOpenCodePermissionAsked(
     ctx: GenerationContext,
     client: OpencodeClient,
-    request: PermissionRequest
+    request: PermissionRequest,
   ): Promise<void> {
     const permissionType = request.permission || "file access";
     const patterns = request.patterns;
-    const allPatternsAllowed = shouldAutoApproveOpenCodePermission(permissionType, patterns);
+    const allPatternsAllowed = shouldAutoApproveOpenCodePermission(
+      permissionType,
+      patterns,
+    );
 
     if (allPatternsAllowed) {
-      console.log("[GenerationManager] Auto-approving sandbox permission:", request.id, permissionType, patterns);
+      console.log(
+        "[GenerationManager] Auto-approving sandbox permission:",
+        request.id,
+        permissionType,
+        patterns,
+      );
       try {
         await client.permission.reply({
           requestID: request.id,
@@ -2845,11 +3131,13 @@ class GenerationManager {
       "[GenerationManager] Surfacing permission request to UI:",
       request.id,
       request.permission,
-      patterns
+      patterns,
     );
 
     const toolUseId = `opencode-perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const command = patterns?.length ? `${permissionType}: ${patterns.join(", ")}` : permissionType;
+    const command = patterns?.length
+      ? `${permissionType}: ${patterns.join(", ")}`
+      : permissionType;
 
     await this.queueOpenCodeApprovalRequest(
       ctx,
@@ -2866,14 +3154,14 @@ class GenerationManager {
         integration: "Bap",
         operation: permissionType,
         command,
-      }
+      },
     );
   }
 
   private async handleOpenCodeQuestionAsked(
     ctx: GenerationContext,
     client: OpencodeClient,
-    request: QuestionRequest
+    request: QuestionRequest,
   ): Promise<void> {
     const defaultAnswers = buildDefaultQuestionAnswers(request);
 
@@ -2884,7 +3172,10 @@ class GenerationManager {
           answers: defaultAnswers,
         });
       } catch (err) {
-        console.error("[GenerationManager] Failed to auto-answer question:", err);
+        console.error(
+          "[GenerationManager] Failed to auto-answer question:",
+          err,
+        );
       }
       return;
     }
@@ -2908,7 +3199,7 @@ class GenerationManager {
         integration: "Bap",
         operation: "question",
         command,
-      }
+      },
     );
   }
 
@@ -2916,7 +3207,7 @@ class GenerationManager {
     ctx: GenerationContext,
     client: OpencodeClient,
     openCodeRequest: PendingOpenCodeApprovalRequest,
-    pendingApproval: PendingApproval
+    pendingApproval: PendingApproval,
   ): Promise<void> {
     ctx.status = "awaiting_approval";
     ctx.pendingApproval = pendingApproval;
@@ -2924,14 +3215,27 @@ class GenerationManager {
     ctx.opencodeClient = client;
 
     db.update(generation)
-      .set({ status: "awaiting_approval", pendingApproval: ctx.pendingApproval })
+      .set({
+        status: "awaiting_approval",
+        pendingApproval: ctx.pendingApproval,
+      })
       .where(eq(generation.id, ctx.id))
-      .then(() => db.update(conversation).set({ generationStatus: "awaiting_approval" }).where(eq(conversation.id, ctx.conversationId)))
+      .then(() =>
+        db
+          .update(conversation)
+          .set({ generationStatus: "awaiting_approval" })
+          .where(eq(conversation.id, ctx.conversationId)),
+      )
       .then(() => {
         if (!ctx.workflowRunId) return;
-        return db.update(workflowRun).set({ status: "awaiting_approval" }).where(eq(workflowRun.id, ctx.workflowRunId));
+        return db
+          .update(workflowRun)
+          .set({ status: "awaiting_approval" })
+          .where(eq(workflowRun.id, ctx.workflowRunId));
       })
-      .catch((err) => console.error("[GenerationManager] DB update error:", err));
+      .catch((err) =>
+        console.error("[GenerationManager] DB update error:", err),
+      );
 
     this.broadcast(ctx, {
       type: "pending_approval",
@@ -2947,14 +3251,21 @@ class GenerationManager {
 
     ctx.approvalTimeoutId = setTimeout(() => {
       this.rejectOpenCodePendingApprovalRequest(ctx)
-        .catch((err) => console.error("[GenerationManager] Failed to reject OpenCode request on timeout:", err))
+        .catch((err) =>
+          console.error(
+            "[GenerationManager] Failed to reject OpenCode request on timeout:",
+            err,
+          ),
+        )
         .finally(() => {
           this.handleApprovalTimeout(ctx);
         });
     }, APPROVAL_TIMEOUT_MS);
   }
 
-  private async rejectOpenCodePendingApprovalRequest(ctx: GenerationContext): Promise<void> {
+  private async rejectOpenCodePendingApprovalRequest(
+    ctx: GenerationContext,
+  ): Promise<void> {
     if (!ctx.opencodePendingApprovalRequest || !ctx.opencodeClient) {
       return;
     }
@@ -2989,7 +3300,10 @@ class GenerationManager {
     event: OpenCodeTrackedEvent,
     currentTextPart: { type: "text"; text: string } | null,
     currentTextPartId: string | null,
-    setCurrentTextPart: (part: { type: "text"; text: string } | null, partId: string | null) => void
+    setCurrentTextPart: (
+      part: { type: "text"; text: string } | null,
+      partId: string | null,
+    ) => void,
   ): Promise<void> {
     switch (event.type) {
       case "message.updated": {
@@ -3009,7 +3323,7 @@ class GenerationManager {
             let replayTextPartId = currentTextPartId;
             const replaySetCurrentTextPart = (
               part: { type: "text"; text: string } | null,
-              partId: string | null
+              partId: string | null,
             ) => {
               replayTextPart = part;
               replayTextPartId = partId;
@@ -3021,7 +3335,7 @@ class GenerationManager {
                 pendingPart,
                 replayTextPart,
                 replayTextPartId,
-                replaySetCurrentTextPart
+                replaySetCurrentTextPart,
               );
             }
           }
@@ -3055,7 +3369,7 @@ class GenerationManager {
           part,
           currentTextPart,
           currentTextPartId,
-          setCurrentTextPart
+          setCurrentTextPart,
         );
         break;
       }
@@ -3077,7 +3391,7 @@ class GenerationManager {
 
   private shouldProcessUnknownMessagePart(
     ctx: GenerationContext,
-    part: OpencodePart
+    part: OpencodePart,
   ): boolean {
     if (part.type === "tool") {
       return true;
@@ -3110,7 +3424,10 @@ class GenerationManager {
     part: OpencodePart,
     currentTextPart: { type: "text"; text: string } | null,
     currentTextPartId: string | null,
-    setCurrentTextPart: (part: { type: "text"; text: string } | null, partId: string | null) => void
+    setCurrentTextPart: (
+      part: { type: "text"; text: string } | null,
+      partId: string | null,
+    ) => void,
   ): Promise<void> {
     const partId = part.id;
 
@@ -3124,7 +3441,9 @@ class GenerationManager {
         const isNewPart = partId !== currentTextPartId;
 
         // Calculate delta from the previous text
-        const previousLength = isNewPart ? 0 : (currentTextPart?.text.length ?? 0);
+        const previousLength = isNewPart
+          ? 0
+          : (currentTextPart?.text.length ?? 0);
         const delta = fullText.slice(previousLength);
 
         // Only process if there's new content
@@ -3157,7 +3476,7 @@ class GenerationManager {
 
       const existingToolUse = ctx.contentParts.find(
         (p): p is ContentPart & { type: "tool_use" } =>
-          p.type === "tool_use" && p.id === toolUseId
+          p.type === "tool_use" && p.id === toolUseId,
       );
 
       switch (part.state.status) {
@@ -3237,9 +3556,12 @@ class GenerationManager {
     ].join("\n");
   }
 
-  private async importIntegrationSkillDraftsFromE2B(ctx: GenerationContext, sandbox: Sandbox): Promise<void> {
+  private async importIntegrationSkillDraftsFromE2B(
+    ctx: GenerationContext,
+    sandbox: Sandbox,
+  ): Promise<void> {
     const findResult = await sandbox.commands.run(
-      `find /app/.opencode/integration-skill-drafts -maxdepth 1 -type f -name '*.json' 2>/dev/null | head -20`
+      `find /app/.opencode/integration-skill-drafts -maxdepth 1 -type f -name '*.json' 2>/dev/null | head -20`,
     );
     const paths = findResult.stdout
       .trim()
@@ -3250,22 +3572,28 @@ class GenerationManager {
     for (const filePath of paths) {
       try {
         const content = await sandbox.files.read(filePath);
-        const created = await this.importIntegrationSkillDraftContent(ctx, String(content));
+        const created = await this.importIntegrationSkillDraftContent(
+          ctx,
+          String(content),
+        );
         if (created > 0) {
           await sandbox.commands.run(`rm -f "${filePath}"`);
         }
       } catch (error) {
-        console.error(`[GenerationManager] Failed to import integration skill draft ${filePath}:`, error);
+        console.error(
+          `[GenerationManager] Failed to import integration skill draft ${filePath}:`,
+          error,
+        );
       }
     }
   }
 
   private async importIntegrationSkillDraftsFromSandbox(
     ctx: GenerationContext,
-    sandbox: SandboxBackend
+    sandbox: SandboxBackend,
   ): Promise<void> {
     const findResult = await sandbox.execute(
-      `find /app/.opencode/integration-skill-drafts -maxdepth 1 -type f -name '*.json' 2>/dev/null | head -20`
+      `find /app/.opencode/integration-skill-drafts -maxdepth 1 -type f -name '*.json' 2>/dev/null | head -20`,
     );
     const paths = findResult.stdout
       .trim()
@@ -3276,19 +3604,25 @@ class GenerationManager {
     for (const filePath of paths) {
       try {
         const content = await sandbox.readFile(filePath);
-        const created = await this.importIntegrationSkillDraftContent(ctx, content);
+        const created = await this.importIntegrationSkillDraftContent(
+          ctx,
+          content,
+        );
         if (created > 0) {
           await sandbox.execute(`rm -f "${filePath}"`);
         }
       } catch (error) {
-        console.error(`[GenerationManager] Failed to import integration skill draft ${filePath}:`, error);
+        console.error(
+          `[GenerationManager] Failed to import integration skill draft ${filePath}:`,
+          error,
+        );
       }
     }
   }
 
   private async importIntegrationSkillDraftContent(
     ctx: GenerationContext,
-    rawContent: string
+    rawContent: string,
   ): Promise<number> {
     let parsed: unknown;
     try {
@@ -3305,20 +3639,23 @@ class GenerationManager {
       const rec = draft as Record<string, unknown>;
       const slug = typeof rec.slug === "string" ? rec.slug : "";
       const title = typeof rec.title === "string" ? rec.title : "";
-      const description = typeof rec.description === "string" ? rec.description : "";
+      const description =
+        typeof rec.description === "string" ? rec.description : "";
       if (!slug || !title || !description) continue;
 
-      const files =
-        Array.isArray(rec.files)
-          ? rec.files
-              .map((entry) => {
-                if (!entry || typeof entry !== "object") return null;
-                const e = entry as Record<string, unknown>;
-                if (typeof e.path !== "string" || typeof e.content !== "string") return null;
-                return { path: e.path, content: e.content };
-              })
-              .filter((entry): entry is { path: string; content: string } => !!entry)
-          : [];
+      const files = Array.isArray(rec.files)
+        ? rec.files
+            .map((entry) => {
+              if (!entry || typeof entry !== "object") return null;
+              const e = entry as Record<string, unknown>;
+              if (typeof e.path !== "string" || typeof e.content !== "string")
+                return null;
+              return { path: e.path, content: e.content };
+            })
+            .filter(
+              (entry): entry is { path: string; content: string } => !!entry,
+            )
+        : [];
 
       try {
         await createCommunityIntegrationSkill(ctx.userId, {
@@ -3332,7 +3669,7 @@ class GenerationManager {
       } catch (error) {
         console.warn(
           `[GenerationManager] Skipped integration skill draft for slug '${slug}':`,
-          error instanceof Error ? error.message : error
+          error instanceof Error ? error.message : error,
         );
       }
     }
@@ -3345,7 +3682,9 @@ class GenerationManager {
       return;
     }
 
-    console.log(`[GenerationManager] Approval timeout for generation ${ctx.id}, pausing sandbox`);
+    console.log(
+      `[GenerationManager] Approval timeout for generation ${ctx.id}, pausing sandbox`,
+    );
 
     ctx.status = "paused";
 
@@ -3375,7 +3714,9 @@ class GenerationManager {
       return;
     }
 
-    console.log(`[GenerationManager] Auth timeout for generation ${ctx.id}, cancelling`);
+    console.log(
+      `[GenerationManager] Auth timeout for generation ${ctx.id}, cancelling`,
+    );
 
     await this.finishGeneration(ctx, "cancelled");
   }
@@ -3387,7 +3728,7 @@ class GenerationManager {
     generationId: string,
     integration: string,
     success: boolean,
-    userId: string
+    userId: string,
   ): Promise<boolean> {
     const ctx = this.activeGenerations.get(generationId);
     if (!ctx) {
@@ -3421,8 +3762,8 @@ class GenerationManager {
     // Track connected integration
     ctx.pendingAuth.connectedIntegrations.push(integration);
 
-    const allConnected = ctx.pendingAuth.integrations.every(
-      (i) => ctx.pendingAuth!.connectedIntegrations.includes(i)
+    const allConnected = ctx.pendingAuth.integrations.every((i) =>
+      ctx.pendingAuth!.connectedIntegrations.includes(i),
     );
 
     if (allConnected) {
@@ -3469,7 +3810,7 @@ class GenerationManager {
         type: "auth_progress",
         connected: integration,
         remaining: ctx.pendingAuth.integrations.filter(
-          (i) => !ctx.pendingAuth!.connectedIntegrations.includes(i)
+          (i) => !ctx.pendingAuth!.connectedIntegrations.includes(i),
         ),
       });
     }
@@ -3488,7 +3829,7 @@ class GenerationManager {
       integration: string;
       operation: string;
       command: string;
-    }
+    },
   ): Promise<"allow" | "deny"> {
     const ctx = this.activeGenerations.get(generationId);
     if (!ctx) {
@@ -3536,7 +3877,9 @@ class GenerationManager {
             .set({ status: "awaiting_approval" })
             .where(eq(workflowRun.id, ctx.workflowRunId));
         })
-        .catch((err) => console.error("[GenerationManager] DB update error:", err));
+        .catch((err) =>
+          console.error("[GenerationManager] DB update error:", err),
+        );
 
       // Notify subscribers
       this.broadcast(ctx, {
@@ -3571,7 +3914,7 @@ class GenerationManager {
     request: {
       integration: string;
       reason?: string;
-    }
+    },
   ): Promise<{ success: boolean; userId?: string }> {
     const ctx = this.activeGenerations.get(generationId);
     if (!ctx) {
@@ -3609,7 +3952,9 @@ class GenerationManager {
             .set({ status: "awaiting_auth" })
             .where(eq(workflowRun.id, ctx.workflowRunId));
         })
-        .catch((err) => console.error("[GenerationManager] DB update error:", err));
+        .catch((err) =>
+          console.error("[GenerationManager] DB update error:", err),
+        );
 
       // Notify subscribers
       this.broadcast(ctx, {
@@ -3633,7 +3978,7 @@ class GenerationManager {
 
   private async finishGeneration(
     ctx: GenerationContext,
-    status: "completed" | "cancelled" | "error"
+    status: "completed" | "cancelled" | "error",
   ): Promise<void> {
     // Clear any pending timeouts
     if (ctx.saveDebounceId) {
@@ -3665,7 +4010,11 @@ class GenerationManager {
       if (status === "completed" && ctx.sandbox && ctx.generationMarkerTime) {
         try {
           const excludePaths = Array.from(ctx.sentFilePaths || []);
-          const newFiles = await collectNewSandboxFiles(ctx.sandbox, ctx.generationMarkerTime, excludePaths);
+          const newFiles = await collectNewSandboxFiles(
+            ctx.sandbox,
+            ctx.generationMarkerTime,
+            excludePaths,
+          );
 
           for (const file of newFiles) {
             try {
@@ -3687,11 +4036,17 @@ class GenerationManager {
                 sizeBytes: fileRecord.sizeBytes,
               });
             } catch (err) {
-              console.warn(`[GenerationManager] Failed to upload collected file ${file.path}:`, err);
+              console.warn(
+                `[GenerationManager] Failed to upload collected file ${file.path}:`,
+                err,
+              );
             }
           }
         } catch (err) {
-          console.error("[GenerationManager] Failed to collect new sandbox files:", err);
+          console.error(
+            "[GenerationManager] Failed to collect new sandbox files:",
+            err,
+          );
         }
       }
 
@@ -3700,14 +4055,14 @@ class GenerationManager {
         status === "cancelled"
           ? [
               ...ctx.contentParts,
-              ...(
-                ctx.contentParts.some(
-                  (part): part is ContentPart & { type: "system" } =>
-                    part.type === "system" && part.content === interruptionText
-                )
-                  ? []
-                  : ([{ type: "system", content: interruptionText }] as ContentPart[])
-              ),
+              ...(ctx.contentParts.some(
+                (part): part is ContentPart & { type: "system" } =>
+                  part.type === "system" && part.content === interruptionText,
+              )
+                ? []
+                : ([
+                    { type: "system", content: interruptionText },
+                  ] as ContentPart[])),
             ]
           : ctx.contentParts;
 
@@ -3725,7 +4080,8 @@ class GenerationManager {
           content:
             status === "cancelled"
               ? ctx.assistantContent || interruptionText
-              : ctx.assistantContent || "I apologize, but I couldn't generate a response.",
+              : ctx.assistantContent ||
+                "I apologize, but I couldn't generate a response.",
           contentParts: cancelledParts.length > 0 ? cancelledParts : null,
           inputTokens: ctx.usage.inputTokens,
           outputTokens: ctx.usage.outputTokens,
@@ -3746,11 +4102,15 @@ class GenerationManager {
       }
 
       // Generate title for new conversations
-      if (status === "completed" && ctx.isNewConversation && ctx.assistantContent) {
+      if (
+        status === "completed" &&
+        ctx.isNewConversation &&
+        ctx.assistantContent
+      ) {
         try {
           const title = await generateConversationTitle(
             ctx.userMessageContent,
-            ctx.assistantContent
+            ctx.assistantContent,
           );
           if (title) {
             await db
@@ -3782,7 +4142,12 @@ class GenerationManager {
     await db
       .update(conversation)
       .set({
-        generationStatus: status === "completed" ? "complete" : status === "error" ? "error" : "idle",
+        generationStatus:
+          status === "completed"
+            ? "complete"
+            : status === "error"
+              ? "error"
+              : "idle",
       })
       .where(eq(conversation.id, ctx.conversationId));
 
@@ -3819,7 +4184,10 @@ class GenerationManager {
         messageId,
       });
     } else if (status === "error") {
-      this.broadcast(ctx, { type: "error", message: ctx.errorMessage || "Unknown error" });
+      this.broadcast(ctx, {
+        type: "error",
+        message: ctx.errorMessage || "Unknown error",
+      });
     }
 
     // Set status AFTER broadcast so subscription loop receives the terminal event
@@ -3872,7 +4240,9 @@ class GenerationManager {
     if (!ctx.workflowPrompt && ctx.triggerPayload === undefined) return null;
 
     const sections = [
-      ctx.workflowPrompt ? `## Workflow Instructions\n${ctx.workflowPrompt}` : null,
+      ctx.workflowPrompt
+        ? `## Workflow Instructions\n${ctx.workflowPrompt}`
+        : null,
       ctx.workflowPromptDo ? `## Do\n${ctx.workflowPromptDo}` : null,
       ctx.workflowPromptDont ? `## Don't\n${ctx.workflowPromptDont}` : null,
       ctx.triggerPayload !== undefined
@@ -3886,7 +4256,7 @@ class GenerationManager {
 
   private async recordWorkflowRunEvent(
     workflowRunId: string,
-    event: GenerationEvent
+    event: GenerationEvent,
   ): Promise<void> {
     const loggableEvents = new Set([
       "tool_use",
@@ -3927,7 +4297,8 @@ async function resolveProviderID(modelID: string): Promise<string> {
     return "openai";
   }
   if (modelID.startsWith("gemini")) return "google";
-  if (modelID === "k2p5" || modelID === "kimi-k2-thinking") return "kimi-for-coding";
+  if (modelID === "k2p5" || modelID === "kimi-k2-thinking")
+    return "kimi-for-coding";
   return "anthropic"; // default
 }
 

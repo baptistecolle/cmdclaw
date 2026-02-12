@@ -34,7 +34,7 @@ async function handleRequest(request: Request) {
     console.error("[RPC Handler Error]", error);
     return new Response(JSON.stringify({ error: String(error) }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }

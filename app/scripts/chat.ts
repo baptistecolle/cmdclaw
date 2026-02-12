@@ -8,7 +8,10 @@ import type { RouterClient } from "@orpc/server";
 import type { AppRouter } from "../src/server/orpc";
 import { createGenerationRuntime } from "../src/lib/generation-runtime";
 import { runGenerationStream } from "../src/lib/generation-stream";
-import { fetchOpencodeFreeModels, resolveDefaultOpencodeFreeModel } from "../src/lib/zen-models";
+import {
+  fetchOpencodeFreeModels,
+  resolveDefaultOpencodeFreeModel,
+} from "../src/lib/zen-models";
 
 type ChatConfig = {
   serverUrl: string;
@@ -116,10 +119,14 @@ function parseArgs(argv: string[]): Args {
 function printHelp(): void {
   console.log("\nUsage: bun run chat [options]\n");
   console.log("Options:");
-  console.log("  -s, --server <url>        Server URL (default http://localhost:3000)");
+  console.log(
+    "  -s, --server <url>        Server URL (default http://localhost:3000)",
+  );
   console.log("  -c, --conversation <id>   Continue an existing conversation");
   console.log("  -m, --message <text>      Send one message and exit");
-  console.log("  -M, --model <id>          Model id to use (default resolves to a free model)");
+  console.log(
+    "  -M, --model <id>          Model id to use (default resolves to a free model)",
+  );
   console.log("  --list-models             List free model ids and exit");
   console.log("  --auto-approve            Auto-approve tool calls");
   console.log("  --show-thinking           Print thinking events");
@@ -127,7 +134,9 @@ function printHelp(): void {
   console.log("  --auth                    Run auth flow and exit");
   console.log("  --token <token>           Use provided auth token directly");
   console.log("  --reset-auth              Clear saved token and re-auth");
-  console.log("  -f, --file <path>         Attach file (can be used multiple times)");
+  console.log(
+    "  -f, --file <path>         Attach file (can be used multiple times)",
+  );
   console.log("  -h, --help                Show help\n");
   console.log("Interactive commands:");
   console.log("  /file <path>              Attach file before sending");
@@ -258,7 +267,10 @@ async function authenticate(serverUrl: string): Promise<ChatConfig | null> {
   return null;
 }
 
-function createClient(serverUrl: string, token: string): RouterClient<AppRouter> {
+function createClient(
+  serverUrl: string,
+  token: string,
+): RouterClient<AppRouter> {
   const link = new RPCLink({
     url: `${serverUrl}/api/rpc`,
     headers: () => ({ Authorization: `Bearer ${token}` }),
@@ -283,7 +295,7 @@ function ask(rl: readline.Interface, query: string): Promise<string> {
 async function runChatLoop(
   client: RouterClient<AppRouter>,
   rl: readline.Interface,
-  options: Args
+  options: Args,
 ): Promise<void> {
   let conversationId = options.conversationId;
 
@@ -300,7 +312,9 @@ async function runChatLoop(
   }
 
   while (true) {
-    const input = (await ask(rl, conversationId ? "followup> " : "chat> ")).trim();
+    const input = (
+      await ask(rl, conversationId ? "followup> " : "chat> ")
+    ).trim();
     if (!input) {
       console.log("Bye.");
       return;
@@ -311,7 +325,9 @@ async function runChatLoop(
       const filePath = input.slice(6).trim();
       try {
         pendingFiles.push(fileToAttachment(filePath));
-        console.log(`Attached: ${basename(filePath)} (${pendingFiles.length} file(s) pending)`);
+        console.log(
+          `Attached: ${basename(filePath)} (${pendingFiles.length} file(s) pending)`,
+        );
       } catch (e) {
         console.error(e instanceof Error ? e.message : String(e));
       }
@@ -342,7 +358,14 @@ async function runChatLoop(
     const attachments = pendingFiles.length ? pendingFiles : undefined;
     pendingFiles = [];
 
-    const result = await runGeneration(client, rl, input, conversationId, options, attachments);
+    const result = await runGeneration(
+      client,
+      rl,
+      input,
+      conversationId,
+      options,
+      attachments,
+    );
     if (!result) {
       return;
     }
@@ -406,11 +429,14 @@ async function runGeneration(
             return;
           }
 
-          const decision = (await ask(rl, "Approve? (y/n) ")).trim().toLowerCase();
+          const decision = (await ask(rl, "Approve? (y/n) "))
+            .trim()
+            .toLowerCase();
           await client.generation.submitApproval({
             generationId: approval.generationId,
             toolUseId: approval.toolUseId,
-            decision: decision === "y" || decision === "yes" ? "approve" : "deny",
+            decision:
+              decision === "y" || decision === "yes" ? "approve" : "deny",
           });
         },
         onApprovalResult: (toolUseId, decision) => {
@@ -419,11 +445,15 @@ async function runGeneration(
         },
         onAuthNeeded: (auth) => {
           runtime.handleAuthNeeded(auth);
-          process.stdout.write(`\n[auth_needed] ${auth.integrations.join(", ")}\n`);
+          process.stdout.write(
+            `\n[auth_needed] ${auth.integrations.join(", ")}\n`,
+          );
         },
         onAuthProgress: (connected, remaining) => {
           runtime.handleAuthProgress(connected, remaining);
-          process.stdout.write(`\n[auth_progress] connected=${connected} remaining=${remaining.join(", ")}\n`);
+          process.stdout.write(
+            `\n[auth_progress] connected=${connected} remaining=${remaining.join(", ")}\n`,
+          );
         },
         onAuthResult: (success) => {
           runtime.handleAuthResult(success);
@@ -447,7 +477,7 @@ async function runGeneration(
               client,
               doneConversationId,
               messageId,
-              runtime.buildAssistantMessage()
+              runtime.buildAssistantMessage(),
             );
           }
         },
@@ -463,7 +493,9 @@ async function runGeneration(
     });
 
     if (!result) {
-      throw new Error("Generation stream closed before a terminal event (done/error/cancelled)");
+      throw new Error(
+        "Generation stream closed before a terminal event (done/error/cancelled)",
+      );
     }
 
     return result;
@@ -489,13 +521,23 @@ async function main(): Promise<void> {
   }
 
   const loaded = loadConfig();
-  const serverUrl = args.serverUrl || loaded?.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const serverUrl =
+    args.serverUrl ||
+    loaded?.serverUrl ||
+    process.env.BAP_SERVER_URL ||
+    DEFAULT_SERVER_URL;
 
   let config = loaded;
   if (args.token) {
     config = { serverUrl, token: args.token };
     saveConfig(config);
-  } else if (!config || !config.token || config.serverUrl !== serverUrl || args.authOnly || args.resetAuth) {
+  } else if (
+    !config ||
+    !config.token ||
+    config.serverUrl !== serverUrl ||
+    args.authOnly ||
+    args.resetAuth
+  ) {
     config = await authenticate(serverUrl);
     if (!config) {
       process.exit(1);
@@ -505,15 +547,24 @@ async function main(): Promise<void> {
     }
   }
 
-  args.model = await resolveDefaultOpencodeFreeModel(args.model ?? process.env.BAP_CHAT_MODEL);
+  args.model = await resolveDefaultOpencodeFreeModel(
+    args.model ?? process.env.BAP_CHAT_MODEL,
+  );
   console.log(`[model] ${args.model}`);
 
   const client = createClient(serverUrl, config.token);
 
   if (args.message) {
     // Non-interactive: send a single message and exit
-    const attachments = args.files.map(f => fileToAttachment(f));
-    const result = await runGeneration(client, null as any, args.message, args.conversationId, args, attachments.length ? attachments : undefined);
+    const attachments = args.files.map((f) => fileToAttachment(f));
+    const result = await runGeneration(
+      client,
+      null as any,
+      args.message,
+      args.conversationId,
+      args,
+      attachments.length ? attachments : undefined,
+    );
     if (result) {
       console.log(`\n[conversation] ${result.conversationId}`);
     }
@@ -546,7 +597,7 @@ async function printFreeModels(): Promise<void> {
     }
   } catch (error) {
     console.error(
-      `Failed to fetch free models: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to fetch free models: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
@@ -568,7 +619,11 @@ const MIME_MAP: Record<string, string> = {
   ".csv": "text/csv",
 };
 
-function fileToAttachment(filePath: string): { name: string; mimeType: string; dataUrl: string } {
+function fileToAttachment(filePath: string): {
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+} {
   const resolved = resolve(filePath);
   if (!existsSync(resolved)) {
     throw new Error(`File not found: ${resolved}`);
@@ -592,21 +647,29 @@ async function validatePersistedAssistantMessage(
   client: RouterClient<AppRouter>,
   conversationId: string,
   messageId: string,
-  expected: { content: string; parts: Array<{ type: string }> }
+  expected: { content: string; parts: Array<{ type: string }> },
 ): Promise<void> {
   const conv = await client.conversation.get({ id: conversationId });
   const savedMessage = conv.messages.find((m) => m.id === messageId);
 
   if (!savedMessage) {
-    throw new Error(`Validation failed: assistant message ${messageId} was not saved in conversation ${conversationId}`);
+    throw new Error(
+      `Validation failed: assistant message ${messageId} was not saved in conversation ${conversationId}`,
+    );
   }
   if (savedMessage.role !== "assistant") {
-    throw new Error(`Validation failed: message ${messageId} saved with role ${savedMessage.role}, expected assistant`);
+    throw new Error(
+      `Validation failed: message ${messageId} saved with role ${savedMessage.role}, expected assistant`,
+    );
   }
 
-  const persistedParts = Array.isArray(savedMessage.contentParts) ? savedMessage.contentParts : [];
+  const persistedParts = Array.isArray(savedMessage.contentParts)
+    ? savedMessage.contentParts
+    : [];
   if (expected.parts.length > 0 && persistedParts.length === 0) {
-    throw new Error("Validation failed: stream produced activity/text but saved message has no contentParts");
+    throw new Error(
+      "Validation failed: stream produced activity/text but saved message has no contentParts",
+    );
   }
 
   const normalizedStream = normalizeText(expected.content);
@@ -616,7 +679,9 @@ async function validatePersistedAssistantMessage(
 
   const normalizedPersisted = normalizeText(savedMessage.content ?? "");
   if (!normalizedPersisted.includes(normalizedStream)) {
-    throw new Error("Validation failed: streamed assistant text does not match saved message content");
+    throw new Error(
+      "Validation failed: streamed assistant text does not match saved message content",
+    );
   }
 }
 

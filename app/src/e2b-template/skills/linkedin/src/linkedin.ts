@@ -5,7 +5,9 @@ const UNIPILE_DSN = process.env.UNIPILE_DSN;
 const LINKEDIN_ACCOUNT_ID = process.env.LINKEDIN_ACCOUNT_ID;
 
 if (!UNIPILE_API_KEY || !LINKEDIN_ACCOUNT_ID) {
-  console.error("Error: UNIPILE_API_KEY and LINKEDIN_ACCOUNT_ID environment variables required");
+  console.error(
+    "Error: UNIPILE_API_KEY and LINKEDIN_ACCOUNT_ID environment variables required",
+  );
   process.exit(1);
 }
 
@@ -60,33 +62,40 @@ async function listChats() {
   if (values.cursor) params.set("cursor", values.cursor);
 
   const data = await api(`/chats?${params}`);
-  const chats = data.items?.map((c: any) => ({
-    id: c.id,
-    attendees: c.attendees?.map((a: any) => ({
-      id: a.provider_id,
-      name: a.display_name,
-    })),
-    lastMessage: c.last_message?.text?.substring(0, 100),
-    unreadCount: c.unread_count,
-    updatedAt: c.updated_at,
-  })) || [];
+  const chats =
+    data.items?.map((c: any) => ({
+      id: c.id,
+      attendees: c.attendees?.map((a: any) => ({
+        id: a.provider_id,
+        name: a.display_name,
+      })),
+      lastMessage: c.last_message?.text?.substring(0, 100),
+      unreadCount: c.unread_count,
+      updatedAt: c.updated_at,
+    })) || [];
 
   console.log(JSON.stringify({ items: chats, cursor: data.cursor }, null, 2));
 }
 
 async function getChat(chatId: string) {
   const data = await api(`/chats/${chatId}?account_id=${LINKEDIN_ACCOUNT_ID}`);
-  console.log(JSON.stringify({
-    id: data.id,
-    attendees: data.attendees?.map((a: any) => ({
-      id: a.provider_id,
-      name: a.display_name,
-      headline: a.headline,
-    })),
-    unreadCount: data.unread_count,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        id: data.id,
+        attendees: data.attendees?.map((a: any) => ({
+          id: a.provider_id,
+          name: a.display_name,
+          headline: a.headline,
+        })),
+        unreadCount: data.unread_count,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function listMessages(chatId: string) {
@@ -98,16 +107,19 @@ async function listMessages(chatId: string) {
   if (values.cursor) params.set("cursor", values.cursor);
 
   const data = await api(`/chats/${chatId}/messages?${params}`);
-  const messages = data.items?.map((m: any) => ({
-    id: m.id,
-    text: m.text,
-    sender: m.sender?.display_name,
-    senderId: m.sender?.provider_id,
-    timestamp: m.timestamp,
-    isFromMe: m.is_from_me,
-  })) || [];
+  const messages =
+    data.items?.map((m: any) => ({
+      id: m.id,
+      text: m.text,
+      sender: m.sender?.display_name,
+      senderId: m.sender?.provider_id,
+      timestamp: m.timestamp,
+      isFromMe: m.is_from_me,
+    })) || [];
 
-  console.log(JSON.stringify({ items: messages, cursor: data.cursor }, null, 2));
+  console.log(
+    JSON.stringify({ items: messages, cursor: data.cursor }, null, 2),
+  );
 }
 
 async function sendMessage(chatId: string, text: string) {
@@ -118,7 +130,9 @@ async function sendMessage(chatId: string, text: string) {
       text,
     }),
   });
-  console.log(JSON.stringify({ success: true, messageId: data.message_id }, null, 2));
+  console.log(
+    JSON.stringify({ success: true, messageId: data.message_id }, null, 2),
+  );
 }
 
 async function startChat(attendeeId: string, message: string) {
@@ -137,41 +151,63 @@ async function startChat(attendeeId: string, message: string) {
 
 async function getMyProfile() {
   const data = await api(`/users/me?account_id=${LINKEDIN_ACCOUNT_ID}`);
-  console.log(JSON.stringify({
-    id: data.provider_id,
-    name: data.display_name,
-    headline: data.headline,
-    location: data.location,
-    profileUrl: data.public_identifier,
-    connectionsCount: data.connections_count,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        id: data.provider_id,
+        name: data.display_name,
+        headline: data.headline,
+        location: data.location,
+        profileUrl: data.public_identifier,
+        connectionsCount: data.connections_count,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function getProfile(identifier: string) {
-  const data = await api(`/users/${encodeURIComponent(identifier)}?account_id=${LINKEDIN_ACCOUNT_ID}`);
-  console.log(JSON.stringify({
-    id: data.provider_id,
-    name: data.display_name,
-    headline: data.headline,
-    location: data.location,
-    profileUrl: data.public_identifier,
-    connectionsCount: data.connections_count,
-    company: data.current_company,
-    summary: data.summary,
-  }, null, 2));
+  const data = await api(
+    `/users/${encodeURIComponent(identifier)}?account_id=${LINKEDIN_ACCOUNT_ID}`,
+  );
+  console.log(
+    JSON.stringify(
+      {
+        id: data.provider_id,
+        name: data.display_name,
+        headline: data.headline,
+        location: data.location,
+        profileUrl: data.public_identifier,
+        connectionsCount: data.connections_count,
+        company: data.current_company,
+        summary: data.summary,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function getCompanyProfile(identifier: string) {
-  const data = await api(`/companies/${encodeURIComponent(identifier)}?account_id=${LINKEDIN_ACCOUNT_ID}`);
-  console.log(JSON.stringify({
-    id: data.provider_id,
-    name: data.name,
-    description: data.description,
-    industry: data.industry,
-    employeeCount: data.employee_count,
-    website: data.website,
-    headquarters: data.headquarters,
-  }, null, 2));
+  const data = await api(
+    `/companies/${encodeURIComponent(identifier)}?account_id=${LINKEDIN_ACCOUNT_ID}`,
+  );
+  console.log(
+    JSON.stringify(
+      {
+        id: data.provider_id,
+        name: data.name,
+        description: data.description,
+        industry: data.industry,
+        employeeCount: data.employee_count,
+        website: data.website,
+        headquarters: data.headquarters,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function searchUsers(query: string) {
@@ -185,13 +221,14 @@ async function searchUsers(query: string) {
     }),
   });
 
-  const users = data.items?.map((u: any) => ({
-    id: u.provider_id,
-    name: u.display_name,
-    headline: u.headline,
-    profileUrl: u.public_identifier,
-    location: u.location,
-  })) || [];
+  const users =
+    data.items?.map((u: any) => ({
+      id: u.provider_id,
+      name: u.display_name,
+      headline: u.headline,
+      profileUrl: u.public_identifier,
+      location: u.location,
+    })) || [];
 
   console.log(JSON.stringify({ items: users, cursor: data.cursor }, null, 2));
 }
@@ -209,22 +246,33 @@ async function sendInvitation(profileId: string, message?: string) {
     method: "POST",
     body: JSON.stringify(body),
   });
-  console.log(JSON.stringify({ success: true, message: `Invitation sent to ${profileId}` }, null, 2));
+  console.log(
+    JSON.stringify(
+      { success: true, message: `Invitation sent to ${profileId}` },
+      null,
+      2,
+    ),
+  );
 }
 
 async function listPendingInvitations() {
   const limit = parseInt(values.limit || "20");
-  const data = await api(`/users/invitations?account_id=${LINKEDIN_ACCOUNT_ID}&limit=${limit}`);
+  const data = await api(
+    `/users/invitations?account_id=${LINKEDIN_ACCOUNT_ID}&limit=${limit}`,
+  );
 
-  const invitations = data.items?.map((i: any) => ({
-    id: i.provider_id,
-    name: i.display_name,
-    headline: i.headline,
-    sentAt: i.sent_at,
-    direction: i.direction,
-  })) || [];
+  const invitations =
+    data.items?.map((i: any) => ({
+      id: i.provider_id,
+      name: i.display_name,
+      headline: i.headline,
+      sentAt: i.sent_at,
+      direction: i.direction,
+    })) || [];
 
-  console.log(JSON.stringify({ items: invitations, cursor: data.cursor }, null, 2));
+  console.log(
+    JSON.stringify({ items: invitations, cursor: data.cursor }, null, 2),
+  );
 }
 
 async function listConnections() {
@@ -237,21 +285,30 @@ async function listConnections() {
 
   const data = await api(`/users/relations?${params}`);
 
-  const connections = data.items?.map((c: any) => ({
-    id: c.provider_id,
-    name: c.display_name,
-    headline: c.headline,
-    connectedAt: c.connected_at,
-  })) || [];
+  const connections =
+    data.items?.map((c: any) => ({
+      id: c.provider_id,
+      name: c.display_name,
+      headline: c.headline,
+      connectedAt: c.connected_at,
+    })) || [];
 
-  console.log(JSON.stringify({ items: connections, cursor: data.cursor }, null, 2));
+  console.log(
+    JSON.stringify({ items: connections, cursor: data.cursor }, null, 2),
+  );
 }
 
 async function removeConnection(profileId: string) {
   await api(`/users/relations/${profileId}?account_id=${LINKEDIN_ACCOUNT_ID}`, {
     method: "DELETE",
   });
-  console.log(JSON.stringify({ success: true, message: `Connection removed: ${profileId}` }, null, 2));
+  console.log(
+    JSON.stringify(
+      { success: true, message: `Connection removed: ${profileId}` },
+      null,
+      2,
+    ),
+  );
 }
 
 // ========== POSTS & CONTENT ==========
@@ -270,18 +327,24 @@ async function createPost(text: string, visibility = "PUBLIC") {
 
 async function getPost(postId: string) {
   const data = await api(`/posts/${postId}?account_id=${LINKEDIN_ACCOUNT_ID}`);
-  console.log(JSON.stringify({
-    id: data.id,
-    text: data.text,
-    author: {
-      id: data.author?.provider_id,
-      name: data.author?.display_name,
-    },
-    likesCount: data.likes_count,
-    commentsCount: data.comments_count,
-    sharesCount: data.shares_count,
-    createdAt: data.created_at,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        id: data.id,
+        text: data.text,
+        author: {
+          id: data.author?.provider_id,
+          name: data.author?.display_name,
+        },
+        likesCount: data.likes_count,
+        commentsCount: data.comments_count,
+        sharesCount: data.shares_count,
+        createdAt: data.created_at,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function listPosts(profileId?: string) {
@@ -295,14 +358,15 @@ async function listPosts(profileId?: string) {
 
   const data = await api(`/posts?${params}`);
 
-  const posts = data.items?.map((p: any) => ({
-    id: p.id,
-    text: p.text?.substring(0, 200),
-    author: p.author?.display_name,
-    likesCount: p.likes_count,
-    commentsCount: p.comments_count,
-    createdAt: p.created_at,
-  })) || [];
+  const posts =
+    data.items?.map((p: any) => ({
+      id: p.id,
+      text: p.text?.substring(0, 200),
+      author: p.author?.display_name,
+      likesCount: p.likes_count,
+      commentsCount: p.comments_count,
+      createdAt: p.created_at,
+    })) || [];
 
   console.log(JSON.stringify({ items: posts, cursor: data.cursor }, null, 2));
 }
@@ -315,7 +379,9 @@ async function commentOnPost(postId: string, text: string) {
       text,
     }),
   });
-  console.log(JSON.stringify({ success: true, commentId: data.comment_id }, null, 2));
+  console.log(
+    JSON.stringify({ success: true, commentId: data.comment_id }, null, 2),
+  );
 }
 
 async function reactToPost(postId: string, reactionType: string) {
@@ -326,7 +392,13 @@ async function reactToPost(postId: string, reactionType: string) {
       reaction_type: reactionType.toUpperCase(),
     }),
   });
-  console.log(JSON.stringify({ success: true, message: `Reacted with ${reactionType}` }, null, 2));
+  console.log(
+    JSON.stringify(
+      { success: true, message: `Reacted with ${reactionType}` },
+      null,
+      2,
+    ),
+  );
 }
 
 // ========== COMPANY PAGES ==========
@@ -341,13 +413,14 @@ async function listCompanyPosts(companyId: string) {
 
   const data = await api(`/companies/${companyId}/posts?${params}`);
 
-  const posts = data.items?.map((p: any) => ({
-    id: p.id,
-    text: p.text?.substring(0, 200),
-    likesCount: p.likes_count,
-    commentsCount: p.comments_count,
-    createdAt: p.created_at,
-  })) || [];
+  const posts =
+    data.items?.map((p: any) => ({
+      id: p.id,
+      text: p.text?.substring(0, 200),
+      likesCount: p.likes_count,
+      commentsCount: p.comments_count,
+      createdAt: p.created_at,
+    })) || [];
 
   console.log(JSON.stringify({ items: posts, cursor: data.cursor }, null, 2));
 }
@@ -602,10 +675,16 @@ async function main() {
         showHelp();
     }
   } catch (error) {
-    console.error(JSON.stringify({
-      error: true,
-      message: error instanceof Error ? error.message : "Unknown error",
-    }, null, 2));
+    console.error(
+      JSON.stringify(
+        {
+          error: true,
+          message: error instanceof Error ? error.message : "Unknown error",
+        },
+        null,
+        2,
+      ),
+    );
     process.exit(1);
   }
 }

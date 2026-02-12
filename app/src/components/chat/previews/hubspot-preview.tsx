@@ -5,7 +5,13 @@ import {
   IntegrationLogo,
 } from "./preview-styles";
 
-type HubSpotObjectType = "contacts" | "companies" | "deals" | "tickets" | "tasks" | "notes";
+type HubSpotObjectType =
+  | "contacts"
+  | "companies"
+  | "deals"
+  | "tickets"
+  | "tasks"
+  | "notes";
 
 const OBJECT_LABELS: Record<HubSpotObjectType, string> = {
   contacts: "Contact",
@@ -16,12 +22,12 @@ const OBJECT_LABELS: Record<HubSpotObjectType, string> = {
   notes: "Note",
 };
 
-export function HubspotPreview({
-  operation,
-  args,
-}: PreviewProps) {
+export function HubspotPreview({ operation, args }: PreviewProps) {
   // Parse operation: "contacts.create" -> { object: "contacts", action: "create" }
-  const [objectType, action] = operation.split(".") as [HubSpotObjectType, string];
+  const [objectType, action] = operation.split(".") as [
+    HubSpotObjectType,
+    string,
+  ];
 
   if (!objectType || !action) return null;
 
@@ -37,19 +43,9 @@ export function HubspotPreview({
         />
       );
     case "update":
-      return (
-        <HubspotUpdatePreview
-          args={args}
-          objectLabel={objectLabel}
-        />
-      );
+      return <HubspotUpdatePreview args={args} objectLabel={objectLabel} />;
     case "complete":
-      return (
-        <HubspotCompletePreview
-          args={args}
-          objectLabel={objectLabel}
-        />
-      );
+      return <HubspotCompletePreview args={args} objectLabel={objectLabel} />;
     default:
       return null;
   }
@@ -80,11 +76,15 @@ function HubspotCreatePreview({
         <div className="rounded border bg-muted/30 p-3">
           <div className="flex items-center gap-2 mb-2">
             <IntegrationLogo integration="hubspot" size={16} />
-            <span className="font-medium">{getPrimaryField(objectType!, args)}</span>
+            <span className="font-medium">
+              {getPrimaryField(objectType!, args)}
+            </span>
           </div>
 
           {fields.map(([label, value]) =>
-            value ? <PreviewField key={label} label={label} value={value} /> : null
+            value ? (
+              <PreviewField key={label} label={label} value={value} />
+            ) : null,
           )}
         </div>
       </PreviewSection>
@@ -148,7 +148,10 @@ function HubspotCompletePreview({
   );
 }
 
-function getPrimaryField(objectType: HubSpotObjectType, args: Record<string, string | undefined>): string {
+function getPrimaryField(
+  objectType: HubSpotObjectType,
+  args: Record<string, string | undefined>,
+): string {
   switch (objectType) {
     case "contacts":
       if (args.firstname && args.lastname) {
@@ -172,7 +175,7 @@ function getPrimaryField(objectType: HubSpotObjectType, args: Record<string, str
 
 function getDisplayFields(
   objectType: HubSpotObjectType,
-  args: Record<string, string | undefined>
+  args: Record<string, string | undefined>,
 ): [string, string | undefined][] {
   switch (objectType) {
     case "contacts":
@@ -198,9 +201,7 @@ function getDisplayFields(
         ["Stage", args.stage],
       ];
     case "tasks":
-      return [
-        ["Due", args.due],
-      ];
+      return [["Due", args.due]];
     case "notes":
       return [
         ["Contact", args.contact],
@@ -234,6 +235,8 @@ function PropertiesPreview({ properties }: { properties: string }) {
   }
 
   return (
-    <pre className="rounded bg-muted p-2 text-xs overflow-x-auto">{properties}</pre>
+    <pre className="rounded bg-muted p-2 text-xs overflow-x-auto">
+      {properties}
+    </pre>
   );
 }

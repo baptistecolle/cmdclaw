@@ -6,7 +6,9 @@ import { env } from "@/env";
 /**
  * Submit a custom integration to the community repo via GitHub PR
  */
-export async function submitToCommunityRepo(customIntegrationId: string): Promise<string | null> {
+export async function submitToCommunityRepo(
+  customIntegrationId: string,
+): Promise<string | null> {
   const token = env.COMMUNITY_REPO_GITHUB_TOKEN;
   const owner = env.COMMUNITY_REPO_OWNER;
   const repo = env.COMMUNITY_REPO_NAME;
@@ -39,7 +41,9 @@ export async function submitToCommunityRepo(customIntegrationId: string): Promis
     const repoData = await repoRes.json();
     const defaultBranch = repoData.default_branch || "main";
 
-    const refRes = await fetch(`${apiBase}/git/refs/heads/${defaultBranch}`, { headers });
+    const refRes = await fetch(`${apiBase}/git/refs/heads/${defaultBranch}`, {
+      headers,
+    });
     const refData = await refRes.json();
     const baseSha = refData.object.sha;
 
@@ -73,7 +77,7 @@ export async function submitToCommunityRepo(customIntegrationId: string): Promis
             permissions: integ.permissions,
           },
           null,
-          2
+          2,
         ),
       },
       {

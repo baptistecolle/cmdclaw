@@ -58,18 +58,27 @@ function buildBase64ReadCommand(filePath: string): string {
 
 export async function readSandboxFileAsBuffer(
   sandbox: SandboxBackend,
-  filePath: string
+  filePath: string,
 ): Promise<Buffer> {
-  const result = await sandbox.execute(buildBase64ReadCommand(filePath), { timeout: 120_000 });
+  const result = await sandbox.execute(buildBase64ReadCommand(filePath), {
+    timeout: 120_000,
+  });
   if (result.exitCode !== 0) {
-    throw new Error(result.stderr || `Failed to read sandbox file: ${filePath}`);
+    throw new Error(
+      result.stderr || `Failed to read sandbox file: ${filePath}`,
+    );
   }
   const base64Content = result.stdout.replace(/\s+/g, "");
   return Buffer.from(base64Content, "base64");
 }
 
-async function readE2BSandboxFileAsBuffer(sandbox: Sandbox, filePath: string): Promise<Buffer> {
-  const result = await sandbox.commands.run(buildBase64ReadCommand(filePath), { timeoutMs: 120_000 });
+async function readE2BSandboxFileAsBuffer(
+  sandbox: Sandbox,
+  filePath: string,
+): Promise<Buffer> {
+  const result = await sandbox.commands.run(buildBase64ReadCommand(filePath), {
+    timeoutMs: 120_000,
+  });
   if (result.exitCode !== 0) {
     throw new Error(result.stderr || `Failed to read E2B file: ${filePath}`);
   }
@@ -80,7 +89,9 @@ async function readE2BSandboxFileAsBuffer(sandbox: Sandbox, filePath: string): P
 /**
  * Upload a sandbox file to S3 and save record to database.
  */
-export async function uploadSandboxFile(file: SandboxFileUpload): Promise<SandboxFileRecord> {
+export async function uploadSandboxFile(
+  file: SandboxFileUpload,
+): Promise<SandboxFileRecord> {
   const filename = path.basename(file.path);
   const mimeType = mimeLookup(filename) || "application/octet-stream";
   const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
@@ -89,15 +100,18 @@ export async function uploadSandboxFile(file: SandboxFileUpload): Promise<Sandbo
   await ensureBucket();
   await uploadToS3(storageKey, file.content, mimeType);
 
-  const [record] = await db.insert(sandboxFile).values({
-    conversationId: file.conversationId,
-    messageId: file.messageId,
-    path: file.path,
-    filename,
-    mimeType,
-    sizeBytes: file.content.length,
-    storageKey,
-  }).returning();
+  const [record] = await db
+    .insert(sandboxFile)
+    .values({
+      conversationId: file.conversationId,
+      messageId: file.messageId,
+      path: file.path,
+      filename,
+      mimeType,
+      sizeBytes: file.content.length,
+      storageKey,
+    })
+    .returning();
 
   return {
     id: record.id,
@@ -116,10 +130,12 @@ export async function uploadSandboxFile(file: SandboxFileUpload): Promise<Sandbo
 export async function collectNewSandboxFiles(
   sandbox: SandboxBackend,
   markerTime: number,
-  excludePaths: string[] = []
+  excludePaths: string[] = [],
 ): Promise<Array<{ path: string; content: Buffer }>> {
   // Build grep exclusion pattern
-  const excludeGrep = EXCLUDED_PATTERNS.map(p => `grep -v "${p}"`).join(" | ");
+  const excludeGrep = EXCLUDED_PATTERNS.map((p) => `grep -v "${p}"`).join(
+    " | ",
+  );
 
   // Find files newer than marker in /app and /home/user, excluding system directories
   // Use Unix timestamp for -newermt
@@ -136,19 +152,22 @@ export async function collectNewSandboxFiles(
 
   if (!result.stdout?.trim()) return [];
 
-  const paths = result.stdout.trim().split("\n").filter((p: string) => {
-    // Skip empty paths, hidden files, and explicitly excluded paths
-    if (!p || p.includes("/.") || excludePaths.includes(p)) {
-      return false;
-    }
-    // Skip if matches any excluded pattern
-    for (const pattern of EXCLUDED_PATTERNS) {
-      if (p.includes(pattern)) {
+  const paths = result.stdout
+    .trim()
+    .split("\n")
+    .filter((p: string) => {
+      // Skip empty paths, hidden files, and explicitly excluded paths
+      if (!p || p.includes("/.") || excludePaths.includes(p)) {
         return false;
       }
-    }
-    return true;
-  });
+      // Skip if matches any excluded pattern
+      for (const pattern of EXCLUDED_PATTERNS) {
+        if (p.includes(pattern)) {
+          return false;
+        }
+      }
+      return true;
+    });
 
   const files: Array<{ path: string; content: Buffer }> = [];
 
@@ -158,7 +177,10 @@ export async function collectNewSandboxFiles(
       files.push({ path: filePath, content });
     } catch (err) {
       // Skip files we can't read
-      console.warn(`[SandboxFileService] Could not read file ${filePath}:`, err);
+      console.warn(
+        `[SandboxFileService] Could not read file ${filePath}:`,
+        err,
+      );
     }
   }
 
@@ -172,10 +194,12 @@ export async function collectNewSandboxFiles(
 export async function collectNewE2BFiles(
   sandbox: Sandbox,
   markerTime: number,
-  excludePaths: string[] = []
+  excludePaths: string[] = [],
 ): Promise<Array<{ path: string; content: Buffer }>> {
   // Build grep exclusion pattern
-  const excludeGrep = EXCLUDED_PATTERNS.map(p => `grep -v "${p}"`).join(" | ");
+  const excludeGrep = EXCLUDED_PATTERNS.map((p) => `grep -v "${p}"`).join(
+    " | ",
+  );
 
   // Find files newer than marker in /app and /home/user, excluding system directories
   const markerSeconds = Math.floor(markerTime / 1000);
@@ -191,19 +215,22 @@ export async function collectNewE2BFiles(
 
   if (!result.stdout?.trim()) return [];
 
-  const paths = result.stdout.trim().split("\n").filter((p: string) => {
-    // Skip empty paths, hidden files, and explicitly excluded paths
-    if (!p || p.includes("/.") || excludePaths.includes(p)) {
-      return false;
-    }
-    // Skip if matches any excluded pattern
-    for (const pattern of EXCLUDED_PATTERNS) {
-      if (p.includes(pattern)) {
+  const paths = result.stdout
+    .trim()
+    .split("\n")
+    .filter((p: string) => {
+      // Skip empty paths, hidden files, and explicitly excluded paths
+      if (!p || p.includes("/.") || excludePaths.includes(p)) {
         return false;
       }
-    }
-    return true;
-  });
+      // Skip if matches any excluded pattern
+      for (const pattern of EXCLUDED_PATTERNS) {
+        if (p.includes(pattern)) {
+          return false;
+        }
+      }
+      return true;
+    });
 
   const files: Array<{ path: string; content: Buffer }> = [];
 
@@ -213,7 +240,10 @@ export async function collectNewE2BFiles(
       files.push({ path: filePath, content });
     } catch (err) {
       // Skip files we can't read
-      console.warn(`[SandboxFileService] Could not read E2B file ${filePath}:`, err);
+      console.warn(
+        `[SandboxFileService] Could not read E2B file ${filePath}:`,
+        err,
+      );
     }
   }
 

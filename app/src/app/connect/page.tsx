@@ -9,7 +9,9 @@ import { CheckCircle2, Loader2, Monitor, XCircle } from "lucide-react";
 
 function ConnectDevicePageContent() {
   const [code, setCode] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "submitting" | "success" | "error"
+  >("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {

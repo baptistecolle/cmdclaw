@@ -8,7 +8,7 @@ import { env } from "@/env";
 export function verifySlackSignature(
   body: string,
   timestamp: string,
-  signature: string
+  signature: string,
 ): boolean {
   const secret = env.SLACK_SIGNING_SECRET;
   if (!secret) return false;
@@ -20,10 +20,7 @@ export function verifySlackSignature(
   const sigBasestring = `v0:${timestamp}:${body}`;
   const mySignature =
     "v0=" +
-    crypto
-      .createHmac("sha256", secret)
-      .update(sigBasestring)
-      .digest("hex");
+    crypto.createHmac("sha256", secret).update(sigBasestring).digest("hex");
 
   const expectedBuffer = Buffer.from(mySignature);
   const actualBuffer = Buffer.from(signature);

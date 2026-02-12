@@ -30,7 +30,7 @@ export function validateFileUpload(
   filename: string,
   mimeType: string,
   sizeBytes: number,
-  currentDocumentCount: number
+  currentDocumentCount: number,
 ): void {
   // Check file size
   if (sizeBytes > MAX_FILE_SIZE_BYTES) {

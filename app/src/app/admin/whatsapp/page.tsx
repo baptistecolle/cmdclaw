@@ -78,7 +78,9 @@ export default function AdminWhatsAppPage() {
             onClick={async () => {
               setWaLoading(true);
               try {
-                const res = await fetch("/api/whatsapp/start", { method: "POST" });
+                const res = await fetch("/api/whatsapp/start", {
+                  method: "POST",
+                });
                 if (res.ok) {
                   const data = (await res.json()) as WhatsAppStatus;
                   setWaStatus(data);
@@ -102,14 +104,23 @@ export default function AdminWhatsAppPage() {
 
         <div className="mt-4 rounded-lg border bg-background p-4">
           <div className="text-sm text-muted-foreground">
-            Status: <span className="font-medium text-foreground">{waStatus?.status ?? "unknown"}</span>
+            Status:{" "}
+            <span className="font-medium text-foreground">
+              {waStatus?.status ?? "unknown"}
+            </span>
           </div>
           {waStatus?.lastError && (
-            <div className="mt-1 text-sm text-destructive">{waStatus.lastError}</div>
+            <div className="mt-1 text-sm text-destructive">
+              {waStatus.lastError}
+            </div>
           )}
           {waQrDataUrl ? (
             <div className="mt-4 flex flex-col items-start gap-2">
-              <img src={waQrDataUrl} alt="WhatsApp QR code" className="h-56 w-56" />
+              <img
+                src={waQrDataUrl}
+                alt="WhatsApp QR code"
+                className="h-56 w-56"
+              />
               <p className="text-xs text-muted-foreground">
                 Scan this QR code in WhatsApp {"->"} Linked devices.
               </p>

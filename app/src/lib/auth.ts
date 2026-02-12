@@ -1,7 +1,13 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { admin, bearer, deviceAuthorization, lastLoginMethod, magicLink } from "better-auth/plugins";
+import {
+  admin,
+  bearer,
+  deviceAuthorization,
+  lastLoginMethod,
+  magicLink,
+} from "better-auth/plugins";
 import { autumn } from "autumn-js/better-auth";
 import { Resend } from "resend";
 
@@ -12,7 +18,9 @@ import { authSchema } from "@/server/db/schema";
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
 const appUrl =
-  env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+  env.APP_URL ??
+  env.NEXT_PUBLIC_APP_URL ??
+  `http://localhost:${process.env.PORT ?? 3000}`;
 
 const ADMIN_EMAILS = ["baptiste@heybap.com"];
 

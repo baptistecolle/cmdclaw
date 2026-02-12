@@ -15,7 +15,11 @@ const headers = {
 
 async function api(
   endpoint: string,
-  options: { method?: string; body?: Record<string, unknown>; params?: Record<string, string> } = {}
+  options: {
+    method?: string;
+    body?: Record<string, unknown>;
+    params?: Record<string, string>;
+  } = {},
 ) {
   const { method = "GET", body, params } = options;
   let url = `${API_BASE}${endpoint}`;
@@ -113,15 +117,21 @@ async function sendMessage(channelId: string) {
     body: { content: values.text },
   });
 
-  console.log(JSON.stringify({
-    success: true,
-    message: {
-      id: data.id,
-      content: data.content,
-      channelId: data.channel_id,
-      timestamp: data.timestamp,
-    },
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        success: true,
+        message: {
+          id: data.id,
+          content: data.content,
+          channelId: data.channel_id,
+          timestamp: data.timestamp,
+        },
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 function showHelp() {

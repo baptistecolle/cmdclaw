@@ -1,6 +1,11 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { integration, integrationToken, workflow, workflowRun } from "@/server/db/schema";
+import {
+  integration,
+  integrationToken,
+  workflow,
+  workflowRun,
+} from "@/server/db/schema";
 import { getValidAccessToken } from "@/server/integrations/token-refresh";
 import { GMAIL_WORKFLOW_JOB_NAME, getQueue } from "@/server/queues";
 
@@ -51,15 +56,21 @@ function getPollIntervalMs(): number {
 
 function getHeaderValue(
   headers: Array<{ name?: string; value?: string }> | undefined,
-  headerName: string
+  headerName: string,
 ): string | null {
-  const item = headers?.find((header) => header.name?.toLowerCase() === headerName.toLowerCase());
+  const item = headers?.find(
+    (header) => header.name?.toLowerCase() === headerName.toLowerCase(),
+  );
   return item?.value ?? null;
 }
 
 function isGmailAuthError(error: unknown): boolean {
   const message =
-    error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(error);
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : JSON.stringify(error);
 
   return (
     message.includes("invalid_grant") ||
@@ -71,7 +82,7 @@ function isGmailAuthError(error: unknown): boolean {
 
 async function disableBrokenGmailIntegration(
   integrationId: string,
-  reason: string
+  reason: string,
 ): Promise<void> {
   await db
     .update(integration)
@@ -82,7 +93,7 @@ async function disableBrokenGmailIntegration(
     .where(eq(integration.id, integrationId));
 
   console.warn(
-    `[workflow-gmail-watcher] disabled gmail integration ${integrationId} due to auth failure (${reason}); reconnect required`
+    `[workflow-gmail-watcher] disabled gmail integration ${integrationId} due to auth failure (${reason}); reconnect required`,
   );
 }
 
@@ -101,26 +112,38 @@ async function listWatchableWorkflows(): Promise<WatchableWorkflow[]> {
       and(
         eq(integration.userId, workflow.ownerId),
         eq(integration.type, "gmail"),
-        eq(integration.enabled, true)
-      )
+        eq(integration.enabled, true),
+      ),
     )
-    .innerJoin(integrationToken, eq(integrationToken.integrationId, integration.id))
-    .where(and(eq(workflow.status, "on"), eq(workflow.triggerType, GMAIL_TRIGGER_TYPE)));
+    .innerJoin(
+      integrationToken,
+      eq(integrationToken.integrationId, integration.id),
+    )
+    .where(
+      and(
+        eq(workflow.status, "on"),
+        eq(workflow.triggerType, GMAIL_TRIGGER_TYPE),
+      ),
+    );
 
   return rows;
 }
 
-async function getWorkflowLastProcessedInternalDate(workflowId: string): Promise<number | null> {
+async function getWorkflowLastProcessedInternalDate(
+  workflowId: string,
+): Promise<number | null> {
   const result = await db
     .select({
-      maxInternalDate: sql<string | null>`max(((${workflowRun.triggerPayload} ->> 'gmailInternalDate')::bigint)::text)`,
+      maxInternalDate: sql<
+        string | null
+      >`max(((${workflowRun.triggerPayload} ->> 'gmailInternalDate')::bigint)::text)`,
     })
     .from(workflowRun)
     .where(
       and(
         eq(workflowRun.workflowId, workflowId),
-        sql`${workflowRun.triggerPayload} ->> 'source' = ${GMAIL_TRIGGER_TYPE}`
-      )
+        sql`${workflowRun.triggerPayload} ->> 'source' = ${GMAIL_TRIGGER_TYPE}`,
+      ),
     );
 
   const value = result[0]?.maxInternalDate;
@@ -130,23 +153,31 @@ async function getWorkflowLastProcessedInternalDate(workflowId: string): Promise
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-async function hasRunForGmailMessage(workflowId: string, gmailMessageId: string): Promise<boolean> {
+async function hasRunForGmailMessage(
+  workflowId: string,
+  gmailMessageId: string,
+): Promise<boolean> {
   const rows = await db
     .select({ id: workflowRun.id })
     .from(workflowRun)
     .where(
       and(
         eq(workflowRun.workflowId, workflowId),
-        sql`${workflowRun.triggerPayload} ->> 'gmailMessageId' = ${gmailMessageId}`
-      )
+        sql`${workflowRun.triggerPayload} ->> 'gmailMessageId' = ${gmailMessageId}`,
+      ),
     )
     .limit(1);
 
   return rows.length > 0;
 }
 
-async function listRecentGmailMessages(accessToken: string, afterSeconds: number): Promise<string[]> {
-  const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
+async function listRecentGmailMessages(
+  accessToken: string,
+  afterSeconds: number,
+): Promise<string[]> {
+  const url = new URL(
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+  );
   url.searchParams.set("maxResults", String(GMAIL_LIST_LIMIT));
   url.searchParams.set("q", `after:${afterSeconds}`);
 
@@ -158,7 +189,9 @@ async function listRecentGmailMessages(accessToken: string, afterSeconds: number
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Gmail list request failed (${response.status}): ${errorText}`);
+    throw new Error(
+      `Gmail list request failed (${response.status}): ${errorText}`,
+    );
   }
 
   const data = (await response.json()) as GmailListResponse;
@@ -167,9 +200,11 @@ async function listRecentGmailMessages(accessToken: string, afterSeconds: number
 
 async function getGmailMessageSummary(
   accessToken: string,
-  messageId: string
+  messageId: string,
 ): Promise<GmailMessageSummary | null> {
-  const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`);
+  const url = new URL(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`,
+  );
   url.searchParams.set("format", "metadata");
   url.searchParams.set("metadataHeaders", "Subject");
   url.searchParams.set("metadataHeaders", "From");
@@ -183,7 +218,9 @@ async function getGmailMessageSummary(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Gmail get request failed (${response.status}): ${errorText}`);
+    throw new Error(
+      `Gmail get request failed (${response.status}): ${errorText}`,
+    );
   }
 
   const data = (await response.json()) as GmailMessageResponse;
@@ -203,35 +240,42 @@ async function getGmailMessageSummary(
 
 async function triggerWorkflowFromGmailMessage(
   workflowId: string,
-  message: GmailMessageSummary
+  message: GmailMessageSummary,
 ): Promise<void> {
   const queue = getQueue();
-  await queue.add(GMAIL_WORKFLOW_JOB_NAME, {
-    workflowId,
-    triggerPayload: {
-      source: GMAIL_TRIGGER_TYPE,
+  await queue.add(
+    GMAIL_WORKFLOW_JOB_NAME,
+    {
       workflowId,
-      gmailMessageId: message.id,
-      gmailThreadId: message.threadId,
-      gmailInternalDate: message.internalDateMs,
-      from: message.from,
-      subject: message.subject,
-      date: message.date,
-      snippet: message.snippet,
-      watchedAt: new Date().toISOString(),
+      triggerPayload: {
+        source: GMAIL_TRIGGER_TYPE,
+        workflowId,
+        gmailMessageId: message.id,
+        gmailThreadId: message.threadId,
+        gmailInternalDate: message.internalDateMs,
+        from: message.from,
+        subject: message.subject,
+        date: message.date,
+        snippet: message.snippet,
+        watchedAt: new Date().toISOString(),
+      },
     },
-  }, {
-    jobId: `workflow-gmail-${workflowId}-${message.id}`,
-    attempts: 20,
-    backoff: {
-      type: "exponential",
-      delay: 10_000,
+    {
+      jobId: `workflow-gmail-${workflowId}-${message.id}`,
+      attempts: 20,
+      backoff: {
+        type: "exponential",
+        delay: 10_000,
+      },
+      removeOnComplete: true,
     },
-    removeOnComplete: true,
-  });
+  );
 }
 
-export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; enqueued: number }> {
+export async function pollGmailWorkflowTriggers(): Promise<{
+  checked: number;
+  enqueued: number;
+}> {
   const watchable = await listWatchableWorkflows();
   if (watchable.length === 0) return { checked: 0, enqueued: 0 };
 
@@ -255,14 +299,22 @@ export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; en
         tokenCache.set(item.integrationId, accessToken);
       }
 
-      const lastProcessed = await getWorkflowLastProcessedInternalDate(item.workflowId);
-      const fallbackStart = Math.floor(Date.now() / 1000) - DEFAULT_LOOKBACK_SECONDS;
+      const lastProcessed = await getWorkflowLastProcessedInternalDate(
+        item.workflowId,
+      );
+      const fallbackStart =
+        Math.floor(Date.now() / 1000) - DEFAULT_LOOKBACK_SECONDS;
       const afterSeconds = Math.max(
         0,
-        Math.floor(((lastProcessed ?? fallbackStart * 1000) - 60 * 1000) / 1000)
+        Math.floor(
+          ((lastProcessed ?? fallbackStart * 1000) - 60 * 1000) / 1000,
+        ),
       );
 
-      const messageIds = await listRecentGmailMessages(accessToken, afterSeconds);
+      const messageIds = await listRecentGmailMessages(
+        accessToken,
+        afterSeconds,
+      );
       if (messageIds.length === 0) continue;
 
       const messages: GmailMessageSummary[] = [];
@@ -273,7 +325,7 @@ export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; en
         } catch (error) {
           console.error(
             `[workflow-gmail-watcher] failed to fetch message ${messageId} for workflow ${item.workflowId}`,
-            error
+            error,
           );
         }
       }
@@ -285,7 +337,10 @@ export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; en
           continue;
         }
 
-        const alreadyHandled = await hasRunForGmailMessage(item.workflowId, message.id);
+        const alreadyHandled = await hasRunForGmailMessage(
+          item.workflowId,
+          message.id,
+        );
         if (alreadyHandled) continue;
 
         try {
@@ -294,7 +349,7 @@ export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; en
         } catch (error) {
           console.error(
             `[workflow-gmail-watcher] failed to trigger workflow ${item.workflowId} for message ${message.id}`,
-            error
+            error,
           );
         }
       }
@@ -303,16 +358,19 @@ export async function pollGmailWorkflowTriggers(): Promise<{ checked: number; en
         try {
           await disableBrokenGmailIntegration(
             item.integrationId,
-            error instanceof Error ? error.message : "auth_error"
+            error instanceof Error ? error.message : "auth_error",
           );
         } catch (disableError) {
           console.error(
             `[workflow-gmail-watcher] failed to disable broken gmail integration ${item.integrationId}`,
-            disableError
+            disableError,
           );
         }
       }
-      console.error(`[workflow-gmail-watcher] failed for workflow ${item.workflowId}`, error);
+      console.error(
+        `[workflow-gmail-watcher] failed for workflow ${item.workflowId}`,
+        error,
+      );
     }
   }
 
@@ -331,7 +389,7 @@ export function startGmailWorkflowWatcher(): () => void {
       const { checked, enqueued } = await pollGmailWorkflowTriggers();
       if (checked > 0) {
         console.log(
-          `[workflow-gmail-watcher] checked ${checked} workflow(s), enqueued ${enqueued} run(s)`
+          `[workflow-gmail-watcher] checked ${checked} workflow(s), enqueued ${enqueued} run(s)`,
         );
       }
     } catch (error) {

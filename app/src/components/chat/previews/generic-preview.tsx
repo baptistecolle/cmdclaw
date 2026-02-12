@@ -1,9 +1,5 @@
 import { getFlagLabel } from "@/lib/parse-cli-command";
-import {
-  PreviewProps,
-  PreviewField,
-  PreviewSection,
-} from "./preview-styles";
+import { PreviewProps, PreviewField, PreviewSection } from "./preview-styles";
 
 export function GenericPreview({
   operation,

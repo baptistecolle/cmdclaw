@@ -1,32 +1,50 @@
 import { ORPCError } from "@orpc/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { conversation, generation, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
+import {
+  conversation,
+  generation,
+  workflow,
+  workflowRun,
+  workflowRunEvent,
+} from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
 import type { IntegrationType } from "@/server/oauth/config";
 
-const ACTIVE_WORKFLOW_RUN_STATUSES = ["running", "awaiting_approval", "awaiting_auth"] as const;
-const TERMINAL_GENERATION_STATUSES = ["completed", "cancelled", "error"] as const;
+const ACTIVE_WORKFLOW_RUN_STATUSES = [
+  "running",
+  "awaiting_approval",
+  "awaiting_auth",
+] as const;
+const TERMINAL_GENERATION_STATUSES = [
+  "completed",
+  "cancelled",
+  "error",
+] as const;
 const ORPHAN_RUN_GRACE_MS = 2 * 60 * 1000;
 const WORKFLOW_PREPARING_TIMEOUT_MS = (() => {
-  const seconds = Number(process.env.WORKFLOW_PREPARING_TIMEOUT_SECONDS ?? "300");
+  const seconds = Number(
+    process.env.WORKFLOW_PREPARING_TIMEOUT_SECONDS ?? "300",
+  );
   if (!Number.isFinite(seconds) || seconds <= 0) return 5 * 60 * 1000;
   return Math.floor(seconds * 1000);
 })();
 
 function mapGenerationStatusToWorkflowRunStatus(
-  status: (typeof TERMINAL_GENERATION_STATUSES)[number]
+  status: (typeof TERMINAL_GENERATION_STATUSES)[number],
 ): "completed" | "cancelled" | "error" {
   if (status === "completed") return "completed";
   if (status === "cancelled") return "cancelled";
   return "error";
 }
 
-async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promise<void> {
+async function reconcileStaleWorkflowRunsForWorkflow(
+  workflowId: string,
+): Promise<void> {
   const candidateRuns = await db.query.workflowRun.findMany({
     where: and(
       eq(workflowRun.workflowId, workflowId),
-      inArray(workflowRun.status, [...ACTIVE_WORKFLOW_RUN_STATUSES])
+      inArray(workflowRun.status, [...ACTIVE_WORKFLOW_RUN_STATUSES]),
     ),
     with: {
       generation: {
@@ -49,7 +67,9 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
   for (const run of candidateRuns) {
     const gen = run.generation;
     if (!gen) {
-      const isLikelyOrphan = run.status === "running" && Date.now() - run.startedAt.getTime() > ORPHAN_RUN_GRACE_MS;
+      const isLikelyOrphan =
+        run.status === "running" &&
+        Date.now() - run.startedAt.getTime() > ORPHAN_RUN_GRACE_MS;
       if (!isLikelyOrphan) continue;
 
       await db
@@ -57,14 +77,20 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
         .set({
           status: "error",
           finishedAt: run.finishedAt ?? new Date(),
-          errorMessage: run.errorMessage ?? "Workflow run failed before generation could start.",
+          errorMessage:
+            run.errorMessage ??
+            "Workflow run failed before generation could start.",
         })
         .where(eq(workflowRun.id, run.id));
 
       continue;
     }
 
-    if (!TERMINAL_GENERATION_STATUSES.includes(gen.status as (typeof TERMINAL_GENERATION_STATUSES)[number])) {
+    if (
+      !TERMINAL_GENERATION_STATUSES.includes(
+        gen.status as (typeof TERMINAL_GENERATION_STATUSES)[number],
+      )
+    ) {
       const isPreparingTimeout =
         run.status === "running" &&
         gen.status === "running" &&
@@ -106,7 +132,7 @@ async function reconcileStaleWorkflowRunsForWorkflow(workflowId: string): Promis
     }
 
     const mappedStatus = mapGenerationStatusToWorkflowRunStatus(
-      gen.status as (typeof TERMINAL_GENERATION_STATUSES)[number]
+      gen.status as (typeof TERMINAL_GENERATION_STATUSES)[number],
     );
 
     await db
@@ -133,7 +159,10 @@ export async function triggerWorkflowRun(params: {
 }> {
   const wf = await db.query.workflow.findFirst({
     where: params.userId
-      ? and(eq(workflow.id, params.workflowId), eq(workflow.ownerId, params.userId))
+      ? and(
+          eq(workflow.id, params.workflowId),
+          eq(workflow.ownerId, params.userId),
+        )
       : eq(workflow.id, params.workflowId),
   });
 
@@ -152,7 +181,7 @@ export async function triggerWorkflowRun(params: {
   const activeRun = await db.query.workflowRun.findFirst({
     where: and(
       eq(workflowRun.workflowId, wf.id),
-      inArray(workflowRun.status, [...ACTIVE_WORKFLOW_RUN_STATUSES])
+      inArray(workflowRun.status, [...ACTIVE_WORKFLOW_RUN_STATUSES]),
     ),
     orderBy: (run, { desc }) => [desc(run.startedAt)],
   });
@@ -181,7 +210,8 @@ export async function triggerWorkflowRun(params: {
   const payloadText = JSON.stringify(params.triggerPayload ?? {}, null, 2);
   const userContent = `Workflow trigger received.\n\n<trigger_payload>\n${payloadText}\n</trigger_payload>`;
 
-  const allowedIntegrations = (wf.allowedIntegrations ?? []) as IntegrationType[];
+  const allowedIntegrations = (wf.allowedIntegrations ??
+    []) as IntegrationType[];
 
   let generationId: string;
   let conversationId: string;
@@ -207,7 +237,10 @@ export async function triggerWorkflowRun(params: {
       .set({ generationId })
       .where(eq(workflowRun.id, run.id));
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to start workflow generation";
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to start workflow generation";
 
     await db
       .update(workflowRun)

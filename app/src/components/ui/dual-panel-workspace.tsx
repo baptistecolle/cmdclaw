@@ -70,7 +70,7 @@ export function DualPanelWorkspace({
         window.localStorage.setItem(storageKey, String(next));
       }
     },
-    [bounds.maxRight, bounds.minRight, storageKey]
+    [bounds.maxRight, bounds.minRight, storageKey],
   );
 
   const onPointerMove = useCallback(
@@ -82,7 +82,7 @@ export function DualPanelWorkspace({
       const nextRight = 100 - leftPct;
       setWidthWithinBounds(nextRight);
     },
-    [setWidthWithinBounds]
+    [setWidthWithinBounds],
   );
 
   const stopDrag = useCallback(() => {

@@ -16,19 +16,29 @@ export function SheetsPreview({
     case "create":
       return <SheetsCreatePreview args={args} />;
     case "append":
-      return <SheetsAppendPreview args={args} positionalArgs={positionalArgs} />;
+      return (
+        <SheetsAppendPreview args={args} positionalArgs={positionalArgs} />
+      );
     case "update":
-      return <SheetsUpdatePreview args={args} positionalArgs={positionalArgs} />;
+      return (
+        <SheetsUpdatePreview args={args} positionalArgs={positionalArgs} />
+      );
     case "clear":
       return <SheetsClearPreview args={args} positionalArgs={positionalArgs} />;
     case "add-sheet":
-      return <SheetsAddSheetPreview args={args} positionalArgs={positionalArgs} />;
+      return (
+        <SheetsAddSheetPreview args={args} positionalArgs={positionalArgs} />
+      );
     default:
       return null;
   }
 }
 
-function SheetsCreatePreview({ args }: { args: Record<string, string | undefined> }) {
+function SheetsCreatePreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const title = args.title;
 
   return (
@@ -175,10 +185,7 @@ function ValuesPreview({ values }: { values: string }) {
                 <tr key={i}>
                   {Array.isArray(row) ? (
                     row.map((cell, j) => (
-                      <td
-                        key={j}
-                        className="border px-2 py-1 bg-muted/30"
-                      >
+                      <td key={j} className="border px-2 py-1 bg-muted/30">
                         {String(cell)}
                       </td>
                     ))

@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Check, X, Loader2, Link2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Check,
+  X,
+  Loader2,
+  Link2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -37,7 +44,7 @@ export function AuthRequestCard({
         status === "pending" && "border-blue-500/50 bg-blue-50/10",
         status === "connecting" && "border-amber-500/50 bg-amber-50/10",
         status === "completed" && "border-green-500/50",
-        status === "cancelled" && "border-red-500/50"
+        status === "cancelled" && "border-red-500/50",
       )}
     >
       <button

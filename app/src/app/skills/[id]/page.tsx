@@ -66,7 +66,9 @@ function SkillEditorPageContent() {
   const getDocumentUrl = useGetDocumentUrl();
 
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
+    null,
+  );
   const [editorMode, setEditorMode] = useState<EditorMode>("rich");
   const [isSaving, setIsSaving] = useState(false);
   const [showAddFile, setShowAddFile] = useState(false);
@@ -76,8 +78,14 @@ function SkillEditorPageContent() {
     message: string;
   } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [documentToDelete, setDocumentToDelete] = useState<{ id: string; filename: string } | null>(null);
-  const [fileToDelete, setFileToDelete] = useState<{ id: string; path: string } | null>(null);
+  const [documentToDelete, setDocumentToDelete] = useState<{
+    id: string;
+    filename: string;
+  } | null>(null);
+  const [fileToDelete, setFileToDelete] = useState<{
+    id: string;
+    path: string;
+  } | null>(null);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [isLoadingDocumentUrl, setIsLoadingDocumentUrl] = useState(false);
 
@@ -170,10 +178,7 @@ function SkillEditorPageContent() {
   };
 
   const isViewableDocument = (mimeType: string) => {
-    return (
-      mimeType === "application/pdf" ||
-      mimeType.startsWith("image/")
-    );
+    return mimeType === "application/pdf" || mimeType.startsWith("image/");
   };
 
   const handleSelectDocument = async (docId: string) => {
@@ -434,7 +439,14 @@ function SkillEditorPageContent() {
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [skillBody, editedContent, skillDisplayName, skillSlug, skillDescription, skillIcon]);
+  }, [
+    skillBody,
+    editedContent,
+    skillDisplayName,
+    skillSlug,
+    skillDescription,
+    skillIcon,
+  ]);
 
   // Cmd+S / Ctrl+S to save immediately
   useHotkeys(
@@ -444,7 +456,7 @@ function SkillEditorPageContent() {
       handleSaveFile(true);
     },
     { enableOnFormTags: ["INPUT", "TEXTAREA"] },
-    [handleSaveFile]
+    [handleSaveFile],
   );
 
   if (isLoading) {
@@ -473,318 +485,339 @@ function SkillEditorPageContent() {
     <div className="h-[calc(100vh-8rem)]">
       {/* Skill copilot dual panel is disabled until it is ready. */}
       <div className="flex h-full min-h-0 flex-col p-4 md:p-6">
-      {/* Header with back button and delete */}
-      <div className="mb-6 flex items-center justify-between shrink-0">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/skills">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex items-center gap-2">
-          <span className={cn(
-            "flex items-center gap-1.5 text-xs transition-opacity",
-            isSaving ? "opacity-100 text-muted-foreground" :
-            notification?.type === "success" ? "opacity-100 text-green-600 dark:text-green-400" :
-            notification?.type === "error" ? "opacity-100 text-red-600 dark:text-red-400" : "opacity-0 text-muted-foreground"
-          )}>
-            {isSaving ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Saving...
-              </>
-            ) : notification?.type === "success" ? (
-              <>
-                <CheckCircle2 className="h-3 w-3" />
-                Saved
-              </>
-            ) : notification?.type === "error" ? (
-              <>
-                <XCircle className="h-3 w-3" />
-                {notification.message}
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="h-3 w-3" />
-                Saved
-              </>
-            )}
-          </span>
-          <Button variant="ghost" size="sm" onClick={handleDeleteSkill}>
-            <Trash2 className="h-3 w-3" />
+        {/* Header with back button and delete */}
+        <div className="mb-6 flex items-center justify-between shrink-0">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/skills">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
-        </div>
-      </div>
-
-      {/* Notion-style inline editable metadata */}
-      <div className="mb-6 space-y-2 shrink-0">
-        {/* Icon and Display Name */}
-        <div className="flex items-start gap-3">
-          <IconPicker value={skillIcon} onChange={setSkillIcon}>
-            <button
-              type="button"
-              className="flex h-12 w-12 items-center justify-center rounded-lg border bg-muted hover:bg-muted/80 transition-colors shrink-0"
-            >
-              {skillIcon ? (
-                <span className="text-2xl">{skillIcon}</span>
-              ) : (
-                <FileText className="h-6 w-6 text-muted-foreground" />
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "flex items-center gap-1.5 text-xs transition-opacity",
+                isSaving
+                  ? "opacity-100 text-muted-foreground"
+                  : notification?.type === "success"
+                    ? "opacity-100 text-green-600 dark:text-green-400"
+                    : notification?.type === "error"
+                      ? "opacity-100 text-red-600 dark:text-red-400"
+                      : "opacity-0 text-muted-foreground",
               )}
-            </button>
-          </IconPicker>
-          <input
-            ref={displayNameRef}
-            type="text"
-            value={skillDisplayName}
-            onChange={(e) => handleDisplayNameChange(e.target.value)}
-            placeholder="Untitled Skill"
-            className="w-full bg-transparent text-3xl font-bold outline-none placeholder:text-muted-foreground/50 focus:outline-none pt-1"
-          />
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Saving...
+                </>
+              ) : notification?.type === "success" ? (
+                <>
+                  <CheckCircle2 className="h-3 w-3" />
+                  Saved
+                </>
+              ) : notification?.type === "error" ? (
+                <>
+                  <XCircle className="h-3 w-3" />
+                  {notification.message}
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-3 w-3" />
+                  Saved
+                </>
+              )}
+            </span>
+            <Button variant="ghost" size="sm" onClick={handleDeleteSkill}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
 
-        {/* Slug - Small monospace, editable on click */}
-        <div className="flex items-center gap-1.5">
-          {isEditingSlug ? (
+        {/* Notion-style inline editable metadata */}
+        <div className="mb-6 space-y-2 shrink-0">
+          {/* Icon and Display Name */}
+          <div className="flex items-start gap-3">
+            <IconPicker value={skillIcon} onChange={setSkillIcon}>
+              <button
+                type="button"
+                className="flex h-12 w-12 items-center justify-center rounded-lg border bg-muted hover:bg-muted/80 transition-colors shrink-0"
+              >
+                {skillIcon ? (
+                  <span className="text-2xl">{skillIcon}</span>
+                ) : (
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                )}
+              </button>
+            </IconPicker>
             <input
-              ref={slugRef}
+              ref={displayNameRef}
               type="text"
-              value={skillSlug}
-              onChange={(e) =>
-                setSkillSlug(
-                  e.target.value
-                    .toLowerCase()
-                    .replace(/[^a-z0-9-]/g, "-")
-                    .replace(/-+/g, "-")
-                )
-              }
-              onBlur={() => setIsEditingSlug(false)}
+              value={skillDisplayName}
+              onChange={(e) => handleDisplayNameChange(e.target.value)}
+              placeholder="Untitled Skill"
+              className="w-full bg-transparent text-3xl font-bold outline-none placeholder:text-muted-foreground/50 focus:outline-none pt-1"
+            />
+          </div>
+
+          {/* Slug - Small monospace, editable on click */}
+          <div className="flex items-center gap-1.5">
+            {isEditingSlug ? (
+              <input
+                ref={slugRef}
+                type="text"
+                value={skillSlug}
+                onChange={(e) =>
+                  setSkillSlug(
+                    e.target.value
+                      .toLowerCase()
+                      .replace(/[^a-z0-9-]/g, "-")
+                      .replace(/-+/g, "-"),
+                  )
+                }
+                onBlur={() => setIsEditingSlug(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Escape") {
+                    setIsEditingSlug(false);
+                  }
+                }}
+                className="h-6 bg-transparent font-mono text-xs text-muted-foreground outline-none"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => setIsEditingSlug(true)}
+                className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <span className="font-mono">{skillSlug || "skill-slug"}</span>
+                <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100" />
+              </button>
+            )}
+          </div>
+
+          {/* Description - Muted text, expands to input on click */}
+          {isEditingDescription ? (
+            <input
+              ref={descriptionRef}
+              type="text"
+              value={skillDescription}
+              onChange={(e) => setSkillDescription(e.target.value)}
+              onBlur={() => setIsEditingDescription(false)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === "Escape") {
-                  setIsEditingSlug(false);
+                  setIsEditingDescription(false);
                 }
               }}
-              className="h-6 bg-transparent font-mono text-xs text-muted-foreground outline-none"
+              placeholder="Add a description..."
+              className="w-full bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/50"
               autoFocus
             />
           ) : (
             <button
-              onClick={() => setIsEditingSlug(true)}
-              className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setIsEditingDescription(true)}
+              className="text-left text-sm text-muted-foreground hover:text-foreground"
             >
-              <span className="font-mono">{skillSlug || "skill-slug"}</span>
-              <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100" />
+              {skillDescription || (
+                <span className="text-muted-foreground/50">
+                  Add a description...
+                </span>
+              )}
             </button>
           )}
         </div>
 
-        {/* Description - Muted text, expands to input on click */}
-        {isEditingDescription ? (
-          <input
-            ref={descriptionRef}
-            type="text"
-            value={skillDescription}
-            onChange={(e) => setSkillDescription(e.target.value)}
-            onBlur={() => setIsEditingDescription(false)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape") {
-                setIsEditingDescription(false);
-              }
-            }}
-            placeholder="Add a description..."
-            className="w-full bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/50"
-            autoFocus
-          />
-        ) : (
-          <button
-            onClick={() => setIsEditingDescription(true)}
-            className="text-left text-sm text-muted-foreground hover:text-foreground"
-          >
-            {skillDescription || (
-              <span className="text-muted-foreground/50">
-                Add a description...
-              </span>
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* File tabs - subtle style, above editor */}
-      <div className="mb-3 flex items-center gap-1 border-b border-border/50 shrink-0">
-        {/* Text files */}
-        {skill.files
-          .sort((a, b) => {
-            if (a.path === "SKILL.md") return -1;
-            if (b.path === "SKILL.md") return 1;
-            return a.path.localeCompare(b.path);
-          })
-          .map((file) => (
-            <button
-              key={file.id}
-              onClick={() => handleSelectFile(file.id)}
-              className={cn(
-                "group flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors",
-                selectedFileId === file.id
-                  ? "border-b-2 border-foreground/70 font-medium text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <FileText className="h-3 w-3" />
-              {file.path}
-              {file.path !== "SKILL.md" && (
+        {/* File tabs - subtle style, above editor */}
+        <div className="mb-3 flex items-center gap-1 border-b border-border/50 shrink-0">
+          {/* Text files */}
+          {skill.files
+            .sort((a, b) => {
+              if (a.path === "SKILL.md") return -1;
+              if (b.path === "SKILL.md") return 1;
+              return a.path.localeCompare(b.path);
+            })
+            .map((file) => (
+              <button
+                key={file.id}
+                onClick={() => handleSelectFile(file.id)}
+                className={cn(
+                  "group flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors",
+                  selectedFileId === file.id
+                    ? "border-b-2 border-foreground/70 font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <FileText className="h-3 w-3" />
+                {file.path}
+                {file.path !== "SKILL.md" && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFileToDelete({ id: file.id, path: file.path });
+                    }}
+                    className="ml-0.5 rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
+                  >
+                    <Trash2 className="h-2.5 w-2.5" />
+                  </button>
+                )}
+              </button>
+            ))}
+          {/* Document tabs */}
+          {skill.documents?.map((doc) => {
+            const Icon = getDocumentIcon(doc.mimeType);
+            return (
+              <div
+                key={doc.id}
+                onClick={() => handleSelectDocument(doc.id)}
+                className={cn(
+                  "group flex cursor-pointer items-center gap-1 px-2.5 py-1.5 text-xs transition-colors",
+                  selectedDocumentId === doc.id
+                    ? "border-b-2 border-foreground/70 font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="h-3 w-3" />
+                {doc.filename}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setFileToDelete({ id: file.id, path: file.path });
+                    setDocumentToDelete({ id: doc.id, filename: doc.filename });
                   }}
                   className="ml-0.5 rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
                 >
                   <Trash2 className="h-2.5 w-2.5" />
                 </button>
-              )}
-            </button>
-          ))}
-        {/* Document tabs */}
-        {skill.documents?.map((doc) => {
-          const Icon = getDocumentIcon(doc.mimeType);
-          return (
-            <div
-              key={doc.id}
-              onClick={() => handleSelectDocument(doc.id)}
-              className={cn(
-                "group flex cursor-pointer items-center gap-1 px-2.5 py-1.5 text-xs transition-colors",
-                selectedDocumentId === doc.id
-                  ? "border-b-2 border-foreground/70 font-medium text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Icon className="h-3 w-3" />
-              {doc.filename}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDocumentToDelete({ id: doc.id, filename: doc.filename });
-                }}
-                className="ml-0.5 rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
+              </div>
+            );
+          })}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+                <Plus className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setShowAddFile(true)}>
+                <FileText className="h-4 w-4" />
+                Text file
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
               >
-                <Trash2 className="h-2.5 w-2.5" />
+                {isUploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileUp className="h-4 w-4" />
+                )}
+                {isUploading ? "Uploading..." : "Document"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileSelect}
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp,.svg"
+            className="hidden"
+          />
+
+          {/* Mode toggle - far right */}
+          {isSkillMd && (
+            <div className="ml-auto flex items-center gap-0.5">
+              <button
+                onClick={() => setEditorMode("rich")}
+                className={cn(
+                  "rounded p-1.5 transition-colors",
+                  editorMode === "rich"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                title="Rich editor"
+              >
+                <Eye className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setEditorMode("markdown")}
+                className={cn(
+                  "rounded p-1.5 transition-colors",
+                  editorMode === "markdown"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                title="Markdown"
+              >
+                <Code2 className="h-3.5 w-3.5" />
               </button>
             </div>
-          );
-        })}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground">
-              <Plus className="h-3 w-3" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => setShowAddFile(true)}>
-              <FileText className="h-4 w-4" />
-              Text file
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-              {isUploading ? "Uploading..." : "Document"}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <input
-          ref={fileInputRef}
-          type="file"
-          onChange={handleFileSelect}
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp,.svg"
-          className="hidden"
-        />
+          )}
+        </div>
 
-        {/* Mode toggle - far right */}
-        {isSkillMd && (
-          <div className="ml-auto flex items-center gap-0.5">
-            <button
-              onClick={() => setEditorMode("rich")}
-              className={cn(
-                "rounded p-1.5 transition-colors",
-                editorMode === "rich"
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              title="Rich editor"
+        {/* Add file input */}
+        {showAddFile && (
+          <div className="mb-4 flex items-center gap-2 shrink-0">
+            <Input
+              placeholder="filename.md"
+              value={newFilePath}
+              onChange={(e) => setNewFilePath(e.target.value)}
+              className="h-8 flex-1 text-sm"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddFile();
+                if (e.key === "Escape") {
+                  setShowAddFile(false);
+                  setNewFilePath("");
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              onClick={handleAddFile}
+              disabled={!newFilePath.trim()}
             >
-              <Eye className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => setEditorMode("markdown")}
-              className={cn(
-                "rounded p-1.5 transition-colors",
-                editorMode === "markdown"
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              title="Markdown"
-            >
-              <Code2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Add file input */}
-      {showAddFile && (
-        <div className="mb-4 flex items-center gap-2 shrink-0">
-          <Input
-            placeholder="filename.md"
-            value={newFilePath}
-            onChange={(e) => setNewFilePath(e.target.value)}
-            className="h-8 flex-1 text-sm"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAddFile();
-              if (e.key === "Escape") {
+              Add
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
                 setShowAddFile(false);
                 setNewFilePath("");
-              }
-            }}
-          />
-          <Button size="sm" onClick={handleAddFile} disabled={!newFilePath.trim()}>
-            Add
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setShowAddFile(false);
-              setNewFilePath("");
-            }}
-          >
-            Cancel
-          </Button>
-        </div>
-      )}
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
 
-      {/* Editor/Content area */}
-      <div className="flex-1 min-h-0">
-        {selectedFile && !selectedDocumentId && (
-          <>
-            {isSkillMd && editorMode === "rich" ? (
-              <SkillEditor
-                content={skillBody}
-                onChange={setSkillBody}
-                editorKey={`${selectedFileId}-body`}
-                className="h-full"
-              />
-            ) : isSkillMd && editorMode === "markdown" ? (
-              <textarea
-                value={serializeSkillContent(skillSlug, skillDescription, skillBody)}
-                onChange={(e) => {
-                  const parsed = parseSkillContent(e.target.value);
-                  setSkillSlug(parsed.name);
-                  setSkillDescription(parsed.description);
-                  setSkillBody(parsed.body);
-                  // Also update display name when name changes in markdown mode
-                  if (parsed.name !== skillSlug) {
-                    setSkillDisplayName(generateDisplayName(parsed.name));
-                  }
-                }}
-                className="h-full w-full rounded-lg border bg-background p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                placeholder="---
+        {/* Editor/Content area */}
+        <div className="flex-1 min-h-0">
+          {selectedFile && !selectedDocumentId && (
+            <>
+              {isSkillMd && editorMode === "rich" ? (
+                <SkillEditor
+                  content={skillBody}
+                  onChange={setSkillBody}
+                  editorKey={`${selectedFileId}-body`}
+                  className="h-full"
+                />
+              ) : isSkillMd && editorMode === "markdown" ? (
+                <textarea
+                  value={serializeSkillContent(
+                    skillSlug,
+                    skillDescription,
+                    skillBody,
+                  )}
+                  onChange={(e) => {
+                    const parsed = parseSkillContent(e.target.value);
+                    setSkillSlug(parsed.name);
+                    setSkillDescription(parsed.description);
+                    setSkillBody(parsed.body);
+                    // Also update display name when name changes in markdown mode
+                    if (parsed.name !== skillSlug) {
+                      setSkillDisplayName(generateDisplayName(parsed.name));
+                    }
+                  }}
+                  className="h-full w-full rounded-lg border bg-background p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                  placeholder="---
 name: skill-name
 description: What this skill does
 ---
@@ -792,125 +825,123 @@ description: What this skill does
 # Instructions
 
 Add your skill instructions here..."
-              />
-            ) : (
-              <SkillEditor
-                content={editedContent}
-                onChange={setEditedContent}
-                editorKey={selectedFileId || ""}
-                className="h-full"
-              />
-            )}
-          </>
-        )}
-        {selectedDocumentId && (() => {
-          const selectedDoc = skill.documents?.find((d) => d.id === selectedDocumentId);
-          if (!selectedDoc) return null;
-
-          const isViewable = isViewableDocument(selectedDoc.mimeType);
-
-          if (isLoadingDocumentUrl) {
-            return (
-              <div className="flex h-full items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            );
-          }
-
-          if (isViewable && documentUrl) {
-            if (selectedDoc.mimeType === "application/pdf") {
-              return (
-                <iframe
-                  src={documentUrl}
-                  className="h-full w-full rounded-lg border"
-                  title={selectedDoc.filename}
                 />
+              ) : (
+                <SkillEditor
+                  content={editedContent}
+                  onChange={setEditedContent}
+                  editorKey={selectedFileId || ""}
+                  className="h-full"
+                />
+              )}
+            </>
+          )}
+          {selectedDocumentId &&
+            (() => {
+              const selectedDoc = skill.documents?.find(
+                (d) => d.id === selectedDocumentId,
               );
-            }
-            if (selectedDoc.mimeType.startsWith("image/")) {
+              if (!selectedDoc) return null;
+
+              const isViewable = isViewableDocument(selectedDoc.mimeType);
+
+              if (isLoadingDocumentUrl) {
+                return (
+                  <div className="flex h-full items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                );
+              }
+
+              if (isViewable && documentUrl) {
+                if (selectedDoc.mimeType === "application/pdf") {
+                  return (
+                    <iframe
+                      src={documentUrl}
+                      className="h-full w-full rounded-lg border"
+                      title={selectedDoc.filename}
+                    />
+                  );
+                }
+                if (selectedDoc.mimeType.startsWith("image/")) {
+                  return (
+                    <div className="flex h-full items-center justify-center overflow-auto rounded-lg border bg-muted/30 p-4">
+                      <img
+                        src={documentUrl}
+                        alt={selectedDoc.filename}
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
+                  );
+                }
+              }
+
+              // Non-viewable document - show download prompt
+              const Icon = getDocumentIcon(selectedDoc.mimeType);
               return (
-                <div className="flex h-full items-center justify-center overflow-auto rounded-lg border bg-muted/30 p-4">
-                  <img
-                    src={documentUrl}
-                    alt={selectedDoc.filename}
-                    className="max-h-full max-w-full object-contain"
-                  />
+                <div className="flex h-full flex-col items-center justify-center gap-4 rounded-lg border bg-muted/30">
+                  <Icon className="h-16 w-16 text-muted-foreground" />
+                  <div className="text-center">
+                    <p className="font-medium">{selectedDoc.filename}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatFileSize(selectedDoc.sizeBytes)}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => handleDownloadDocument(selectedDoc.id)}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
+                  </Button>
                 </div>
               );
-            }
-          }
+            })()}
+        </div>
 
-          // Non-viewable document - show download prompt
-          const Icon = getDocumentIcon(selectedDoc.mimeType);
-          return (
-            <div className="flex h-full flex-col items-center justify-center gap-4 rounded-lg border bg-muted/30">
-              <Icon className="h-16 w-16 text-muted-foreground" />
-              <div className="text-center">
-                <p className="font-medium">{selectedDoc.filename}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatFileSize(selectedDoc.sizeBytes)}
-                </p>
+        {/* Delete document confirmation modal */}
+        {documentToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="mx-4 w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
+              <h3 className="text-lg font-semibold">Delete document</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Are you sure you want to delete "{documentToDelete.filename}"?
+                This action cannot be undone.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setDocumentToDelete(null)}
+                >
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleDeleteDocument}>
+                  Delete
+                </Button>
               </div>
-              <Button onClick={() => handleDownloadDocument(selectedDoc.id)}>
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </Button>
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* Delete document confirmation modal */}
-      {documentToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
-            <h3 className="text-lg font-semibold">Delete document</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Are you sure you want to delete "{documentToDelete.filename}"? This action cannot be undone.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setDocumentToDelete(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteDocument}
-              >
-                Delete
-              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Delete file confirmation modal */}
-      {fileToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
-            <h3 className="text-lg font-semibold">Delete file</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Are you sure you want to delete "{fileToDelete.path}"? This action cannot be undone.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setFileToDelete(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteFile}
-              >
-                Delete
-              </Button>
+        {/* Delete file confirmation modal */}
+        {fileToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="mx-4 w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
+              <h3 className="text-lg font-semibold">Delete file</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Are you sure you want to delete "{fileToDelete.path}"? This
+                action cannot be undone.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setFileToDelete(null)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleDeleteFile}>
+                  Delete
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
     </div>
   );

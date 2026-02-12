@@ -113,7 +113,10 @@ export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
 };
 
 // Human-readable descriptions for integration operations
-export const INTEGRATION_OPERATION_LABELS: Record<IntegrationType, Record<string, string>> = {
+export const INTEGRATION_OPERATION_LABELS: Record<
+  IntegrationType,
+  Record<string, string>
+> = {
   slack: {
     channels: "Listing channels",
     history: "Reading messages",
@@ -316,14 +319,19 @@ export function getIntegrationIcon(integration: string): LucideIcon | null {
  * Get the display name for an integration (with custom integration fallback)
  */
 export function getIntegrationDisplayName(integration: string): string {
-  return INTEGRATION_DISPLAY_NAMES[integration as IntegrationType] || integration;
+  return (
+    INTEGRATION_DISPLAY_NAMES[integration as IntegrationType] || integration
+  );
 }
 
 /**
  * Get the color class for an integration icon (with custom fallback)
  */
 export function getIntegrationColor(integration: string): string {
-  return INTEGRATION_COLORS[integration as IntegrationType] || "text-muted-foreground";
+  return (
+    INTEGRATION_COLORS[integration as IntegrationType] ||
+    "text-muted-foreground"
+  );
 }
 
 /**
@@ -336,7 +344,10 @@ export function getIntegrationLogo(integration: string): string | null {
 /**
  * Get display info for a custom integration (fallback defaults)
  */
-export function getCustomIntegrationDisplayInfo(name: string, iconUrl?: string | null) {
+export function getCustomIntegrationDisplayInfo(
+  name: string,
+  iconUrl?: string | null,
+) {
   return {
     displayName: name,
     color: "text-indigo-500",
@@ -347,7 +358,10 @@ export function getCustomIntegrationDisplayInfo(name: string, iconUrl?: string |
 /**
  * Get the human-readable label for an integration operation
  */
-export function getOperationLabel(integration: string, operation: string): string {
+export function getOperationLabel(
+  integration: string,
+  operation: string,
+): string {
   const labels = INTEGRATION_OPERATION_LABELS[integration as IntegrationType];
   if (labels && labels[operation]) {
     return labels[operation];
@@ -359,7 +373,9 @@ export function getOperationLabel(integration: string, operation: string): strin
 /**
  * Get all available actions for an integration as display-friendly labels
  */
-export function getIntegrationActions(integration: string): { key: string; label: string }[] {
+export function getIntegrationActions(
+  integration: string,
+): { key: string; label: string }[] {
   const labels = INTEGRATION_OPERATION_LABELS[integration as IntegrationType];
   if (!labels) return [];
 
@@ -387,7 +403,7 @@ export function getIntegrationActions(integration: string): { key: string; label
     // Convert labels like "Listing channels" into "List channels".
     label: (() => {
       const match = label.match(
-        /^(Listing|Getting|Reading|Searching|Creating|Updating|Deleting|Sending|Adding|Uploading|Appending|Completing|Removing|Commenting|Reacting|Starting)\b(?:\s+(?:on|to))?/
+        /^(Listing|Getting|Reading|Searching|Creating|Updating|Deleting|Sending|Adding|Uploading|Appending|Completing|Removing|Commenting|Reacting|Starting)\b(?:\s+(?:on|to))?/,
       );
       if (!match) return label;
       const verb = match[1];

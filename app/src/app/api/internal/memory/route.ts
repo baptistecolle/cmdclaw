@@ -32,7 +32,10 @@ export async function POST(request: Request) {
     }
 
     if (!conversationId) {
-      return Response.json({ success: false, error: "Missing conversationId" }, { status: 400 });
+      return Response.json(
+        { success: false, error: "Missing conversationId" },
+        { status: 400 },
+      );
     }
 
     const convo = await db.query.conversation.findFirst({
@@ -40,7 +43,10 @@ export async function POST(request: Request) {
     });
 
     if (!convo?.userId) {
-      return Response.json({ success: false, error: "Conversation not found" }, { status: 404 });
+      return Response.json(
+        { success: false, error: "Conversation not found" },
+        { status: 404 },
+      );
     }
 
     const userId = convo.userId;
@@ -60,10 +66,14 @@ export async function POST(request: Request) {
 
     if (operation === "get") {
       const path = String(payload.path || "");
-      const result = await readSessionTranscriptByPath({ userId, path })
-        ?? await readMemoryFile({ userId, path });
+      const result =
+        (await readSessionTranscriptByPath({ userId, path })) ??
+        (await readMemoryFile({ userId, path }));
       if (!result) {
-        return Response.json({ success: false, error: "Not found" }, { status: 404 });
+        return Response.json(
+          { success: false, error: "Not found" },
+          { status: 404 },
+        );
       }
       return Response.json({ success: true, ...result });
     }
@@ -88,14 +98,17 @@ export async function POST(request: Request) {
           },
           async (dir) => {
             await state.sandbox.commands.run(`mkdir -p "${dir}"`);
-          }
+          },
         );
       }
 
       return Response.json({ success: true, entryId: entry.id });
     }
 
-    return Response.json({ success: false, error: "Unknown operation" }, { status: 400 });
+    return Response.json(
+      { success: false, error: "Unknown operation" },
+      { status: 400 },
+    );
   } catch (error) {
     console.error("[Internal] memory request error:", error);
     return Response.json({ success: false }, { status: 500 });

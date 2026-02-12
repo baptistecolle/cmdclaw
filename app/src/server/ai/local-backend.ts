@@ -4,11 +4,7 @@
  * The daemon handles the actual API calls and streams results back.
  */
 
-import type {
-  LLMBackend,
-  ChatParams,
-  StreamEvent,
-} from "./llm-backend";
+import type { LLMBackend, ChatParams, StreamEvent } from "./llm-backend";
 import { sendToDevice, isDeviceOnline } from "@/server/ws/server";
 import type { DaemonResponse } from "@/server/sandbox/types";
 
@@ -140,7 +136,7 @@ const streamListeners = new Map<string, (msg: DaemonResponse) => void>();
 
 export function registerStreamListener(
   requestId: string,
-  listener: (msg: DaemonResponse) => void
+  listener: (msg: DaemonResponse) => void,
 ): void {
   streamListeners.set(requestId, listener);
 }

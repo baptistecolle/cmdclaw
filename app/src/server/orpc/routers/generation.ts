@@ -1,7 +1,10 @@
 import { eventIterator } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import { generationManager, type GenerationEvent } from "@/server/services/generation-manager";
+import {
+  generationManager,
+  type GenerationEvent,
+} from "@/server/services/generation-manager";
 import { db } from "@/server/db/client";
 import { generation, conversation } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -109,18 +112,22 @@ const startGeneration = protectedProcedure
       model: z.string().optional(),
       autoApprove: z.boolean().optional(),
       deviceId: z.string().optional(),
-      attachments: z.array(z.object({
-        name: z.string(),
-        mimeType: z.string(),
-        dataUrl: z.string(),
-      })).optional(),
-    })
+      attachments: z
+        .array(
+          z.object({
+            name: z.string(),
+            mimeType: z.string(),
+            dataUrl: z.string(),
+          }),
+        )
+        .optional(),
+    }),
   )
   .output(
     z.object({
       generationId: z.string(),
       conversationId: z.string(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const startedAt = Date.now();
@@ -147,9 +154,14 @@ const startGeneration = protectedProcedure
         generationId: result.generationId,
         conversationId: result.conversationId,
       };
-      logServerEvent("info", "RPC_START_GENERATION_OK", {
-        elapsedMs: Date.now() - startedAt,
-      }, successLogContext);
+      logServerEvent(
+        "info",
+        "RPC_START_GENERATION_OK",
+        {
+          elapsedMs: Date.now() - startedAt,
+        },
+        successLogContext,
+      );
 
       return result;
     } catch (error) {
@@ -159,9 +171,12 @@ const startGeneration = protectedProcedure
         {
           elapsedMs: Date.now() - startedAt,
           conversationId: input.conversationId,
-          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+          error:
+            error instanceof Error
+              ? `${error.name}: ${error.message}`
+              : String(error),
         },
-        logContext
+        logContext,
       );
       throw error;
     }
@@ -172,7 +187,7 @@ const subscribeGeneration = protectedProcedure
   .input(
     z.object({
       generationId: z.string(),
-    })
+    }),
   )
   .output(eventIterator(generationEventSchema))
   .handler(async function* ({ input, context }) {
@@ -185,7 +200,10 @@ const subscribeGeneration = protectedProcedure
     };
     logServerEvent("info", "RPC_SUBSCRIBE_GENERATION_OPENED", {}, logContext);
 
-    const stream = generationManager.subscribeToGeneration(input.generationId, context.user.id);
+    const stream = generationManager.subscribeToGeneration(
+      input.generationId,
+      context.user.id,
+    );
 
     try {
       for await (const event of stream) {
@@ -201,11 +219,14 @@ const cancelGeneration = protectedProcedure
   .input(
     z.object({
       generationId: z.string(),
-    })
+    }),
   )
   .output(z.object({ success: z.boolean() }))
   .handler(async ({ input, context }) => {
-    const success = await generationManager.cancelGeneration(input.generationId, context.user.id);
+    const success = await generationManager.cancelGeneration(
+      input.generationId,
+      context.user.id,
+    );
     return { success };
   });
 
@@ -214,7 +235,7 @@ const resumeGeneration = protectedProcedure
   .input(
     z.object({
       generationId: z.string(),
-    })
+    }),
   )
   .output(z.object({ success: z.boolean() }))
   .handler(async ({ input, context }) => {
@@ -230,7 +251,7 @@ const submitApproval = protectedProcedure
       generationId: z.string(),
       toolUseId: z.string(),
       decision: z.enum(["approve", "deny"]),
-    })
+    }),
   )
   .output(z.object({ success: z.boolean() }))
   .handler(async ({ input, context }) => {
@@ -238,7 +259,7 @@ const submitApproval = protectedProcedure
       input.generationId,
       input.toolUseId,
       input.decision,
-      context.user.id
+      context.user.id,
     );
     return { success };
   });
@@ -250,7 +271,7 @@ const submitAuthResult = protectedProcedure
       generationId: z.string(),
       integration: z.string(),
       success: z.boolean(),
-    })
+    }),
   )
   .output(z.object({ success: z.boolean() }))
   .handler(async ({ input, context }) => {
@@ -258,7 +279,7 @@ const submitAuthResult = protectedProcedure
       input.generationId,
       input.integration,
       input.success,
-      context.user.id
+      context.user.id,
     );
     return { success };
   });
@@ -268,25 +289,35 @@ const getGenerationStatus = protectedProcedure
   .input(
     z.object({
       generationId: z.string(),
-    })
+    }),
   )
   .output(
-    z.object({
-      status: z.enum(["running", "awaiting_approval", "awaiting_auth", "paused", "completed", "cancelled", "error"]),
-      contentParts: z.array(z.unknown()),
-      pendingApproval: z
-        .object({
-          toolUseId: z.string(),
-          toolName: z.string(),
-          toolInput: z.unknown(),
-          requestedAt: z.string(),
-        })
-        .nullable(),
-      usage: z.object({
-        inputTokens: z.number(),
-        outputTokens: z.number(),
-      }),
-    }).nullable()
+    z
+      .object({
+        status: z.enum([
+          "running",
+          "awaiting_approval",
+          "awaiting_auth",
+          "paused",
+          "completed",
+          "cancelled",
+          "error",
+        ]),
+        contentParts: z.array(z.unknown()),
+        pendingApproval: z
+          .object({
+            toolUseId: z.string(),
+            toolName: z.string(),
+            toolInput: z.unknown(),
+            requestedAt: z.string(),
+          })
+          .nullable(),
+        usage: z.object({
+          inputTokens: z.number(),
+          outputTokens: z.number(),
+        }),
+      })
+      .nullable(),
   )
   .handler(async ({ input, context }) => {
     // First check if user has access
@@ -303,7 +334,9 @@ const getGenerationStatus = protectedProcedure
       throw new Error("Access denied");
     }
 
-    const status = await generationManager.getGenerationStatus(input.generationId);
+    const status = await generationManager.getGenerationStatus(
+      input.generationId,
+    );
     return status;
   });
 
@@ -312,13 +345,23 @@ const getActiveGeneration = protectedProcedure
   .input(
     z.object({
       conversationId: z.string(),
-    })
+    }),
   )
   .output(
     z.object({
       generationId: z.string().nullable(),
-      status: z.enum(["idle", "generating", "awaiting_approval", "awaiting_auth", "paused", "complete", "error"]).nullable(),
-    })
+      status: z
+        .enum([
+          "idle",
+          "generating",
+          "awaiting_approval",
+          "awaiting_auth",
+          "paused",
+          "complete",
+          "error",
+        ])
+        .nullable(),
+    }),
   )
   .handler(async ({ input, context }) => {
     // Check conversation access
@@ -335,24 +378,45 @@ const getActiveGeneration = protectedProcedure
     }
 
     // Map generation status to conversation status
-    const mapStatus = (genStatus: string | null | undefined): "idle" | "generating" | "awaiting_approval" | "awaiting_auth" | "paused" | "complete" | "error" | null => {
+    const mapStatus = (
+      genStatus: string | null | undefined,
+    ):
+      | "idle"
+      | "generating"
+      | "awaiting_approval"
+      | "awaiting_auth"
+      | "paused"
+      | "complete"
+      | "error"
+      | null => {
       if (!genStatus) return null;
       switch (genStatus) {
-        case "running": return "generating";
-        case "completed": return "complete";
-        case "cancelled": return "idle";
-        case "awaiting_approval": return "awaiting_approval";
-        case "awaiting_auth": return "awaiting_auth";
-        case "paused": return "paused";
-        case "error": return "error";
-        default: return null;
+        case "running":
+          return "generating";
+        case "completed":
+          return "complete";
+        case "cancelled":
+          return "idle";
+        case "awaiting_approval":
+          return "awaiting_approval";
+        case "awaiting_auth":
+          return "awaiting_auth";
+        case "paused":
+          return "paused";
+        case "error":
+          return "error";
+        default:
+          return null;
       }
     };
 
     // Check for in-memory generation first
-    const activeGenId = generationManager.getGenerationForConversation(input.conversationId);
+    const activeGenId = generationManager.getGenerationForConversation(
+      input.conversationId,
+    );
     if (activeGenId) {
-      const genStatus = await generationManager.getGenerationStatus(activeGenId);
+      const genStatus =
+        await generationManager.getGenerationStatus(activeGenId);
       return {
         generationId: activeGenId,
         status: mapStatus(genStatus?.status),

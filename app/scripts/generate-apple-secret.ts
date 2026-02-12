@@ -33,4 +33,6 @@ console.log("\n=== Apple Client Secret ===\n");
 console.log(secret);
 console.log("\n=== Add this to your .env file ===\n");
 console.log(`APPLE_CLIENT_SECRET="${secret}"`);
-console.log(`\nExpires: ${new Date(Date.now() + EXPIRATION_DAYS * 24 * 60 * 60 * 1000).toISOString()}`);
+console.log(
+  `\nExpires: ${new Date(Date.now() + EXPIRATION_DAYS * 24 * 60 * 60 * 1000).toISOString()}`,
+);

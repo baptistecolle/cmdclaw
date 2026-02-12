@@ -64,11 +64,14 @@ export default function WorkflowEditorPage() {
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState(TRIGGERS[0].value);
   const [prompt, setPrompt] = useState("");
-  const [allowedIntegrations, setAllowedIntegrations] = useState<IntegrationType[]>([]);
+  const [allowedIntegrations, setAllowedIntegrations] = useState<
+    IntegrationType[]
+  >([]);
   const [restrictTools, setRestrictTools] = useState(false);
   const [status, setStatus] = useState<"on" | "off">("off");
   const [autoApprove, setAutoApprove] = useState(true);
-  const [showDisableAutoApproveDialog, setShowDisableAutoApproveDialog] = useState(false);
+  const [showDisableAutoApproveDialog, setShowDisableAutoApproveDialog] =
+    useState(false);
   const [saving, setSaving] = useState(false);
   const [showAllIntegrations, setShowAllIntegrations] = useState(false);
   const [notification, setNotification] = useState<{
@@ -77,20 +80,27 @@ export default function WorkflowEditorPage() {
   } | null>(null);
 
   // Schedule state (only used when triggerType is "schedule")
-  const [scheduleType, setScheduleType] = useState<"interval" | "daily" | "weekly" | "monthly">("daily");
+  const [scheduleType, setScheduleType] = useState<
+    "interval" | "daily" | "weekly" | "monthly"
+  >("daily");
   const [intervalMinutes, setIntervalMinutes] = useState(60);
   const [scheduleTime, setScheduleTime] = useState("09:00");
-  const [scheduleDaysOfWeek, setScheduleDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]); // Mon-Fri
+  const [scheduleDaysOfWeek, setScheduleDaysOfWeek] = useState<number[]>([
+    1, 2, 3, 4, 5,
+  ]); // Mon-Fri
   const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState(1);
   const localTimezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    []
+    [],
   );
 
   useEffect(() => {
     if (!workflow) return;
-    const availableIntegrationTypes = Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[];
-    const workflowAllowedIntegrations = (workflow.allowedIntegrations ?? []) as IntegrationType[];
+    const availableIntegrationTypes = Object.keys(
+      INTEGRATION_DISPLAY_NAMES,
+    ) as IntegrationType[];
+    const workflowAllowedIntegrations = (workflow.allowedIntegrations ??
+      []) as IntegrationType[];
     const hasRestriction =
       workflowAllowedIntegrations.length > 0 &&
       workflowAllowedIntegrations.length < availableIntegrationTypes.length;
@@ -101,9 +111,11 @@ export default function WorkflowEditorPage() {
     setAllowedIntegrations(
       hasRestriction || workflowAllowedIntegrations.length === 0
         ? workflowAllowedIntegrations
-        : availableIntegrationTypes
+        : availableIntegrationTypes,
     );
-    setRestrictTools(hasRestriction || workflowAllowedIntegrations.length === 0);
+    setRestrictTools(
+      hasRestriction || workflowAllowedIntegrations.length === 0,
+    );
     setStatus(workflow.status);
     setAutoApprove(workflow.autoApprove ?? true);
 
@@ -133,21 +145,23 @@ export default function WorkflowEditorPage() {
 
   const integrationEntries = useMemo(
     () =>
-      (Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[]).map((key) => ({
-        key,
-        name: INTEGRATION_DISPLAY_NAMES[key],
-        logo: INTEGRATION_LOGOS[key],
-      })),
-    []
+      (Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[]).map(
+        (key) => ({
+          key,
+          name: INTEGRATION_DISPLAY_NAMES[key],
+          logo: INTEGRATION_LOGOS[key],
+        }),
+      ),
+    [],
   );
   const allIntegrationTypes = useMemo(
     () => integrationEntries.map((entry) => entry.key),
-    [integrationEntries]
+    [integrationEntries],
   );
 
   const toggleIntegration = (type: IntegrationType) => {
     setAllowedIntegrations((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
     );
   };
 
@@ -156,9 +170,16 @@ export default function WorkflowEditorPage() {
 
     switch (scheduleType) {
       case "interval":
-        return { type: "interval", intervalMinutes: Math.max(60, Math.round(intervalMinutes / 60) * 60) };
+        return {
+          type: "interval",
+          intervalMinutes: Math.max(60, Math.round(intervalMinutes / 60) * 60),
+        };
       case "daily":
-        return { type: "daily", time: scheduleTime.slice(0, 5), timezone: localTimezone };
+        return {
+          type: "daily",
+          time: scheduleTime.slice(0, 5),
+          timezone: localTimezone,
+        };
       case "weekly":
         return {
           type: "weekly",
@@ -189,7 +210,9 @@ export default function WorkflowEditorPage() {
         triggerType,
         prompt,
         autoApprove,
-        allowedIntegrations: restrictTools ? allowedIntegrations : allIntegrationTypes,
+        allowedIntegrations: restrictTools
+          ? allowedIntegrations
+          : allIntegrationTypes,
         schedule: buildSchedule(),
       });
       setNotification({ type: "success", message: "Workflow saved." });
@@ -220,7 +243,8 @@ export default function WorkflowEditorPage() {
     );
   }
 
-  const workflowDisplayName = workflow.name.trim().length > 0 ? workflow.name : "New Workflow";
+  const workflowDisplayName =
+    workflow.name.trim().length > 0 ? workflow.name : "New Workflow";
 
   return (
     <div className="min-h-[calc(100vh-8rem)] space-y-5 pb-8">
@@ -238,8 +262,8 @@ export default function WorkflowEditorPage() {
             </p>
           </div>
         </div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <div className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5">
             <span className="text-sm text-muted-foreground">
               {status === "on" ? "Workflow is on" : "Workflow is off"}
             </span>
@@ -263,7 +287,11 @@ export default function WorkflowEditorPage() {
               }}
             />
           </div>
-          <Button variant="secondary" onClick={handleRun} disabled={status !== "on"}>
+          <Button
+            variant="secondary"
+            onClick={handleRun}
+            disabled={status !== "on"}
+          >
             <Play className="mr-2 h-4 w-4" />
             Run now
           </Button>
@@ -280,7 +308,7 @@ export default function WorkflowEditorPage() {
             "rounded-lg border px-4 py-3 text-sm",
             notification.type === "success"
               ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400"
+              : "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
           )}
         >
           {notification.message}
@@ -333,13 +361,17 @@ export default function WorkflowEditorPage() {
                       <label className="text-sm font-medium">Frequency</label>
                       <Select
                         value={scheduleType}
-                        onValueChange={(value) => setScheduleType(value as typeof scheduleType)}
+                        onValueChange={(value) =>
+                          setScheduleType(value as typeof scheduleType)
+                        }
                       >
                         <SelectTrigger className="h-10 w-full bg-background">
                           <SelectValue placeholder="Select frequency" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="interval">Every X hours</SelectItem>
+                          <SelectItem value="interval">
+                            Every X hours
+                          </SelectItem>
                           <SelectItem value="daily">Daily</SelectItem>
                           <SelectItem value="weekly">Weekly</SelectItem>
                           <SelectItem value="monthly">Monthly</SelectItem>
@@ -356,25 +388,39 @@ export default function WorkflowEditorPage() {
                             min={1}
                             max={168}
                             className="h-10 w-24 rounded-md border bg-background px-3 text-sm"
-                            value={Math.max(1, Math.round(intervalMinutes / 60))}
+                            value={Math.max(
+                              1,
+                              Math.round(intervalMinutes / 60),
+                            )}
                             onChange={(e) => {
-                              const hours = Math.max(1, parseInt(e.target.value) || 1);
+                              const hours = Math.max(
+                                1,
+                                parseInt(e.target.value) || 1,
+                              );
                               setIntervalMinutes(hours * 60);
                             }}
                           />
-                          <span className="text-sm text-muted-foreground">hours</span>
+                          <span className="text-sm text-muted-foreground">
+                            hours
+                          </span>
                         </div>
                       </div>
                     )}
 
-                    {(scheduleType === "daily" || scheduleType === "weekly" || scheduleType === "monthly") && (
+                    {(scheduleType === "daily" ||
+                      scheduleType === "weekly" ||
+                      scheduleType === "monthly") && (
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Time ({localTimezone})</label>
+                        <label className="text-sm font-medium">
+                          Time ({localTimezone})
+                        </label>
                         <Input
                           type="time"
                           step={60}
                           value={scheduleTime}
-                          onChange={(e) => setScheduleTime(e.target.value.slice(0, 5))}
+                          onChange={(e) =>
+                            setScheduleTime(e.target.value.slice(0, 5))
+                          }
                           className="h-10 w-36 bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                         />
                       </div>
@@ -382,9 +428,19 @@ export default function WorkflowEditorPage() {
 
                     {scheduleType === "weekly" && (
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Days of the week</label>
+                        <label className="text-sm font-medium">
+                          Days of the week
+                        </label>
                         <div className="flex flex-wrap gap-2">
-                          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => (
+                          {[
+                            "Sun",
+                            "Mon",
+                            "Tue",
+                            "Wed",
+                            "Thu",
+                            "Fri",
+                            "Sat",
+                          ].map((day, index) => (
                             <button
                               key={day}
                               type="button"
@@ -392,13 +448,13 @@ export default function WorkflowEditorPage() {
                                 "h-9 w-12 rounded-md border text-sm font-medium transition-colors",
                                 scheduleDaysOfWeek.includes(index)
                                   ? "border-primary bg-primary text-primary-foreground"
-                                  : "bg-background hover:bg-muted"
+                                  : "bg-background hover:bg-muted",
                               )}
                               onClick={() => {
                                 setScheduleDaysOfWeek((prev) =>
                                   prev.includes(index)
                                     ? prev.filter((d) => d !== index)
-                                    : [...prev, index].sort()
+                                    : [...prev, index].sort(),
                                 );
                               }}
                             >
@@ -411,20 +467,26 @@ export default function WorkflowEditorPage() {
 
                     {scheduleType === "monthly" && (
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Day of the month</label>
+                        <label className="text-sm font-medium">
+                          Day of the month
+                        </label>
                         <Select
                           value={String(scheduleDayOfMonth)}
-                          onValueChange={(value) => setScheduleDayOfMonth(parseInt(value, 10))}
+                          onValueChange={(value) =>
+                            setScheduleDayOfMonth(parseInt(value, 10))
+                          }
                         >
                           <SelectTrigger className="h-10 w-24 bg-background">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                              <SelectItem key={day} value={String(day)}>
-                                {day}
-                              </SelectItem>
-                            ))}
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map(
+                              (day) => (
+                                <SelectItem key={day} value={String(day)}>
+                                  {day}
+                                </SelectItem>
+                              ),
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -447,7 +509,9 @@ export default function WorkflowEditorPage() {
               <div className="flex items-center justify-between gap-3">
                 <label className="text-sm font-medium">Allowed tools</label>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">All tools allowed</span>
+                  <span className="text-sm text-muted-foreground">
+                    All tools allowed
+                  </span>
                   <Switch
                     checked={!restrictTools}
                     onCheckedChange={(checked) => {
@@ -462,20 +526,28 @@ export default function WorkflowEditorPage() {
                 </div>
               </div>
               {!restrictTools ? (
-                <p className="text-sm text-muted-foreground">All tools are allowed.</p>
+                <p className="text-sm text-muted-foreground">
+                  All tools are allowed.
+                </p>
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs text-muted-foreground">
-                      {allowedIntegrations.length}/{allIntegrationTypes.length} selected
+                      {allowedIntegrations.length}/{allIntegrationTypes.length}{" "}
+                      selected
                     </p>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
                         className="h-8"
-                        disabled={allowedIntegrations.length === allIntegrationTypes.length}
-                        onClick={() => setAllowedIntegrations(allIntegrationTypes)}
+                        disabled={
+                          allowedIntegrations.length ===
+                          allIntegrationTypes.length
+                        }
+                        onClick={() =>
+                          setAllowedIntegrations(allIntegrationTypes)
+                        }
                       >
                         Select all
                       </Button>
@@ -491,29 +563,32 @@ export default function WorkflowEditorPage() {
                     </div>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    {(showAllIntegrations ? integrationEntries : integrationEntries.slice(0, 4)).map(
-                      ({ key, name: label, logo }) => (
-                        <label
-                          key={key}
-                          className={cn(
-                            "flex items-center gap-3 rounded-md bg-muted/30 p-3 text-sm transition-colors hover:bg-muted/50"
-                          )}
-                        >
-                          <Checkbox
-                            checked={allowedIntegrations.includes(key)}
-                            onCheckedChange={() => toggleIntegration(key)}
-                          />
-                          <img src={logo} alt={label} className="h-4 w-4" />
-                          <span>{label}</span>
-                        </label>
-                      )
-                    )}
+                    {(showAllIntegrations
+                      ? integrationEntries
+                      : integrationEntries.slice(0, 4)
+                    ).map(({ key, name: label, logo }) => (
+                      <label
+                        key={key}
+                        className={cn(
+                          "flex items-center gap-3 rounded-md bg-muted/30 p-3 text-sm transition-colors hover:bg-muted/50",
+                        )}
+                      >
+                        <Checkbox
+                          checked={allowedIntegrations.includes(key)}
+                          onCheckedChange={() => toggleIntegration(key)}
+                        />
+                        <img src={logo} alt={label} className="h-4 w-4" />
+                        <span>{label}</span>
+                      </label>
+                    ))}
                   </div>
                   {integrationEntries.length > 4 && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowAllIntegrations(!showAllIntegrations)}
+                      onClick={() =>
+                        setShowAllIntegrations(!showAllIntegrations)
+                      }
                       className="text-muted-foreground"
                     >
                       {showAllIntegrations ? (
@@ -532,7 +607,6 @@ export default function WorkflowEditorPage() {
                 </>
               )}
             </div>
-
           </div>
         </section>
 
@@ -540,7 +614,9 @@ export default function WorkflowEditorPage() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold">Recent runs</h3>
-              <p className="text-xs text-muted-foreground">Latest workflow runs and their status.</p>
+              <p className="text-xs text-muted-foreground">
+                Latest workflow runs and their status.
+              </p>
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link href={`/workflows/${workflowId}`}>Refresh</Link>
@@ -556,7 +632,9 @@ export default function WorkflowEditorPage() {
                   className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 text-sm transition-colors hover:bg-muted/50"
                 >
                   <span>{getWorkflowRunStatusLabel(run.status)}</span>
-                  <span className="text-xs text-muted-foreground">{formatDate(run.startedAt)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(run.startedAt)}
+                  </span>
                 </Link>
               ))}
             </div>
@@ -573,8 +651,9 @@ export default function WorkflowEditorPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Turn off auto-approve?</AlertDialogTitle>
             <AlertDialogDescription>
-              If you turn this off, workflow runs can stop and wait for manual approval on write actions.
-              The agent might stay stuck until someone approves in the UI.
+              If you turn this off, workflow runs can stop and wait for manual
+              approval on write actions. The agent might stay stuck until
+              someone approves in the UI.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

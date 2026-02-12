@@ -8,7 +8,9 @@ const TAG_LENGTH = 16;
 function getKey(): Buffer {
   const key = env.ENCRYPTION_KEY;
   if (!key) {
-    throw new Error("ENCRYPTION_KEY environment variable is required for credential encryption");
+    throw new Error(
+      "ENCRYPTION_KEY environment variable is required for credential encryption",
+    );
   }
   return Buffer.from(key, "hex");
 }

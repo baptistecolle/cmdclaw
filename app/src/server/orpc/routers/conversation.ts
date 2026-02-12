@@ -1,7 +1,12 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import { conversation, message, messageAttachment, sandboxFile } from "@/server/db/schema";
+import {
+  conversation,
+  message,
+  messageAttachment,
+  sandboxFile,
+} from "@/server/db/schema";
 import { eq, desc, and, isNull, asc } from "drizzle-orm";
 import { writeSessionTranscriptFromConversation } from "@/server/services/memory-service";
 
@@ -11,14 +16,14 @@ const list = protectedProcedure
     z.object({
       limit: z.number().min(1).max(100).default(50),
       cursor: z.string().optional(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const conversations = await context.db.query.conversation.findMany({
       where: and(
         eq(conversation.userId, context.user.id),
         eq(conversation.type, "chat"),
-        isNull(conversation.archivedAt)
+        isNull(conversation.archivedAt),
       ),
       orderBy: desc(conversation.updatedAt),
       limit: input.limit + 1,
@@ -51,7 +56,7 @@ const get = protectedProcedure
     const conv = await context.db.query.conversation.findFirst({
       where: and(
         eq(conversation.id, input.id),
-        eq(conversation.userId, context.user.id)
+        eq(conversation.userId, context.user.id),
       ),
       with: {
         messages: {
@@ -106,7 +111,7 @@ const updateTitle = protectedProcedure
     z.object({
       id: z.string(),
       title: z.string().min(1).max(200),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const result = await context.db
@@ -116,8 +121,8 @@ const updateTitle = protectedProcedure
         and(
           eq(conversation.id, input.id),
           eq(conversation.userId, context.user.id),
-          eq(conversation.type, "chat")
-        )
+          eq(conversation.type, "chat"),
+        ),
       )
       .returning({ id: conversation.id });
 
@@ -134,7 +139,7 @@ const updateAutoApprove = protectedProcedure
     z.object({
       id: z.string(),
       autoApprove: z.boolean(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const result = await context.db
@@ -144,10 +149,13 @@ const updateAutoApprove = protectedProcedure
         and(
           eq(conversation.id, input.id),
           eq(conversation.userId, context.user.id),
-          eq(conversation.type, "chat")
-        )
+          eq(conversation.type, "chat"),
+        ),
       )
-      .returning({ id: conversation.id, autoApprove: conversation.autoApprove });
+      .returning({
+        id: conversation.id,
+        autoApprove: conversation.autoApprove,
+      });
 
     if (result.length === 0) {
       throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
@@ -168,7 +176,10 @@ const archive = protectedProcedure
         messageLimit: 15,
       });
     } catch (err) {
-      console.error("[Conversation] Failed to write session transcript on archive:", err);
+      console.error(
+        "[Conversation] Failed to write session transcript on archive:",
+        err,
+      );
     }
 
     const result = await context.db
@@ -178,8 +189,8 @@ const archive = protectedProcedure
         and(
           eq(conversation.id, input.id),
           eq(conversation.userId, context.user.id),
-          eq(conversation.type, "chat")
-        )
+          eq(conversation.type, "chat"),
+        ),
       )
       .returning({ id: conversation.id });
 
@@ -202,7 +213,10 @@ const del = protectedProcedure
         messageLimit: 15,
       });
     } catch (err) {
-      console.error("[Conversation] Failed to write session transcript on delete:", err);
+      console.error(
+        "[Conversation] Failed to write session transcript on delete:",
+        err,
+      );
     }
 
     const result = await context.db
@@ -211,8 +225,8 @@ const del = protectedProcedure
         and(
           eq(conversation.id, input.id),
           eq(conversation.userId, context.user.id),
-          eq(conversation.type, "chat")
-        )
+          eq(conversation.type, "chat"),
+        ),
       )
       .returning({ id: conversation.id });
 
@@ -239,14 +253,22 @@ const downloadAttachment = protectedProcedure
       },
     });
 
-    if (!attachment || attachment.message.conversation.userId !== context.user.id) {
+    if (
+      !attachment ||
+      attachment.message.conversation.userId !== context.user.id
+    ) {
       throw new ORPCError("NOT_FOUND", { message: "Attachment not found" });
     }
 
-    const { getPresignedDownloadUrl } = await import("@/server/storage/s3-client");
+    const { getPresignedDownloadUrl } =
+      await import("@/server/storage/s3-client");
     const url = await getPresignedDownloadUrl(attachment.storageKey);
 
-    return { url, filename: attachment.filename, mimeType: attachment.mimeType };
+    return {
+      url,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+    };
   });
 
 // Download sandbox file (returns presigned URL)
@@ -269,7 +291,8 @@ const downloadSandboxFile = protectedProcedure
       throw new ORPCError("NOT_FOUND", { message: "File not uploaded" });
     }
 
-    const { getPresignedDownloadUrl } = await import("@/server/storage/s3-client");
+    const { getPresignedDownloadUrl } =
+      await import("@/server/storage/s3-client");
     const url = await getPresignedDownloadUrl(file.storageKey);
 
     return {
@@ -289,7 +312,7 @@ const getSandboxFiles = protectedProcedure
     const conv = await context.db.query.conversation.findFirst({
       where: and(
         eq(conversation.id, input.conversationId),
-        eq(conversation.userId, context.user.id)
+        eq(conversation.userId, context.user.id),
       ),
     });
 

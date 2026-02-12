@@ -23,7 +23,11 @@ export function DrivePreview({
   }
 }
 
-function DriveUploadPreview({ args }: { args: Record<string, string | undefined> }) {
+function DriveUploadPreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const file = args.file;
   const name = args.name;
   const folder = args.folder;
@@ -46,7 +50,11 @@ function DriveUploadPreview({ args }: { args: Record<string, string | undefined>
   );
 }
 
-function DriveMkdirPreview({ args }: { args: Record<string, string | undefined> }) {
+function DriveMkdirPreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const name = args.name;
   const parent = args.parent;
 

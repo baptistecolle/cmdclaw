@@ -23,7 +23,7 @@ export function logServerEvent(
   level: LogLevel,
   event: string,
   details: Record<string, unknown> = {},
-  context: ObservabilityContext = {}
+  context: ObservabilityContext = {},
 ): void {
   const payload = {
     ts: new Date().toISOString(),

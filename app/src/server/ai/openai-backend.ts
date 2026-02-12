@@ -30,7 +30,7 @@ export class OpenAIBackend implements LLMBackend {
 
     // Convert messages to OpenAI format
     const messages: OpenAI.ChatCompletionMessageParam[] = params.messages.map(
-      (m) => convertMessage(m)
+      (m) => convertMessage(m),
     );
 
     if (params.system) {
@@ -46,7 +46,7 @@ export class OpenAIBackend implements LLMBackend {
           description: t.description,
           parameters: t.input_schema,
         },
-      })
+      }),
     );
 
     try {
@@ -119,9 +119,14 @@ export class OpenAIBackend implements LLMBackend {
             currentToolCallId = "";
           }
 
-          const stopReason = choice.finish_reason === "tool_calls" ? "tool_use" :
-            choice.finish_reason === "stop" ? "end_turn" :
-            choice.finish_reason === "length" ? "max_tokens" : "end_turn";
+          const stopReason =
+            choice.finish_reason === "tool_calls"
+              ? "tool_use"
+              : choice.finish_reason === "stop"
+                ? "end_turn"
+                : choice.finish_reason === "length"
+                  ? "max_tokens"
+                  : "end_turn";
 
           yield { type: "done", stopReason };
         }
@@ -136,7 +141,9 @@ export class OpenAIBackend implements LLMBackend {
   async listModels(): Promise<string[]> {
     try {
       const models = await this.client.models.list();
-      return models.data.map((m) => m.id).filter((id) => id.startsWith("gpt") || id.startsWith("o"));
+      return models.data
+        .map((m) => m.id)
+        .filter((id) => id.startsWith("gpt") || id.startsWith("o"));
     } catch {
       return ["gpt-4o", "o3", "o4-mini"];
     }
@@ -195,7 +202,10 @@ function convertMessage(m: ChatMessage): OpenAI.ChatCompletionMessageParam {
       parts.push({
         role: "tool",
         tool_call_id: block.tool_use_id,
-        content: typeof block.content === "string" ? block.content : JSON.stringify(block.content),
+        content:
+          typeof block.content === "string"
+            ? block.content
+            : JSON.stringify(block.content),
       });
     }
   }

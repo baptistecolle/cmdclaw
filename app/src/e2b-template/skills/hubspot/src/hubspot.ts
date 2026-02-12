@@ -56,7 +56,9 @@ const [resource, action, ...args] = positionals;
 // ========== CONTACTS ==========
 async function listContacts() {
   const limit = parseInt(values.limit || "20");
-  const data = await api(`/crm/v3/objects/contacts?limit=${limit}&properties=firstname,lastname,email,phone,company`);
+  const data = await api(
+    `/crm/v3/objects/contacts?limit=${limit}&properties=firstname,lastname,email,phone,company`,
+  );
   const contacts = data.results.map((c: any) => ({
     id: c.id,
     email: c.properties.email,
@@ -69,13 +71,21 @@ async function listContacts() {
 }
 
 async function getContact(id: string) {
-  const data = await api(`/crm/v3/objects/contacts/${id}?properties=firstname,lastname,email,phone,company,lifecyclestage,hs_lead_status`);
-  console.log(JSON.stringify({
-    id: data.id,
-    ...data.properties,
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
-  }, null, 2));
+  const data = await api(
+    `/crm/v3/objects/contacts/${id}?properties=firstname,lastname,email,phone,company,lifecyclestage,hs_lead_status`,
+  );
+  console.log(
+    JSON.stringify(
+      {
+        id: data.id,
+        ...data.properties,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function createContact() {
@@ -98,7 +108,7 @@ async function createContact() {
 
 async function updateContact(id: string) {
   if (!values.properties) {
-    console.error("Required: --properties '{\"firstname\":\"John\"}'");
+    console.error('Required: --properties \'{"firstname":"John"}\'');
     process.exit(1);
   }
   const properties = JSON.parse(values.properties);
@@ -135,7 +145,9 @@ async function searchContacts() {
 // ========== COMPANIES ==========
 async function listCompanies() {
   const limit = parseInt(values.limit || "20");
-  const data = await api(`/crm/v3/objects/companies?limit=${limit}&properties=name,domain,industry,numberofemployees`);
+  const data = await api(
+    `/crm/v3/objects/companies?limit=${limit}&properties=name,domain,industry,numberofemployees`,
+  );
   const companies = data.results.map((c: any) => ({
     id: c.id,
     name: c.properties.name,
@@ -147,13 +159,21 @@ async function listCompanies() {
 }
 
 async function getCompany(id: string) {
-  const data = await api(`/crm/v3/objects/companies/${id}?properties=name,domain,industry,numberofemployees,city,state,country`);
-  console.log(JSON.stringify({
-    id: data.id,
-    ...data.properties,
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
-  }, null, 2));
+  const data = await api(
+    `/crm/v3/objects/companies/${id}?properties=name,domain,industry,numberofemployees,city,state,country`,
+  );
+  console.log(
+    JSON.stringify(
+      {
+        id: data.id,
+        ...data.properties,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function createCompany() {
@@ -174,7 +194,7 @@ async function createCompany() {
 
 async function updateCompany(id: string) {
   if (!values.properties) {
-    console.error("Required: --properties '{\"name\":\"Acme\"}'");
+    console.error('Required: --properties \'{"name":"Acme"}\'');
     process.exit(1);
   }
   const properties = JSON.parse(values.properties);
@@ -188,7 +208,9 @@ async function updateCompany(id: string) {
 // ========== DEALS ==========
 async function listDeals() {
   const limit = parseInt(values.limit || "20");
-  const data = await api(`/crm/v3/objects/deals?limit=${limit}&properties=dealname,amount,dealstage,pipeline,closedate`);
+  const data = await api(
+    `/crm/v3/objects/deals?limit=${limit}&properties=dealname,amount,dealstage,pipeline,closedate`,
+  );
   const deals = data.results.map((d: any) => ({
     id: d.id,
     name: d.properties.dealname,
@@ -201,18 +223,28 @@ async function listDeals() {
 }
 
 async function getDeal(id: string) {
-  const data = await api(`/crm/v3/objects/deals/${id}?properties=dealname,amount,dealstage,pipeline,closedate,hubspot_owner_id`);
-  console.log(JSON.stringify({
-    id: data.id,
-    ...data.properties,
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
-  }, null, 2));
+  const data = await api(
+    `/crm/v3/objects/deals/${id}?properties=dealname,amount,dealstage,pipeline,closedate,hubspot_owner_id`,
+  );
+  console.log(
+    JSON.stringify(
+      {
+        id: data.id,
+        ...data.properties,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function createDeal() {
   if (!values.name || !values.pipeline || !values.stage) {
-    console.error("Required: --name <deal name> --pipeline <pipeline id> --stage <stage id>");
+    console.error(
+      "Required: --name <deal name> --pipeline <pipeline id> --stage <stage id>",
+    );
     process.exit(1);
   }
   const properties: Record<string, string> = {
@@ -231,7 +263,7 @@ async function createDeal() {
 
 async function updateDeal(id: string) {
   if (!values.properties) {
-    console.error("Required: --properties '{\"amount\":\"5000\"}'");
+    console.error('Required: --properties \'{"amount":"5000"}\'');
     process.exit(1);
   }
   const properties = JSON.parse(values.properties);
@@ -245,7 +277,9 @@ async function updateDeal(id: string) {
 // ========== TICKETS ==========
 async function listTickets() {
   const limit = parseInt(values.limit || "20");
-  const data = await api(`/crm/v3/objects/tickets?limit=${limit}&properties=subject,content,hs_pipeline,hs_pipeline_stage,hs_ticket_priority`);
+  const data = await api(
+    `/crm/v3/objects/tickets?limit=${limit}&properties=subject,content,hs_pipeline,hs_pipeline_stage,hs_ticket_priority`,
+  );
   const tickets = data.results.map((t: any) => ({
     id: t.id,
     subject: t.properties.subject,
@@ -258,18 +292,28 @@ async function listTickets() {
 }
 
 async function getTicket(id: string) {
-  const data = await api(`/crm/v3/objects/tickets/${id}?properties=subject,content,hs_pipeline,hs_pipeline_stage,hs_ticket_priority,createdate`);
-  console.log(JSON.stringify({
-    id: data.id,
-    ...data.properties,
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
-  }, null, 2));
+  const data = await api(
+    `/crm/v3/objects/tickets/${id}?properties=subject,content,hs_pipeline,hs_pipeline_stage,hs_ticket_priority,createdate`,
+  );
+  console.log(
+    JSON.stringify(
+      {
+        id: data.id,
+        ...data.properties,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function createTicket() {
   if (!values.subject || !values.pipeline || !values.stage) {
-    console.error("Required: --subject <subject> --pipeline <pipeline id> --stage <stage id>");
+    console.error(
+      "Required: --subject <subject> --pipeline <pipeline id> --stage <stage id>",
+    );
     process.exit(1);
   }
   const properties: Record<string, string> = {
@@ -288,7 +332,7 @@ async function createTicket() {
 
 async function updateTicket(id: string) {
   if (!values.properties) {
-    console.error("Required: --properties '{\"subject\":\"Updated subject\"}'");
+    console.error('Required: --properties \'{"subject":"Updated subject"}\'');
     process.exit(1);
   }
   const properties = JSON.parse(values.properties);
@@ -302,7 +346,9 @@ async function updateTicket(id: string) {
 // ========== TASKS ==========
 async function listTasks() {
   const limit = parseInt(values.limit || "20");
-  const data = await api(`/crm/v3/objects/tasks?limit=${limit}&properties=hs_task_subject,hs_task_body,hs_task_status,hs_task_priority,hs_timestamp`);
+  const data = await api(
+    `/crm/v3/objects/tasks?limit=${limit}&properties=hs_task_subject,hs_task_body,hs_task_status,hs_task_priority,hs_timestamp`,
+  );
   const tasks = data.results.map((t: any) => ({
     id: t.id,
     subject: t.properties.hs_task_subject,
@@ -315,17 +361,25 @@ async function listTasks() {
 }
 
 async function getTask(id: string) {
-  const data = await api(`/crm/v3/objects/tasks/${id}?properties=hs_task_subject,hs_task_body,hs_task_status,hs_task_priority,hs_timestamp`);
-  console.log(JSON.stringify({
-    id: data.id,
-    subject: data.properties.hs_task_subject,
-    body: data.properties.hs_task_body,
-    status: data.properties.hs_task_status,
-    priority: data.properties.hs_task_priority,
-    dueDate: data.properties.hs_timestamp,
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
-  }, null, 2));
+  const data = await api(
+    `/crm/v3/objects/tasks/${id}?properties=hs_task_subject,hs_task_body,hs_task_status,hs_task_priority,hs_timestamp`,
+  );
+  console.log(
+    JSON.stringify(
+      {
+        id: data.id,
+        subject: data.properties.hs_task_subject,
+        body: data.properties.hs_task_body,
+        status: data.properties.hs_task_status,
+        priority: data.properties.hs_task_priority,
+        dueDate: data.properties.hs_timestamp,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function createTask() {
@@ -339,7 +393,8 @@ async function createTask() {
     hs_task_type: "TODO",
   };
   if (values.body) properties.hs_task_body = values.body;
-  if (values.due) properties.hs_timestamp = new Date(values.due).getTime().toString();
+  if (values.due)
+    properties.hs_timestamp = new Date(values.due).getTime().toString();
 
   const data = await api("/crm/v3/objects/tasks", {
     method: "POST",
@@ -359,7 +414,9 @@ async function completeTask(id: string) {
 // ========== NOTES ==========
 async function listNotes() {
   const limit = parseInt(values.limit || "20");
-  const data = await api(`/crm/v3/objects/notes?limit=${limit}&properties=hs_note_body,hs_timestamp`);
+  const data = await api(
+    `/crm/v3/objects/notes?limit=${limit}&properties=hs_note_body,hs_timestamp`,
+  );
   const notes = data.results.map((n: any) => ({
     id: n.id,
     body: n.properties.hs_note_body,
@@ -386,22 +443,37 @@ async function createNote() {
   // Associate with contact, company, or deal if specified
   const noteId = data.id;
   if (values.contact) {
-    await api(`/crm/v4/objects/notes/${noteId}/associations/contacts/${values.contact}`, {
-      method: "PUT",
-      body: JSON.stringify([{ associationCategory: "HUBSPOT_DEFINED", associationTypeId: 202 }]),
-    });
+    await api(
+      `/crm/v4/objects/notes/${noteId}/associations/contacts/${values.contact}`,
+      {
+        method: "PUT",
+        body: JSON.stringify([
+          { associationCategory: "HUBSPOT_DEFINED", associationTypeId: 202 },
+        ]),
+      },
+    );
   }
   if (values.company) {
-    await api(`/crm/v4/objects/notes/${noteId}/associations/companies/${values.company}`, {
-      method: "PUT",
-      body: JSON.stringify([{ associationCategory: "HUBSPOT_DEFINED", associationTypeId: 190 }]),
-    });
+    await api(
+      `/crm/v4/objects/notes/${noteId}/associations/companies/${values.company}`,
+      {
+        method: "PUT",
+        body: JSON.stringify([
+          { associationCategory: "HUBSPOT_DEFINED", associationTypeId: 190 },
+        ]),
+      },
+    );
   }
   if (values.deal) {
-    await api(`/crm/v4/objects/notes/${noteId}/associations/deals/${values.deal}`, {
-      method: "PUT",
-      body: JSON.stringify([{ associationCategory: "HUBSPOT_DEFINED", associationTypeId: 214 }]),
-    });
+    await api(
+      `/crm/v4/objects/notes/${noteId}/associations/deals/${values.deal}`,
+      {
+        method: "PUT",
+        body: JSON.stringify([
+          { associationCategory: "HUBSPOT_DEFINED", associationTypeId: 214 },
+        ]),
+      },
+    );
   }
 
   console.log(`Note created with ID: ${noteId}`);
@@ -510,68 +582,125 @@ async function main() {
     switch (resource) {
       case "contacts":
         switch (action) {
-          case "list": await listContacts(); break;
-          case "get": await getContact(args[0]); break;
-          case "create": await createContact(); break;
-          case "update": await updateContact(args[0]); break;
-          case "search": await searchContacts(); break;
-          default: console.error(`Unknown contacts action: ${action}`);
+          case "list":
+            await listContacts();
+            break;
+          case "get":
+            await getContact(args[0]);
+            break;
+          case "create":
+            await createContact();
+            break;
+          case "update":
+            await updateContact(args[0]);
+            break;
+          case "search":
+            await searchContacts();
+            break;
+          default:
+            console.error(`Unknown contacts action: ${action}`);
         }
         break;
 
       case "companies":
         switch (action) {
-          case "list": await listCompanies(); break;
-          case "get": await getCompany(args[0]); break;
-          case "create": await createCompany(); break;
-          case "update": await updateCompany(args[0]); break;
-          default: console.error(`Unknown companies action: ${action}`);
+          case "list":
+            await listCompanies();
+            break;
+          case "get":
+            await getCompany(args[0]);
+            break;
+          case "create":
+            await createCompany();
+            break;
+          case "update":
+            await updateCompany(args[0]);
+            break;
+          default:
+            console.error(`Unknown companies action: ${action}`);
         }
         break;
 
       case "deals":
         switch (action) {
-          case "list": await listDeals(); break;
-          case "get": await getDeal(args[0]); break;
-          case "create": await createDeal(); break;
-          case "update": await updateDeal(args[0]); break;
-          default: console.error(`Unknown deals action: ${action}`);
+          case "list":
+            await listDeals();
+            break;
+          case "get":
+            await getDeal(args[0]);
+            break;
+          case "create":
+            await createDeal();
+            break;
+          case "update":
+            await updateDeal(args[0]);
+            break;
+          default:
+            console.error(`Unknown deals action: ${action}`);
         }
         break;
 
       case "tickets":
         switch (action) {
-          case "list": await listTickets(); break;
-          case "get": await getTicket(args[0]); break;
-          case "create": await createTicket(); break;
-          case "update": await updateTicket(args[0]); break;
-          default: console.error(`Unknown tickets action: ${action}`);
+          case "list":
+            await listTickets();
+            break;
+          case "get":
+            await getTicket(args[0]);
+            break;
+          case "create":
+            await createTicket();
+            break;
+          case "update":
+            await updateTicket(args[0]);
+            break;
+          default:
+            console.error(`Unknown tickets action: ${action}`);
         }
         break;
 
       case "tasks":
         switch (action) {
-          case "list": await listTasks(); break;
-          case "get": await getTask(args[0]); break;
-          case "create": await createTask(); break;
-          case "complete": await completeTask(args[0]); break;
-          default: console.error(`Unknown tasks action: ${action}`);
+          case "list":
+            await listTasks();
+            break;
+          case "get":
+            await getTask(args[0]);
+            break;
+          case "create":
+            await createTask();
+            break;
+          case "complete":
+            await completeTask(args[0]);
+            break;
+          default:
+            console.error(`Unknown tasks action: ${action}`);
         }
         break;
 
       case "notes":
         switch (action) {
-          case "list": await listNotes(); break;
-          case "create": await createNote(); break;
-          default: console.error(`Unknown notes action: ${action}`);
+          case "list":
+            await listNotes();
+            break;
+          case "create":
+            await createNote();
+            break;
+          default:
+            console.error(`Unknown notes action: ${action}`);
         }
         break;
 
       case "pipelines":
         switch (action) {
-          case "deals": await listDealPipelines(); break;
-          case "tickets": await listTicketPipelines(); break;
-          default: console.error(`Unknown pipelines action: ${action}`);
+          case "deals":
+            await listDealPipelines();
+            break;
+          case "tickets":
+            await listTicketPipelines();
+            break;
+          default:
+            console.error(`Unknown pipelines action: ${action}`);
         }
         break;
 

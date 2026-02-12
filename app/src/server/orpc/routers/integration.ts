@@ -1,11 +1,20 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import { integration, integrationToken, customIntegration, customIntegrationCredential } from "@/server/db/schema";
+import {
+  integration,
+  integrationToken,
+  customIntegration,
+  customIntegrationCredential,
+} from "@/server/db/schema";
 import { eq, and, or } from "drizzle-orm";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 import { createHash, randomBytes } from "crypto";
-import { generateLinkedInAuthUrl, deleteUnipileAccount, getUnipileAccount } from "@/server/integrations/unipile";
+import {
+  generateLinkedInAuthUrl,
+  deleteUnipileAccount,
+  getUnipileAccount,
+} from "@/server/integrations/unipile";
 import { encrypt, decrypt } from "@/server/lib/encryption";
 
 // PKCE helpers for Airtable OAuth
@@ -57,12 +66,15 @@ const getAuthUrl = protectedProcedure
     z.object({
       type: integrationTypeSchema,
       redirectUrl: z.string().url(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     // LinkedIn uses Unipile hosted auth instead of standard OAuth
     if (input.type === "linkedin") {
-      const url = await generateLinkedInAuthUrl(context.user.id, input.redirectUrl);
+      const url = await generateLinkedInAuthUrl(
+        context.user.id,
+        input.redirectUrl,
+      );
       return { authUrl: url };
     }
 
@@ -70,7 +82,9 @@ const getAuthUrl = protectedProcedure
 
     // Generate PKCE code_verifier for providers that require it
     const pkceProviders = ["airtable", "salesforce", "twitter"];
-    const codeVerifier = pkceProviders.includes(input.type) ? generateCodeVerifier() : undefined;
+    const codeVerifier = pkceProviders.includes(input.type)
+      ? generateCodeVerifier()
+      : undefined;
 
     const state = Buffer.from(
       JSON.stringify({
@@ -78,7 +92,7 @@ const getAuthUrl = protectedProcedure
         type: input.type,
         redirectUrl: input.redirectUrl,
         codeVerifier, // Store verifier in state for Airtable
-      })
+      }),
     ).toString("base64url");
 
     const params = new URLSearchParams({
@@ -96,7 +110,13 @@ const getAuthUrl = protectedProcedure
     }
 
     // Add provider-specific params
-    const googleTypes = ["gmail", "google_calendar", "google_docs", "google_sheets", "google_drive"];
+    const googleTypes = [
+      "gmail",
+      "google_calendar",
+      "google_docs",
+      "google_sheets",
+      "google_drive",
+    ];
     if (googleTypes.includes(input.type)) {
       params.set("access_type", "offline");
       params.set("prompt", "consent");
@@ -126,17 +146,22 @@ const handleCallback = protectedProcedure
     z.object({
       code: z.string(),
       state: z.string(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
-    let stateData: { userId: string; type: IntegrationType; redirectUrl: string; codeVerifier?: string };
+    let stateData: {
+      userId: string;
+      type: IntegrationType;
+      redirectUrl: string;
+      codeVerifier?: string;
+    };
 
     try {
-      stateData = JSON.parse(
-        Buffer.from(input.state, "base64url").toString()
-      );
+      stateData = JSON.parse(Buffer.from(input.state, "base64url").toString());
     } catch {
-      throw new ORPCError("BAD_REQUEST", { message: "Invalid state parameter" });
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Invalid state parameter",
+      });
     }
 
     // Verify user matches
@@ -166,9 +191,14 @@ const handleCallback = protectedProcedure
     };
 
     // Notion, Airtable, Reddit, and Twitter require Basic auth header
-    if (stateData.type === "notion" || stateData.type === "airtable" || stateData.type === "reddit" || stateData.type === "twitter") {
+    if (
+      stateData.type === "notion" ||
+      stateData.type === "airtable" ||
+      stateData.type === "reddit" ||
+      stateData.type === "twitter"
+    ) {
       headers["Authorization"] = `Basic ${Buffer.from(
-        `${config.clientId}:${config.clientSecret}`
+        `${config.clientId}:${config.clientSecret}`,
       ).toString("base64")}`;
       tokenBody.delete("client_id");
       tokenBody.delete("client_secret");
@@ -187,7 +217,10 @@ const handleCallback = protectedProcedure
     // Debug logging for token exchange
     console.log("Token exchange request:", {
       url: config.tokenUrl,
-      headers: { ...headers, Authorization: headers.Authorization ? "[REDACTED]" : undefined },
+      headers: {
+        ...headers,
+        Authorization: headers.Authorization ? "[REDACTED]" : undefined,
+      },
       body: Object.fromEntries(tokenBody.entries()),
       clientIdPresent: !!config.clientId,
       clientSecretPresent: !!config.clientSecret,
@@ -204,8 +237,13 @@ const handleCallback = protectedProcedure
       const error = await tokenResponse.text();
       console.error("Token exchange failed:", error);
       console.error("Response status:", tokenResponse.status);
-      console.error("Response headers:", Object.fromEntries(tokenResponse.headers.entries()));
-      throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Failed to exchange code for tokens" });
+      console.error(
+        "Response headers:",
+        Object.fromEntries(tokenResponse.headers.entries()),
+      );
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Failed to exchange code for tokens",
+      });
     }
 
     const tokens = await tokenResponse.json();
@@ -217,7 +255,9 @@ const handleCallback = protectedProcedure
       accessToken = tokens.authed_user?.access_token;
       if (!accessToken) {
         console.error("Slack token response:", JSON.stringify(tokens, null, 2));
-        throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Failed to get Slack user token" });
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Failed to get Slack user token",
+        });
       }
     } else {
       accessToken = tokens.access_token;
@@ -230,7 +270,7 @@ const handleCallback = protectedProcedure
     const existingIntegration = await context.db.query.integration.findFirst({
       where: and(
         eq(integration.userId, context.user.id),
-        eq(integration.type, stateData.type)
+        eq(integration.type, stateData.type),
       ),
     });
 
@@ -277,7 +317,11 @@ const handleCallback = protectedProcedure
       idToken: tokens.id_token,
     });
 
-    return { success: true, integrationId: integId, redirectUrl: stateData.redirectUrl };
+    return {
+      success: true,
+      integrationId: integId,
+      redirectUrl: stateData.redirectUrl,
+    };
   });
 
 // Toggle integration enabled/disabled
@@ -286,7 +330,7 @@ const toggle = protectedProcedure
     z.object({
       id: z.string(),
       enabled: z.boolean(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const result = await context.db
@@ -295,8 +339,8 @@ const toggle = protectedProcedure
       .where(
         and(
           eq(integration.id, input.id),
-          eq(integration.userId, context.user.id)
-        )
+          eq(integration.userId, context.user.id),
+        ),
       )
       .returning({ id: integration.id });
 
@@ -315,7 +359,7 @@ const disconnect = protectedProcedure
     const existingIntegration = await context.db.query.integration.findFirst({
       where: and(
         eq(integration.id, input.id),
-        eq(integration.userId, context.user.id)
+        eq(integration.userId, context.user.id),
       ),
     });
 
@@ -324,7 +368,10 @@ const disconnect = protectedProcedure
     }
 
     // For LinkedIn, also delete the Unipile account
-    if (existingIntegration.type === "linkedin" && existingIntegration.providerAccountId) {
+    if (
+      existingIntegration.type === "linkedin" &&
+      existingIntegration.providerAccountId
+    ) {
       try {
         await deleteUnipileAccount(existingIntegration.providerAccountId);
       } catch (error) {
@@ -333,9 +380,7 @@ const disconnect = protectedProcedure
       }
     }
 
-    await context.db
-      .delete(integration)
-      .where(eq(integration.id, input.id));
+    await context.db.delete(integration).where(eq(integration.id, input.id));
 
     return { success: true };
   });
@@ -373,7 +418,9 @@ const linkLinkedIn = protectedProcedure
       return { success: true };
     } catch (error) {
       console.error("Failed to link LinkedIn account:", error);
-      throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Failed to link LinkedIn account" });
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Failed to link LinkedIn account",
+      });
     }
   });
 
@@ -382,36 +429,46 @@ const linkLinkedIn = protectedProcedure
 const createCustomIntegration = protectedProcedure
   .input(
     z.object({
-      slug: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/),
+      slug: z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[a-z0-9-]+$/),
       name: z.string().min(1).max(128),
       description: z.string().min(1).max(1000),
       iconUrl: z.string().url().nullish(),
       baseUrl: z.string().url(),
       authType: z.enum(["oauth2", "api_key", "bearer_token"]),
-      oauthConfig: z.object({
-        authUrl: z.string().url(),
-        tokenUrl: z.string().url(),
-        scopes: z.array(z.string()),
-        pkce: z.boolean().optional(),
-        authStyle: z.enum(["header", "params"]).optional(),
-        extraAuthParams: z.record(z.string(), z.string()).optional(),
-      }).nullish(),
-      apiKeyConfig: z.object({
-        method: z.enum(["header", "query"]),
-        headerName: z.string().optional(),
-        queryParam: z.string().optional(),
-      }).nullish(),
+      oauthConfig: z
+        .object({
+          authUrl: z.string().url(),
+          tokenUrl: z.string().url(),
+          scopes: z.array(z.string()),
+          pkce: z.boolean().optional(),
+          authStyle: z.enum(["header", "params"]).optional(),
+          extraAuthParams: z.record(z.string(), z.string()).optional(),
+        })
+        .nullish(),
+      apiKeyConfig: z
+        .object({
+          method: z.enum(["header", "query"]),
+          headerName: z.string().optional(),
+          queryParam: z.string().optional(),
+        })
+        .nullish(),
       cliCode: z.string().default("// CLI code placeholder"),
       cliInstructions: z.string().default("Custom integration CLI"),
-      permissions: z.object({
-        readOps: z.array(z.string()),
-        writeOps: z.array(z.string()),
-      }).default({ readOps: [], writeOps: [] }),
+      permissions: z
+        .object({
+          readOps: z.array(z.string()),
+          writeOps: z.array(z.string()),
+        })
+        .default({ readOps: [], writeOps: [] }),
       // Credentials (for the creating user)
       clientId: z.string().nullish(),
       clientSecret: z.string().nullish(),
       apiKey: z.string().nullish(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     // Check slug uniqueness
@@ -419,7 +476,9 @@ const createCustomIntegration = protectedProcedure
       where: eq(customIntegration.slug, input.slug),
     });
     if (existing) {
-      throw new ORPCError("BAD_REQUEST", { message: `Integration with slug '${input.slug}' already exists` });
+      throw new ORPCError("BAD_REQUEST", {
+        message: `Integration with slug '${input.slug}' already exists`,
+      });
     }
 
     const [created] = await context.db
@@ -431,10 +490,14 @@ const createCustomIntegration = protectedProcedure
         iconUrl: input.iconUrl ?? null,
         baseUrl: input.baseUrl,
         authType: input.authType,
-        oauthConfig: input.oauthConfig ? {
-          ...input.oauthConfig,
-          extraAuthParams: input.oauthConfig.extraAuthParams as Record<string, string> | undefined,
-        } : null,
+        oauthConfig: input.oauthConfig
+          ? {
+              ...input.oauthConfig,
+              extraAuthParams: input.oauthConfig.extraAuthParams as
+                | Record<string, string>
+                | undefined,
+            }
+          : null,
         apiKeyConfig: input.apiKeyConfig ?? null,
         cliCode: input.cliCode,
         cliInstructions: input.cliInstructions,
@@ -458,41 +521,44 @@ const createCustomIntegration = protectedProcedure
     return { id: created.id, slug: created.slug };
   });
 
-const listCustomIntegrations = protectedProcedure.handler(async ({ context }) => {
-  const integrations = await context.db.query.customIntegration.findMany({
-    where: or(
-      eq(customIntegration.createdByUserId, context.user.id),
-      eq(customIntegration.isBuiltIn, true)
-    ),
-  });
+const listCustomIntegrations = protectedProcedure.handler(
+  async ({ context }) => {
+    const integrations = await context.db.query.customIntegration.findMany({
+      where: or(
+        eq(customIntegration.createdByUserId, context.user.id),
+        eq(customIntegration.isBuiltIn, true),
+      ),
+    });
 
-  // Get user's credentials for these integrations
-  const credentials = await context.db.query.customIntegrationCredential.findMany({
-    where: eq(customIntegrationCredential.userId, context.user.id),
-  });
+    // Get user's credentials for these integrations
+    const credentials =
+      await context.db.query.customIntegrationCredential.findMany({
+        where: eq(customIntegrationCredential.userId, context.user.id),
+      });
 
-  const credMap = new Map(credentials.map((c) => [c.customIntegrationId, c]));
+    const credMap = new Map(credentials.map((c) => [c.customIntegrationId, c]));
 
-  return integrations.map((i) => {
-    const cred = credMap.get(i.id);
-    return {
-      id: i.id,
-      slug: i.slug,
-      name: i.name,
-      description: i.description,
-      iconUrl: i.iconUrl,
-      baseUrl: i.baseUrl,
-      authType: i.authType,
-      isBuiltIn: i.isBuiltIn,
-      communityStatus: i.communityStatus,
-      communityPrUrl: i.communityPrUrl,
-      createdAt: i.createdAt,
-      connected: !!cred,
-      enabled: cred?.enabled ?? false,
-      displayName: cred?.displayName ?? null,
-    };
-  });
-});
+    return integrations.map((i) => {
+      const cred = credMap.get(i.id);
+      return {
+        id: i.id,
+        slug: i.slug,
+        name: i.name,
+        description: i.description,
+        iconUrl: i.iconUrl,
+        baseUrl: i.baseUrl,
+        authType: i.authType,
+        isBuiltIn: i.isBuiltIn,
+        communityStatus: i.communityStatus,
+        communityPrUrl: i.communityPrUrl,
+        createdAt: i.createdAt,
+        connected: !!cred,
+        enabled: cred?.enabled ?? false,
+        displayName: cred?.displayName ?? null,
+      };
+    });
+  },
+);
 
 const getCustomIntegration = protectedProcedure
   .input(z.object({ slug: z.string() }))
@@ -502,13 +568,15 @@ const getCustomIntegration = protectedProcedure
     });
 
     if (!integ) {
-      throw new ORPCError("NOT_FOUND", { message: "Custom integration not found" });
+      throw new ORPCError("NOT_FOUND", {
+        message: "Custom integration not found",
+      });
     }
 
     const cred = await context.db.query.customIntegrationCredential.findFirst({
       where: and(
         eq(customIntegrationCredential.userId, context.user.id),
-        eq(customIntegrationCredential.customIntegrationId, integ.id)
+        eq(customIntegrationCredential.customIntegrationId, integ.id),
       ),
     });
 
@@ -531,7 +599,7 @@ const setCustomCredentials = protectedProcedure
       clientSecret: z.string().nullish(),
       apiKey: z.string().nullish(),
       displayName: z.string().nullish(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const values = {
@@ -548,7 +616,10 @@ const setCustomCredentials = protectedProcedure
       .insert(customIntegrationCredential)
       .values(values)
       .onConflictDoUpdate({
-        target: [customIntegrationCredential.userId, customIntegrationCredential.customIntegrationId],
+        target: [
+          customIntegrationCredential.userId,
+          customIntegrationCredential.customIntegrationId,
+        ],
         set: {
           clientId: values.clientId,
           clientSecret: values.clientSecret,
@@ -569,8 +640,11 @@ const disconnectCustomIntegration = protectedProcedure
       .where(
         and(
           eq(customIntegrationCredential.userId, context.user.id),
-          eq(customIntegrationCredential.customIntegrationId, input.customIntegrationId)
-        )
+          eq(
+            customIntegrationCredential.customIntegrationId,
+            input.customIntegrationId,
+          ),
+        ),
       );
 
     return { success: true };
@@ -585,8 +659,11 @@ const toggleCustomIntegration = protectedProcedure
       .where(
         and(
           eq(customIntegrationCredential.userId, context.user.id),
-          eq(customIntegrationCredential.customIntegrationId, input.customIntegrationId)
-        )
+          eq(
+            customIntegrationCredential.customIntegrationId,
+            input.customIntegrationId,
+          ),
+        ),
       )
       .returning({ id: customIntegrationCredential.id });
 
@@ -605,13 +682,15 @@ const deleteCustomIntegration = protectedProcedure
       .where(
         and(
           eq(customIntegration.id, input.id),
-          eq(customIntegration.createdByUserId, context.user.id)
-        )
+          eq(customIntegration.createdByUserId, context.user.id),
+        ),
       )
       .returning({ id: customIntegration.id });
 
     if (result.length === 0) {
-      throw new ORPCError("NOT_FOUND", { message: "Custom integration not found" });
+      throw new ORPCError("NOT_FOUND", {
+        message: "Custom integration not found",
+      });
     }
 
     return { success: true };
@@ -623,25 +702,29 @@ const getCustomAuthUrl = protectedProcedure
     z.object({
       slug: z.string(),
       redirectUrl: z.string().url(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const integ = await context.db.query.customIntegration.findFirst({
       where: eq(customIntegration.slug, input.slug),
     });
     if (!integ || integ.authType !== "oauth2" || !integ.oauthConfig) {
-      throw new ORPCError("BAD_REQUEST", { message: "Not a valid OAuth2 custom integration" });
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Not a valid OAuth2 custom integration",
+      });
     }
 
     const cred = await context.db.query.customIntegrationCredential.findFirst({
       where: and(
         eq(customIntegrationCredential.userId, context.user.id),
-        eq(customIntegrationCredential.customIntegrationId, integ.id)
+        eq(customIntegrationCredential.customIntegrationId, integ.id),
       ),
     });
 
     if (!cred?.clientId) {
-      throw new ORPCError("BAD_REQUEST", { message: "Client credentials not configured" });
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Client credentials not configured",
+      });
     }
 
     const clientId = decrypt(cred.clientId);
@@ -655,10 +738,11 @@ const getCustomAuthUrl = protectedProcedure
         type: `custom_${integ.slug}`,
         redirectUrl: input.redirectUrl,
         codeVerifier,
-      })
+      }),
     ).toString("base64url");
 
-    const appUrl = process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+    const appUrl =
+      process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -688,14 +772,21 @@ const handleCustomCallback = protectedProcedure
     z.object({
       code: z.string(),
       state: z.string(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
-    let stateData: { userId: string; type: string; redirectUrl: string; codeVerifier?: string };
+    let stateData: {
+      userId: string;
+      type: string;
+      redirectUrl: string;
+      codeVerifier?: string;
+    };
     try {
       stateData = JSON.parse(Buffer.from(input.state, "base64url").toString());
     } catch {
-      throw new ORPCError("BAD_REQUEST", { message: "Invalid state parameter" });
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Invalid state parameter",
+      });
     }
 
     if (stateData.userId !== context.user.id) {
@@ -708,24 +799,29 @@ const handleCustomCallback = protectedProcedure
     });
 
     if (!integ || !integ.oauthConfig) {
-      throw new ORPCError("NOT_FOUND", { message: "Custom integration not found" });
+      throw new ORPCError("NOT_FOUND", {
+        message: "Custom integration not found",
+      });
     }
 
     const cred = await context.db.query.customIntegrationCredential.findFirst({
       where: and(
         eq(customIntegrationCredential.userId, context.user.id),
-        eq(customIntegrationCredential.customIntegrationId, integ.id)
+        eq(customIntegrationCredential.customIntegrationId, integ.id),
       ),
     });
 
     if (!cred?.clientId || !cred?.clientSecret) {
-      throw new ORPCError("BAD_REQUEST", { message: "Client credentials not configured" });
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Client credentials not configured",
+      });
     }
 
     const clientId = decrypt(cred.clientId);
     const clientSecret = decrypt(cred.clientSecret);
     const oauth = integ.oauthConfig;
-    const appUrl = process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+    const appUrl =
+      process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
     const tokenBody = new URLSearchParams({
       grant_type: "authorization_code",
@@ -742,7 +838,8 @@ const handleCustomCallback = protectedProcedure
     };
 
     if (oauth.authStyle === "header") {
-      headers["Authorization"] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+      headers["Authorization"] =
+        `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
     } else {
       tokenBody.set("client_id", clientId);
       tokenBody.set("client_secret", clientSecret);
@@ -757,7 +854,9 @@ const handleCustomCallback = protectedProcedure
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
       console.error("Custom OAuth token exchange failed:", error);
-      throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Failed to exchange code for tokens" });
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Failed to exchange code for tokens",
+      });
     }
 
     const tokens = await tokenResponse.json();

@@ -52,7 +52,7 @@ async function build(): Promise<void> {
         cwd: import.meta.dir,
         stdout: "inherit",
         stderr: "inherit",
-      }
+      },
     );
 
     const exitCode = await proc.exited;

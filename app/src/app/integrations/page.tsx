@@ -20,7 +20,17 @@ import {
 } from "@/orpc/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ExternalLink, CheckCircle2, XCircle, Loader2, Search, ChevronDown, Plus, Trash2, Puzzle } from "lucide-react";
+import {
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Search,
+  ChevronDown,
+  Plus,
+  Trash2,
+  Puzzle,
+} from "lucide-react";
 import { getIntegrationActions } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -132,7 +142,8 @@ type OAuthIntegrationType = Exclude<IntegrationType, "whatsapp">;
 function IntegrationsPageContent() {
   const searchParams = useSearchParams();
   const { data: integrations, isLoading, refetch } = useIntegrationList();
-  const { data: customIntegrations, refetch: refetchCustom } = useCustomIntegrationList();
+  const { data: customIntegrations, refetch: refetchCustom } =
+    useCustomIntegrationList();
   const getAuthUrl = useGetAuthUrl();
   const toggleIntegration = useToggleIntegration();
   const disconnectIntegration = useDisconnectIntegration();
@@ -152,7 +163,9 @@ function IntegrationsPageContent() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const linkedInLinkingRef = useRef(false);
-  const [whatsAppBridgeStatus, setWhatsAppBridgeStatus] = useState<"disconnected" | "connecting" | "connected" | null>(null);
+  const [whatsAppBridgeStatus, setWhatsAppBridgeStatus] = useState<
+    "disconnected" | "connecting" | "connected" | null
+  >(null);
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [customForm, setCustomForm] = useState({
     slug: "",
@@ -173,7 +186,8 @@ function IntegrationsPageContent() {
     const accountId = searchParams.get("account_id");
     if (accountId && !linkedInLinkingRef.current) {
       linkedInLinkingRef.current = true;
-      linkLinkedIn.mutateAsync(accountId)
+      linkLinkedIn
+        .mutateAsync(accountId)
         .then(() => {
           setNotification({
             type: "success",
@@ -272,7 +286,9 @@ function IntegrationsPageContent() {
           }
           return;
         }
-        const data = (await res.json()) as { status: "disconnected" | "connecting" | "connected" };
+        const data = (await res.json()) as {
+          status: "disconnected" | "connecting" | "connected";
+        };
         if (active) {
           setWhatsAppBridgeStatus(data.status);
         }
@@ -292,32 +308,44 @@ function IntegrationsPageContent() {
   }, []);
 
   const integrationsList = Array.isArray(integrations) ? integrations : [];
-  const connectedIntegrations = new Map<string, (typeof integrationsList)[number]>(
-    integrationsList.map((i) => [i.type, i])
-  );
+  const connectedIntegrations = new Map<
+    string,
+    (typeof integrationsList)[number]
+  >(integrationsList.map((i) => [i.type, i]));
 
   // Filter integrations based on search and tab
-  const filteredIntegrations = (Object.entries(integrationConfig) as [IntegrationType, (typeof integrationConfig)[IntegrationType]][]).filter(
-    ([type, config]) => {
-      const integration = connectedIntegrations.get(type);
-      const isWhatsAppConnected = type === "whatsapp" && whatsAppBridgeStatus === "connected";
-      const matchesSearch = config.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        config.description.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredIntegrations = (
+    Object.entries(integrationConfig) as [
+      IntegrationType,
+      (typeof integrationConfig)[IntegrationType],
+    ][]
+  ).filter(([type, config]) => {
+    const integration = connectedIntegrations.get(type);
+    const isWhatsAppConnected =
+      type === "whatsapp" && whatsAppBridgeStatus === "connected";
+    const matchesSearch =
+      config.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      config.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-      if (!matchesSearch) return false;
+    if (!matchesSearch) return false;
 
-      if (activeTab === "connected") return !!integration || isWhatsAppConnected;
-      if (activeTab === "not_connected") return !integration && !isWhatsAppConnected;
-      return true;
-    }
-  );
+    if (activeTab === "connected") return !!integration || isWhatsAppConnected;
+    if (activeTab === "not_connected")
+      return !integration && !isWhatsAppConnected;
+    return true;
+  });
 
-  const connectedCount = connectedIntegrations.size + (whatsAppBridgeStatus === "connected" ? 1 : 0);
+  const connectedCount =
+    connectedIntegrations.size + (whatsAppBridgeStatus === "connected" ? 1 : 0);
 
   const tabs: { id: FilterTab; label: string; count: number }[] = [
     { id: "all", label: "All", count: Object.keys(integrationConfig).length },
     { id: "connected", label: "Connected", count: connectedCount },
-    { id: "not_connected", label: "Not Connected", count: Object.keys(integrationConfig).length - connectedCount },
+    {
+      id: "not_connected",
+      label: "Not Connected",
+      count: Object.keys(integrationConfig).length - connectedCount,
+    },
   ];
 
   return (
@@ -335,7 +363,7 @@ function IntegrationsPageContent() {
             "mb-6 flex items-center gap-2 rounded-lg border p-4",
             notification.type === "success"
               ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400"
+              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400",
           )}
         >
           {notification.type === "success" ? (
@@ -357,16 +385,18 @@ function IntegrationsPageContent() {
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 activeTab === tab.id
                   ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {tab.label}
-              <span className={cn(
-                "ml-1.5 rounded-full px-1.5 py-0.5 text-xs",
-                activeTab === tab.id
-                  ? "bg-muted text-muted-foreground"
-                  : "bg-muted-foreground/20 text-muted-foreground"
-              )}>
+              <span
+                className={cn(
+                  "ml-1.5 rounded-full px-1.5 py-0.5 text-xs",
+                  activeTab === tab.id
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-muted-foreground/20 text-muted-foreground",
+                )}
+              >
                 {tab.count}
               </span>
             </button>
@@ -403,22 +433,18 @@ function IntegrationsPageContent() {
             const isConnecting = connectingType === type;
             const isExpanded = expandedCard === type;
             const isWhatsApp = type === "whatsapp";
-            const isWhatsAppConnected = isWhatsApp && whatsAppBridgeStatus === "connected";
+            const isWhatsAppConnected =
+              isWhatsApp && whatsAppBridgeStatus === "connected";
             const actions = isWhatsApp ? [] : getIntegrationActions(type);
 
             return (
-              <div
-                key={type}
-                className="rounded-lg border overflow-hidden"
-              >
-                <div
-                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-                >
+              <div key={type} className="rounded-lg border overflow-hidden">
+                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                     <div
                       className={cn(
                         "flex shrink-0 items-center justify-center rounded-lg p-2 shadow-sm border",
-                        config.bgColor
+                        config.bgColor,
                       )}
                     >
                       <Image
@@ -463,7 +489,7 @@ function IntegrationsPageContent() {
                         <ChevronDown
                           className={cn(
                             "ml-1 h-4 w-4 transition-transform duration-200",
-                            isExpanded && "rotate-180"
+                            isExpanded && "rotate-180",
                           )}
                         />
                       </Button>
@@ -522,13 +548,15 @@ function IntegrationsPageContent() {
                 <div
                   className={cn(
                     "grid transition-all duration-200 ease-in-out",
-                    isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                    isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
                   )}
                 >
                   <div className="overflow-hidden">
                     {actions.length > 0 && (
                       <div className="border-t px-4 py-3 bg-muted/30">
-                        <p className="text-xs text-muted-foreground mb-2">Available actions:</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Available actions:
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {actions.map((action) => (
                             <span
@@ -572,7 +600,12 @@ function IntegrationsPageContent() {
                   <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                     <div className="flex shrink-0 items-center justify-center rounded-lg p-2 shadow-sm border bg-white dark:bg-gray-800">
                       {ci.iconUrl ? (
-                        <Image src={ci.iconUrl} alt={ci.name} width={24} height={24} />
+                        <Image
+                          src={ci.iconUrl}
+                          alt={ci.name}
+                          width={24}
+                          height={24}
+                        />
                       ) : (
                         <Puzzle className="h-6 w-6 text-indigo-500" />
                       )}
@@ -581,18 +614,25 @@ function IntegrationsPageContent() {
                       <h3 className="font-medium">{ci.name}</h3>
                       <p className="text-sm text-muted-foreground">
                         {ci.connected ? (
-                          <>Connected{ci.displayName ? ` as ${ci.displayName}` : ""}</>
+                          <>
+                            Connected
+                            {ci.displayName ? ` as ${ci.displayName}` : ""}
+                          </>
                         ) : (
                           ci.description
                         )}
                       </p>
                       {ci.communityStatus && (
-                        <span className={cn(
-                          "mt-1 inline-block rounded-full px-2 py-0.5 text-xs",
-                          ci.communityStatus === "approved" ? "bg-green-100 text-green-700" :
-                          ci.communityStatus === "pending" ? "bg-yellow-100 text-yellow-700" :
-                          "bg-red-100 text-red-700"
-                        )}>
+                        <span
+                          className={cn(
+                            "mt-1 inline-block rounded-full px-2 py-0.5 text-xs",
+                            ci.communityStatus === "approved"
+                              ? "bg-green-100 text-green-700"
+                              : ci.communityStatus === "pending"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-red-100 text-red-700",
+                          )}
+                        >
                           Community: {ci.communityStatus}
                         </span>
                       )}
@@ -606,7 +646,11 @@ function IntegrationsPageContent() {
                           <Checkbox
                             checked={ci.enabled}
                             onCheckedChange={(checked) => {
-                              toggleCustom.mutateAsync({ customIntegrationId: ci.id, enabled: checked === true })
+                              toggleCustom
+                                .mutateAsync({
+                                  customIntegrationId: ci.id,
+                                  enabled: checked === true,
+                                })
                                 .then(() => refetchCustom());
                             }}
                           />
@@ -616,7 +660,9 @@ function IntegrationsPageContent() {
                           variant="ghost"
                           size="sm"
                           onClick={() => {
-                            disconnectCustom.mutateAsync(ci.id).then(() => refetchCustom());
+                            disconnectCustom
+                              .mutateAsync(ci.id)
+                              .then(() => refetchCustom());
                           }}
                         >
                           Disconnect
@@ -632,21 +678,28 @@ function IntegrationsPageContent() {
                             });
                             window.location.href = result.authUrl;
                           } catch {
-                            setNotification({ type: "error", message: "Failed to start OAuth flow" });
+                            setNotification({
+                              type: "error",
+                              message: "Failed to start OAuth flow",
+                            });
                           }
                         }}
                       >
                         Connect <ExternalLink className="ml-2 h-4 w-4" />
                       </Button>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Credentials saved</span>
+                      <span className="text-xs text-muted-foreground">
+                        Credentials saved
+                      </span>
                     )}
                     {!ci.isBuiltIn && (
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          deleteCustom.mutateAsync(ci.id).then(() => refetchCustom());
+                          deleteCustom
+                            .mutateAsync(ci.id)
+                            .then(() => refetchCustom());
                         }}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -666,16 +719,31 @@ function IntegrationsPageContent() {
 
       {/* Add Custom Integration Dialog */}
       {showAddCustom && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowAddCustom(false)}>
-          <div className="w-full max-w-lg rounded-lg bg-background p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-4 text-lg font-semibold">Add Custom Integration</h3>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setShowAddCustom(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-lg bg-background p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-4 text-lg font-semibold">
+              Add Custom Integration
+            </h3>
             <div className="space-y-3 max-h-[60vh] overflow-y-auto">
               <div>
                 <label className="text-sm font-medium">Slug</label>
                 <Input
                   placeholder="e.g. trello"
                   value={customForm.slug}
-                  onChange={(e) => setCustomForm({ ...customForm, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                  onChange={(e) =>
+                    setCustomForm({
+                      ...customForm,
+                      slug: e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9-]/g, ""),
+                    })
+                  }
                 />
               </div>
               <div>
@@ -683,7 +751,9 @@ function IntegrationsPageContent() {
                 <Input
                   placeholder="e.g. Trello"
                   value={customForm.name}
-                  onChange={(e) => setCustomForm({ ...customForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setCustomForm({ ...customForm, name: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -691,7 +761,12 @@ function IntegrationsPageContent() {
                 <Input
                   placeholder="What does this integration do?"
                   value={customForm.description}
-                  onChange={(e) => setCustomForm({ ...customForm, description: e.target.value })}
+                  onChange={(e) =>
+                    setCustomForm({
+                      ...customForm,
+                      description: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div>
@@ -699,7 +774,9 @@ function IntegrationsPageContent() {
                 <Input
                   placeholder="https://api.example.com"
                   value={customForm.baseUrl}
-                  onChange={(e) => setCustomForm({ ...customForm, baseUrl: e.target.value })}
+                  onChange={(e) =>
+                    setCustomForm({ ...customForm, baseUrl: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -707,7 +784,12 @@ function IntegrationsPageContent() {
                 <select
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                   value={customForm.authType}
-                  onChange={(e) => setCustomForm({ ...customForm, authType: e.target.value as any })}
+                  onChange={(e) =>
+                    setCustomForm({
+                      ...customForm,
+                      authType: e.target.value as any,
+                    })
+                  }
                 >
                   <option value="api_key">API Key</option>
                   <option value="bearer_token">Bearer Token</option>
@@ -722,7 +804,9 @@ function IntegrationsPageContent() {
                     type="password"
                     placeholder="Your API key"
                     value={customForm.apiKey}
-                    onChange={(e) => setCustomForm({ ...customForm, apiKey: e.target.value })}
+                    onChange={(e) =>
+                      setCustomForm({ ...customForm, apiKey: e.target.value })
+                    }
                   />
                 </div>
               )}
@@ -734,7 +818,9 @@ function IntegrationsPageContent() {
                     type="password"
                     placeholder="Your bearer token"
                     value={customForm.apiKey}
-                    onChange={(e) => setCustomForm({ ...customForm, apiKey: e.target.value })}
+                    onChange={(e) =>
+                      setCustomForm({ ...customForm, apiKey: e.target.value })
+                    }
                   />
                 </div>
               )}
@@ -745,7 +831,12 @@ function IntegrationsPageContent() {
                     <label className="text-sm font-medium">Client ID</label>
                     <Input
                       value={customForm.clientId}
-                      onChange={(e) => setCustomForm({ ...customForm, clientId: e.target.value })}
+                      onChange={(e) =>
+                        setCustomForm({
+                          ...customForm,
+                          clientId: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div>
@@ -753,7 +844,12 @@ function IntegrationsPageContent() {
                     <Input
                       type="password"
                       value={customForm.clientSecret}
-                      onChange={(e) => setCustomForm({ ...customForm, clientSecret: e.target.value })}
+                      onChange={(e) =>
+                        setCustomForm({
+                          ...customForm,
+                          clientSecret: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div>
@@ -761,7 +857,12 @@ function IntegrationsPageContent() {
                     <Input
                       placeholder="https://example.com/oauth/authorize"
                       value={customForm.authUrl}
-                      onChange={(e) => setCustomForm({ ...customForm, authUrl: e.target.value })}
+                      onChange={(e) =>
+                        setCustomForm({
+                          ...customForm,
+                          authUrl: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div>
@@ -769,15 +870,24 @@ function IntegrationsPageContent() {
                     <Input
                       placeholder="https://example.com/oauth/token"
                       value={customForm.tokenUrl}
-                      onChange={(e) => setCustomForm({ ...customForm, tokenUrl: e.target.value })}
+                      onChange={(e) =>
+                        setCustomForm({
+                          ...customForm,
+                          tokenUrl: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Scopes (comma-separated)</label>
+                    <label className="text-sm font-medium">
+                      Scopes (comma-separated)
+                    </label>
                     <Input
                       placeholder="read,write"
                       value={customForm.scopes}
-                      onChange={(e) => setCustomForm({ ...customForm, scopes: e.target.value })}
+                      onChange={(e) =>
+                        setCustomForm({ ...customForm, scopes: e.target.value })
+                      }
                     />
                   </div>
                 </>
@@ -785,9 +895,13 @@ function IntegrationsPageContent() {
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setShowAddCustom(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setShowAddCustom(false)}>
+                Cancel
+              </Button>
               <Button
-                disabled={!customForm.slug || !customForm.name || !customForm.baseUrl}
+                disabled={
+                  !customForm.slug || !customForm.name || !customForm.baseUrl
+                }
                 onClick={async () => {
                   try {
                     await createCustom.mutateAsync({
@@ -796,25 +910,52 @@ function IntegrationsPageContent() {
                       description: customForm.description || customForm.name,
                       baseUrl: customForm.baseUrl,
                       authType: customForm.authType,
-                      oauthConfig: customForm.authType === "oauth2" ? {
-                        authUrl: customForm.authUrl,
-                        tokenUrl: customForm.tokenUrl,
-                        scopes: customForm.scopes.split(",").map(s => s.trim()).filter(Boolean),
-                      } : null,
-                      apiKeyConfig: customForm.authType === "api_key" ? {
-                        method: "header" as const,
-                        headerName: "Authorization",
-                      } : null,
+                      oauthConfig:
+                        customForm.authType === "oauth2"
+                          ? {
+                              authUrl: customForm.authUrl,
+                              tokenUrl: customForm.tokenUrl,
+                              scopes: customForm.scopes
+                                .split(",")
+                                .map((s) => s.trim())
+                                .filter(Boolean),
+                            }
+                          : null,
+                      apiKeyConfig:
+                        customForm.authType === "api_key"
+                          ? {
+                              method: "header" as const,
+                              headerName: "Authorization",
+                            }
+                          : null,
                       clientId: customForm.clientId || null,
                       clientSecret: customForm.clientSecret || null,
                       apiKey: customForm.apiKey || null,
                     });
                     setShowAddCustom(false);
-                    setCustomForm({ slug: "", name: "", description: "", baseUrl: "", authType: "api_key", apiKey: "", clientId: "", clientSecret: "", authUrl: "", tokenUrl: "", scopes: "" });
+                    setCustomForm({
+                      slug: "",
+                      name: "",
+                      description: "",
+                      baseUrl: "",
+                      authType: "api_key",
+                      apiKey: "",
+                      clientId: "",
+                      clientSecret: "",
+                      authUrl: "",
+                      tokenUrl: "",
+                      scopes: "",
+                    });
                     refetchCustom();
-                    setNotification({ type: "success", message: "Custom integration created!" });
+                    setNotification({
+                      type: "success",
+                      message: "Custom integration created!",
+                    });
                   } catch (error: any) {
-                    setNotification({ type: "error", message: error?.message || "Failed to create integration" });
+                    setNotification({
+                      type: "error",
+                      message: error?.message || "Failed to create integration",
+                    });
                   }
                 }}
               >

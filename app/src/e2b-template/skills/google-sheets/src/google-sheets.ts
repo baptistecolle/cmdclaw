@@ -2,7 +2,9 @@ import { parseArgs } from "util";
 
 const TOKEN = process.env.GOOGLE_SHEETS_ACCESS_TOKEN;
 if (!TOKEN) {
-  console.error("Error: GOOGLE_SHEETS_ACCESS_TOKEN environment variable required");
+  console.error(
+    "Error: GOOGLE_SHEETS_ACCESS_TOKEN environment variable required",
+  );
   process.exit(1);
 }
 
@@ -36,23 +38,35 @@ async function getSpreadsheet(spreadsheetId: string) {
   const data = await res.json();
 
   if (values.range) {
-    console.log(JSON.stringify({
-      spreadsheetId,
-      range: data.range,
-      values: data.values || [],
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          spreadsheetId,
+          range: data.range,
+          values: data.values || [],
+        },
+        null,
+        2,
+      ),
+    );
   } else {
-    console.log(JSON.stringify({
-      spreadsheetId: data.spreadsheetId,
-      title: data.properties?.title,
-      sheets: data.sheets?.map((s: any) => ({
-        sheetId: s.properties?.sheetId,
-        title: s.properties?.title,
-        rowCount: s.properties?.gridProperties?.rowCount,
-        columnCount: s.properties?.gridProperties?.columnCount,
-      })),
-      url: data.spreadsheetUrl,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          spreadsheetId: data.spreadsheetId,
+          title: data.properties?.title,
+          sheets: data.sheets?.map((s: any) => ({
+            sheetId: s.properties?.sheetId,
+            title: s.properties?.title,
+            rowCount: s.properties?.gridProperties?.rowCount,
+            columnCount: s.properties?.gridProperties?.columnCount,
+          })),
+          url: data.spreadsheetUrl,
+        },
+        null,
+        2,
+      ),
+    );
   }
 }
 
@@ -77,7 +91,7 @@ async function createSpreadsheet() {
 
 async function appendRows(spreadsheetId: string) {
   if (!values.range || !values.values) {
-    console.error("Required: --range <A:B> --values '[[\"value1\",\"value2\"]]'");
+    console.error('Required: --range <A:B> --values \'[["value1","value2"]]\'');
     process.exit(1);
   }
 
@@ -85,7 +99,9 @@ async function appendRows(spreadsheetId: string) {
   try {
     rowValues = JSON.parse(values.values);
   } catch {
-    console.error("Invalid JSON for --values. Use format: '[[\"val1\",\"val2\"],[\"val3\",\"val4\"]]'");
+    console.error(
+      'Invalid JSON for --values. Use format: \'[["val1","val2"],["val3","val4"]]\'',
+    );
     process.exit(1);
   }
 
@@ -95,17 +111,21 @@ async function appendRows(spreadsheetId: string) {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ values: rowValues }),
-    }
+    },
   );
 
   if (!res.ok) throw new Error(await res.text());
   const result = await res.json();
-  console.log(`Appended ${result.updates?.updatedRows || 0} rows to ${result.updates?.updatedRange}`);
+  console.log(
+    `Appended ${result.updates?.updatedRows || 0} rows to ${result.updates?.updatedRange}`,
+  );
 }
 
 async function updateCells(spreadsheetId: string) {
   if (!values.range || !values.values) {
-    console.error("Required: --range <A1:B2> --values '[[\"value1\",\"value2\"]]'");
+    console.error(
+      'Required: --range <A1:B2> --values \'[["value1","value2"]]\'',
+    );
     process.exit(1);
   }
 
@@ -113,7 +133,9 @@ async function updateCells(spreadsheetId: string) {
   try {
     cellValues = JSON.parse(values.values);
   } catch {
-    console.error("Invalid JSON for --values. Use format: '[[\"val1\",\"val2\"],[\"val3\",\"val4\"]]'");
+    console.error(
+      'Invalid JSON for --values. Use format: \'[["val1","val2"],["val3","val4"]]\'',
+    );
     process.exit(1);
   }
 
@@ -123,12 +145,14 @@ async function updateCells(spreadsheetId: string) {
       method: "PUT",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ values: cellValues }),
-    }
+    },
   );
 
   if (!res.ok) throw new Error(await res.text());
   const result = await res.json();
-  console.log(`Updated ${result.updatedCells || 0} cells in ${result.updatedRange}`);
+  console.log(
+    `Updated ${result.updatedCells || 0} cells in ${result.updatedRange}`,
+  );
 }
 
 async function clearRange(spreadsheetId: string) {
@@ -142,7 +166,7 @@ async function clearRange(spreadsheetId: string) {
     {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
-    }
+    },
   );
 
   if (!res.ok) throw new Error(await res.text());
@@ -159,11 +183,13 @@ async function addSheet(spreadsheetId: string) {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
     body: JSON.stringify({
-      requests: [{
-        addSheet: {
-          properties: { title: values.title },
+      requests: [
+        {
+          addSheet: {
+            properties: { title: values.title },
+          },
         },
-      }],
+      ],
     }),
   });
 
@@ -220,13 +246,27 @@ async function main() {
 
   try {
     switch (command) {
-      case "get": await getSpreadsheet(args[0]); break;
-      case "create": await createSpreadsheet(); break;
-      case "append": await appendRows(args[0]); break;
-      case "update": await updateCells(args[0]); break;
-      case "clear": await clearRange(args[0]); break;
-      case "add-sheet": await addSheet(args[0]); break;
-      case "list": await listSpreadsheets(); break;
+      case "get":
+        await getSpreadsheet(args[0]);
+        break;
+      case "create":
+        await createSpreadsheet();
+        break;
+      case "append":
+        await appendRows(args[0]);
+        break;
+      case "update":
+        await updateCells(args[0]);
+        break;
+      case "clear":
+        await clearRange(args[0]);
+        break;
+      case "add-sheet":
+        await addSheet(args[0]);
+        break;
+      case "list":
+        await listSpreadsheets();
+        break;
       default:
         showHelp();
     }

@@ -8,7 +8,9 @@ describe("middleware", () => {
     const response = middleware(request);
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("http://localhost:3000/login?callbackUrl=%2Fchat");
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/login?callbackUrl=%2Fchat",
+    );
   });
 
   test("allows protected routes with session cookie", () => {
@@ -32,7 +34,9 @@ describe("middleware", () => {
   });
 
   test("skips auth checks for rpc routes", () => {
-    const request = new NextRequest("http://localhost:3000/api/rpc/conversation.list");
+    const request = new NextRequest(
+      "http://localhost:3000/api/rpc/conversation.list",
+    );
     const response = middleware(request);
 
     expect(response.status).toBe(200);

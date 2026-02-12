@@ -14,9 +14,13 @@ let s3Client: S3Client | null = null;
 
 export function getS3Client(): S3Client {
   if (!s3Client) {
-    if (!env.S3_ENDPOINT || !env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
+    if (
+      !env.S3_ENDPOINT ||
+      !env.S3_ACCESS_KEY_ID ||
+      !env.S3_SECRET_ACCESS_KEY
+    ) {
       throw new Error(
-        "S3 configuration is incomplete. Check S3_ENDPOINT, S3_ACCESS_KEY_ID, and S3_SECRET_ACCESS_KEY."
+        "S3 configuration is incomplete. Check S3_ENDPOINT, S3_ACCESS_KEY_ID, and S3_SECRET_ACCESS_KEY.",
       );
     }
 
@@ -42,7 +46,10 @@ export async function ensureBucket(): Promise<void> {
   try {
     await client.send(new HeadBucketCommand({ Bucket: BUCKET_NAME }));
   } catch (error: unknown) {
-    const err = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+    const err = error as {
+      name?: string;
+      $metadata?: { httpStatusCode?: number };
+    };
     if (err.name === "NotFound" || err.$metadata?.httpStatusCode === 404) {
       await client.send(new CreateBucketCommand({ Bucket: BUCKET_NAME }));
       console.log(`Created S3 bucket: ${BUCKET_NAME}`);
@@ -56,7 +63,7 @@ export async function ensureBucket(): Promise<void> {
 export async function uploadToS3(
   key: string,
   body: Buffer,
-  contentType: string
+  contentType: string,
 ): Promise<void> {
   const client = getS3Client();
 
@@ -66,7 +73,7 @@ export async function uploadToS3(
       Key: key,
       Body: body,
       ContentType: contentType,
-    })
+    }),
   );
 }
 
@@ -78,14 +85,14 @@ export async function deleteFromS3(key: string): Promise<void> {
     new DeleteObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
-    })
+    }),
   );
 }
 
 // Generate presigned URL for downloading
 export async function getPresignedDownloadUrl(
   key: string,
-  expiresInSeconds: number = 3600
+  expiresInSeconds: number = 3600,
 ): Promise<string> {
   const client = getS3Client();
 
@@ -105,7 +112,7 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
     new GetObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
-    })
+    }),
   );
 
   if (!response.Body) {
@@ -124,7 +131,7 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
 export function generateStorageKey(
   userId: string,
   skillId: string,
-  filename: string
+  filename: string,
 ): string {
   const timestamp = Date.now();
   const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "_");

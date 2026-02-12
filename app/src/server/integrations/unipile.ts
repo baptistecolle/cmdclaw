@@ -1,7 +1,8 @@
 import { env } from "@/env";
 
 const getUnipileBaseUrl = () => `https://${env.UNIPILE_DSN}`;
-const getAppUrl = () => env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+const getAppUrl = () =>
+  env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 interface UnipileAccount {
   id: string;
@@ -29,7 +30,7 @@ interface HostedAuthResponse {
 
 export async function generateLinkedInAuthUrl(
   userId: string,
-  redirectUrl: string
+  redirectUrl: string,
 ): Promise<string> {
   const response = await fetch(
     `${getUnipileBaseUrl()}/api/v1/hosted/accounts/link`,
@@ -50,7 +51,7 @@ export async function generateLinkedInAuthUrl(
         failure_redirect_url: redirectUrl,
         name: userId,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -64,7 +65,7 @@ export async function generateLinkedInAuthUrl(
 }
 
 export async function getUnipileAccount(
-  accountId: string
+  accountId: string,
 ): Promise<UnipileAccount> {
   const response = await fetch(
     `${getUnipileBaseUrl()}/api/v1/accounts/${accountId}`,
@@ -73,7 +74,7 @@ export async function getUnipileAccount(
         "X-API-KEY": env.UNIPILE_API_KEY!,
         Accept: "application/json",
       },
-    }
+    },
   );
 
   if (!response.ok) {
@@ -86,7 +87,7 @@ export async function getUnipileAccount(
 }
 
 export async function getLinkedInProfile(
-  accountId: string
+  accountId: string,
 ): Promise<UnipileProfile> {
   const response = await fetch(
     `${getUnipileBaseUrl()}/api/v1/users/me?account_id=${accountId}`,
@@ -95,7 +96,7 @@ export async function getLinkedInProfile(
         "X-API-KEY": env.UNIPILE_API_KEY!,
         Accept: "application/json",
       },
-    }
+    },
   );
 
   if (!response.ok) {
@@ -116,7 +117,7 @@ export async function deleteUnipileAccount(accountId: string): Promise<void> {
         "X-API-KEY": env.UNIPILE_API_KEY!,
         Accept: "application/json",
       },
-    }
+    },
   );
 
   if (!response.ok) {

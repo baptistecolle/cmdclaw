@@ -32,9 +32,10 @@ export class AnthropicBackend implements LLMBackend {
     // Convert our message format to Anthropic format
     const messages = params.messages.map((m) => ({
       role: m.role as "user" | "assistant",
-      content: typeof m.content === "string"
-        ? m.content
-        : convertContentBlocks(m.content),
+      content:
+        typeof m.content === "string"
+          ? m.content
+          : convertContentBlocks(m.content),
     }));
 
     // Build tools in Anthropic format
@@ -76,7 +77,12 @@ export class AnthropicBackend implements LLMBackend {
       };
       yield {
         type: "done",
-        stopReason: finalMessage.stop_reason as StreamEvent extends { type: "done" } ? StreamEvent : never extends { stopReason: infer R } ? R : string || "end_turn",
+        stopReason:
+          (finalMessage.stop_reason as StreamEvent extends { type: "done" }
+            ? StreamEvent
+            : never extends { stopReason: infer R }
+              ? R
+              : string) || "end_turn",
       } as StreamEvent;
     } catch (err: unknown) {
       if (params.signal?.aborted) return;
@@ -98,13 +104,20 @@ export class AnthropicBackend implements LLMBackend {
   }
 }
 
-function convertContentBlocks(blocks: ContentBlock[]): Anthropic.ContentBlockParam[] {
+function convertContentBlocks(
+  blocks: ContentBlock[],
+): Anthropic.ContentBlockParam[] {
   return blocks.map((block): Anthropic.ContentBlockParam => {
     switch (block.type) {
       case "text":
         return { type: "text", text: block.text };
       case "tool_use":
-        return { type: "tool_use", id: block.id, name: block.name, input: block.input };
+        return {
+          type: "tool_use",
+          id: block.id,
+          name: block.name,
+          input: block.input,
+        };
       case "tool_result":
         return {
           type: "tool_result",
@@ -113,7 +126,11 @@ function convertContentBlocks(blocks: ContentBlock[]): Anthropic.ContentBlockPar
           is_error: block.is_error,
         };
       case "thinking":
-        return { type: "thinking", thinking: block.thinking, signature: block.signature } as any;
+        return {
+          type: "thinking",
+          thinking: block.thinking,
+          signature: block.signature,
+        } as any;
       case "image":
         return {
           type: "image",

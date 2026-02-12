@@ -14,13 +14,13 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error("OAuth error:", error);
     return NextResponse.redirect(
-      new URL(`/integrations?error=${error}`, request.url)
+      new URL(`/integrations?error=${error}`, request.url),
     );
   }
 
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL("/integrations?error=missing_params", request.url)
+      new URL("/integrations?error=missing_params", request.url),
     );
   }
 
@@ -31,18 +31,23 @@ export async function GET(request: NextRequest) {
 
   if (!sessionData?.user) {
     return NextResponse.redirect(
-      new URL("/login?error=unauthorized", request.url)
+      new URL("/login?error=unauthorized", request.url),
     );
   }
 
   // Parse state
-  let stateData: { userId: string; type: IntegrationType; redirectUrl: string; codeVerifier?: string };
+  let stateData: {
+    userId: string;
+    type: IntegrationType;
+    redirectUrl: string;
+    codeVerifier?: string;
+  };
 
   try {
     stateData = JSON.parse(Buffer.from(state, "base64url").toString());
   } catch {
     return NextResponse.redirect(
-      new URL("/integrations?error=invalid_state", request.url)
+      new URL("/integrations?error=invalid_state", request.url),
     );
   }
 
@@ -76,7 +81,7 @@ export async function GET(request: NextRequest) {
     // Notion and Airtable require Basic auth header
     if (stateData.type === "notion" || stateData.type === "airtable") {
       headers["Authorization"] = `Basic ${Buffer.from(
-        `${config.clientId}:${config.clientSecret}`
+        `${config.clientId}:${config.clientSecret}`,
       ).toString("base64")}`;
       tokenBody.delete("client_id");
       tokenBody.delete("client_secret");
@@ -101,7 +106,9 @@ export async function GET(request: NextRequest) {
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
       console.error("Token exchange failed:", error);
-      return NextResponse.redirect(buildRedirectUrl("error=token_exchange_failed"));
+      return NextResponse.redirect(
+        buildRedirectUrl("error=token_exchange_failed"),
+      );
     }
 
     const tokens = await tokenResponse.json();
@@ -142,7 +149,7 @@ export async function GET(request: NextRequest) {
     const existingIntegration = await db.query.integration.findFirst({
       where: and(
         eq(integration.userId, sessionData.user.id),
-        eq(integration.type, stateData.type)
+        eq(integration.type, stateData.type),
       ),
     });
 
@@ -183,9 +190,7 @@ export async function GET(request: NextRequest) {
       integrationId: integId,
       accessToken: accessToken,
       refreshToken: refreshToken,
-      expiresAt: expiresIn
-        ? new Date(Date.now() + expiresIn * 1000)
-        : null,
+      expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
       idToken: tokens.id_token,
     });
 

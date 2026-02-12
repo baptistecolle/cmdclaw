@@ -17,7 +17,8 @@ const providerSchema = z.enum(["openai", "google", "kimi"]);
 
 // PKCE helpers — matches OpenCode's codex.ts implementation
 function generateCodeVerifier(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
   const bytes = new Uint8Array(43);
   crypto.getRandomValues(bytes);
   return Array.from(bytes)
@@ -36,7 +37,9 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 
 function generateState(): string {
-  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+  return btoa(
+    String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))),
+  )
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
@@ -140,8 +143,8 @@ const disconnect = protectedProcedure
       .where(
         and(
           eq(providerAuth.userId, context.user.id),
-          eq(providerAuth.provider, input.provider)
-        )
+          eq(providerAuth.provider, input.provider),
+        ),
       );
 
     return { success: true };
@@ -156,7 +159,7 @@ const setApiKey = protectedProcedure
     z.object({
       provider: z.literal("kimi"),
       apiKey: z.string().min(1),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const apiKey = input.apiKey.trim();
@@ -207,7 +210,7 @@ export async function storeProviderTokens(params: {
   const existing = await db.query.providerAuth.findFirst({
     where: and(
       eq(providerAuth.userId, params.userId),
-      eq(providerAuth.provider, params.provider)
+      eq(providerAuth.provider, params.provider),
     ),
   });
 

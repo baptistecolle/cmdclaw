@@ -15,7 +15,7 @@ import { eq } from "drizzle-orm";
  */
 export async function verifyDeviceToken(
   token: string,
-  deviceId: string
+  deviceId: string,
 ): Promise<{ userId: string; deviceId: string } | null> {
   try {
     const session = await auth.api.getSession({

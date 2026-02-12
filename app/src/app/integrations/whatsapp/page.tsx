@@ -115,10 +115,16 @@ export default function WhatsAppIntegrationPage() {
       const data = (await res.json()) as { code: string; expiresAt: string };
       setLinkCode(data.code);
       setLinkExpiresAt(data.expiresAt);
-      setNotification({ type: "success", message: "WhatsApp link code generated." });
+      setNotification({
+        type: "success",
+        message: "WhatsApp link code generated.",
+      });
     } catch (err) {
       console.error("Failed to generate link code:", err);
-      setNotification({ type: "error", message: "Failed to generate link code." });
+      setNotification({
+        type: "error",
+        message: "Failed to generate link code.",
+      });
     } finally {
       setLinkLoading(false);
     }
@@ -139,7 +145,7 @@ export default function WhatsAppIntegrationPage() {
             "mb-6 rounded-lg border p-3 text-sm",
             notification.type === "success"
               ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400"
+              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400",
           )}
         >
           {notification.message}
@@ -152,7 +158,8 @@ export default function WhatsAppIntegrationPage() {
             <div>
               <h3 className="text-lg font-semibold">Bridge Pairing</h3>
               <p className="text-sm text-muted-foreground">
-                Connect the app bridge to a WhatsApp account by scanning the QR code.
+                Connect the app bridge to a WhatsApp account by scanning the QR
+                code.
               </p>
             </div>
             <Button onClick={handleReconnect} disabled={waLoading || forbidden}>
@@ -169,7 +176,10 @@ export default function WhatsAppIntegrationPage() {
 
           <div className="mt-4 rounded-lg border bg-muted/20 p-4">
             <div className="text-sm text-muted-foreground">
-              Status: <span className="font-medium text-foreground">{waStatus?.status ?? "unknown"}</span>
+              Status:{" "}
+              <span className="font-medium text-foreground">
+                {waStatus?.status ?? "unknown"}
+              </span>
             </div>
             {forbidden && (
               <p className="mt-2 text-sm text-muted-foreground">
@@ -177,13 +187,20 @@ export default function WhatsAppIntegrationPage() {
               </p>
             )}
             {waStatus?.lastError && (
-              <div className="mt-1 text-sm text-destructive">{waStatus.lastError}</div>
+              <div className="mt-1 text-sm text-destructive">
+                {waStatus.lastError}
+              </div>
             )}
             {waQrDataUrl ? (
               <div className="mt-4 flex flex-col items-start gap-2">
-                <img src={waQrDataUrl} alt="WhatsApp QR code" className="h-60 w-60 rounded-md border bg-white p-2" />
+                <img
+                  src={waQrDataUrl}
+                  alt="WhatsApp QR code"
+                  className="h-60 w-60 rounded-md border bg-white p-2"
+                />
                 <p className="text-xs text-muted-foreground">
-                  Scan this in WhatsApp: Settings {"->"} Linked Devices {"->"} Link a Device.
+                  Scan this in WhatsApp: Settings {"->"} Linked Devices {"->"}{" "}
+                  Link a Device.
                 </p>
               </div>
             ) : (
@@ -197,7 +214,8 @@ export default function WhatsAppIntegrationPage() {
         <div className="rounded-lg border p-6">
           <h3 className="text-lg font-semibold">User Linking Code</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Generate your code and send it from your WhatsApp number to complete account linking.
+            Generate your code and send it from your WhatsApp number to complete
+            account linking.
           </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button onClick={handleGenerateLinkCode} disabled={linkLoading}>

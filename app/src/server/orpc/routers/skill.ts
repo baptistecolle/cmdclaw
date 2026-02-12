@@ -23,7 +23,11 @@ function toSkillSlug(name: string): string {
 }
 
 // Generate default SKILL.md content
-function generateSkillMd(displayName: string, slug: string, description: string): string {
+function generateSkillMd(
+  displayName: string,
+  slug: string,
+  description: string,
+): string {
   return `---
 name: ${slug}
 description: ${description}
@@ -63,10 +67,7 @@ const get = protectedProcedure
   .input(z.object({ id: z.string() }))
   .handler(async ({ input, context }) => {
     const result = await context.db.query.skill.findFirst({
-      where: and(
-        eq(skill.id, input.id),
-        eq(skill.userId, context.user.id)
-      ),
+      where: and(eq(skill.id, input.id), eq(skill.userId, context.user.id)),
       with: {
         files: true,
         documents: true,
@@ -111,7 +112,7 @@ const create = protectedProcedure
       displayName: z.string().min(1).max(128),
       description: z.string().min(1).max(1024),
       icon: z.string().max(64).optional(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const slug = toSkillSlug(input.displayName);
@@ -158,7 +159,7 @@ const update = protectedProcedure
       description: z.string().min(1).max(1024).optional(),
       icon: z.string().max(64).nullish(),
       enabled: z.boolean().optional(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const updates: Partial<typeof skill.$inferInsert> = {};
@@ -185,9 +186,7 @@ const update = protectedProcedure
     const result = await context.db
       .update(skill)
       .set(updates)
-      .where(
-        and(eq(skill.id, input.id), eq(skill.userId, context.user.id))
-      )
+      .where(and(eq(skill.id, input.id), eq(skill.userId, context.user.id)))
       .returning({ id: skill.id });
 
     if (result.length === 0) {
@@ -203,9 +202,7 @@ const deleteSkill = protectedProcedure
   .handler(async ({ input, context }) => {
     const result = await context.db
       .delete(skill)
-      .where(
-        and(eq(skill.id, input.id), eq(skill.userId, context.user.id))
-      )
+      .where(and(eq(skill.id, input.id), eq(skill.userId, context.user.id)))
       .returning({ id: skill.id });
 
     if (result.length === 0) {
@@ -222,14 +219,14 @@ const addFile = protectedProcedure
       skillId: z.string(),
       path: z.string().min(1).max(256),
       content: z.string(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     // Verify ownership
     const existingSkill = await context.db.query.skill.findFirst({
       where: and(
         eq(skill.id, input.skillId),
-        eq(skill.userId, context.user.id)
+        eq(skill.userId, context.user.id),
       ),
     });
 
@@ -258,7 +255,7 @@ const updateFile = protectedProcedure
     z.object({
       id: z.string(),
       content: z.string(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     // Get the file and verify ownership through skill
@@ -318,14 +315,14 @@ const uploadDocument = protectedProcedure
       mimeType: z.string(),
       content: z.string(), // Base64-encoded file content
       description: z.string().max(1024).optional(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     // Verify skill ownership
     const existingSkill = await context.db.query.skill.findFirst({
       where: and(
         eq(skill.id, input.skillId),
-        eq(skill.userId, context.user.id)
+        eq(skill.userId, context.user.id),
       ),
     });
 
@@ -351,7 +348,7 @@ const uploadDocument = protectedProcedure
     const storageKey = generateStorageKey(
       context.user.id,
       input.skillId,
-      input.filename
+      input.filename,
     );
     await uploadToS3(storageKey, fileBuffer, input.mimeType);
 

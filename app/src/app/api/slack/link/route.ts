@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!slackUserId || !slackTeamId) {
     return NextResponse.json(
       { error: "Missing slackUserId or slackTeamId" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -25,9 +25,7 @@ export async function GET(request: Request) {
     // Redirect to login with return URL
     const appUrl = url.origin;
     const returnUrl = encodeURIComponent(url.pathname + url.search);
-    return NextResponse.redirect(
-      `${appUrl}/login?redirect=${returnUrl}`
-    );
+    return NextResponse.redirect(`${appUrl}/login?redirect=${returnUrl}`);
   }
 
   const userId = sessionData.session.userId;
@@ -55,6 +53,6 @@ export async function GET(request: Request) {
 </body></html>`,
     {
       headers: { "Content-Type": "text/html" },
-    }
+    },
   );
 }

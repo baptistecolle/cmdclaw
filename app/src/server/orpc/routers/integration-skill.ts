@@ -27,12 +27,12 @@ const createFromChat = protectedProcedure
           z.object({
             path: z.string().min(1).max(256),
             content: z.string(),
-          })
+          }),
         )
         .max(50)
         .default([]),
       setAsPreferred: z.boolean().default(false),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const slug = normalizeIntegrationSkillSlug(input.slug);
@@ -54,7 +54,10 @@ const createFromChat = protectedProcedure
       };
     } catch (error) {
       throw new ORPCError("BAD_REQUEST", {
-        message: error instanceof Error ? error.message : "Failed to create integration skill",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to create integration skill",
       });
     }
   });
@@ -71,7 +74,7 @@ const listBySlug = protectedProcedure
         eq(integrationSkill.slug, slug),
         eq(integrationSkill.source, "community"),
         eq(integrationSkill.isActive, true),
-        eq(integrationSkill.visibility, "public")
+        eq(integrationSkill.visibility, "public"),
       ),
       with: {
         files: true,
@@ -82,7 +85,7 @@ const listBySlug = protectedProcedure
     const pref = await context.db.query.integrationSkillPreference.findFirst({
       where: and(
         eq(integrationSkillPreference.userId, context.user.id),
-        eq(integrationSkillPreference.slug, slug)
+        eq(integrationSkillPreference.slug, slug),
       ),
     });
 
@@ -119,12 +122,15 @@ const getResolvedForUser = protectedProcedure
   .input(z.object({ slug: z.string().min(1).max(64) }))
   .handler(async ({ input, context }) => {
     const slug = normalizeIntegrationSkillSlug(input.slug);
-    const resolved = await resolveIntegrationSkillForUser(context.user.id, slug);
+    const resolved = await resolveIntegrationSkillForUser(
+      context.user.id,
+      slug,
+    );
 
     const pref = await context.db.query.integrationSkillPreference.findFirst({
       where: and(
         eq(integrationSkillPreference.userId, context.user.id),
-        eq(integrationSkillPreference.slug, slug)
+        eq(integrationSkillPreference.slug, slug),
       ),
     });
 
@@ -146,7 +152,7 @@ const setPreference = protectedProcedure
       slug: z.string().min(1).max(64),
       preferredSource: z.enum(["official", "community"]),
       preferredSkillId: z.string().optional(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const slug = normalizeIntegrationSkillSlug(input.slug);
@@ -164,7 +170,7 @@ const setPreference = protectedProcedure
           eq(integrationSkill.slug, slug),
           eq(integrationSkill.source, "community"),
           eq(integrationSkill.isActive, true),
-          eq(integrationSkill.visibility, "public")
+          eq(integrationSkill.visibility, "public"),
         ),
       });
       if (!selected) {
@@ -190,14 +196,21 @@ const setPreference = protectedProcedure
         slug,
         preferredSource: input.preferredSource,
         preferredSkillId:
-          input.preferredSource === "community" ? input.preferredSkillId ?? null : null,
+          input.preferredSource === "community"
+            ? (input.preferredSkillId ?? null)
+            : null,
       })
       .onConflictDoUpdate({
-        target: [integrationSkillPreference.userId, integrationSkillPreference.slug],
+        target: [
+          integrationSkillPreference.userId,
+          integrationSkillPreference.slug,
+        ],
         set: {
           preferredSource: input.preferredSource,
           preferredSkillId:
-            input.preferredSource === "community" ? input.preferredSkillId ?? null : null,
+            input.preferredSource === "community"
+              ? (input.preferredSkillId ?? null)
+              : null,
           updatedAt: new Date(),
         },
       });
@@ -216,22 +229,24 @@ const updateCommunitySkill = protectedProcedure
           z.object({
             path: z.string().min(1).max(256),
             content: z.string(),
-          })
+          }),
         )
         .max(50)
         .optional(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const existing = await context.db.query.integrationSkill.findFirst({
       where: and(
         eq(integrationSkill.id, input.id),
         eq(integrationSkill.source, "community"),
-        eq(integrationSkill.isActive, true)
+        eq(integrationSkill.isActive, true),
       ),
     });
     if (!existing) {
-      throw new ORPCError("NOT_FOUND", { message: "Integration skill not found" });
+      throw new ORPCError("NOT_FOUND", {
+        message: "Integration skill not found",
+      });
     }
     if (existing.createdByUserId !== context.user.id) {
       throw new ORPCError("FORBIDDEN", { message: "Not allowed" });
@@ -251,21 +266,27 @@ const updateCommunitySkill = protectedProcedure
       const seen = new Set<string>();
       for (const file of input.files) {
         if (!validateIntegrationSkillFilePath(file.path)) {
-          throw new ORPCError("BAD_REQUEST", { message: `Invalid file path: ${file.path}` });
+          throw new ORPCError("BAD_REQUEST", {
+            message: `Invalid file path: ${file.path}`,
+          });
         }
         if (seen.has(file.path)) {
-          throw new ORPCError("BAD_REQUEST", { message: `Duplicate file path: ${file.path}` });
+          throw new ORPCError("BAD_REQUEST", {
+            message: `Duplicate file path: ${file.path}`,
+          });
         }
         seen.add(file.path);
       }
 
-      await context.db.delete(integrationSkillFile).where(eq(integrationSkillFile.integrationSkillId, existing.id));
+      await context.db
+        .delete(integrationSkillFile)
+        .where(eq(integrationSkillFile.integrationSkillId, existing.id));
       await context.db.insert(integrationSkillFile).values(
         input.files.map((file) => ({
           integrationSkillId: existing.id,
           path: file.path,
           content: file.content,
-        }))
+        })),
       );
     }
 
@@ -279,11 +300,13 @@ const deleteCommunitySkill = protectedProcedure
       where: and(
         eq(integrationSkill.id, input.id),
         eq(integrationSkill.source, "community"),
-        eq(integrationSkill.isActive, true)
+        eq(integrationSkill.isActive, true),
       ),
     });
     if (!existing) {
-      throw new ORPCError("NOT_FOUND", { message: "Integration skill not found" });
+      throw new ORPCError("NOT_FOUND", {
+        message: "Integration skill not found",
+      });
     }
     if (existing.createdByUserId !== context.user.id) {
       throw new ORPCError("FORBIDDEN", { message: "Not allowed" });
@@ -304,10 +327,12 @@ const listPublic = protectedProcedure
         slug: z.string().min(1).max(64).optional(),
         limit: z.number().int().min(1).max(100).default(50),
       })
-      .optional()
+      .optional(),
   )
   .handler(async ({ input }) => {
-    const slug = input?.slug ? normalizeIntegrationSkillSlug(input.slug) : undefined;
+    const slug = input?.slug
+      ? normalizeIntegrationSkillSlug(input.slug)
+      : undefined;
     const limit = input?.limit ?? 50;
 
     const filters = [

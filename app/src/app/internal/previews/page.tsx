@@ -35,11 +35,18 @@ function MissingMockDataAlert({ integrations }: { integrations: string[] }) {
           </h3>
           <p className="text-sm text-amber-600 dark:text-amber-500 mt-1">
             The following integrations have preview components but no mock data
-            defined in <code className="font-mono text-xs bg-amber-500/20 px-1 py-0.5 rounded">mock-data.ts</code>:
+            defined in{" "}
+            <code className="font-mono text-xs bg-amber-500/20 px-1 py-0.5 rounded">
+              mock-data.ts
+            </code>
+            :
           </p>
           <ul className="mt-2 space-y-1">
             {integrations.map((key) => (
-              <li key={key} className="text-sm font-mono text-amber-700 dark:text-amber-400">
+              <li
+                key={key}
+                className="text-sm font-mono text-amber-700 dark:text-amber-400"
+              >
                 {key} ({INTEGRATION_PREVIEWS[key]?.displayName})
               </li>
             ))}
@@ -55,7 +62,9 @@ export default function PreviewsPage() {
 
   // Find integrations without mock data
   const missingMockData = integrations
-    .filter(([key]) => !PREVIEW_MOCK_DATA[key] || PREVIEW_MOCK_DATA[key].length === 0)
+    .filter(
+      ([key]) => !PREVIEW_MOCK_DATA[key] || PREVIEW_MOCK_DATA[key].length === 0,
+    )
     .map(([key]) => key);
 
   return (

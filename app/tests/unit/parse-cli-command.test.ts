@@ -7,7 +7,9 @@ describe("parseCliCommand", () => {
   });
 
   test("parses quoted arguments and long/short flags", () => {
-    const parsed = parseCliCommand("slack send -c general --text='hello world' --thread=12345");
+    const parsed = parseCliCommand(
+      "slack send -c general --text='hello world' --thread=12345",
+    );
 
     expect(parsed).toEqual({
       integration: "slack",
@@ -23,7 +25,9 @@ describe("parseCliCommand", () => {
   });
 
   test("parses hubspot nested operations", () => {
-    const parsed = parseCliCommand("hubspot contacts update --id 42 --email user@example.com");
+    const parsed = parseCliCommand(
+      "hubspot contacts update --id 42 --email user@example.com",
+    );
     expect(parsed?.integration).toBe("hubspot");
     expect(parsed?.operation).toBe("contacts.update");
     expect(parsed?.args.id).toBe("42");
@@ -54,20 +58,72 @@ describe("parseCliCommand", () => {
       integration: string;
       operation: string;
     }> = [
-      { command: "slack channels", integration: "slack", operation: "channels" },
-      { command: "google-gmail list --limit 5", integration: "gmail", operation: "list" },
-      { command: "gcalendar today", integration: "google_calendar", operation: "today" },
-      { command: "gdocs get doc_123", integration: "google_docs", operation: "get" },
-      { command: "gsheets get sheet_123", integration: "google_sheets", operation: "get" },
-      { command: "gdrive list", integration: "google_drive", operation: "list" },
-      { command: "notion search --query roadmap", integration: "notion", operation: "search" },
+      {
+        command: "slack channels",
+        integration: "slack",
+        operation: "channels",
+      },
+      {
+        command: "google-gmail list --limit 5",
+        integration: "gmail",
+        operation: "list",
+      },
+      {
+        command: "gcalendar today",
+        integration: "google_calendar",
+        operation: "today",
+      },
+      {
+        command: "gdocs get doc_123",
+        integration: "google_docs",
+        operation: "get",
+      },
+      {
+        command: "gsheets get sheet_123",
+        integration: "google_sheets",
+        operation: "get",
+      },
+      {
+        command: "gdrive list",
+        integration: "google_drive",
+        operation: "list",
+      },
+      {
+        command: "notion search --query roadmap",
+        integration: "notion",
+        operation: "search",
+      },
       { command: "linear mine", integration: "linear", operation: "mine" },
-      { command: "github prs --owner acme --repo app", integration: "github", operation: "prs" },
-      { command: "airtable bases", integration: "airtable", operation: "bases" },
-      { command: "hubspot owners", integration: "hubspot", operation: "owners" },
-      { command: "salesforce objects", integration: "salesforce", operation: "objects" },
-      { command: "reddit feed -l 10", integration: "reddit", operation: "feed" },
-      { command: "twitter timeline -l 5", integration: "twitter", operation: "timeline" },
+      {
+        command: "github prs --owner acme --repo app",
+        integration: "github",
+        operation: "prs",
+      },
+      {
+        command: "airtable bases",
+        integration: "airtable",
+        operation: "bases",
+      },
+      {
+        command: "hubspot owners",
+        integration: "hubspot",
+        operation: "owners",
+      },
+      {
+        command: "salesforce objects",
+        integration: "salesforce",
+        operation: "objects",
+      },
+      {
+        command: "reddit feed -l 10",
+        integration: "reddit",
+        operation: "feed",
+      },
+      {
+        command: "twitter timeline -l 5",
+        integration: "twitter",
+        operation: "timeline",
+      },
     ];
 
     for (const item of cases) {

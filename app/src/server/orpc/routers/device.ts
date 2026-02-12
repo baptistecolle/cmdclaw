@@ -15,14 +15,14 @@ const register = baseProcedure
       token: z.string(),
       deviceName: z.string().optional(),
       platform: z.string().optional(),
-    })
+    }),
   )
   .output(
     z.object({
       success: z.boolean(),
       deviceId: z.string().optional(),
       error: z.string().optional(),
-    })
+    }),
   )
   .handler(async ({ input }) => {
     // Verify the Bearer token via Better Auth
@@ -61,8 +61,8 @@ const list = protectedProcedure
         lastSeenAt: z.string().nullable(),
         capabilities: z.unknown().nullable(),
         createdAt: z.string(),
-      })
-    )
+      }),
+    ),
   )
   .handler(async ({ context }) => {
     const devices = await db.query.device.findMany({

@@ -5,7 +5,10 @@ import { triggerWorkflowRun } from "@/server/services/workflow-service";
 const rawQueueName = process.env.BULLMQ_QUEUE_NAME ?? "bap-default";
 export const queueName = rawQueueName.replaceAll(":", "-");
 export const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
-const redisOptions = { maxRetriesPerRequest: null, enableReadyCheck: false } as const;
+const redisOptions = {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
+} as const;
 
 export const SCHEDULED_WORKFLOW_JOB_NAME = "workflow:scheduled-trigger";
 export const GMAIL_WORKFLOW_JOB_NAME = "workflow:gmail-trigger";
@@ -39,7 +42,9 @@ const handlers: Record<string, JobHandler> = {
     }
 
     const scheduleType =
-      typeof job.data?.scheduleType === "string" ? job.data.scheduleType : "unknown";
+      typeof job.data?.scheduleType === "string"
+        ? job.data.scheduleType
+        : "unknown";
 
     return triggerWorkflowRun({
       workflowId,
@@ -65,7 +70,7 @@ const handlers: Record<string, JobHandler> = {
     } catch (error) {
       if (isActiveWorkflowRunConflict(error)) {
         console.warn(
-          `[worker] skipped gmail workflow trigger because run is already active for workflow ${workflowId}`
+          `[worker] skipped gmail workflow trigger because run is already active for workflow ${workflowId}`,
         );
         return;
       }
@@ -86,7 +91,7 @@ const handlers: Record<string, JobHandler> = {
     } catch (error) {
       if (isActiveWorkflowRunConflict(error)) {
         console.warn(
-          `[worker] skipped x dm workflow trigger because run is already active for workflow ${workflowId}`
+          `[worker] skipped x dm workflow trigger because run is already active for workflow ${workflowId}`,
         );
         return;
       }
@@ -158,7 +163,14 @@ export const startQueues = () => {
     console.error("[worker] queue events error", error);
   });
 
-  return { worker, queueEvents, workerConnection, queueEventsConnection, queueName, redisUrl };
+  return {
+    worker,
+    queueEvents,
+    workerConnection,
+    queueEventsConnection,
+    queueName,
+    redisUrl,
+  };
 };
 
 async function closeRedisConnection(connection: IORedis): Promise<void> {
@@ -173,7 +185,7 @@ export const stopQueues = async (
   worker: Worker,
   queueEvents: QueueEvents,
   workerConnection: IORedis,
-  queueEventsConnection: IORedis
+  queueEventsConnection: IORedis,
 ) => {
   const closers: Promise<unknown>[] = [worker.close(), queueEvents.close()];
   if (queue) {

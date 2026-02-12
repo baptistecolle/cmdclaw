@@ -38,7 +38,7 @@ export default function SettingsLayout({
                     "border-b-2 px-1 pb-2 text-sm font-medium transition-colors",
                     isActive
                       ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {tab.label}

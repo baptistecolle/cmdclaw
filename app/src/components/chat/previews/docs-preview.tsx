@@ -6,11 +6,7 @@ import {
   IntegrationLogo,
 } from "./preview-styles";
 
-export function DocsPreview({
-  operation,
-  args,
-  positionalArgs,
-}: PreviewProps) {
+export function DocsPreview({ operation, args, positionalArgs }: PreviewProps) {
   switch (operation) {
     case "create":
       return <DocsCreatePreview args={args} />;
@@ -21,7 +17,11 @@ export function DocsPreview({
   }
 }
 
-function DocsCreatePreview({ args }: { args: Record<string, string | undefined> }) {
+function DocsCreatePreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const title = args.title;
   const content = args.content;
 

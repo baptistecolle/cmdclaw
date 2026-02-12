@@ -84,7 +84,10 @@ export const env = createEnv({
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_BUCKET_NAME: z.string().default("bap-documents"),
-    S3_FORCE_PATH_STYLE: z.string().transform(v => v === "true").default("true"),
+    S3_FORCE_PATH_STYLE: z
+      .string()
+      .transform((v) => v === "true")
+      .default("true"),
     // Autumn (Billing)
     AUTUMN_SECRET_KEY: z.string().optional(),
     // Slack Bot
@@ -176,7 +179,8 @@ export const env = createEnv({
     SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET,
     SLACK_BOT_OWNER_USER_ID: process.env.SLACK_BOT_OWNER_USER_ID,
     SLACK_BOT_RELAY_SECRET: process.env.SLACK_BOT_RELAY_SECRET,
-    SLACK_BOT_RELAY_ALLOWED_CHANNELS: process.env.SLACK_BOT_RELAY_ALLOWED_CHANNELS,
+    SLACK_BOT_RELAY_ALLOWED_CHANNELS:
+      process.env.SLACK_BOT_RELAY_ALLOWED_CHANNELS,
     COMMUNITY_REPO_GITHUB_TOKEN: process.env.COMMUNITY_REPO_GITHUB_TOKEN,
     COMMUNITY_REPO_OWNER: process.env.COMMUNITY_REPO_OWNER,
     COMMUNITY_REPO_NAME: process.env.COMMUNITY_REPO_NAME,

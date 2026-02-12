@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import type React from "react";
 import { Suspense, useEffect, useState } from "react";
@@ -110,7 +110,9 @@ function LoginContent() {
 
     if (signInError) {
       setStatus("error");
-      setError(signInError?.message || "Unable to send the magic link right now.");
+      setError(
+        signInError?.message || "Unable to send the magic link right now.",
+      );
       return;
     }
 
@@ -152,61 +154,76 @@ function LoginContent() {
           Bap
         </p>
         <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-        <p className="text-sm text-muted-foreground">Enter your email to get a magic link.</p>
+        <p className="text-sm text-muted-foreground">
+          Enter your email to get a magic link.
+        </p>
       </div>
 
       <div className="space-y-4">
-          <div className="flex flex-col gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={handleGoogleSignIn}
-            >
-              <GoogleIcon />
-              <span className="ml-2">Continue with Google</span>
-              {lastMethod === "google" && <LastUsedBadge />}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={handleAppleSignIn}
-            >
-              <AppleIcon />
-              <span className="ml-2">Continue with Apple</span>
-              {lastMethod === "apple" && <LastUsedBadge />}
-            </Button>
-          </div>
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleGoogleSignIn}
+          >
+            <GoogleIcon />
+            <span className="ml-2">Continue with Google</span>
+            {lastMethod === "google" && <LastUsedBadge />}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleAppleSignIn}
+          >
+            <AppleIcon />
+            <span className="ml-2">Continue with Apple</span>
+            {lastMethod === "apple" && <LastUsedBadge />}
+          </Button>
+        </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-            </div>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
           </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">
+              Or continue with
+            </span>
+          </div>
+        </div>
 
-          <form onSubmit={requestMagicLink} className="space-y-3">
-            <label className="text-sm font-medium text-muted-foreground" htmlFor="email">
-              Email
-            </label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              aria-invalid={status === "error"}
-            />
-            <Button type="submit" className="w-full" disabled={!email || status === "sending" || status === "sent"}>
-              {status === "sending" ? "Sending..." : status === "sent" ? "Email sent, check your inbox" : "Send magic link"}
-              {lastMethod === "email" && <LastUsedBadge />}
-            </Button>
-          </form>
+        <form onSubmit={requestMagicLink} className="space-y-3">
+          <label
+            className="text-sm font-medium text-muted-foreground"
+            htmlFor="email"
+          >
+            Email
+          </label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            aria-invalid={status === "error"}
+          />
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={!email || status === "sending" || status === "sent"}
+          >
+            {status === "sending"
+              ? "Sending..."
+              : status === "sent"
+                ? "Email sent, check your inbox"
+                : "Send magic link"}
+            {lastMethod === "email" && <LastUsedBadge />}
+          </Button>
+        </form>
       </div>
 
       {error && (
@@ -221,17 +238,19 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background px-4 py-12 flex items-center justify-center">
-      <Suspense fallback={
-        <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
-          <div className="space-y-1 text-center">
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Bap
-            </p>
-            <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-            <p className="text-sm text-muted-foreground">Loading...</p>
+      <Suspense
+        fallback={
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
+            <div className="space-y-1 text-center">
+              <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Bap
+              </p>
+              <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            </div>
           </div>
-        </div>
-      }>
+        }
+      >
         <LoginContent />
       </Suspense>
     </div>

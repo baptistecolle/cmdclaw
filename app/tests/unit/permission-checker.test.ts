@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
+import {
+  checkToolPermissions,
+  parseBashCommand,
+} from "@/server/ai/permission-checker";
 
 describe("parseBashCommand", () => {
   test("returns null for non-integration commands", () => {
@@ -16,7 +19,9 @@ describe("parseBashCommand", () => {
   });
 
   test("parses hubspot nested resource/action operations", () => {
-    expect(parseBashCommand("hubspot contacts create --email user@example.com")).toEqual({
+    expect(
+      parseBashCommand("hubspot contacts create --email user@example.com"),
+    ).toEqual({
       integration: "hubspot",
       operation: "contacts.create",
       integrationName: "HubSpot",
@@ -68,7 +73,9 @@ describe("checkToolPermissions", () => {
   });
 
   test("requires auth when integration is missing", () => {
-    expect(checkToolPermissions("bash", { command: "slack channels" }, [])).toEqual({
+    expect(
+      checkToolPermissions("bash", { command: "slack channels" }, []),
+    ).toEqual({
       allowed: false,
       needsApproval: false,
       needsAuth: true,
@@ -79,7 +86,11 @@ describe("checkToolPermissions", () => {
   });
 
   test("requires approval for write commands with auth", () => {
-    expect(checkToolPermissions("bash", { command: "slack send -c general -t hi" }, ["slack"])).toEqual({
+    expect(
+      checkToolPermissions("bash", { command: "slack send -c general -t hi" }, [
+        "slack",
+      ]),
+    ).toEqual({
       allowed: false,
       needsApproval: true,
       needsAuth: false,
@@ -89,7 +100,9 @@ describe("checkToolPermissions", () => {
   });
 
   test("allows read commands with auth", () => {
-    expect(checkToolPermissions("bash", { command: "github prs" }, ["github"])).toEqual({
+    expect(
+      checkToolPermissions("bash", { command: "github prs" }, ["github"]),
+    ).toEqual({
       allowed: true,
       needsApproval: false,
       needsAuth: false,
@@ -97,7 +110,9 @@ describe("checkToolPermissions", () => {
   });
 
   test("requires auth for twitter when integration token is missing", () => {
-    expect(checkToolPermissions("bash", { command: "twitter timeline -l 5" }, [])).toEqual({
+    expect(
+      checkToolPermissions("bash", { command: "twitter timeline -l 5" }, []),
+    ).toEqual({
       allowed: false,
       needsApproval: false,
       needsAuth: true,
@@ -108,7 +123,13 @@ describe("checkToolPermissions", () => {
   });
 
   test("requires approval for reddit write operations with auth", () => {
-    expect(checkToolPermissions("bash", { command: "reddit comment --id t3_123 --text hi" }, ["reddit"])).toEqual({
+    expect(
+      checkToolPermissions(
+        "bash",
+        { command: "reddit comment --id t3_123 --text hi" },
+        ["reddit"],
+      ),
+    ).toEqual({
       allowed: false,
       needsApproval: true,
       needsAuth: false,
@@ -118,7 +139,11 @@ describe("checkToolPermissions", () => {
   });
 
   test("allows reddit read operations when auth exists", () => {
-    expect(checkToolPermissions("bash", { command: "reddit feed -l 10" }, ["reddit"])).toEqual({
+    expect(
+      checkToolPermissions("bash", { command: "reddit feed -l 10" }, [
+        "reddit",
+      ]),
+    ).toEqual({
       allowed: true,
       needsApproval: false,
       needsAuth: false,

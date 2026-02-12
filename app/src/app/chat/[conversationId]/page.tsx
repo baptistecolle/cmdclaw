@@ -20,16 +20,19 @@ export default function ConversationPage({ params }: Props) {
 
     if (authComplete && generationId) {
       // Notify server that auth is complete
-      client.generation.submitAuthResult({
-        generationId,
-        integration: authComplete,
-        success: true,
-      }).then(() => {
-        // Clear URL params
-        window.history.replaceState({}, "", `/chat/${conversationId}`);
-      }).catch((err) => {
-        console.error("Failed to submit auth result:", err);
-      });
+      client.generation
+        .submitAuthResult({
+          generationId,
+          integration: authComplete,
+          success: true,
+        })
+        .then(() => {
+          // Clear URL params
+          window.history.replaceState({}, "", `/chat/${conversationId}`);
+        })
+        .catch((err) => {
+          console.error("Failed to submit auth result:", err);
+        });
     }
   }, [searchParams, conversationId]);
 

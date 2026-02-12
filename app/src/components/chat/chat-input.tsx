@@ -57,7 +57,9 @@ export function ChatInput({
       const toAdd: AttachmentItem[] = [];
       for (const file of fileArray.slice(0, remaining)) {
         if (file.size > MAX_FILE_SIZE) continue;
-        const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+        const preview = file.type.startsWith("image/")
+          ? URL.createObjectURL(file)
+          : undefined;
         toAdd.push({ file, preview });
       }
       return [...prev, ...toAdd];
@@ -90,7 +92,7 @@ export function ChatInput({
           name: a.file.name,
           mimeType: a.file.type,
           dataUrl: await readFileAsDataUrl(a.file),
-        }))
+        })),
       );
       // Clean up previews
       for (const a of attachments) {
@@ -132,7 +134,7 @@ export function ChatInput({
     <div
       className={cn(
         "flex flex-col gap-2 rounded-lg border bg-muted/50 p-2 transition-colors",
-        isDragging && "border-primary bg-primary/5"
+        isDragging && "border-primary bg-primary/5",
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -147,7 +149,11 @@ export function ChatInput({
               className="group relative flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs"
             >
               {a.preview ? (
-                <img src={a.preview} alt={a.file.name} className="h-8 w-8 rounded object-cover" />
+                <img
+                  src={a.preview}
+                  alt={a.file.name}
+                  className="h-8 w-8 rounded object-cover"
+                />
               ) : (
                 <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
               )}
@@ -198,59 +204,59 @@ export function ChatInput({
           rows={1}
           className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm focus:outline-none disabled:opacity-50"
         />
-      {onStartRecording && onStopRecording && (
-        <Button
-          onMouseDown={(e) => {
-            e.preventDefault();
-            if (!disabled && !isStreaming) onStartRecording();
-          }}
-          onMouseUp={(e) => {
-            e.preventDefault();
-            if (isRecording) onStopRecording();
-          }}
-          onMouseLeave={(e) => {
-            e.preventDefault();
-            if (isRecording) onStopRecording();
-          }}
-          onTouchStart={(e) => {
-            e.preventDefault();
-            if (!disabled && !isStreaming) onStartRecording();
-          }}
-          onTouchEnd={(e) => {
-            e.preventDefault();
-            if (isRecording) onStopRecording();
-          }}
-          disabled={disabled && !isRecording}
-          size="icon"
-          variant={isRecording ? "destructive" : "outline"}
-          className={cn("h-9 w-9 touch-none", isRecording && "animate-pulse")}
-        >
-          <Mic className="h-4 w-4" />
-        </Button>
-      )}
-      {isStreaming ? (
-        <Button
-          onClick={onStop}
-          data-testid="chat-stop"
-          aria-label="Stop generation"
-          size="icon"
-          variant="destructive"
-          className="h-9 w-9"
-        >
-          <Square className="h-4 w-4" />
-        </Button>
-      ) : (
-        <Button
-          onClick={handleSubmit}
-          data-testid="chat-send"
-          aria-label="Send message"
-          disabled={disabled || (!value.trim() && attachments.length === 0)}
-          size="icon"
-          className="h-9 w-9"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
-      )}
+        {onStartRecording && onStopRecording && (
+          <Button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              if (!disabled && !isStreaming) onStartRecording();
+            }}
+            onMouseUp={(e) => {
+              e.preventDefault();
+              if (isRecording) onStopRecording();
+            }}
+            onMouseLeave={(e) => {
+              e.preventDefault();
+              if (isRecording) onStopRecording();
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              if (!disabled && !isStreaming) onStartRecording();
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              if (isRecording) onStopRecording();
+            }}
+            disabled={disabled && !isRecording}
+            size="icon"
+            variant={isRecording ? "destructive" : "outline"}
+            className={cn("h-9 w-9 touch-none", isRecording && "animate-pulse")}
+          >
+            <Mic className="h-4 w-4" />
+          </Button>
+        )}
+        {isStreaming ? (
+          <Button
+            onClick={onStop}
+            data-testid="chat-stop"
+            aria-label="Stop generation"
+            size="icon"
+            variant="destructive"
+            className="h-9 w-9"
+          >
+            <Square className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            onClick={handleSubmit}
+            data-testid="chat-send"
+            aria-label="Send message"
+            disabled={disabled || (!value.trim() && attachments.length === 0)}
+            size="icon"
+            className="h-9 w-9"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );

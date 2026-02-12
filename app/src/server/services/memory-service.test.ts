@@ -112,13 +112,9 @@ import {
 
 describe("chunkMarkdown", () => {
   it("keeps chunk boundaries and overlap", () => {
-    const content = [
-      "line-1",
-      "line-2",
-      "line-3",
-      "line-4",
-      "line-5",
-    ].join("\n");
+    const content = ["line-1", "line-2", "line-3", "line-4", "line-5"].join(
+      "\n",
+    );
 
     const chunks = chunkMarkdown(content, { tokens: 3, overlap: 1 });
 
@@ -163,7 +159,10 @@ describe("readMemoryFile path resolution", () => {
   });
 
   it("returns null for invalid paths", async () => {
-    const file = await readMemoryFile({ userId: "user-1", path: "notes/random.md" });
+    const file = await readMemoryFile({
+      userId: "user-1",
+      path: "notes/random.md",
+    });
 
     expect(file).toBeNull();
     expect(memoryFileFindFirstMock).not.toHaveBeenCalled();

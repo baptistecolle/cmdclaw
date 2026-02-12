@@ -1,10 +1,19 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { protectedProcedure } from "../middleware";
-import { generation, user, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
+import {
+  generation,
+  user,
+  workflow,
+  workflowRun,
+  workflowRunEvent,
+} from "@/server/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
-import { removeWorkflowScheduleJob, syncWorkflowScheduleJob } from "@/server/services/workflow-scheduler";
+import {
+  removeWorkflowScheduleJob,
+  syncWorkflowScheduleJob,
+} from "@/server/services/workflow-scheduler";
 import { generateWorkflowName } from "@/server/utils/generate-workflow-name";
 
 const integrationTypeSchema = z.enum([
@@ -28,7 +37,10 @@ const ALL_INTEGRATION_TYPES = [...integrationTypeSchema.options];
 
 const triggerTypeSchema = z.string().min(1).max(128);
 
-function buildFallbackWorkflowName(agentDescription: string, triggerType: string): string {
+function buildFallbackWorkflowName(
+  agentDescription: string,
+  triggerType: string,
+): string {
   const firstSentence = agentDescription
     .split(/[\n.!?]/)[0]
     ?.replace(/\s+/g, " ")
@@ -98,7 +110,8 @@ const list = protectedProcedure.handler(async ({ context }) => {
             run.triggerPayload && typeof run.triggerPayload === "object"
               ? (run.triggerPayload as Record<string, unknown>)
               : null;
-          const source = payload && Object.keys(payload).length > 0 ? "trigger" : "manual";
+          const source =
+            payload && Object.keys(payload).length > 0 ? "trigger" : "manual";
 
           return {
             id: run.id,
@@ -108,7 +121,7 @@ const list = protectedProcedure.handler(async ({ context }) => {
           };
         }),
       };
-    })
+    }),
   );
 
   return items;
@@ -118,7 +131,10 @@ const get = protectedProcedure
   .input(z.object({ id: z.string() }))
   .handler(async ({ input, context }) => {
     const wf = await context.db.query.workflow.findFirst({
-      where: and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)),
+      where: and(
+        eq(workflow.id, input.id),
+        eq(workflow.ownerId, context.user.id),
+      ),
     });
 
     if (!wf) {
@@ -164,10 +180,12 @@ const create = protectedProcedure
       promptDo: z.string().max(2000).optional(),
       promptDont: z.string().max(2000).optional(),
       autoApprove: z.boolean().optional(),
-      allowedIntegrations: z.array(integrationTypeSchema).default(ALL_INTEGRATION_TYPES),
+      allowedIntegrations: z
+        .array(integrationTypeSchema)
+        .default(ALL_INTEGRATION_TYPES),
       allowedCustomIntegrations: z.array(z.string()).default([]),
       schedule: scheduleSchema.nullish(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const providedName = input.name?.trim();
@@ -189,7 +207,8 @@ const create = protectedProcedure
       providedName && providedName.length > 0
         ? providedName
         : hasAgentDescription
-          ? generatedName ?? buildFallbackWorkflowName(input.prompt, input.triggerType)
+          ? (generatedName ??
+            buildFallbackWorkflowName(input.prompt, input.triggerType))
           : "";
 
     const [created] = await context.db
@@ -213,7 +232,10 @@ const create = protectedProcedure
       try {
         await syncWorkflowScheduleJob(created);
       } catch (error) {
-        console.error(`[workflow] failed to sync scheduler after create (${created.id})`, error);
+        console.error(
+          `[workflow] failed to sync scheduler after create (${created.id})`,
+          error,
+        );
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: "Workflow created but failed to sync schedule job",
         });
@@ -241,11 +263,14 @@ const update = protectedProcedure
       allowedIntegrations: z.array(integrationTypeSchema).optional(),
       allowedCustomIntegrations: z.array(z.string()).optional(),
       schedule: scheduleSchema.nullish(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const existing = await context.db.query.workflow.findFirst({
-      where: and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)),
+      where: and(
+        eq(workflow.id, input.id),
+        eq(workflow.ownerId, context.user.id),
+      ),
     });
 
     if (!existing) {
@@ -266,24 +291,43 @@ const update = protectedProcedure
           const generatedName = await generateWorkflowName({
             agentDescription: nextPrompt,
             triggerType: input.triggerType ?? existing.triggerType,
-            allowedIntegrations: input.allowedIntegrations ?? existing.allowedIntegrations,
-            allowedCustomIntegrations: input.allowedCustomIntegrations ?? existing.allowedCustomIntegrations,
-            schedule: input.schedule === undefined ? existing.schedule : input.schedule ?? null,
+            allowedIntegrations:
+              input.allowedIntegrations ?? existing.allowedIntegrations,
+            allowedCustomIntegrations:
+              input.allowedCustomIntegrations ??
+              existing.allowedCustomIntegrations,
+            schedule:
+              input.schedule === undefined
+                ? existing.schedule
+                : (input.schedule ?? null),
             autoApprove: input.autoApprove ?? existing.autoApprove,
-            promptDo: input.promptDo === undefined ? existing.promptDo : input.promptDo ?? null,
-            promptDont: input.promptDont === undefined ? existing.promptDont : input.promptDont ?? null,
+            promptDo:
+              input.promptDo === undefined
+                ? existing.promptDo
+                : (input.promptDo ?? null),
+            promptDont:
+              input.promptDont === undefined
+                ? existing.promptDont
+                : (input.promptDont ?? null),
           });
           updates.name =
-            generatedName ?? buildFallbackWorkflowName(nextPrompt, input.triggerType ?? existing.triggerType);
+            generatedName ??
+            buildFallbackWorkflowName(
+              nextPrompt,
+              input.triggerType ?? existing.triggerType,
+            );
         }
       }
     }
     if (input.status !== undefined) updates.status = input.status;
-    if (input.triggerType !== undefined) updates.triggerType = input.triggerType;
+    if (input.triggerType !== undefined)
+      updates.triggerType = input.triggerType;
     if (input.prompt !== undefined) updates.prompt = input.prompt;
     if (input.promptDo !== undefined) updates.promptDo = input.promptDo ?? null;
-    if (input.promptDont !== undefined) updates.promptDont = input.promptDont ?? null;
-    if (input.autoApprove !== undefined) updates.autoApprove = input.autoApprove;
+    if (input.promptDont !== undefined)
+      updates.promptDont = input.promptDont ?? null;
+    if (input.autoApprove !== undefined)
+      updates.autoApprove = input.autoApprove;
     if (input.allowedIntegrations !== undefined) {
       updates.allowedIntegrations = input.allowedIntegrations;
     }
@@ -297,7 +341,9 @@ const update = protectedProcedure
     const result = await context.db
       .update(workflow)
       .set(updates)
-      .where(and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)))
+      .where(
+        and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)),
+      )
       .returning({
         id: workflow.id,
         status: workflow.status,
@@ -310,13 +356,18 @@ const update = protectedProcedure
     }
 
     const shouldSyncSchedule =
-      input.status !== undefined || input.triggerType !== undefined || input.schedule !== undefined;
+      input.status !== undefined ||
+      input.triggerType !== undefined ||
+      input.schedule !== undefined;
 
     if (shouldSyncSchedule) {
       try {
         await syncWorkflowScheduleJob(result[0]!);
       } catch (error) {
-        console.error(`[workflow] failed to sync scheduler after update (${input.id})`, error);
+        console.error(
+          `[workflow] failed to sync scheduler after update (${input.id})`,
+          error,
+        );
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: "Workflow updated but failed to sync schedule job",
         });
@@ -331,7 +382,9 @@ const del = protectedProcedure
   .handler(async ({ input, context }) => {
     const result = await context.db
       .delete(workflow)
-      .where(and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)))
+      .where(
+        and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)),
+      )
       .returning({ id: workflow.id });
 
     if (result.length === 0) {
@@ -341,7 +394,10 @@ const del = protectedProcedure
     try {
       await removeWorkflowScheduleJob(input.id);
     } catch (error) {
-      console.error(`[workflow] failed to remove scheduler after delete (${input.id})`, error);
+      console.error(
+        `[workflow] failed to remove scheduler after delete (${input.id})`,
+        error,
+      );
       throw new ORPCError("INTERNAL_SERVER_ERROR", {
         message: "Workflow deleted but failed to remove schedule job",
       });
@@ -355,7 +411,7 @@ const trigger = protectedProcedure
     z.object({
       id: z.string(),
       payload: z.unknown().optional(),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const dbUser = await context.db.query.user.findFirst({
@@ -383,7 +439,10 @@ const getRun = protectedProcedure
     }
 
     const wf = await context.db.query.workflow.findFirst({
-      where: and(eq(workflow.id, run.workflowId), eq(workflow.ownerId, context.user.id)),
+      where: and(
+        eq(workflow.id, run.workflowId),
+        eq(workflow.ownerId, context.user.id),
+      ),
     });
 
     if (!wf) {
@@ -427,11 +486,14 @@ const listRuns = protectedProcedure
     z.object({
       workflowId: z.string(),
       limit: z.number().min(1).max(50).default(20),
-    })
+    }),
   )
   .handler(async ({ input, context }) => {
     const wf = await context.db.query.workflow.findFirst({
-      where: and(eq(workflow.id, input.workflowId), eq(workflow.ownerId, context.user.id)),
+      where: and(
+        eq(workflow.id, input.workflowId),
+        eq(workflow.ownerId, context.user.id),
+      ),
     });
 
     if (!wf) {

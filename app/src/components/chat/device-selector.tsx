@@ -48,7 +48,7 @@ export function DeviceSelector({ selectedDeviceId, onSelect }: Props) {
                 name: d.name,
                 platform: d.platform,
                 isOnline: d.isOnline,
-              }))
+              })),
           );
         }
       } catch {
@@ -76,7 +76,11 @@ export function DeviceSelector({ selectedDeviceId, onSelect }: Props) {
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-xs"
+            >
               {selected ? (
                 <>
                   <Monitor className="h-3 w-3" />
@@ -104,10 +108,7 @@ export function DeviceSelector({ selectedDeviceId, onSelect }: Props) {
         </DropdownMenuItem>
 
         {devices.map((device) => (
-          <DropdownMenuItem
-            key={device.id}
-            onClick={() => onSelect(device.id)}
-          >
+          <DropdownMenuItem key={device.id} onClick={() => onSelect(device.id)}>
             <Monitor className="mr-2 h-3.5 w-3.5" />
             <span className="flex items-center gap-1.5">
               {device.name}

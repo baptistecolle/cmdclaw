@@ -43,7 +43,7 @@ export async function executeCommand(
     conversationId?: string;
     timeout?: number;
     env?: Record<string, string>;
-  }
+  },
 ): Promise<ExecResult> {
   const cwd = opts?.conversationId
     ? sandboxes.get(opts.conversationId) || getSandboxDir(opts.conversationId)
@@ -80,10 +80,7 @@ export async function executeCommand(
       new Response(proc.stderr).text(),
     ]);
 
-    const exitCode = await Promise.race([
-      proc.exited,
-      timeoutPromise,
-    ]);
+    const exitCode = await Promise.race([proc.exited, timeoutPromise]);
 
     logger.debug("sandbox", `Exit code: ${exitCode}`, {
       stdout: stdout.slice(0, 200),

@@ -109,7 +109,9 @@ describe("integrationRouter", () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    generateLinkedInAuthUrlMock.mockResolvedValue("https://linkedin.example.com/auth");
+    generateLinkedInAuthUrlMock.mockResolvedValue(
+      "https://linkedin.example.com/auth",
+    );
     deleteUnipileAccountMock.mockResolvedValue(undefined);
     getUnipileAccountMock.mockResolvedValue({
       name: "LinkedIn Profile",
@@ -164,22 +166,33 @@ describe("integrationRouter", () => {
     const context = createContext();
 
     const slack = await integrationRouterAny.getAuthUrl({
-      input: { type: "slack", redirectUrl: "https://app.example.com/integrations" },
+      input: {
+        type: "slack",
+        redirectUrl: "https://app.example.com/integrations",
+      },
       context,
     });
     const slackUrl = new URL(slack.authUrl);
-    expect(slackUrl.searchParams.get("user_scope")).toBe("scope:read scope:write");
+    expect(slackUrl.searchParams.get("user_scope")).toBe(
+      "scope:read scope:write",
+    );
     expect(slackUrl.searchParams.get("scope")).toBeNull();
 
     const reddit = await integrationRouterAny.getAuthUrl({
-      input: { type: "reddit", redirectUrl: "https://app.example.com/integrations" },
+      input: {
+        type: "reddit",
+        redirectUrl: "https://app.example.com/integrations",
+      },
       context,
     });
     const redditUrl = new URL(reddit.authUrl);
     expect(redditUrl.searchParams.get("duration")).toBe("permanent");
 
     const airtable = await integrationRouterAny.getAuthUrl({
-      input: { type: "airtable", redirectUrl: "https://app.example.com/integrations" },
+      input: {
+        type: "airtable",
+        redirectUrl: "https://app.example.com/integrations",
+      },
       context,
     });
     const airtableUrl = new URL(airtable.authUrl);
@@ -191,19 +204,28 @@ describe("integrationRouter", () => {
     const context = createContext();
 
     const result = await integrationRouterAny.getAuthUrl({
-      input: { type: "linkedin", redirectUrl: "https://app.example.com/integrations" },
+      input: {
+        type: "linkedin",
+        redirectUrl: "https://app.example.com/integrations",
+      },
       context,
     });
 
     expect(result).toEqual({ authUrl: "https://linkedin.example.com/auth" });
-    expect(generateLinkedInAuthUrlMock).toHaveBeenCalledWith("user-1", "https://app.example.com/integrations");
+    expect(generateLinkedInAuthUrlMock).toHaveBeenCalledWith(
+      "user-1",
+      "https://app.example.com/integrations",
+    );
   });
 
   it("adds google and notion-specific auth params", async () => {
     const context = createContext();
 
     const google = await integrationRouterAny.getAuthUrl({
-      input: { type: "gmail", redirectUrl: "https://app.example.com/integrations" },
+      input: {
+        type: "gmail",
+        redirectUrl: "https://app.example.com/integrations",
+      },
       context,
     });
     const googleUrl = new URL(google.authUrl);
@@ -211,7 +233,10 @@ describe("integrationRouter", () => {
     expect(googleUrl.searchParams.get("prompt")).toBe("consent");
 
     const notion = await integrationRouterAny.getAuthUrl({
-      input: { type: "notion", redirectUrl: "https://app.example.com/integrations" },
+      input: {
+        type: "notion",
+        redirectUrl: "https://app.example.com/integrations",
+      },
       context,
     });
     const notionUrl = new URL(notion.authUrl);
@@ -225,7 +250,7 @@ describe("integrationRouter", () => {
       integrationRouterAny.handleCallback({
         input: { code: "abc", state: "invalid-state" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
     const state = encodeState({
@@ -238,19 +263,22 @@ describe("integrationRouter", () => {
       integrationRouterAny.handleCallback({
         input: { code: "abc", state },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("uses basic auth and user-agent headers for reddit callback", async () => {
     const context = createContext();
-    context.db.query.integration.findFirst.mockResolvedValue({ id: "integration-existing" });
+    context.db.query.integration.findFirst.mockResolvedValue({
+      id: "integration-existing",
+    });
 
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ access_token: "reddit-access" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ access_token: "reddit-access" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -266,7 +294,9 @@ describe("integrationRouter", () => {
       context,
     });
 
-    const requestInit = (fetchMock.mock.calls as any[][])[0]?.[1] as RequestInit | undefined;
+    const requestInit = (fetchMock.mock.calls as any[][])[0]?.[1] as
+      | RequestInit
+      | undefined;
     expect(requestInit).toBeDefined();
     const headers = requestInit?.headers as Record<string, string>;
     const body = requestInit?.body as URLSearchParams;
@@ -288,7 +318,7 @@ describe("integrationRouter", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response("bad oauth request", { status: 400 }))
+      vi.fn(async () => new Response("bad oauth request", { status: 400 })),
     );
 
     const state = encodeState({
@@ -301,7 +331,7 @@ describe("integrationRouter", () => {
       integrationRouterAny.handleCallback({
         input: { code: "oauth-code", state },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "INTERNAL_SERVER_ERROR",
       message: "Failed to exchange code for tokens",
@@ -313,12 +343,13 @@ describe("integrationRouter", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ access_token: "bot-token" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        })
-      )
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ access_token: "bot-token" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
     );
 
     const state = encodeState({
@@ -331,26 +362,29 @@ describe("integrationRouter", () => {
       integrationRouterAny.handleCallback({
         input: { code: "oauth-code", state },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
   });
 
   it("handles slack callback using authed_user access token", async () => {
     const context = createContext();
     context.db.query.integration.findFirst.mockResolvedValue(null);
-    context.mocks.insertReturningMock.mockResolvedValue([{ id: "integration-slack" }]);
+    context.mocks.insertReturningMock.mockResolvedValue([
+      { id: "integration-slack" },
+    ]);
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            authed_user: { access_token: "slack-user-token" },
-            refresh_token: "slack-refresh",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        )
-      )
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              authed_user: { access_token: "slack-user-token" },
+              refresh_token: "slack-refresh",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
     );
 
     const state = encodeState({
@@ -373,16 +407,22 @@ describe("integrationRouter", () => {
 
   it("updates existing integration instead of inserting a new one", async () => {
     const context = createContext();
-    context.db.query.integration.findFirst.mockResolvedValue({ id: "integration-existing" });
+    context.db.query.integration.findFirst.mockResolvedValue({
+      id: "integration-existing",
+    });
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({ access_token: "access-token", refresh_token: "refresh-token" }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        )
-      )
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              access_token: "access-token",
+              refresh_token: "refresh-token",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
     );
 
     const state = encodeState({
@@ -409,16 +449,22 @@ describe("integrationRouter", () => {
   it("inserts a new integration when one does not exist", async () => {
     const context = createContext();
     context.db.query.integration.findFirst.mockResolvedValue(null);
-    context.mocks.insertReturningMock.mockResolvedValue([{ id: "integration-new" }]);
+    context.mocks.insertReturningMock.mockResolvedValue([
+      { id: "integration-new" },
+    ]);
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({ access_token: "access-token", refresh_token: "refresh-token" }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        )
-      )
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              access_token: "access-token",
+              refresh_token: "refresh-token",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
     );
 
     const state = encodeState({
@@ -441,7 +487,9 @@ describe("integrationRouter", () => {
 
   it("toggles integration enabled state", async () => {
     const context = createContext();
-    context.mocks.updateReturningMock.mockResolvedValueOnce([{ id: "integration-1" }]);
+    context.mocks.updateReturningMock.mockResolvedValueOnce([
+      { id: "integration-1" },
+    ]);
 
     const result = await integrationRouterAny.toggle({
       input: { id: "integration-1", enabled: false },
@@ -449,7 +497,9 @@ describe("integrationRouter", () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(context.mocks.updateSetMock).toHaveBeenCalledWith({ enabled: false });
+    expect(context.mocks.updateSetMock).toHaveBeenCalledWith({
+      enabled: false,
+    });
   });
 
   it("throws when toggling a missing integration", async () => {
@@ -459,7 +509,7 @@ describe("integrationRouter", () => {
       integrationRouterAny.toggle({
         input: { id: "missing", enabled: true },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -506,7 +556,7 @@ describe("integrationRouter", () => {
       integrationRouterAny.disconnect({
         input: { id: "missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -529,7 +579,7 @@ describe("integrationRouter", () => {
         type: "linkedin",
         providerAccountId: "unipile-account",
         displayName: "identifier-only",
-      })
+      }),
     );
     expect(context.mocks.insertOnConflictDoUpdateMock).toHaveBeenCalled();
   });
@@ -542,7 +592,7 @@ describe("integrationRouter", () => {
       integrationRouterAny.linkLinkedIn({
         input: { accountId: "bad-account" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "INTERNAL_SERVER_ERROR",
       message: "Failed to link LinkedIn account",
@@ -552,7 +602,9 @@ describe("integrationRouter", () => {
   it("creates custom integration and stores encrypted credentials", async () => {
     const context = createContext();
     context.db.query.customIntegration.findFirst.mockResolvedValue(null);
-    context.mocks.insertReturningMock.mockResolvedValue([{ id: "custom-1", slug: "custom-api" }]);
+    context.mocks.insertReturningMock.mockResolvedValue([
+      { id: "custom-1", slug: "custom-api" },
+    ]);
 
     const result = await integrationRouterAny.createCustomIntegration({
       input: {
@@ -592,14 +644,16 @@ describe("integrationRouter", () => {
         clientId: "enc:client-id",
         clientSecret: "enc:client-secret",
         apiKey: "enc:api-key",
-      })
+      }),
     );
   });
 
   it("creates custom integration without creating credentials when none are provided", async () => {
     const context = createContext();
     context.db.query.customIntegration.findFirst.mockResolvedValue(null);
-    context.mocks.insertReturningMock.mockResolvedValue([{ id: "custom-2", slug: "custom-no-creds" }]);
+    context.mocks.insertReturningMock.mockResolvedValue([
+      { id: "custom-2", slug: "custom-no-creds" },
+    ]);
 
     const result = await integrationRouterAny.createCustomIntegration({
       input: {
@@ -627,7 +681,9 @@ describe("integrationRouter", () => {
 
   it("rejects duplicate custom integration slug", async () => {
     const context = createContext();
-    context.db.query.customIntegration.findFirst.mockResolvedValue({ id: "existing" });
+    context.db.query.customIntegration.findFirst.mockResolvedValue({
+      id: "existing",
+    });
 
     await expect(
       integrationRouterAny.createCustomIntegration({
@@ -648,7 +704,7 @@ describe("integrationRouter", () => {
           apiKey: null,
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -691,7 +747,9 @@ describe("integrationRouter", () => {
       },
     ]);
 
-    const result = await integrationRouterAny.listCustomIntegrations({ context });
+    const result = await integrationRouterAny.listCustomIntegrations({
+      context,
+    });
 
     expect(result).toEqual([
       expect.objectContaining({
@@ -741,7 +799,7 @@ describe("integrationRouter", () => {
         hasClientId: true,
         hasClientSecret: true,
         hasApiKey: true,
-      })
+      }),
     );
   });
 
@@ -753,7 +811,7 @@ describe("integrationRouter", () => {
       integrationRouterAny.getCustomIntegration({
         input: { slug: "missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -814,16 +872,17 @@ describe("integrationRouter", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            access_token: "custom-access-token",
-            refresh_token: "custom-refresh-token",
-            expires_in: 3600,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        )
-      )
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              access_token: "custom-access-token",
+              refresh_token: "custom-refresh-token",
+              expires_in: 3600,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
     );
 
     const customState = encodeState({
@@ -838,13 +897,16 @@ describe("integrationRouter", () => {
       context,
     });
 
-    expect(callbackResult).toEqual({ success: true, redirectUrl: "/integrations/custom" });
+    expect(callbackResult).toEqual({
+      success: true,
+      redirectUrl: "/integrations/custom",
+    });
     expect(context.mocks.updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
         accessToken: "custom-access-token",
         refreshToken: "custom-refresh-token",
         enabled: true,
-      })
+      }),
     );
   });
 
@@ -879,13 +941,15 @@ describe("integrationRouter", () => {
       integrationRouterAny.toggleCustomIntegration({
         input: { customIntegrationId: "missing", enabled: true },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("deletes a custom integration owned by the user", async () => {
     const context = createContext();
-    context.mocks.deleteReturningMock.mockResolvedValueOnce([{ id: "custom-1" }]);
+    context.mocks.deleteReturningMock.mockResolvedValueOnce([
+      { id: "custom-1" },
+    ]);
 
     const result = await integrationRouterAny.deleteCustomIntegration({
       input: { id: "custom-1" },
@@ -902,7 +966,7 @@ describe("integrationRouter", () => {
       integrationRouterAny.deleteCustomIntegration({
         input: { id: "missing" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -917,9 +981,12 @@ describe("integrationRouter", () => {
 
     await expect(
       integrationRouterAny.getCustomAuthUrl({
-        input: { slug: "my-custom", redirectUrl: "https://app.example.com/custom" },
+        input: {
+          slug: "my-custom",
+          redirectUrl: "https://app.example.com/custom",
+        },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -936,13 +1003,19 @@ describe("integrationRouter", () => {
         pkce: false,
       },
     });
-    context.db.query.customIntegrationCredential.findFirst.mockResolvedValue({ id: "cred-1", clientId: null });
+    context.db.query.customIntegrationCredential.findFirst.mockResolvedValue({
+      id: "cred-1",
+      clientId: null,
+    });
 
     await expect(
       integrationRouterAny.getCustomAuthUrl({
-        input: { slug: "my-custom", redirectUrl: "https://app.example.com/custom" },
+        input: {
+          slug: "my-custom",
+          redirectUrl: "https://app.example.com/custom",
+        },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -970,7 +1043,10 @@ describe("integrationRouter", () => {
     });
 
     const result = await integrationRouterAny.getCustomAuthUrl({
-      input: { slug: "my-custom", redirectUrl: "https://app.example.com/custom" },
+      input: {
+        slug: "my-custom",
+        redirectUrl: "https://app.example.com/custom",
+      },
       context,
     });
 
@@ -987,17 +1063,21 @@ describe("integrationRouter", () => {
       integrationRouterAny.handleCustomCallback({
         input: { code: "code", state: "bad-state" },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
     await expect(
       integrationRouterAny.handleCustomCallback({
         input: {
           code: "code",
-          state: encodeState({ userId: "someone-else", type: "custom_my-custom", redirectUrl: "/custom" }),
+          state: encodeState({
+            userId: "someone-else",
+            type: "custom_my-custom",
+            redirectUrl: "/custom",
+          }),
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
@@ -1009,10 +1089,14 @@ describe("integrationRouter", () => {
       integrationRouterAny.handleCustomCallback({
         input: {
           code: "code",
-          state: encodeState({ userId: "user-1", type: "custom_missing", redirectUrl: "/custom" }),
+          state: encodeState({
+            userId: "user-1",
+            type: "custom_missing",
+            redirectUrl: "/custom",
+          }),
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -1037,10 +1121,14 @@ describe("integrationRouter", () => {
       integrationRouterAny.handleCustomCallback({
         input: {
           code: "code",
-          state: encodeState({ userId: "user-1", type: "custom_my-custom", redirectUrl: "/custom" }),
+          state: encodeState({
+            userId: "user-1",
+            type: "custom_my-custom",
+            redirectUrl: "/custom",
+          }),
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -1063,23 +1151,30 @@ describe("integrationRouter", () => {
       clientSecret: "enc:client-secret",
     });
 
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ access_token: "token" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ access_token: "token" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await integrationRouterAny.handleCustomCallback({
       input: {
         code: "code",
-        state: encodeState({ userId: "user-1", type: "custom_my-custom", redirectUrl: "/custom" }),
+        state: encodeState({
+          userId: "user-1",
+          type: "custom_my-custom",
+          redirectUrl: "/custom",
+        }),
       },
       context,
     });
 
-    const requestInit = (fetchMock.mock.calls as any[][])[0]?.[1] as RequestInit | undefined;
+    const requestInit = (fetchMock.mock.calls as any[][])[0]?.[1] as
+      | RequestInit
+      | undefined;
     expect(requestInit).toBeDefined();
     const headers = requestInit?.headers as Record<string, string>;
     const body = requestInit?.body as URLSearchParams;
@@ -1111,17 +1206,21 @@ describe("integrationRouter", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response("token exchange failed", { status: 401 }))
+      vi.fn(async () => new Response("token exchange failed", { status: 401 })),
     );
 
     await expect(
       integrationRouterAny.handleCustomCallback({
         input: {
           code: "code",
-          state: encodeState({ userId: "user-1", type: "custom_my-custom", redirectUrl: "/custom" }),
+          state: encodeState({
+            userId: "user-1",
+            type: "custom_my-custom",
+            redirectUrl: "/custom",
+          }),
         },
         context,
-      })
+      }),
     ).rejects.toMatchObject({
       code: "INTERNAL_SERVER_ERROR",
       message: "Failed to exchange code for tokens",

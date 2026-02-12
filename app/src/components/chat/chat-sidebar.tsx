@@ -108,7 +108,10 @@ export function ChatSidebar() {
                     </SidebarMenuButton>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <SidebarMenuAction showOnHover className="focus:ring-0 focus:outline-none focus-visible:ring-0 border-0 data-[state=open]:bg-transparent">
+                        <SidebarMenuAction
+                          showOnHover
+                          className="focus:ring-0 focus:outline-none focus-visible:ring-0 border-0 data-[state=open]:bg-transparent"
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                         </SidebarMenuAction>
                       </DropdownMenuTrigger>

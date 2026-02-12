@@ -43,11 +43,13 @@ const PhoneInput: React.ForwardRefExoticComponent<PhoneInputProps> =
           inputComponent={InputComponent}
           smartCaret={false}
           value={value || undefined}
-          onChange={(nextValue) => onChange?.(nextValue || ("" as RPNInput.Value))}
+          onChange={(nextValue) =>
+            onChange?.(nextValue || ("" as RPNInput.Value))
+          }
           {...props}
         />
       );
-    }
+    },
   );
 PhoneInput.displayName = "PhoneInput";
 
@@ -107,7 +109,7 @@ const CountrySelect = ({
           <ChevronsUpDown
             className={cn(
               "-mr-2 size-4 opacity-50",
-              disabled ? "hidden" : "opacity-100"
+              disabled ? "hidden" : "opacity-100",
             )}
           />
         </Button>
@@ -123,7 +125,7 @@ const CountrySelect = ({
                   return;
                 }
                 const viewportElement = scrollAreaRef.current.querySelector(
-                  "[data-radix-scroll-area-viewport]"
+                  "[data-radix-scroll-area-viewport]",
                 );
                 if (viewportElement) {
                   viewportElement.scrollTop = 0;
@@ -146,7 +148,7 @@ const CountrySelect = ({
                       onChange={onChange}
                       onSelectComplete={() => setIsOpen(false)}
                     />
-                  ) : null
+                  ) : null,
                 )}
               </CommandGroup>
             </ScrollArea>
@@ -185,7 +187,7 @@ const CountrySelectOption = ({
       <CheckIcon
         className={cn(
           "ml-auto size-4",
-          country === selectedCountry ? "opacity-100" : "opacity-0"
+          country === selectedCountry ? "opacity-100" : "opacity-0",
         )}
       />
     </CommandItem>

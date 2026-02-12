@@ -17,7 +17,7 @@ import { isE2BConfigured } from "./e2b";
 export function getSandboxBackend(
   conversationId: string,
   userId: string,
-  deviceId?: string
+  deviceId?: string,
 ): SandboxBackend {
   // Prefer BYOC if device is specified and online
   if (deviceId && isDeviceOnline(deviceId)) {
@@ -26,7 +26,9 @@ export function getSandboxBackend(
 
   // Fall back to E2B
   if (!isE2BConfigured()) {
-    throw new Error("No sandbox backend available: E2B not configured and no BYOC device connected");
+    throw new Error(
+      "No sandbox backend available: E2B not configured and no BYOC device connected",
+    );
   }
 
   return new E2BSandboxBackend();

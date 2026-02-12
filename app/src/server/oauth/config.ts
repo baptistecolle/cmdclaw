@@ -1,6 +1,21 @@
 import { env } from "@/env";
 
-export type IntegrationType = "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive" | "notion" | "linear" | "github" | "airtable" | "slack" | "hubspot" | "linkedin" | "salesforce" | "reddit" | "twitter";
+export type IntegrationType =
+  | "gmail"
+  | "google_calendar"
+  | "google_docs"
+  | "google_sheets"
+  | "google_drive"
+  | "notion"
+  | "linear"
+  | "github"
+  | "airtable"
+  | "slack"
+  | "hubspot"
+  | "linkedin"
+  | "salesforce"
+  | "reddit"
+  | "twitter";
 
 export type OAuthConfig = {
   clientId: string;
@@ -16,7 +31,8 @@ export type OAuthConfig = {
   }>;
 };
 
-const getAppUrl = () => env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+const getAppUrl = () =>
+  env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 const configs: Record<IntegrationType, () => OAuthConfig> = {
   gmail: () => ({
@@ -198,7 +214,12 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     authUrl: "https://airtable.com/oauth2/v1/authorize",
     tokenUrl: "https://airtable.com/oauth2/v1/token",
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
-    scopes: ["data.records:read", "data.records:write", "schema.bases:read", "user.email:read"],
+    scopes: [
+      "data.records:read",
+      "data.records:write",
+      "schema.bases:read",
+      "user.email:read",
+    ],
     getUserInfo: async (accessToken) => {
       const res = await fetch("https://api.airtable.com/v0/meta/whoami", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -259,12 +280,15 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     ],
     getUserInfo: async (accessToken) => {
       // Get token info which includes the user email
-      const tokenRes = await fetch(`https://api.hubapi.com/oauth/v1/access-tokens/${accessToken}`);
+      const tokenRes = await fetch(
+        `https://api.hubapi.com/oauth/v1/access-tokens/${accessToken}`,
+      );
       const tokenData = await tokenRes.json();
 
       return {
         id: String(tokenData.hub_id),
-        displayName: tokenData.user ?? tokenData.hub_domain ?? String(tokenData.hub_id),
+        displayName:
+          tokenData.user ?? tokenData.hub_domain ?? String(tokenData.hub_id),
         metadata: {
           portalId: tokenData.hub_id,
           userId: tokenData.user_id,
@@ -300,7 +324,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
         "https://login.salesforce.com/services/oauth2/userinfo",
         {
           headers: { Authorization: `Bearer ${accessToken}` },
-        }
+        },
       );
       const data = await res.json();
       return {
@@ -368,11 +392,14 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
       "offline.access",
     ],
     getUserInfo: async (accessToken: string) => {
-      const res = await fetch("https://api.twitter.com/2/users/me?user.fields=profile_image_url,username", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+      const res = await fetch(
+        "https://api.twitter.com/2/users/me?user.fields=profile_image_url,username",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
-      });
+      );
       const data = await res.json();
       return {
         id: data.data?.id,

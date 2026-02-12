@@ -15,13 +15,19 @@ export function NotionPreview({
     case "create":
       return <NotionCreatePreview args={args} />;
     case "append":
-      return <NotionAppendPreview args={args} positionalArgs={positionalArgs} />;
+      return (
+        <NotionAppendPreview args={args} positionalArgs={positionalArgs} />
+      );
     default:
       return null;
   }
 }
 
-function NotionCreatePreview({ args }: { args: Record<string, string | undefined> }) {
+function NotionCreatePreview({
+  args,
+}: {
+  args: Record<string, string | undefined>;
+}) {
   const parent = args.parent;
   const title = args.title;
   const content = args.content;
@@ -35,9 +41,7 @@ function NotionCreatePreview({ args }: { args: Record<string, string | undefined
 
       <PreviewSection>
         <div className="rounded border bg-white dark:bg-muted/30 p-4">
-          <div className="font-medium text-lg mb-2">
-            {title || "Untitled"}
-          </div>
+          <div className="font-medium text-lg mb-2">{title || "Untitled"}</div>
 
           {parent && (
             <div className="text-xs text-muted-foreground mb-2">

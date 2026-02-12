@@ -25,5 +25,7 @@ export async function listOpencodeFreeModels(): Promise<ZenModelOption[]> {
 
 export async function isOpencodeFreeModel(modelID: string): Promise<boolean> {
   const models = await listOpencodeFreeModels();
-  return models.some((model) => model.id === modelID) || modelID.endsWith("-free");
+  return (
+    models.some((model) => model.id === modelID) || modelID.endsWith("-free")
+  );
 }

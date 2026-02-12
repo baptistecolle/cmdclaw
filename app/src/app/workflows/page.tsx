@@ -13,8 +13,19 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
-import { INTEGRATION_DISPLAY_NAMES, type IntegrationType } from "@/lib/integration-icons";
-import { Loader2, Plus, Pencil, Trash2, Play, CheckCircle2, XCircle } from "lucide-react";
+import {
+  INTEGRATION_DISPLAY_NAMES,
+  type IntegrationType,
+} from "@/lib/integration-icons";
+import {
+  Loader2,
+  Plus,
+  Pencil,
+  Trash2,
+  Play,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 
 function formatDate(value?: Date | string | null) {
   if (!value) return "—";
@@ -38,7 +49,9 @@ export default function WorkflowsPage() {
     id: string;
     name: string;
   } | null>(null);
-  const [expandedRunsByWorkflow, setExpandedRunsByWorkflow] = useState<Record<string, boolean>>({});
+  const [expandedRunsByWorkflow, setExpandedRunsByWorkflow] = useState<
+    Record<string, boolean>
+  >({});
 
   useEffect(() => {
     if (!notification) return;
@@ -53,7 +66,9 @@ export default function WorkflowsPage() {
         name: "",
         triggerType: "schedule",
         prompt: "",
-        allowedIntegrations: Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[],
+        allowedIntegrations: Object.keys(
+          INTEGRATION_DISPLAY_NAMES,
+        ) as IntegrationType[],
       });
       window.location.href = `/workflows/${result.id}`;
     } catch (error) {
@@ -142,7 +157,7 @@ export default function WorkflowsPage() {
             "mb-6 flex items-center gap-2 rounded-lg border p-4",
             notification.type === "success"
               ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400"
+              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400",
           )}
         >
           {notification.type === "success" ? (
@@ -181,23 +196,36 @@ export default function WorkflowsPage() {
               className="rounded-md border border-border/30 bg-background/70 px-5 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-muted/20"
             >
               {(() => {
-                const recentRuns = Array.isArray(wf.recentRuns) ? wf.recentRuns : [];
+                const recentRuns = Array.isArray(wf.recentRuns)
+                  ? wf.recentRuns
+                  : [];
                 const isExpanded = !!expandedRunsByWorkflow[wf.id];
-                const visibleRuns = isExpanded ? recentRuns : recentRuns.slice(0, 1);
-                const hiddenCount = Math.max(0, recentRuns.length - visibleRuns.length);
+                const visibleRuns = isExpanded
+                  ? recentRuns
+                  : recentRuns.slice(0, 1);
+                const hiddenCount = Math.max(
+                  0,
+                  recentRuns.length - visibleRuns.length,
+                );
 
                 return (
                   <>
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-medium">{getWorkflowDisplayName(wf.name)}</h3>
+                          <h3 className="font-medium">
+                            {getWorkflowDisplayName(wf.name)}
+                          </h3>
                           <span className="rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
                             {wf.triggerType}
                           </span>
                         </div>
                         <div className="mt-1.5 text-xs text-muted-foreground">
-                          Last run: {wf.lastRunStatus ? getWorkflowRunStatusLabel(wf.lastRunStatus) : "—"} · {formatDate(wf.lastRunAt)}
+                          Last run:{" "}
+                          {wf.lastRunStatus
+                            ? getWorkflowRunStatusLabel(wf.lastRunStatus)
+                            : "—"}{" "}
+                          · {formatDate(wf.lastRunAt)}
                         </div>
                       </div>
 
@@ -209,7 +237,9 @@ export default function WorkflowsPage() {
                               handleToggle(wf.id, checked ? "on" : "off")
                             }
                           />
-                          <span className="text-sm">{wf.status === "on" ? "On" : "Off"}</span>
+                          <span className="text-sm">
+                            {wf.status === "on" ? "On" : "Off"}
+                          </span>
                         </div>
                         <Button
                           variant="secondary"
@@ -228,7 +258,12 @@ export default function WorkflowsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setWorkflowToDelete({ id: wf.id, name: getWorkflowDisplayName(wf.name) })}
+                          onClick={() =>
+                            setWorkflowToDelete({
+                              id: wf.id,
+                              name: getWorkflowDisplayName(wf.name),
+                            })
+                          }
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -251,9 +286,13 @@ export default function WorkflowsPage() {
                                 <span className="text-xs capitalize text-muted-foreground">
                                   {run.source}
                                 </span>
-                                <span>{getWorkflowRunStatusLabel(run.status)}</span>
+                                <span>
+                                  {getWorkflowRunStatusLabel(run.status)}
+                                </span>
                               </div>
-                              <span className="text-xs text-muted-foreground">{formatDate(run.startedAt)}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(run.startedAt)}
+                              </span>
                             </Link>
                           ))}
                           {hiddenCount > 0 ? (
@@ -288,7 +327,9 @@ export default function WorkflowsPage() {
                           ) : null}
                         </div>
                       ) : (
-                        <div className="text-sm text-muted-foreground">No runs yet.</div>
+                        <div className="text-sm text-muted-foreground">
+                          No runs yet.
+                        </div>
                       )}
                     </div>
                   </>
@@ -310,7 +351,8 @@ export default function WorkflowsPage() {
           >
             <h3 className="text-lg font-semibold">Delete workflow?</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              This will permanently delete "{workflowToDelete.name}" and cannot be undone.
+              This will permanently delete "{workflowToDelete.name}" and cannot
+              be undone.
             </p>
             <div className="mt-6 flex items-center justify-end gap-2">
               <Button

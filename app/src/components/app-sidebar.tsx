@@ -118,9 +118,9 @@ export function AppSidebar() {
       });
 
       if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
+        const data = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
         setReportError(data?.error ?? "Failed to send report.");
         return;
       }
@@ -246,7 +246,7 @@ export function AppSidebar() {
                       "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
                       active
                         ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     )}
                   >
                     <item.icon className="h-4 w-4" />
@@ -282,7 +282,7 @@ export function AppSidebar() {
                     "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
                     isActive("/admin")
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   )}
                 >
                   <Shield className="h-4 w-4" />
@@ -316,7 +316,11 @@ export function AppSidebar() {
               </>
             )}
             <DropdownMenuItem asChild>
-              <Link href="/settings" prefetch={false} className="flex items-center gap-2">
+              <Link
+                href="/settings"
+                prefetch={false}
+                className="flex items-center gap-2"
+              >
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>
               </Link>
@@ -331,7 +335,11 @@ export function AppSidebar() {
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem asChild>
-                <Link href="/login" prefetch={false} className="flex items-center gap-2">
+                <Link
+                  href="/login"
+                  prefetch={false}
+                  className="flex items-center gap-2"
+                >
                   <LogOut className="h-4 w-4" />
                   <span>Log in</span>
                 </Link>
