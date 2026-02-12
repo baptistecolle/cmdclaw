@@ -206,11 +206,7 @@ export function AppSidebar() {
                   <span className="max-w-[180px] truncate text-xs text-muted-foreground">
                     {reportAttachment.name}
                   </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={clearAttachment}
-                  >
+                  <Button type="button" variant="ghost" onClick={clearAttachment}>
                     Remove
                   </Button>
                 </>
@@ -219,11 +215,7 @@ export function AppSidebar() {
             {reportError && <p className="mt-2 text-xs text-destructive">{reportError}</p>}
           </div>
           <SheetFooter className="border-t">
-            <Button
-              variant="outline"
-              onClick={closeReportSheet}
-              disabled={isSubmittingReport}
-            >
+            <Button variant="outline" onClick={closeReportSheet} disabled={isSubmittingReport}>
               Cancel
             </Button>
             <Button onClick={handleSubmitReport} disabled={isSubmittingReport}>

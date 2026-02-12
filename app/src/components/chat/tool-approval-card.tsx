@@ -200,12 +200,7 @@ export function ToolApprovalCard({
 
           {status === "pending" && (
             <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDenyClick}
-                disabled={isLoading}
-              >
+              <Button variant="outline" size="sm" onClick={handleDenyClick} disabled={isLoading}>
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -213,11 +208,7 @@ export function ToolApprovalCard({
                 )}
                 Deny
               </Button>
-              <Button
-                size="sm"
-                onClick={handleApproveClick}
-                disabled={isLoading}
-              >
+              <Button size="sm" onClick={handleApproveClick} disabled={isLoading}>
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (

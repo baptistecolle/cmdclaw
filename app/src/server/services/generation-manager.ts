@@ -1112,7 +1112,11 @@ class GenerationManager {
           setTimeout(resolve, 100);
         });
 
-      const streamEvents = async function* (): AsyncGenerator<GenerationStreamEvent, void, unknown> {
+      const streamEvents = async function* (): AsyncGenerator<
+        GenerationStreamEvent,
+        void,
+        unknown
+      > {
         if (isUnsubscribed) {
           return;
         }
@@ -1919,7 +1923,10 @@ class GenerationManager {
 
                 uploadedSandboxFileCount += 1;
               } catch (err) {
-                console.error(`[GenerationManager] Failed to upload sandbox file ${file.path}:`, err);
+                console.error(
+                  `[GenerationManager] Failed to upload sandbox file ${file.path}:`,
+                  err,
+                );
               }
             }),
           );
@@ -2675,8 +2682,7 @@ class GenerationManager {
       (m) => m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX),
     );
 
-    const sessionMessages =
-      boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
+    const sessionMessages = boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
 
     const summaryIndex = sessionMessages.findLastIndex(
       (m) => m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX),

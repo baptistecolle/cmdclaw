@@ -1,8 +1,8 @@
 "use client";
 
 import { Download } from "lucide-react";
-import ReactMarkdown from "react-markdown";
 import { useCallback, useMemo } from "react";
+import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import type { SandboxFileData } from "./message-list";
 
@@ -154,11 +154,7 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
   return (
     <div data-testid="chat-bubble-assistant" className={className}>
       <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 max-w-none">
-        <ReactMarkdown
-          components={markdownComponents}
-        >
-          {content}
-        </ReactMarkdown>
+        <ReactMarkdown components={markdownComponents}>{content}</ReactMarkdown>
       </div>
     </div>
   );

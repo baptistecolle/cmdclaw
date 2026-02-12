@@ -166,15 +166,18 @@ function Highlight<T extends React.ElementType = "div">({ ref, ...props }: Highl
   const [boundsState, setBoundsState] = React.useState<Bounds | null>(null);
   const [activeClassNameState, setActiveClassNameState] = React.useState<string>("");
 
-  const safeSetActiveValue = React.useCallback((id: string | null) => {
-    setActiveValue((prev) => {
-      if (prev !== id) {
-        onValueChange?.(id);
-        return id;
-      }
-      return prev;
-    });
-  }, [onValueChange]);
+  const safeSetActiveValue = React.useCallback(
+    (id: string | null) => {
+      setActiveValue((prev) => {
+        if (prev !== id) {
+          onValueChange?.(id);
+          return id;
+        }
+        return prev;
+      });
+    },
+    [onValueChange],
+  );
 
   const safeSetBoundsRef = React.useRef<((bounds: DOMRect) => void) | undefined>(undefined);
 

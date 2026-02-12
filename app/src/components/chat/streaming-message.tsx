@@ -45,14 +45,21 @@ export function StreamingMessage({ parts }: Props) {
 
           if (part.type === "text") {
             const isLast = index === parts.length - 1;
-            return (
-              <TextPartDisplay key={partKey} content={part.content} isStreaming={isLast} />
-            );
+            return <TextPartDisplay key={partKey} content={part.content} isStreaming={isLast} />;
           } else if (part.type === "thinking") {
             const isLast = index === parts.length - 1;
-            return <ThinkingPartDisplay key={partKey} content={part.content} isStreaming={isLast} />;
+            return (
+              <ThinkingPartDisplay key={partKey} content={part.content} isStreaming={isLast} />
+            );
           } else if (part.type === "tool_call") {
-            return <ToolCallDisplay key={partKey} name={part.name} input={part.input} result={part.result} />;
+            return (
+              <ToolCallDisplay
+                key={partKey}
+                name={part.name}
+                input={part.input}
+                result={part.result}
+              />
+            );
           } else {
             // Skip approval parts - they're shown separately in the approval card
             return null;

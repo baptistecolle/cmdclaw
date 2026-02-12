@@ -80,19 +80,23 @@ export function useVoiceRecording(): UseVoiceRecordingReturn {
         return;
       }
 
-      mediaRecorder.addEventListener("stop", () => {
-        const mimeType = mediaRecorder.mimeType || "audio/webm";
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+      mediaRecorder.addEventListener(
+        "stop",
+        () => {
+          const mimeType = mediaRecorder.mimeType || "audio/webm";
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
 
-        // Clean up stream
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((track) => track.stop());
-          streamRef.current = null;
-        }
+          // Clean up stream
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+          }
 
-        setIsRecording(false);
-        resolve(audioBlob);
-      }, { once: true });
+          setIsRecording(false);
+          resolve(audioBlob);
+        },
+        { once: true },
+      );
 
       mediaRecorder.stop();
     });

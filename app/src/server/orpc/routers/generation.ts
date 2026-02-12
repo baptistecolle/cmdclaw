@@ -16,9 +16,7 @@ type ActiveGenerationStatus =
   | "complete"
   | "error";
 
-function mapGenerationStatus(
-  genStatus: string | null | undefined,
-): ActiveGenerationStatus | null {
+function mapGenerationStatus(genStatus: string | null | undefined): ActiveGenerationStatus | null {
   if (!genStatus) {
     return null;
   }
@@ -371,7 +369,17 @@ const getActiveGeneration = protectedProcedure
   .output(
     z.object({
       generationId: z.string().nullable(),
-      status: z.enum(["idle", "generating", "awaiting_approval", "awaiting_auth", "paused", "complete", "error"]).nullable(),
+      status: z
+        .enum([
+          "idle",
+          "generating",
+          "awaiting_approval",
+          "awaiting_auth",
+          "paused",
+          "complete",
+          "error",
+        ])
+        .nullable(),
     }),
   )
   .handler(async ({ input, context }) => {

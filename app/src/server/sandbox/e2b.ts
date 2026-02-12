@@ -570,8 +570,7 @@ async function replayConversationHistory(
     (m) => m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX),
   );
 
-  const sessionMessages =
-    boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
+  const sessionMessages = boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
 
   const summaryIndex = sessionMessages.findLastIndex(
     (m) => m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX),

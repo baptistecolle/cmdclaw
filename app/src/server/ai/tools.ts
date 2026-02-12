@@ -80,7 +80,8 @@ export const listFilesTool: ToolDefinition = {
 
 export const searchFilesTool: ToolDefinition = {
   name: "search_files",
-  description: "Search for files matching a pattern using glob syntax. Returns matching file paths.",
+  description:
+    "Search for files matching a pattern using glob syntax. Returns matching file paths.",
   input_schema: {
     type: "object",
     properties: {

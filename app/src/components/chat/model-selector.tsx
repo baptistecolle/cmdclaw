@@ -202,10 +202,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
             </DropdownMenuItem>
           ))
         ) : (
-          <DropdownMenuItem
-            className="text-xs text-muted-foreground"
-            onClick={openSubscriptions}
-          >
+          <DropdownMenuItem className="text-xs text-muted-foreground" onClick={openSubscriptions}>
             Connect in Settings to unlock
           </DropdownMenuItem>
         )}
@@ -228,10 +225,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
             </DropdownMenuItem>
           ))
         ) : (
-          <DropdownMenuItem
-            className="text-xs text-muted-foreground"
-            onClick={openSubscriptions}
-          >
+          <DropdownMenuItem className="text-xs text-muted-foreground" onClick={openSubscriptions}>
             Connect in Settings to unlock
           </DropdownMenuItem>
         )}
@@ -254,10 +248,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
             </DropdownMenuItem>
           ))
         ) : (
-          <DropdownMenuItem
-            className="text-xs text-muted-foreground"
-            onClick={openSubscriptions}
-          >
+          <DropdownMenuItem className="text-xs text-muted-foreground" onClick={openSubscriptions}>
             Connect in Settings to unlock
           </DropdownMenuItem>
         )}

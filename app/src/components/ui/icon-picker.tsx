@@ -23,10 +23,13 @@ export function IconDisplay({ icon, className }: { icon?: string | null; classNa
 export function IconPicker({ value, onChange, children }: IconPickerProps) {
   const [open, setOpen] = useState(false);
 
-  const handleEmojiSelect = useCallback((emoji: string) => {
-    onChange(emoji);
-    setOpen(false);
-  }, [onChange]);
+  const handleEmojiSelect = useCallback(
+    (emoji: string) => {
+      onChange(emoji);
+      setOpen(false);
+    },
+    [onChange],
+  );
 
   const handleRemove = useCallback(() => {
     onChange(null);

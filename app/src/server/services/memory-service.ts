@@ -642,8 +642,7 @@ export async function writeSessionTranscriptFromConversation(input: {
     (m) => m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX),
   );
 
-  const sessionMessages =
-    boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
+  const sessionMessages = boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
 
   const trimmedMessages =
     input.messageLimit && sessionMessages.length > input.messageLimit

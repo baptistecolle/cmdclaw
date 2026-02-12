@@ -118,10 +118,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 test.describe("@live slack bridge", () => {
-  test.skip(
-    !liveEnabled,
-    "Set E2E_LIVE=1 to run Slack live e2e tests",
-  );
+  test.skip(!liveEnabled, "Set E2E_LIVE=1 to run Slack live e2e tests");
 
   test.afterAll(async () => {
     await closePool();
