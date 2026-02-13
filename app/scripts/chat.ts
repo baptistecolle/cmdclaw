@@ -514,7 +514,9 @@ async function runGeneration(
                 toolUseId: approval.toolUseId,
                 decision: "approve",
               });
-              process.stdout.write(" -> no interactive prompt available, using question defaults\n");
+              process.stdout.write(
+                " -> no interactive prompt available, using question defaults\n",
+              );
               return;
             }
 
