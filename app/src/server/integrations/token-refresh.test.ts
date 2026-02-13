@@ -72,7 +72,7 @@ import { getValidAccessToken, getValidTokensForUser, getValidCustomTokens } from
 
 let fetchSpy: ReturnType<typeof vi.spyOn>;
 
-function mockTokenResponse(payload: unknown, status = 200) {
+function mockTokenResponse(payload: Parameters<typeof HttpResponse.json>[0], status = 200) {
   mswServer.use(
     http.post("https://oauth.example.com/token", () => HttpResponse.json(payload, { status })),
   );
