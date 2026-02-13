@@ -21,6 +21,7 @@
   },
   "rules": {
     "curly": "error",
+    "no-empty-pattern": "off",
     "jsx-a11y/aria-role": "off",
     "jsx-a11y/click-events-have-key-events": "off",
     "jsx-a11y/label-has-associated-control": "off",
