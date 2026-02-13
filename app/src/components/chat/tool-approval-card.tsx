@@ -319,35 +319,38 @@ export function ToolApprovalCard({
       return (Array.isArray(selected) && selected.length > 0) || question.options.length > 0;
     });
   }, [questionPayload, selectedOptions, typedAnswers, typedMode]);
-  const handleSelectOption = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    const { questionIndex, optionLabel } = event.currentTarget.dataset;
-    if (!questionIndex || !optionLabel) {
-      return;
-    }
-    const index = Number(questionIndex);
-    if (Number.isNaN(index)) {
-      return;
-    }
-    setSelectedOptions((prev) => {
-      const question = questionPayload?.questions[index];
-      if (!question) {
-        return prev;
+  const handleSelectOption = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      const { questionIndex, optionLabel } = event.currentTarget.dataset;
+      if (!questionIndex || !optionLabel) {
+        return;
       }
-
-      const previous = prev[index] ?? [];
-      if (question.multiple) {
-        const hasOption = previous.includes(optionLabel);
-        const nextOptions = hasOption
-          ? previous.filter((value) => value !== optionLabel)
-          : [...previous, optionLabel];
-        return { ...prev, [index]: nextOptions };
+      const index = Number(questionIndex);
+      if (Number.isNaN(index)) {
+        return;
       }
+      setSelectedOptions((prev) => {
+        const question = questionPayload?.questions[index];
+        if (!question) {
+          return prev;
+        }
 
-      return { ...prev, [index]: [optionLabel] };
-    });
-    setTypedMode((prev) => ({ ...prev, [index]: false }));
-  }, [questionPayload]);
+        const previous = prev[index] ?? [];
+        if (question.multiple) {
+          const hasOption = previous.includes(optionLabel);
+          const nextOptions = hasOption
+            ? previous.filter((value) => value !== optionLabel)
+            : [...previous, optionLabel];
+          return { ...prev, [index]: nextOptions };
+        }
+
+        return { ...prev, [index]: [optionLabel] };
+      });
+      setTypedMode((prev) => ({ ...prev, [index]: false }));
+    },
+    [questionPayload],
+  );
   const handleEnableTypedMode = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     const { questionIndex } = event.currentTarget.dataset;

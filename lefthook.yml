@@ -1,0 +1,11 @@
+pre-commit:
+  commands:
+    lint:
+      root: app
+      run: bun run lint
+    format:
+      root: app
+      run: bun run format:write
+    typecheck:
+      root: app
+      run: bun run typecheck

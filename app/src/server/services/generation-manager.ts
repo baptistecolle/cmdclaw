@@ -1215,9 +1215,7 @@ class GenerationManager {
               const normalizedAnswers =
                 questionAnswers
                   ?.map((answers) =>
-                    answers
-                      .map((answer) => answer.trim())
-                      .filter((answer) => answer.length > 0),
+                    answers.map((answer) => answer.trim()).filter((answer) => answer.length > 0),
                   )
                   .filter((answers) => answers.length > 0) ?? [];
               await ctx.opencodeClient.question.reply({
