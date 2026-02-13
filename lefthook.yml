@@ -6,6 +6,7 @@ pre-commit:
     format:
       root: app
       run: bun run format:write
+      stage_fixed: true
     typecheck:
       root: app
       run: bun run typecheck

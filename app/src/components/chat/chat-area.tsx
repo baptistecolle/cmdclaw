@@ -119,6 +119,7 @@ export function ChatArea({ conversationId }: Props) {
 
   // Current conversation ID (may be set during streaming for new conversations)
   const currentConversationIdRef = useRef<string | undefined>(conversationId);
+  const autoApproveEnabled = useMemo(() => localAutoApprove, [localAutoApprove]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -319,6 +320,7 @@ export function ChatArea({ conversationId }: Props) {
     const conv = existingConversation as
       | {
           model?: string;
+          autoApprove?: boolean;
           messages?: Array<{
             id: string;
             role: string;
@@ -345,6 +347,9 @@ export function ChatArea({ conversationId }: Props) {
     // Sync model from existing conversation
     if (conv?.model) {
       setSelectedModel(conv.model);
+    }
+    if (typeof conv?.autoApprove === "boolean") {
+      setLocalAutoApprove(conv.autoApprove);
     }
 
     if (conv?.messages) {
@@ -537,7 +542,7 @@ export function ChatArea({ conversationId }: Props) {
           runtime.handleToolResult(toolName, result, toolUseId);
           syncFromRuntime(runtime);
         },
-        onPendingApproval: (data) => {
+        onPendingApproval: async (data) => {
           markInitSignal("pending_approval", { toolName: data.toolName });
           console.log("[ApprovalCard] Showing approval card", {
             toolUseId: data.toolUseId,
@@ -549,6 +554,17 @@ export function ChatArea({ conversationId }: Props) {
           currentGenerationIdRef.current = data.generationId;
           runtime.handlePendingApproval(data);
           syncFromRuntime(runtime);
+          if (autoApproveEnabled) {
+            try {
+              await submitApproval({
+                generationId: data.generationId,
+                toolUseId: data.toolUseId,
+                decision: "approve",
+              });
+            } catch (err) {
+              console.error("Failed to auto-approve tool use:", err);
+            }
+          }
         },
         onApprovalResult: (toolUseId, decision) => {
           runtime.handleApprovalResult(toolUseId, decision);
@@ -638,12 +654,14 @@ export function ChatArea({ conversationId }: Props) {
   }, [
     activeGeneration?.generationId,
     activeGeneration?.status,
+    autoApproveEnabled,
     beginInitTracking,
     handleInitStatusChange,
     markInitMissingAtEnd,
     markInitSignal,
     persistInterruptedRuntimeMessage,
     resetInitTracking,
+    submitApproval,
     subscribeToGeneration,
     syncFromRuntime,
   ]);
@@ -781,7 +799,7 @@ export function ChatArea({ conversationId }: Props) {
           conversationId: effectiveConversationId,
           content,
           model: selectedModel,
-          autoApprove: !effectiveConversationId ? localAutoApprove : undefined,
+          autoApprove: autoApproveEnabled,
           deviceId: selectedDeviceId,
           attachments,
         },
@@ -815,7 +833,7 @@ export function ChatArea({ conversationId }: Props) {
             runtime.handleToolResult(toolName, result, toolUseId);
             syncFromRuntime(runtime);
           },
-          onPendingApproval: (data) => {
+          onPendingApproval: async (data) => {
             markInitSignal("pending_approval", { toolName: data.toolName });
             currentGenerationIdRef.current = data.generationId;
             if (data.conversationId) {
@@ -823,6 +841,17 @@ export function ChatArea({ conversationId }: Props) {
             }
             runtime.handlePendingApproval(data);
             syncFromRuntime(runtime);
+            if (autoApproveEnabled) {
+              try {
+                await submitApproval({
+                  generationId: data.generationId,
+                  toolUseId: data.toolUseId,
+                  decision: "approve",
+                });
+              } catch (err) {
+                console.error("Failed to auto-approve tool use:", err);
+              }
+            }
           },
           onApprovalResult: (toolUseId, decision) => {
             runtime.handleApprovalResult(toolUseId, decision);
@@ -929,9 +958,9 @@ export function ChatArea({ conversationId }: Props) {
     },
     [
       beginInitTracking,
+      autoApproveEnabled,
       conversationId,
       handleInitStatusChange,
-      localAutoApprove,
       markInitMissingAtEnd,
       markInitSignal,
       persistInterruptedRuntimeMessage,
@@ -940,6 +969,7 @@ export function ChatArea({ conversationId }: Props) {
       selectedDeviceId,
       selectedModel,
       startGeneration,
+      submitApproval,
       syncFromRuntime,
     ],
   );
@@ -1095,13 +1125,12 @@ export function ChatArea({ conversationId }: Props) {
   }, [handleDeny, segments]);
   const handleAutoApproveChange = useCallback(
     (checked: boolean) => {
+      setLocalAutoApprove(checked);
       if (conversationId) {
         updateAutoApprove({
           id: conversationId,
           autoApprove: checked,
         });
-      } else {
-        setLocalAutoApprove(checked);
       }
     },
     [conversationId, updateAutoApprove],
@@ -1385,12 +1414,7 @@ export function ChatArea({ conversationId }: Props) {
             <div className="flex items-center gap-2">
               <Switch
                 id="auto-approve"
-                checked={
-                  conversationId
-                    ? ((existingConversation as { autoApprove?: boolean } | undefined)
-                        ?.autoApprove ?? false)
-                    : localAutoApprove
-                }
+                checked={autoApproveEnabled}
                 onCheckedChange={handleAutoApproveChange}
               />
               <label

@@ -215,7 +215,7 @@ describe("token-refresh", () => {
     expect(redditRequest!.headers.get("user-agent")).toContain("bap-app:v1.0.0");
   });
 
-  it("falls back to the existing token when refresh fails", async () => {
+  it("throws when refresh fails", async () => {
     mswServer.use(
       http.post(
         "https://oauth.example.com/token",
@@ -227,42 +227,42 @@ describe("token-refresh", () => {
       ),
     );
 
-    const token = await getValidAccessToken({
-      accessToken: "existing-token",
-      refreshToken: "refresh-token",
-      expiresAt: new Date(Date.now() - 1000),
-      integrationId: "int-3",
-      type: "github",
-    });
-
-    expect(token).toBe("existing-token");
+    await expect(
+      getValidAccessToken({
+        accessToken: "existing-token",
+        refreshToken: "refresh-token",
+        expiresAt: new Date(Date.now() - 1000),
+        integrationId: "int-3",
+        type: "github",
+      }),
+    ).rejects.toThrow("Failed to refresh github token: oauth failed");
   });
 
-  it("falls back to existing token when refresh token is missing", async () => {
-    const token = await getValidAccessToken({
-      accessToken: "existing-token",
-      refreshToken: null,
-      expiresAt: new Date(Date.now() - 1000),
-      integrationId: "int-4",
-      type: "github",
-    });
-
-    expect(token).toBe("existing-token");
+  it("throws when refresh token is missing", async () => {
+    await expect(
+      getValidAccessToken({
+        accessToken: "existing-token",
+        refreshToken: null,
+        expiresAt: new Date(Date.now() - 1000),
+        integrationId: "int-4",
+        type: "github",
+      }),
+    ).rejects.toThrow("No refresh token available for github integration");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("falls back to existing token when provider response is missing access token", async () => {
+  it("throws when provider response is missing access token", async () => {
     mockTokenResponse({ refresh_token: "new-refresh-token", expires_in: 3600 });
 
-    const token = await getValidAccessToken({
-      accessToken: "existing-token",
-      refreshToken: "refresh-token",
-      expiresAt: new Date(Date.now() - 1000),
-      integrationId: "int-5",
-      type: "github",
-    });
-
-    expect(token).toBe("existing-token");
+    await expect(
+      getValidAccessToken({
+        accessToken: "existing-token",
+        refreshToken: "refresh-token",
+        expiresAt: new Date(Date.now() - 1000),
+        integrationId: "int-5",
+        type: "github",
+      }),
+    ).rejects.toThrow("No access token in refresh response for github");
   });
 
   it("returns tokens only for enabled integrations", async () => {
@@ -434,7 +434,7 @@ describe("token-refresh", () => {
     );
   });
 
-  it("falls back to stored custom token when custom refresh fails", async () => {
+  it("throws when custom refresh fails", async () => {
     findManyMock.mockResolvedValue([
       {
         id: "cred-fail",
@@ -462,9 +462,9 @@ describe("token-refresh", () => {
       ),
     );
 
-    const tokens = await getValidCustomTokens("user-1");
-
-    expect(tokens.get("cred-fail")).toBe("existing-custom-token");
+    await expect(getValidCustomTokens("user-1")).rejects.toThrow(
+      "Failed to refresh custom token: invalid_grant",
+    );
   });
 
   it("keeps custom token when oauth metadata is incomplete", async () => {

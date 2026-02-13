@@ -129,14 +129,7 @@ export async function getValidAccessToken(token: TokenWithMetadata): Promise<str
     return token.accessToken;
   }
 
-  try {
-    return await refreshAccessToken(token);
-  } catch (error) {
-    console.error(`[Token Refresh] Error refreshing token:`, error);
-    // Return the existing token as fallback - it might still work briefly
-    // or will fail with a clear auth error
-    return token.accessToken;
-  }
+  return await refreshAccessToken(token);
 }
 
 /**
@@ -269,21 +262,15 @@ export async function getValidCustomTokens(userId: string): Promise<Map<string, 
 
         // Check if needs refresh
         if (c.expiresAt && Date.now() >= c.expiresAt.getTime() - EXPIRY_BUFFER_MS) {
-          try {
-            const newToken = await refreshCustomToken(
-              c.id,
-              c.accessToken!,
-              c.refreshToken,
-              oauth,
-              c.clientId,
-              c.clientSecret,
-            );
-            tokens.set(c.id, newToken);
-          } catch {
-            if (c.accessToken) {
-              tokens.set(c.id, c.accessToken);
-            }
-          }
+          const newToken = await refreshCustomToken(
+            c.id,
+            c.accessToken!,
+            c.refreshToken,
+            oauth,
+            c.clientId,
+            c.clientSecret,
+          );
+          tokens.set(c.id, newToken);
         } else if (c.accessToken) {
           tokens.set(c.id, c.accessToken);
         }

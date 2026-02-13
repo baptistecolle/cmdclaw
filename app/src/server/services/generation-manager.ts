@@ -493,7 +493,16 @@ class GenerationManager {
       if (existing.userId !== userId) {
         throw new Error("Access denied");
       }
-      conv = existing;
+      if (typeof autoApprove === "boolean" && existing.autoApprove !== autoApprove) {
+        const [updatedConversation] = await db
+          .update(conversation)
+          .set({ autoApprove })
+          .where(eq(conversation.id, existing.id))
+          .returning();
+        conv = updatedConversation ?? { ...existing, autoApprove };
+      } else {
+        conv = existing;
+      }
     } else {
       isNewConversation = true;
       const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
