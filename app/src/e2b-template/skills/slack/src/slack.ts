@@ -102,9 +102,28 @@ async function postAsBot(
     }),
   });
 
-  const data = await res.json().catch(() => ({}) as Record<string, JsonValue>);
+  const rawBody = await res.text();
+  let data = {} as Record<string, JsonValue>;
+  if (rawBody.length > 0) {
+    try {
+      data = (JSON.parse(rawBody) as Record<string, JsonValue>) ?? {};
+    } catch {
+      data = {};
+    }
+  }
   if (!res.ok || !data.ok) {
-    throw new Error(`Slack relay error: ${String(data.error ?? `HTTP ${res.status}`)}`);
+    const errorPart = typeof data.error === "string" ? data.error : `HTTP ${res.status}`;
+    const detailsPart =
+      data.details && typeof data.details === "object"
+        ? ` details=${JSON.stringify(data.details)}`
+        : "";
+    const reqId = res.headers.get("x-request-id");
+    const reqIdPart = reqId ? ` request_id=${reqId}` : "";
+    const bodyPart =
+      !data.error && rawBody.length > 0 ? ` raw_body=${JSON.stringify(rawBody.slice(0, 300))}` : "";
+    throw new Error(
+      `Slack relay error: ${errorPart} (status=${res.status})${reqIdPart}${detailsPart}${bodyPart}`,
+    );
   }
 
   return {

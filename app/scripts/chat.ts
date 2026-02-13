@@ -143,6 +143,17 @@ function printHelp(): void {
   console.log("  /models                   List free model ids\n");
 }
 
+function formatToolResult(result: unknown): string {
+  if (typeof result === "string") {
+    return result;
+  }
+  try {
+    return JSON.stringify(result);
+  } catch {
+    return String(result);
+  }
+}
+
 async function authenticate(serverUrl: string): Promise<ChatConfig | null> {
   console.log(`\nAuthenticating with ${serverUrl}\n`);
 
@@ -463,7 +474,7 @@ async function runGeneration(
             process.stdout.write(`\n[tool_result] ${toolName} ${JSON.stringify(result)}\n`);
           } else {
             process.stdout.write(`\n[tool_result] ${toolName}\n`);
-            process.stdout.write(`[tool_result_data] ${JSON.stringify(result)}\n`);
+            process.stdout.write(`[tool_result_data] ${formatToolResult(result)}\n`);
           }
         },
         onPendingApproval: async (approval) => {

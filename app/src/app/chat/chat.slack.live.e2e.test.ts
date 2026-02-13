@@ -25,6 +25,7 @@ const liveEnabled = process.env.E2E_LIVE === "1";
 const storageStatePath = process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
 const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "180000");
 const slackPollIntervalMs = Number(process.env.E2E_SLACK_POLL_INTERVAL_MS ?? "2500");
+const slackPostVerifyTimeoutMs = Number(process.env.E2E_SLACK_POST_VERIFY_TIMEOUT_MS ?? "30000");
 const expectedUserEmail = "baptiste@heybap.com";
 const sourceChannelName = "bap-experiments";
 const targetChannelName = "e2e-slack-testing";
@@ -107,6 +108,28 @@ async function ensureAutoApproveEnabled(page: Page): Promise<void> {
   }
 
   await expect(autoApproveSwitch).toHaveAttribute("aria-checked", "true");
+}
+
+async function approvePendingToolRequests(page: Page): Promise<number> {
+  const approveButtons = page.getByRole("button", { name: /^Approve$/ });
+  const buttonCount = await approveButtons.count();
+  const clicks = await Promise.all(
+    Array.from({ length: buttonCount }, async (_, index) => {
+      const button = approveButtons.nth(index);
+      const isVisible = await button.isVisible().catch(() => false);
+      if (!isVisible) {
+        return false;
+      }
+      const isEnabled = await button.isEnabled().catch(() => false);
+      if (!isEnabled) {
+        return false;
+      }
+      await button.click();
+      return true;
+    }),
+  );
+
+  return clicks.filter(Boolean).length;
 }
 
 async function resolveChannelId(token: string, channelName: string): Promise<string> {
@@ -222,6 +245,82 @@ async function getSlackAccessTokenForExpectedUser(): Promise<string> {
   return slackToken;
 }
 
+type AssistantTerminalState = "assistant_final" | "assistant_error" | "auth_required" | "timeout";
+
+async function waitForAssistantTerminalState({
+  page,
+  assistantMessages,
+  initialAssistantCount,
+  responseTimeoutMs,
+  finalAssistantRef,
+  allowApprovalClicks,
+  failOnApprovalCard,
+}: {
+  page: Page;
+  assistantMessages: ReturnType<Page["getByTestId"]>;
+  initialAssistantCount: number;
+  responseTimeoutMs: number;
+  finalAssistantRef: { text: string };
+  allowApprovalClicks: boolean;
+  failOnApprovalCard: boolean;
+}): Promise<AssistantTerminalState | "approval_required"> {
+  const deadline = Date.now() + responseTimeoutMs;
+
+  const poll = async (): Promise<AssistantTerminalState | "approval_required"> => {
+    const approveButtons = page.getByRole("button", { name: /^Approve$/ });
+    const approveButtonCount = await approveButtons.count();
+    if (approveButtonCount > 0) {
+      if (failOnApprovalCard) {
+        return "approval_required";
+      }
+      if (allowApprovalClicks) {
+        const approvedCount = await approvePendingToolRequests(page);
+        if (approvedCount > 0) {
+          await page.waitForTimeout(500);
+          return poll();
+        }
+      }
+    }
+
+    const currentCount = await assistantMessages.count();
+    if (currentCount > initialAssistantCount) {
+      const text = normalizeWhitespace(
+        (await page.getByTestId("chat-bubble-assistant").last().textContent()) ?? "",
+      );
+      if (!text) {
+        if (Date.now() >= deadline) {
+          return "timeout";
+        }
+        await page.waitForTimeout(slackPollIntervalMs);
+        return poll();
+      }
+      finalAssistantRef.text = text;
+      if (text.startsWith("Error:")) {
+        return "assistant_error";
+      }
+      return "assistant_final";
+    }
+
+    const requiresAuth = await page
+      .getByText("Connection Required")
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (requiresAuth) {
+      return "auth_required";
+    }
+
+    if (Date.now() >= deadline) {
+      return "timeout";
+    }
+
+    await page.waitForTimeout(slackPollIntervalMs);
+    return poll();
+  };
+
+  return poll();
+}
+
 test.describe("@live chat slack", () => {
   test.skip(!liveEnabled, "Set E2E_LIVE=1 to run live Playwright tests");
   test.use({ storageState: storageStatePath });
@@ -230,10 +329,17 @@ test.describe("@live chat slack", () => {
     await closePool();
   });
 
-  test("reads latest source message and echoes to target Slack channel", async ({
+  async function runSlackEchoScenario({
     page,
     liveChatModel,
-  }) => {
+    allowApprovalClicks,
+    failOnApprovalCard,
+  }: {
+    page: Page;
+    liveChatModel: string;
+    allowApprovalClicks: boolean;
+    failOnApprovalCard: boolean;
+  }) {
     test.setTimeout(Math.max(responseTimeoutMs + 90_000, 300_000));
 
     if (!existsSync(storageStatePath)) {
@@ -265,31 +371,35 @@ test.describe("@live chat slack", () => {
     await input.fill(buildPrompt(marker));
     await page.getByTestId("chat-send").click();
 
-    await expect
-      .poll(
-        async () => {
-          const currentCount = await assistantMessages.count();
-          if (currentCount > initialAssistantCount) {
-            return "assistant";
-          }
+    const finalAssistantRef = { text: "" };
+    const terminalState = await waitForAssistantTerminalState({
+      page,
+      assistantMessages,
+      initialAssistantCount,
+      responseTimeoutMs,
+      finalAssistantRef,
+      allowApprovalClicks,
+      failOnApprovalCard,
+    });
+    const finalAssistantText = finalAssistantRef.text;
 
-          const requiresAuth = await page
-            .getByText("Connection Required")
-            .first()
-            .isVisible()
-            .catch(() => false);
-          if (requiresAuth) {
-            return "auth_required";
-          }
-
-          return "waiting";
-        },
-        {
-          timeout: responseTimeoutMs,
-          message: "Assistant did not produce a persisted message within timeout",
-        },
-      )
-      .toBe("assistant");
+    if (terminalState === "approval_required") {
+      throw new Error(
+        "Approval card appeared, but this test expects no manual approval for this scenario.",
+      );
+    }
+    if (terminalState === "auth_required") {
+      throw new Error("Slack auth was requested during test. The connected user is missing Slack auth.");
+    }
+    if (terminalState === "assistant_error") {
+      throw new Error(`Assistant returned an error response: ${finalAssistantText}`);
+    }
+    if (terminalState === "timeout") {
+      throw new Error("Assistant did not produce a final message within timeout.");
+    }
+    if (terminalState !== "assistant_final") {
+      throw new Error(`Unexpected terminal assistant state: ${terminalState}`);
+    }
 
     const assistantBubble = page.getByTestId("chat-bubble-assistant").last();
     await expect
@@ -328,9 +438,9 @@ test.describe("@live chat slack", () => {
           return "";
         },
         {
-          timeout: responseTimeoutMs,
+          timeout: Math.min(responseTimeoutMs, slackPostVerifyTimeoutMs),
           intervals: [slackPollIntervalMs],
-          message: `No Slack message containing marker "${marker}" with expected echo format found in #${targetChannelName}.`,
+          message: `No Slack message containing marker "${marker}" with expected echo format found in #${targetChannelName}. Assistant final: "${finalAssistantText}"`,
         },
       )
       .not.toBe("");
@@ -341,5 +451,29 @@ test.describe("@live chat slack", () => {
       postedText.includes(latestSourceMessageText),
       `Posted Slack message did not include the source previous message text. source="${latestSourceMessageText}" posted="${postedText}"`,
     ).toBeTruthy();
+  }
+
+  test("reads latest source message and echoes to target Slack channel", async ({
+    page,
+    liveChatModel,
+  }) => {
+    await runSlackEchoScenario({
+      page,
+      liveChatModel,
+      allowApprovalClicks: true,
+      failOnApprovalCard: false,
+    });
+  });
+
+  test("with auto-approve enabled, posts to Slack without any approval card", async ({
+    page,
+    liveChatModel,
+  }) => {
+    await runSlackEchoScenario({
+      page,
+      liveChatModel,
+      allowApprovalClicks: false,
+      failOnApprovalCard: true,
+    });
   });
 });
