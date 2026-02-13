@@ -532,9 +532,9 @@ export function ChatArea({ conversationId }: Props) {
           runtime.handleToolUse(data);
           syncFromRuntime(runtime);
         },
-        onToolResult: (toolName, result) => {
+        onToolResult: (toolName, result, toolUseId) => {
           markInitSignal("tool_result", { toolName });
-          runtime.handleToolResult(toolName, result);
+          runtime.handleToolResult(toolName, result, toolUseId);
           syncFromRuntime(runtime);
         },
         onPendingApproval: (data) => {
@@ -810,9 +810,9 @@ export function ChatArea({ conversationId }: Props) {
             runtime.handleToolUse(data);
             syncFromRuntime(runtime);
           },
-          onToolResult: (toolName, result) => {
+          onToolResult: (toolName, result, toolUseId) => {
             markInitSignal("tool_result", { toolName });
-            runtime.handleToolResult(toolName, result);
+            runtime.handleToolResult(toolName, result, toolUseId);
             syncFromRuntime(runtime);
           },
           onPendingApproval: (data) => {

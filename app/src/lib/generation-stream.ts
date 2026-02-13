@@ -54,7 +54,7 @@ export type GenerationCallbacks = {
   onText?: (content: string) => void | Promise<void>;
   onThinking?: (data: ThinkingData) => void | Promise<void>;
   onToolUse?: (data: ToolUseData) => void | Promise<void>;
-  onToolResult?: (toolName: string, result: unknown) => void | Promise<void>;
+  onToolResult?: (toolName: string, result: unknown, toolUseId?: string) => void | Promise<void>;
   onPendingApproval?: (data: GenerationPendingApprovalData) => void | Promise<void>;
   onApprovalResult?: (toolUseId: string, decision: "approved" | "denied") => void | Promise<void>;
   onAuthNeeded?: (data: AuthNeededData) => void | Promise<void>;
@@ -137,7 +137,7 @@ export async function runGenerationStream(
         });
         break;
       case "tool_result":
-        await callbacks.onToolResult?.(event.toolName, event.result);
+        await callbacks.onToolResult?.(event.toolName, event.result, event.toolUseId);
         break;
       case "pending_approval":
         conversationId = event.conversationId;

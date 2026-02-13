@@ -888,7 +888,7 @@ describe("generationManager transitions", () => {
         integration: "slack",
         operation: "send",
       },
-      { type: "tool_result", toolName: "bash", result: "ok" },
+      { type: "tool_result", toolName: "bash", result: "ok", toolUseId: "tool-1" },
       { type: "thinking", content: "...", thinkingId: "think-1" },
       {
         type: "done",
@@ -947,7 +947,7 @@ describe("generationManager transitions", () => {
           toolInput: { command: "ls" },
           toolUseId: "tool-1",
         },
-        { type: "tool_result", toolName: "bash", result: "ok" },
+        { type: "tool_result", toolName: "bash", result: "ok", toolUseId: "tool-1" },
         { type: "status_change", status: "agent_init_started" },
         { type: "status_change", status: "agent_init_ready" },
         { type: "status_change", status: "agent_init_failed" },

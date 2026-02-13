@@ -266,6 +266,10 @@ export function ToolApprovalCard({
       return next;
     });
   }, [questionPayload]);
+  const requiresExplicitSubmit = useMemo(
+    () => questionPayload?.questions.some((question) => question.multiple === true) ?? false,
+    [questionPayload],
+  );
 
   // Parse the command to extract structured data
   const parsedCommand = useMemo(() => {
@@ -380,6 +384,10 @@ export function ToolApprovalCard({
     },
     [questionPayload],
   );
+  const canSubmitQuestionAnswers = useMemo(
+    () => isQuestionAnswered(selectedOptions, typedAnswers, typedMode),
+    [isQuestionAnswered, selectedOptions, typedAnswers, typedMode],
+  );
   const handleSelectOption = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
@@ -412,7 +420,10 @@ export function ToolApprovalCard({
       setSelectedOptions(nextSelectedOptions);
       setTypedMode(nextTypedMode);
 
-      if (isQuestionAnswered(nextSelectedOptions, typedAnswers, nextTypedMode)) {
+      if (
+        !requiresExplicitSubmit &&
+        isQuestionAnswered(nextSelectedOptions, typedAnswers, nextTypedMode)
+      ) {
         onApprove(buildQuestionAnswers(nextSelectedOptions, typedAnswers, nextTypedMode));
       }
     },
@@ -422,6 +433,7 @@ export function ToolApprovalCard({
       isQuestionAnswered,
       onApprove,
       questionPayload,
+      requiresExplicitSubmit,
       selectedOptions,
       typedAnswers,
       typedMode,
@@ -469,7 +481,10 @@ export function ToolApprovalCard({
       }
 
       const nextTypedAnswers = { ...typedAnswers, [index]: event.currentTarget.value };
-      if (isQuestionAnswered(selectedOptions, nextTypedAnswers, typedMode)) {
+      if (
+        !requiresExplicitSubmit &&
+        isQuestionAnswered(selectedOptions, nextTypedAnswers, typedMode)
+      ) {
         onApprove(buildQuestionAnswers(selectedOptions, nextTypedAnswers, typedMode));
       }
     },
@@ -479,6 +494,7 @@ export function ToolApprovalCard({
       isQuestionAnswered,
       onApprove,
       questionPayload,
+      requiresExplicitSubmit,
       selectedOptions,
       typedAnswers,
       typedMode,
@@ -659,11 +675,25 @@ export function ToolApprovalCard({
         )}
 
         {status === "pending" && questionPayload && (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={handleDenyClick} disabled={isLoading}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
               Dismiss
             </Button>
+            {requiresExplicitSubmit && (
+              <Button
+                size="sm"
+                onClick={handleApproveClick}
+                disabled={isLoading || !canSubmitQuestionAnswers}
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Submit
+              </Button>
+            )}
           </div>
         )}
       </div>

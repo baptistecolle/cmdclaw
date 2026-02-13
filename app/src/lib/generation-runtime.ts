@@ -30,6 +30,7 @@ export type RuntimeActivityItem = {
   timestamp: number;
   type: "text" | "thinking" | "tool_call" | "tool_result" | "system";
   content: string;
+  toolUseId?: string;
   toolName?: string;
   integration?: string;
   operation?: string;
@@ -121,7 +122,7 @@ export type RuntimeServerEvent =
       operation?: string;
       isWrite?: boolean;
     }
-  | { type: "tool_result"; toolName: string; result: unknown }
+  | { type: "tool_result"; toolName: string; result: unknown; toolUseId?: string }
   | {
       type: "pending_approval";
       generationId: string;
@@ -289,6 +290,7 @@ export class GenerationRuntime {
       timestamp: now,
       type: "tool_call",
       content: data.toolName,
+      toolUseId: toolId,
       toolName: data.toolName,
       integration: data.integration,
       operation: data.operation,
@@ -297,27 +299,54 @@ export class GenerationRuntime {
     });
   }
 
-  handleToolResult(toolName: string, result: unknown): void {
-    for (let i = this.parts.length - 1; i >= 0; i -= 1) {
-      const part = this.parts[i];
-      if (part.type === "tool_call" && part.name === toolName && part.result === undefined) {
-        part.result = result;
-        break;
+  handleToolResult(toolName: string, result: unknown, toolUseId?: string): void {
+    if (toolUseId) {
+      for (let i = this.parts.length - 1; i >= 0; i -= 1) {
+        const part = this.parts[i];
+        if (part.type === "tool_call" && part.id === toolUseId && part.result === undefined) {
+          part.result = result;
+          break;
+        }
+      }
+    } else {
+      for (let i = this.parts.length - 1; i >= 0; i -= 1) {
+        const part = this.parts[i];
+        if (part.type === "tool_call" && part.name === toolName && part.result === undefined) {
+          part.result = result;
+          break;
+        }
       }
     }
 
-    for (let i = this.segments.length - 1; i >= 0; i -= 1) {
-      const seg = this.segments[i];
-      const toolItem = [...seg.items]
-        .toReversed()
-        .find(
-          (item) =>
-            item.type === "tool_call" && item.content === toolName && item.status === "running",
-        );
-      if (toolItem) {
-        toolItem.status = "complete";
-        toolItem.result = result;
-        break;
+    if (toolUseId) {
+      for (let i = this.segments.length - 1; i >= 0; i -= 1) {
+        const seg = this.segments[i];
+        const toolItem = [...seg.items]
+          .toReversed()
+          .find(
+            (item) =>
+              item.type === "tool_call" && item.toolUseId === toolUseId && item.status === "running",
+          );
+        if (toolItem) {
+          toolItem.status = "complete";
+          toolItem.result = result;
+          break;
+        }
+      }
+    } else {
+      for (let i = this.segments.length - 1; i >= 0; i -= 1) {
+        const seg = this.segments[i];
+        const toolItem = [...seg.items]
+          .toReversed()
+          .find(
+            (item) =>
+              item.type === "tool_call" && item.content === toolName && item.status === "running",
+          );
+        if (toolItem) {
+          toolItem.status = "complete";
+          toolItem.result = result;
+          break;
+        }
       }
     }
   }
@@ -516,7 +545,7 @@ export class GenerationRuntime {
         });
         return;
       case "tool_result":
-        this.handleToolResult(event.toolName, event.result);
+        this.handleToolResult(event.toolName, event.result, event.toolUseId);
         return;
       case "pending_approval":
         this.handlePendingApproval(event);

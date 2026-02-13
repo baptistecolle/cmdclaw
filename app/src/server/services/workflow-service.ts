@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, eq, inArray } from "drizzle-orm";
 import type { IntegrationType } from "@/server/oauth/config";
 import { db } from "@/server/db/client";
+import { resolveDefaultOpencodeFreeModel } from "@/lib/zen-models";
 import {
   conversation,
   generation,
@@ -21,6 +22,15 @@ const WORKFLOW_PREPARING_TIMEOUT_MS = (() => {
   }
   return Math.floor(seconds * 1000);
 })();
+let cachedWorkflowModelPromise: Promise<string> | undefined;
+
+async function resolveWorkflowDefaultModel(): Promise<string> {
+  if (!cachedWorkflowModelPromise) {
+    cachedWorkflowModelPromise = resolveDefaultOpencodeFreeModel(process.env.BAP_CHAT_MODEL);
+  }
+
+  return cachedWorkflowModelPromise;
+}
 
 function mapGenerationStatusToWorkflowRunStatus(
   status: (typeof TERMINAL_GENERATION_STATUSES)[number],
@@ -210,9 +220,11 @@ export async function triggerWorkflowRun(params: {
   let generationId: string;
   let conversationId: string;
   try {
+    const workflowModel = await resolveWorkflowDefaultModel();
     const startResult = await generationManager.startWorkflowGeneration({
       workflowRunId: run.id,
       content: userContent,
+      model: workflowModel,
       userId: wf.ownerId,
       autoApprove: wf.autoApprove,
       allowedIntegrations,

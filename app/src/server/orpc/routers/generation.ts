@@ -59,6 +59,7 @@ const generationEventSchema = z.discriminatedUnion("type", [
     type: z.literal("tool_result"),
     toolName: z.string(),
     result: z.unknown(),
+    toolUseId: z.string().optional(),
   }),
   z.object({
     type: z.literal("thinking"),

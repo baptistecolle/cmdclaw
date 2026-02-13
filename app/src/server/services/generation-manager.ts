@@ -106,7 +106,7 @@ export type GenerationEvent =
       operation?: string;
       isWrite?: boolean;
     }
-  | { type: "tool_result"; toolName: string; result: unknown }
+  | { type: "tool_result"; toolName: string; result: unknown; toolUseId?: string }
   | { type: "thinking"; content: string; thinkingId: string }
   | {
       type: "pending_approval";
@@ -855,6 +855,7 @@ class GenerationManager {
               type: "tool_result",
               toolName: toolUse?.name ?? "unknown",
               result: part.content,
+              toolUseId: part.tool_use_id,
             });
           } else if (part.type === "thinking") {
             events.push({
@@ -1069,6 +1070,7 @@ class GenerationManager {
           type: "tool_result",
           toolName: toolUse?.name ?? "unknown",
           result: part.content,
+          toolUseId: part.tool_use_id,
         });
       } else if (part.type === "thinking") {
         eventQueue.push({
@@ -2228,6 +2230,7 @@ class GenerationManager {
                 type: "tool_result",
                 toolName: block.name,
                 result: memoryResult.content,
+                toolUseId: block.id,
               });
               ctx.contentParts.push({
                 type: "tool_result",
@@ -2255,6 +2258,7 @@ class GenerationManager {
                   type: "tool_result",
                   toolName: block.name,
                   result: "Integration not allowed",
+                  toolUseId: block.id,
                 });
                 ctx.contentParts.push({
                   type: "tool_result",
@@ -2282,6 +2286,7 @@ class GenerationManager {
                   type: "tool_result",
                   toolName: block.name,
                   result: "Authentication not completed",
+                  toolUseId: block.id,
                 });
                 ctx.contentParts.push({
                   type: "tool_result",
@@ -2310,6 +2315,7 @@ class GenerationManager {
                   type: "tool_result",
                   toolName: block.name,
                   result: "User denied this action",
+                  toolUseId: block.id,
                 });
                 ctx.contentParts.push({
                   type: "tool_result",
@@ -2360,6 +2366,7 @@ class GenerationManager {
                 type: "tool_result",
                 toolName: block.name,
                 result: resultContent,
+                toolUseId: block.id,
               });
               ctx.contentParts.push({
                 type: "tool_result",
@@ -2404,6 +2411,7 @@ class GenerationManager {
               type: "tool_result",
               toolName: block.name,
               result: resultContent,
+              toolUseId: block.id,
             });
             ctx.contentParts.push({
               type: "tool_result",
@@ -3354,6 +3362,7 @@ class GenerationManager {
             type: "tool_result",
             toolName: existingToolUse.name,
             result,
+            toolUseId,
           });
           ctx.contentParts.push({
             type: "tool_result",
@@ -3372,6 +3381,7 @@ class GenerationManager {
             type: "tool_result",
             toolName: existingToolUse.name,
             result,
+            toolUseId,
           });
           ctx.contentParts.push({
             type: "tool_result",

@@ -1,31 +1,27 @@
 import type { RouterClient } from "@orpc/server";
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join, basename, resolve, extname } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, resolve, extname } from "node:path";
 import readline from "node:readline";
 import type { AppRouter } from "../src/server/orpc";
 import { createGenerationRuntime } from "../src/lib/generation-runtime";
 import { runGenerationStream } from "../src/lib/generation-stream";
 import { fetchOpencodeFreeModels, resolveDefaultOpencodeFreeModel } from "../src/lib/zen-models";
-
-type ChatConfig = {
-  serverUrl: string;
-  token: string;
-};
-
-type QuestionApprovalOption = {
-  label: string;
-  description?: string;
-};
-
-type QuestionApprovalItem = {
-  header: string;
-  question: string;
-  options: QuestionApprovalOption[];
-  custom: boolean;
-};
+import {
+  collectScriptedQuestionAnswers,
+  parseQuestionApprovalInput,
+  resolveQuestionSelection,
+  type QuestionApprovalItem,
+} from "./lib/question-approval";
+import {
+  DEFAULT_SERVER_URL,
+  ask,
+  clearConfig,
+  createPrompt,
+  createRpcClient,
+  loadConfig,
+  saveConfig,
+  type ChatConfig,
+} from "./lib/cli-shared";
 
 type Args = {
   serverUrl?: string;
@@ -43,10 +39,7 @@ type Args = {
   questionAnswers: string[];
 };
 
-const DEFAULT_SERVER_URL = "http://localhost:3000";
 const DEFAULT_CLIENT_ID = "bap-cli";
-const BAP_DIR = join(homedir(), ".bap");
-const CONFIG_PATH = join(BAP_DIR, "chat-config.json");
 
 function parseArgs(argv: string[]): Args {
   const args: Args = {
@@ -156,35 +149,6 @@ function printHelp(): void {
   console.log("  /models                   List free model ids\n");
 }
 
-function ensureBapDir(): void {
-  if (!existsSync(BAP_DIR)) {
-    mkdirSync(BAP_DIR, { recursive: true });
-  }
-}
-
-function loadConfig(): ChatConfig | null {
-  try {
-    if (!existsSync(CONFIG_PATH)) {
-      return null;
-    }
-    const raw = readFileSync(CONFIG_PATH, "utf-8");
-    return JSON.parse(raw) as ChatConfig;
-  } catch {
-    return null;
-  }
-}
-
-function saveConfig(config: ChatConfig): void {
-  ensureBapDir();
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
-}
-
-function clearConfig(): void {
-  if (existsSync(CONFIG_PATH)) {
-    writeFileSync(CONFIG_PATH, "{}", "utf-8");
-  }
-}
-
 async function authenticate(serverUrl: string): Promise<ChatConfig | null> {
   console.log(`\nAuthenticating with ${serverUrl}\n`);
 
@@ -286,85 +250,6 @@ async function authenticate(serverUrl: string): Promise<ChatConfig | null> {
   return pollForToken();
 }
 
-function createClient(serverUrl: string, token: string): RouterClient<AppRouter> {
-  const link = new RPCLink({
-    url: `${serverUrl}/api/rpc`,
-    headers: () => ({ Authorization: `Bearer ${token}` }),
-  });
-
-  return createORPCClient(link) as RouterClient<AppRouter>;
-}
-
-function createPrompt(): readline.Interface {
-  return readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-}
-
-function ask(rl: readline.Interface, query: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question(query, (answer) => resolve(answer));
-  });
-}
-
-function parseQuestionApprovalInput(input: unknown): QuestionApprovalItem[] | null {
-  if (typeof input !== "object" || input === null) {
-    return null;
-  }
-
-  const rawQuestions = (input as { questions?: unknown }).questions;
-  if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
-    return null;
-  }
-
-  const questions: QuestionApprovalItem[] = [];
-  for (const rawQuestion of rawQuestions) {
-    if (typeof rawQuestion !== "object" || rawQuestion === null) {
-      continue;
-    }
-
-    const question = rawQuestion as {
-      header?: unknown;
-      question?: unknown;
-      options?: unknown;
-      custom?: unknown;
-    };
-
-    if (typeof question.header !== "string" || typeof question.question !== "string") {
-      continue;
-    }
-
-    const options: QuestionApprovalOption[] = [];
-    if (Array.isArray(question.options)) {
-      for (const rawOption of question.options) {
-        if (typeof rawOption !== "object" || rawOption === null) {
-          continue;
-        }
-
-        const option = rawOption as { label?: unknown; description?: unknown };
-        if (typeof option.label !== "string" || option.label.length === 0) {
-          continue;
-        }
-
-        options.push({
-          label: option.label,
-          description: typeof option.description === "string" ? option.description : undefined,
-        });
-      }
-    }
-
-    questions.push({
-      header: question.header,
-      question: question.question,
-      options,
-      custom: question.custom !== false,
-    });
-  }
-
-  return questions.length > 0 ? questions : null;
-}
-
 async function collectQuestionApprovalAnswers(
   rl: readline.Interface,
   questions: QuestionApprovalItem[],
@@ -387,59 +272,30 @@ async function collectQuestionApprovalAnswers(
       process.stdout.write("  t. Type your own answer\n");
     }
 
-    const prompt = question.options.length > 0 ? "Select an option (default 1): " : "Answer: ";
+    const prompt =
+      question.options.length > 0
+        ? question.multiple
+          ? "Select option(s) comma-separated (default 1): "
+          : "Select an option (default 1): "
+        : "Answer: ";
     const rawSelection = (await ask(rl, prompt)).trim();
 
-    let selectedAnswer: string;
-
-    if (!rawSelection && question.options.length > 0 && question.options[0]) {
-      selectedAnswer = question.options[0].label;
-    } else if (question.custom && rawSelection.toLowerCase() === "t") {
-      const typedAnswer = (await ask(rl, "Type your answer: ")).trim();
-      if (typedAnswer) {
-        selectedAnswer = typedAnswer;
-      } else {
-        selectedAnswer = question.options[0]?.label ?? "default answer";
-      }
+    let selectedAnswers: string[];
+    if (question.custom && rawSelection.toLowerCase() === "t") {
+      const typedPrompt = question.multiple
+        ? "Type your answer(s) (comma-separated): "
+        : "Type your answer: ";
+      const typedAnswer = await ask(rl, typedPrompt);
+      selectedAnswers = resolveQuestionSelection(question, typedAnswer);
     } else {
-      const selectedIndex = Number(rawSelection);
-      if (
-        Number.isInteger(selectedIndex) &&
-        selectedIndex >= 1 &&
-        selectedIndex <= question.options.length
-      ) {
-        selectedAnswer = question.options[selectedIndex - 1]!.label;
-      } else if (question.custom && rawSelection) {
-        selectedAnswer = rawSelection;
-      } else {
-        selectedAnswer = question.options[0]?.label ?? "default answer";
-      }
+      selectedAnswers = resolveQuestionSelection(question, rawSelection);
     }
 
     const remaining = await collectOne(index + 1);
-    return [[selectedAnswer], ...remaining];
+    return [selectedAnswers, ...remaining];
   };
 
   return collectOne(0);
-}
-
-function collectScriptedQuestionAnswers(
-  questions: QuestionApprovalItem[],
-  scriptedAnswers: string[],
-): string[][] {
-  return questions.map((question, index) => {
-    const scripted = scriptedAnswers[index]?.trim();
-    if (!scripted) {
-      return [question.options[0]?.label ?? "default answer"];
-    }
-
-    const numeric = Number(scripted);
-    if (Number.isInteger(numeric) && numeric >= 1 && numeric <= question.options.length) {
-      return [question.options[numeric - 1]!.label];
-    }
-
-    return [scripted];
-  });
 }
 
 async function runChatLoop(
@@ -554,8 +410,8 @@ async function runGeneration(
           runtime.handleToolUse(toolUse);
           process.stdout.write(`\n[tool_use] ${toolUse.toolName}\n`);
         },
-        onToolResult: (toolName, result) => {
-          runtime.handleToolResult(toolName, result);
+        onToolResult: (toolName, result, toolUseId) => {
+          runtime.handleToolResult(toolName, result, toolUseId);
           if (toolName === "question") {
             process.stdout.write(`\n[tool_result] ${toolName} ${JSON.stringify(result)}\n`);
           } else {
@@ -729,7 +585,7 @@ async function main(): Promise<void> {
   args.model = await resolveDefaultOpencodeFreeModel(args.model ?? process.env.BAP_CHAT_MODEL);
   console.log(`[model] ${args.model}`);
 
-  const client = createClient(serverUrl, config.token);
+  const client = createRpcClient(serverUrl, config.token);
 
   if (args.message) {
     // Non-interactive: send a single message and exit
