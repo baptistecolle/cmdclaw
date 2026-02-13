@@ -6,10 +6,12 @@ import { AppShell } from "@/components/app-shell";
 export default function WorkflowsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isRunsRoute = pathname?.startsWith("/workflows/runs");
+  const isWorkflowEditorRoute =
+    pathname?.startsWith("/workflows/") && pathname !== "/workflows" && !isRunsRoute;
 
   return (
     <AppShell>
-      {isRunsRoute ? (
+      {isRunsRoute || isWorkflowEditorRoute ? (
         <div className="bg-background flex h-full min-h-0 w-full flex-1 overflow-hidden">
           {children}
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import {
   Sidebar,
@@ -34,13 +34,19 @@ type WorkflowListItem = {
 
 export function WorkflowRunsSidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data, isLoading } = useWorkflowList();
   const { isMobile, setOpenMobile } = useSidebar();
+  const scopedWorkflowId = searchParams.get("workflowId");
 
   const workflows = useMemo(() => {
     const list = Array.isArray(data) ? (data as WorkflowListItem[]) : [];
-    return list.filter((wf) => Array.isArray(wf.recentRuns) && wf.recentRuns.length > 0);
-  }, [data]);
+    const withRuns = list.filter((wf) => Array.isArray(wf.recentRuns) && wf.recentRuns.length > 0);
+    if (!scopedWorkflowId) {
+      return withRuns;
+    }
+    return withRuns.filter((wf) => wf.id === scopedWorkflowId);
+  }, [data, scopedWorkflowId]);
 
   const handleSelect = useCallback(() => {
     if (isMobile) {
@@ -74,8 +80,11 @@ export function WorkflowRunsSidebar() {
 
                 <div className="space-y-1 pl-2">
                   {(wf.recentRuns ?? []).map((run) => {
-                    const href = `/workflows/runs/${run.id}`;
-                    const isActive = pathname === href;
+                    const runPath = `/workflows/runs/${run.id}`;
+                    const href = scopedWorkflowId
+                      ? `${runPath}?workflowId=${scopedWorkflowId}`
+                      : runPath;
+                    const isActive = pathname === runPath;
                     return (
                       <Link
                         key={run.id}

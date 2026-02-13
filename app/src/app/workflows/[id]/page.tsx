@@ -1,11 +1,23 @@
 "use client";
 
-import { Loader2, Play, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Loader2,
+  Play,
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  Square,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChatArea } from "@/components/chat/chat-area";
+import { ChatCopyButton } from "@/components/chat/chat-copy-button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +49,8 @@ import {
   useWorkflow,
   useUpdateWorkflow,
   useWorkflowRuns,
+  useWorkflowRun,
+  useCancelGeneration,
   useTriggerWorkflow,
   type WorkflowSchedule,
 } from "@/orpc/hooks";
@@ -53,6 +67,10 @@ const scheduleMotionAnimate = { opacity: 1, y: 0, height: "auto" } as const;
 const scheduleMotionExit = { opacity: 0, y: -8, height: 0 } as const;
 const scheduleMotionTransition = { duration: 0.22, ease: "easeOut" } as const;
 const scheduleMotionStyle = { overflow: "hidden" } as const;
+const testPanelDockCollapsed = { width: "3.5rem" } as const;
+const testPanelDockExpanded = { width: "44rem" } as const;
+const testPanelDockTransition = { duration: 0.28, ease: "easeOut" } as const;
+const ACTIVE_TEST_RUN_STATUSES = new Set(["running", "awaiting_approval", "awaiting_auth"]);
 
 function formatDate(value?: Date | string | null) {
   if (!value) {
@@ -78,13 +96,48 @@ function IntegrationToggleSwitch({
   return <Switch checked={checked} onCheckedChange={handleCheckedChange} />;
 }
 
+type WorkflowRunListItem = {
+  id: string;
+  status: string;
+  startedAt?: Date | string | null;
+};
+
+function WorkflowRunRow({
+  run,
+  isSelected,
+  onSelect,
+}: {
+  run: WorkflowRunListItem;
+  isSelected: boolean;
+  onSelect: (runId: string) => void;
+}) {
+  const handleSelect = useCallback(() => {
+    onSelect(run.id);
+  }, [onSelect, run.id]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleSelect}
+      className={cn(
+        "hover:bg-muted/50 flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs transition-colors",
+        isSelected ? "bg-muted" : "bg-muted/30",
+      )}
+    >
+      <span>{getWorkflowRunStatusLabel(run.status)}</span>
+      <span className="text-muted-foreground">{formatDate(run.startedAt)}</span>
+    </button>
+  );
+}
+
 export default function WorkflowEditorPage() {
   const params = useParams<{ id: string }>();
   const workflowId = params?.id;
   const { data: workflow, isLoading } = useWorkflow(workflowId);
-  const { data: runs } = useWorkflowRuns(workflowId);
+  const { data: runs, refetch: refetchRuns } = useWorkflowRuns(workflowId);
   const updateWorkflow = useUpdateWorkflow();
   const triggerWorkflow = useTriggerWorkflow();
+  const cancelGeneration = useCancelGeneration();
 
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState(TRIGGERS[0].value);
@@ -100,6 +153,10 @@ export default function WorkflowEditorPage() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [testRunId, setTestRunId] = useState<string | null>(null);
+  const [isTestPanelExpanded, setIsTestPanelExpanded] = useState(false);
+  const { data: selectedRun, isLoading: isSelectedRunLoading, refetch: refetchSelectedRun } =
+    useWorkflowRun(testRunId ?? undefined);
 
   // Schedule state (only used when triggerType is "schedule")
   const [scheduleType, setScheduleType] = useState<"interval" | "daily" | "weekly" | "monthly">(
@@ -257,6 +314,70 @@ export default function WorkflowEditorPage() {
     setShowDisableAutoApproveDialog(false);
   }, []);
 
+  const handleRefreshRuns = useCallback(() => {
+    void refetchRuns();
+  }, [refetchRuns]);
+
+  const handleSelectTestRun = useCallback((runId: string) => {
+    setTestRunId(runId);
+  }, []);
+
+  const handleDiscardTestPanel = useCallback(() => {
+    setIsTestPanelExpanded(false);
+    setTestRunId(null);
+  }, []);
+
+  const handleToggleTestPanel = useCallback(() => {
+    setIsTestPanelExpanded((prev) => !prev);
+  }, []);
+
+  const activeRun = useMemo(
+    () => runs?.find((run) => ACTIVE_TEST_RUN_STATUSES.has(run.status)) ?? null,
+    [runs],
+  );
+
+  const cancelTargetRunId = activeRun?.id ?? testRunId ?? null;
+  const { data: cancelTargetRun } = useWorkflowRun(cancelTargetRunId ?? undefined);
+
+  const isTestingLocked = Boolean(activeRun);
+  const canCancelRun = Boolean(
+    cancelTargetRun?.generationId && ACTIVE_TEST_RUN_STATUSES.has(cancelTargetRun.status),
+  );
+
+  useEffect(() => {
+    if (!runs || runs.length === 0) {
+      setTestRunId(null);
+      return;
+    }
+
+    const selectedRunStillExists = Boolean(testRunId && runs.some((run) => run.id === testRunId));
+    if (selectedRunStillExists) {
+      return;
+    }
+
+    if (activeRun) {
+      setTestRunId(activeRun.id);
+      return;
+    }
+
+    setTestRunId(runs[0]!.id);
+  }, [activeRun, runs, testRunId]);
+
+  useEffect(() => {
+    if (!activeRun) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void refetchRuns();
+      if (testRunId) {
+        void refetchSelectedRun();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [activeRun, refetchRuns, refetchSelectedRun, testRunId]);
+
   const buildSchedule = useCallback((): WorkflowSchedule | null => {
     if (triggerType !== "schedule") {
       return null;
@@ -342,14 +463,53 @@ export default function WorkflowEditorPage() {
     if (!workflowId) {
       return;
     }
+    if (activeRun) {
+      setTestRunId(activeRun.id);
+      setIsTestPanelExpanded(true);
+      setNotification({
+        type: "success",
+        message: "A test run is already in progress. Opened it in the test sidebar.",
+      });
+      return;
+    }
     try {
-      await triggerWorkflow.mutateAsync({ id: workflowId, payload: {} });
-      setNotification({ type: "success", message: "Workflow run started." });
+      const result = await triggerWorkflow.mutateAsync({ id: workflowId, payload: {} });
+      setTestRunId(result.runId);
+      setIsTestPanelExpanded(true);
+      setNotification({ type: "success", message: "Test run started." });
+      void refetchRuns();
     } catch (error) {
       console.error("Failed to run workflow:", error);
       setNotification({ type: "error", message: "Failed to start run." });
     }
-  }, [triggerWorkflow, workflowId]);
+  }, [activeRun, refetchRuns, triggerWorkflow, workflowId]);
+
+  const handleCancelRun = useCallback(async () => {
+    if (!cancelTargetRun?.generationId) {
+      setNotification({
+        type: "error",
+        message: "This run cannot be cancelled right now.",
+      });
+      return;
+    }
+
+    try {
+      const result = await cancelGeneration.mutateAsync(cancelTargetRun.generationId);
+      if (!result.success) {
+        setNotification({
+          type: "error",
+          message: "Run could not be cancelled (it may already be finished).",
+        });
+        return;
+      }
+
+      setNotification({ type: "success", message: "Run cancelled." });
+      await Promise.all([refetchRuns(), refetchSelectedRun()]);
+    } catch (error) {
+      console.error("Failed to cancel run:", error);
+      setNotification({ type: "error", message: "Failed to cancel run." });
+    }
+  }, [cancelGeneration, cancelTargetRun?.generationId, refetchRuns, refetchSelectedRun]);
 
   if (isLoading || !workflow) {
     return (
@@ -362,69 +522,75 @@ export default function WorkflowEditorPage() {
   const workflowDisplayName = workflow.name.trim().length > 0 ? workflow.name : "New Workflow";
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] space-y-5 pb-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3 sm:items-center">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/workflows">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div className="min-w-0">
-            <h2 className="text-xl font-semibold">{workflowDisplayName}</h2>
-            <p className="text-muted-foreground text-sm">
-              Configure trigger, agent instructions, and allowed tools.
-            </p>
+    <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden">
+      <div
+        className={cn(
+          "h-full overflow-y-auto px-4 py-5 transition-[padding-right] duration-300 sm:px-6",
+          isTestPanelExpanded ? "xl:pr-[44rem]" : "xl:pr-14",
+        )}
+      >
+        <div className="space-y-5 pb-6">
+          <div className="space-y-3">
+            <div className="flex items-start gap-3 sm:items-center">
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/workflows">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold">{workflowDisplayName}</h2>
+                <p className="text-muted-foreground text-sm">
+                  Configure trigger, agent instructions, and allowed tools.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="bg-muted/50 flex items-center gap-2 rounded-full px-3 py-1.5">
+                <span className="text-muted-foreground text-sm">
+                  {status === "on" ? "Workflow is on" : "Workflow is off"}
+                </span>
+                <Switch checked={status === "on"} onCheckedChange={handleStatusChange} />
+              </div>
+              <div className="bg-muted/50 flex items-center gap-2 rounded-full px-3 py-1.5">
+                <span className="text-muted-foreground text-sm">
+                  {autoApprove ? "Auto-approve on" : "Auto-approve off"}
+                </span>
+                <Switch checked={autoApprove} onCheckedChange={handleAutoApproveChange} />
+              </div>
+              <Button
+                variant="secondary"
+                onClick={handleRun}
+                disabled={(!activeRun && status !== "on") || triggerWorkflow.isPending}
+              >
+                {triggerWorkflow.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="mr-2 h-4 w-4" />
+                )}
+                Test now
+              </Button>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save
+              </Button>
+            </div>
           </div>
-        </div>
-        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
-          <div className="bg-muted/50 flex w-full items-center justify-between gap-2 rounded-full px-3 py-1.5 sm:w-auto sm:justify-start">
-            <span className="text-muted-foreground text-sm">
-              {status === "on" ? "Workflow is on" : "Workflow is off"}
-            </span>
-            <Switch checked={status === "on"} onCheckedChange={handleStatusChange} />
-          </div>
-          <div className="bg-muted/50 flex w-full items-center justify-between gap-2 rounded-full px-3 py-1.5 sm:w-auto sm:justify-start">
-            <span className="text-muted-foreground text-sm">
-              {autoApprove ? "Auto-approve on" : "Auto-approve off"}
-            </span>
-            <Switch checked={autoApprove} onCheckedChange={handleAutoApproveChange} />
-          </div>
-          <Button
-            variant="secondary"
-            onClick={handleRun}
-            disabled={status !== "on"}
-            className="w-full justify-center sm:w-auto"
-          >
-            <Play className="mr-2 h-4 w-4" />
-            Run now
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full justify-center sm:w-auto"
-          >
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save
-          </Button>
-        </div>
-      </div>
 
-      {notification && (
-        <div
-          className={cn(
-            "rounded-lg border px-4 py-3 text-sm",
-            notification.type === "success"
-              ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
+          {notification && (
+            <div
+              className={cn(
+                "rounded-lg border px-4 py-3 text-sm",
+                notification.type === "success"
+                  ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400"
+                  : "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
+              )}
+            >
+              {notification.message}
+            </div>
           )}
-        >
-          {notification.message}
-        </div>
-      )}
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <section className="bg-card/20 rounded-xl p-5 md:p-6">
+          <div className="flex flex-col gap-5">
+        <section className="bg-card/20 w-full min-w-0 flex-1 rounded-xl p-5 md:p-6">
           <div className="space-y-8">
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -654,37 +820,144 @@ export default function WorkflowEditorPage() {
           </div>
         </section>
 
-        <aside className="bg-card/20 rounded-xl p-5 md:p-6 xl:sticky xl:top-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold">Recent runs</h3>
-              <p className="text-muted-foreground text-xs">
-                Latest workflow runs and their status.
-              </p>
+          </div>
+        </div>
+      </div>
+
+      <motion.aside
+        initial={false}
+        animate={isTestPanelExpanded ? testPanelDockExpanded : testPanelDockCollapsed}
+        transition={testPanelDockTransition}
+        className="bg-card/55 border-border/40 absolute inset-y-0 right-0 z-30 overflow-hidden border-l backdrop-blur-sm"
+      >
+        <div className="flex h-full min-h-0">
+          <div className="bg-background/60 border-border/40 flex w-14 shrink-0 flex-col items-center justify-between border-r py-3">
+            <button
+              type="button"
+              onClick={handleToggleTestPanel}
+              className="hover:bg-muted/80 rounded-md p-1.5 transition-colors"
+              aria-label={isTestPanelExpanded ? "Collapse test sidebar" : "Expand test sidebar"}
+            >
+              {isTestPanelExpanded ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleTestPanel}
+              className="hover:bg-muted/80 flex w-full flex-col items-center gap-3 rounded-md py-3 transition-colors"
+            >
+              <Circle
+                className={cn(
+                  "h-2.5 w-2.5 fill-current",
+                  isTestingLocked ? "text-emerald-500" : "text-muted-foreground/70",
+                )}
+              />
+              <span className="[writing-mode:vertical-rl] rotate-180 text-[11px] tracking-[0.12em] uppercase">
+                Test run
+              </span>
+            </button>
+            <div className="text-muted-foreground text-[10px] font-medium tracking-[0.08em] uppercase">
+              {runs?.length ?? 0}
             </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={`/workflows/${workflowId}`}>Refresh</Link>
-            </Button>
           </div>
 
-          {runs && runs.length > 0 ? (
-            <div className="space-y-2">
-              {runs.map((run) => (
-                <Link
-                  key={run.id}
-                  href={`/workflows/runs/${run.id}`}
-                  className="bg-muted/30 hover:bg-muted/50 flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors"
-                >
-                  <span>{getWorkflowRunStatusLabel(run.status)}</span>
-                  <span className="text-muted-foreground text-xs">{formatDate(run.startedAt)}</span>
-                </Link>
-              ))}
+          {isTestPanelExpanded ? (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div className="border-b px-4 py-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Test run</h3>
+                    <p className="text-muted-foreground text-xs">Live output for this workflow test.</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {selectedRun?.conversationId ? (
+                      <ChatCopyButton conversationId={selectedRun.conversationId} />
+                    ) : null}
+                    <Button variant="ghost" size="sm" onClick={handleDiscardTestPanel}>
+                      Discard
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleCancelRun}
+                    disabled={!canCancelRun || cancelGeneration.isPending}
+                  >
+                    {cancelGeneration.isPending ? (
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Square className="mr-2 h-3.5 w-3.5" />
+                    )}
+                    Cancel run
+                  </Button>
+                </div>
+                {isTestingLocked ? (
+                  <p className="text-muted-foreground mt-2 text-xs">
+                    One test run is active. Cancel it before starting another test run.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="bg-background min-h-0 flex-1 overflow-hidden">
+                {isSelectedRunLoading ? (
+                  <div className="flex h-full items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  </div>
+                ) : selectedRun?.conversationId ? (
+                  <ChatArea conversationId={selectedRun.conversationId} />
+                ) : selectedRun ? (
+                  <div className="space-y-2 p-4">
+                    <p className="text-sm font-medium">Run details unavailable in chat view</p>
+                    <p className="text-muted-foreground text-sm">
+                      This run does not have a linked conversation.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 p-4">
+                    <p className="text-sm font-medium">No test run selected</p>
+                    <p className="text-muted-foreground text-sm">
+                      Click <span className="font-medium">Test now</span> to run this workflow.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-muted-foreground text-[11px] font-medium tracking-[0.12em] uppercase">
+                    Recent runs
+                  </p>
+                  <Button variant="ghost" size="sm" onClick={handleRefreshRuns}>
+                    Refresh
+                  </Button>
+                </div>
+                {runs && runs.length > 0 ? (
+                  <div className="max-h-44 space-y-1 overflow-auto pr-1">
+                    {runs.map((run) => {
+                      const isSelected = run.id === testRunId;
+                      return (
+                        <WorkflowRunRow
+                          key={run.id}
+                          run={run}
+                          isSelected={isSelected}
+                          onSelect={handleSelectTestRun}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">No runs yet.</p>
+                )}
+              </div>
             </div>
-          ) : (
-            <p className="text-muted-foreground text-sm">No runs yet.</p>
-          )}
-        </aside>
-      </div>
+          ) : null}
+        </div>
+      </motion.aside>
       <AlertDialog
         open={showDisableAutoApproveDialog}
         onOpenChange={setShowDisableAutoApproveDialog}
