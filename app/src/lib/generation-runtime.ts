@@ -325,7 +325,9 @@ export class GenerationRuntime {
           .toReversed()
           .find(
             (item) =>
-              item.type === "tool_call" && item.toolUseId === toolUseId && item.status === "running",
+              item.type === "tool_call" &&
+              item.toolUseId === toolUseId &&
+              item.status === "running",
           );
         if (toolItem) {
           toolItem.status = "complete";

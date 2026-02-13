@@ -1,8 +1,8 @@
 import type { RouterClient } from "@orpc/server";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import { authClient } from "@/lib/auth-client";
 import type { AppRouter } from "@/server/orpc";
+import { authClient } from "@/lib/auth-client";
 
 function getBaseUrl() {
   if (typeof window !== "undefined") {

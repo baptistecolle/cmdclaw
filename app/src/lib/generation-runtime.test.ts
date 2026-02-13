@@ -26,8 +26,12 @@ describe("GenerationRuntime tool result matching", () => {
     expect(toolCalls[1]).toMatchObject({ id: "tool-2", result: "second result" });
 
     const allItems = snapshot.segments.flatMap((segment) => segment.items);
-    const firstTool = allItems.find((item) => item.type === "tool_call" && item.toolUseId === "tool-1");
-    const secondTool = allItems.find((item) => item.type === "tool_call" && item.toolUseId === "tool-2");
+    const firstTool = allItems.find(
+      (item) => item.type === "tool_call" && item.toolUseId === "tool-1",
+    );
+    const secondTool = allItems.find(
+      (item) => item.type === "tool_call" && item.toolUseId === "tool-2",
+    );
     expect(firstTool).toMatchObject({ status: "running" });
     expect(secondTool).toMatchObject({ status: "complete", result: "second result" });
   });

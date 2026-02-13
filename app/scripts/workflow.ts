@@ -298,7 +298,9 @@ function printHelp(): void {
   console.log("  --watch                           Poll until run reaches terminal status");
   console.log("  --watch-interval <seconds>        Polling interval for --watch (default 2)");
   console.log("\nLogs/Runs flags:");
-  console.log("  --limit <n>                       Limit run list size for runs command (default 20)");
+  console.log(
+    "  --limit <n>                       Limit run list size for runs command (default 20)",
+  );
   console.log("  --watch                           Poll run logs until terminal status");
   console.log("\nCreate flags:");
   console.log("  -n, --name <name>                 Workflow name (required)");

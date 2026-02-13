@@ -7,12 +7,6 @@ import { createGenerationRuntime } from "../src/lib/generation-runtime";
 import { runGenerationStream } from "../src/lib/generation-stream";
 import { fetchOpencodeFreeModels, resolveDefaultOpencodeFreeModel } from "../src/lib/zen-models";
 import {
-  collectScriptedQuestionAnswers,
-  parseQuestionApprovalInput,
-  resolveQuestionSelection,
-  type QuestionApprovalItem,
-} from "./lib/question-approval";
-import {
   DEFAULT_SERVER_URL,
   ask,
   clearConfig,
@@ -22,6 +16,12 @@ import {
   saveConfig,
   type ChatConfig,
 } from "./lib/cli-shared";
+import {
+  collectScriptedQuestionAnswers,
+  parseQuestionApprovalInput,
+  resolveQuestionSelection,
+  type QuestionApprovalItem,
+} from "./lib/question-approval";
 
 type Args = {
   serverUrl?: string;
