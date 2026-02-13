@@ -546,6 +546,13 @@ async function runGeneration(
   return null;
 }
 
+function createSingleMessagePrompt(): readline.Interface | null {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    return null;
+  }
+  return createPrompt();
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
@@ -590,14 +597,16 @@ async function main(): Promise<void> {
   if (args.message) {
     // Non-interactive: send a single message and exit
     const attachments = args.files.map((f) => fileToAttachment(f));
+    const singleMessagePrompt = createSingleMessagePrompt();
     const result = await runGeneration(
       client,
-      null,
+      singleMessagePrompt,
       args.message,
       args.conversationId,
       args,
       attachments.length ? attachments : undefined,
     );
+    singleMessagePrompt?.close();
     if (result) {
       console.log(`\n[conversation] ${result.conversationId}`);
     }

@@ -1,5 +1,8 @@
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { env } from "@/env";
+import { db } from "@/server/db/client";
+import { conversation } from "@/server/db/schema";
 import { getTokensForIntegrations } from "@/server/integrations/cli-env";
 import { generationManager } from "@/server/services/generation-manager";
 import { baseProcedure } from "../middleware";
@@ -79,9 +82,18 @@ const approvalRequest = baseProcedure
     }
 
     // Find the active generation for this conversation
-    const genId = generationManager.getGenerationForConversation(input.conversationId);
+    const inMemoryGenId = generationManager.getGenerationForConversation(input.conversationId);
+    const conv =
+      inMemoryGenId === undefined
+        ? await db.query.conversation.findFirst({
+            where: eq(conversation.id, input.conversationId),
+          })
+        : null;
+    const genId = inMemoryGenId ?? conv?.currentGenerationId ?? undefined;
     console.log("[Internal] Generation lookup:", {
       conversationId: input.conversationId,
+      inMemoryGenId: inMemoryGenId ?? "NOT FOUND",
+      dbGenId: conv?.currentGenerationId ?? "NOT FOUND",
       genId: genId ?? "NOT FOUND",
     });
     if (!genId) {
@@ -141,7 +153,14 @@ const authRequest = baseProcedure
     });
 
     // Find the active generation for this conversation
-    const genId = generationManager.getGenerationForConversation(input.conversationId);
+    const inMemoryGenId = generationManager.getGenerationForConversation(input.conversationId);
+    const conv =
+      inMemoryGenId === undefined
+        ? await db.query.conversation.findFirst({
+            where: eq(conversation.id, input.conversationId),
+          })
+        : null;
+    const genId = inMemoryGenId ?? conv?.currentGenerationId ?? undefined;
     if (!genId) {
       console.error("[Internal] No active generation for conversation:", input.conversationId);
       return { success: false };

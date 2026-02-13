@@ -282,7 +282,6 @@ describe("generationManager transitions", () => {
   });
 
   it("submits approval, persists running status, and emits approval_result", async () => {
-    const callback = vi.fn();
     const ctx = createCtx({
       status: "awaiting_approval",
       pendingApproval: {
@@ -294,28 +293,32 @@ describe("generationManager transitions", () => {
         operation: "send",
       },
     });
-    ctx.subscribers.set("sub-1", { id: "sub-1", callback });
+    generationFindFirstMock.mockResolvedValue({
+      id: ctx.id,
+      conversationId: ctx.conversationId,
+      pendingApproval: ctx.pendingApproval,
+      conversation: {
+        id: ctx.conversationId,
+        userId: ctx.userId,
+      },
+    });
     const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
 
     const result = await generationManager.submitApproval(ctx.id, "tool-1", "approve", ctx.userId);
 
     expect(result).toBe(true);
-    expect(ctx.pendingApproval).toBeNull();
-    expect(ctx.status).toBe("running");
+    expect(ctx.pendingApproval).not.toBeNull();
+    expect(ctx.status).toBe("awaiting_approval");
 
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        status: "running",
-        pendingApproval: null,
+        pendingApproval: expect.objectContaining({
+          toolUseId: "tool-1",
+          decision: "allow",
+        }),
       }),
     );
-
-    expect(callback).toHaveBeenCalledWith({
-      type: "approval_result",
-      toolUseId: "tool-1",
-      decision: "approved",
-    });
   });
 
   it("submits question approval and replies to OpenCode with default answers", async () => {
@@ -609,6 +612,25 @@ describe("generationManager transitions", () => {
 
     const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
+    generationFindFirstMock.mockImplementation(async (input?: unknown) => {
+      const request = input as { with?: { conversation?: boolean } } | undefined;
+      if (request?.with?.conversation) {
+        return {
+          id: ctx.id,
+          conversationId: ctx.conversationId,
+          conversation: {
+            id: ctx.conversationId,
+            userId: ctx.userId,
+            autoApprove: false,
+          },
+        };
+      }
+      return {
+        id: ctx.id,
+        conversationId: ctx.conversationId,
+        pendingApproval: ctx.pendingApproval,
+      };
+    });
 
     const approvalPromise = generationManager.waitForApproval(ctx.id, {
       toolInput: { command: "slack send" },
@@ -625,7 +647,6 @@ describe("generationManager transitions", () => {
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "paused",
-        isPaused: true,
       }),
     );
 
@@ -1145,9 +1166,151 @@ describe("generationManager transitions", () => {
     await expect(
       generationManager.waitForApproval(ctx.id, {
         toolInput: {},
-        integration: "slack",
-        operation: "send",
-        command: "slack send",
+        integration: "github",
+        operation: "create-issue",
+        command: "github create-issue --title bug",
+      }),
+    ).resolves.toBe("allow");
+  });
+
+  it("requires manual approval for slack send even when autoApprove is enabled", async () => {
+    const ctx = createCtx({ id: "gen-slack-send-manual", autoApprove: true });
+    const mgr = asTestManager();
+    mgr.activeGenerations.set(ctx.id, ctx);
+    generationFindFirstMock.mockImplementation(async (input?: unknown) => {
+      const request = input as { with?: { conversation?: boolean } } | undefined;
+      if (request?.with?.conversation) {
+        return {
+          id: ctx.id,
+          conversationId: ctx.conversationId,
+          conversation: {
+            id: ctx.conversationId,
+            userId: ctx.userId,
+            autoApprove: true,
+          },
+        };
+      }
+      return {
+        id: ctx.id,
+        conversationId: ctx.conversationId,
+        pendingApproval: ctx.pendingApproval,
+      };
+    });
+
+    const approvalPromise = generationManager.waitForApproval(ctx.id, {
+      toolInput: { command: "slack send -c C123 -t hi" },
+      integration: "slack",
+      operation: "send",
+      command: "slack send -c C123 -t hi",
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(ctx.status).toBe("awaiting_approval");
+    const pendingApproval = ctx.pendingApproval as
+      | { integration?: string; operation?: string; toolUseId?: string }
+      | null;
+    expect(pendingApproval?.integration).toBe("slack");
+    expect(pendingApproval?.operation).toBe("send");
+
+    const pendingCheck = Promise.race([
+      approvalPromise.then(() => "resolved"),
+      Promise.resolve("pending"),
+    ]);
+    await expect(pendingCheck).resolves.toBe("pending");
+
+    const toolUseId = pendingApproval?.toolUseId;
+    if (!toolUseId) {
+      throw new Error("Expected pending approval to be set for slack send");
+    }
+
+    await expect(generationManager.submitApproval(ctx.id, toolUseId, "deny", ctx.userId)).resolves.toBe(
+      true,
+    );
+    expect(updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pendingApproval: expect.objectContaining({
+          toolUseId,
+          decision: "deny",
+        }),
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(1000);
+    void approvalPromise;
+  });
+
+  it("requires manual approval for slack send detected from command when operation is empty", async () => {
+    const ctx = createCtx({ id: "gen-slack-send-command-only", autoApprove: true });
+    const mgr = asTestManager();
+    mgr.activeGenerations.set(ctx.id, ctx);
+    generationFindFirstMock.mockImplementation(async (input?: unknown) => {
+      const request = input as { with?: { conversation?: boolean } } | undefined;
+      if (request?.with?.conversation) {
+        return {
+          id: ctx.id,
+          conversationId: ctx.conversationId,
+          conversation: {
+            id: ctx.conversationId,
+            userId: ctx.userId,
+            autoApprove: true,
+          },
+        };
+      }
+      return {
+        id: ctx.id,
+        conversationId: ctx.conversationId,
+        pendingApproval: ctx.pendingApproval,
+      };
+    });
+
+    const approvalPromise = generationManager.waitForApproval(ctx.id, {
+      toolInput: { command: "slack send -c C123 -t hi" },
+      integration: "slack",
+      operation: "",
+      command: "slack send -c C123 -t hi",
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(ctx.status).toBe("awaiting_approval");
+    const pendingApproval = ctx.pendingApproval as
+      | { integration?: string; toolUseId?: string }
+      | null;
+    expect(pendingApproval?.integration).toBe("slack");
+
+    const toolUseId = pendingApproval?.toolUseId;
+    if (!toolUseId) {
+      throw new Error("Expected pending approval to be set for slack send command");
+    }
+
+    await expect(
+      generationManager.submitApproval(ctx.id, toolUseId, "approve", ctx.userId),
+    ).resolves.toBe(true);
+    expect(updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pendingApproval: expect.objectContaining({
+          toolUseId,
+          decision: "allow",
+        }),
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(1000);
+    void approvalPromise;
+  });
+
+  it("auto-approves non-slack requests when autoApprove is enabled", async () => {
+    const ctx = createCtx({ autoApprove: true });
+    const mgr = asTestManager();
+    mgr.activeGenerations.set(ctx.id, ctx);
+
+    await expect(
+      generationManager.waitForApproval(ctx.id, {
+        toolInput: {},
+        integration: "github",
+        operation: "create-issue",
+        command: "github create-issue --title bug",
       }),
     ).resolves.toBe("allow");
   });
@@ -1167,6 +1330,35 @@ describe("generationManager transitions", () => {
       "github",
     ]);
     expect(generationManager.getAllowedIntegrationsForConversation("missing-conv")).toBeNull();
+  });
+
+  it("recovers generation lookup when conversation mapping is missing", () => {
+    const ctx = createCtx({
+      id: "gen-recover",
+      conversationId: "conv-recover",
+      allowedIntegrations: ["slack"],
+    });
+    const mgr = asTestManager();
+    mgr.activeGenerations.set(ctx.id, ctx);
+
+    expect(generationManager.getGenerationForConversation(ctx.conversationId)).toBe(ctx.id);
+    expect(mgr.conversationToGeneration.get(ctx.conversationId)).toBe(ctx.id);
+  });
+
+  it("recovers allowed integrations lookup when mapping is missing", () => {
+    const ctx = createCtx({
+      id: "gen-recover-integrations",
+      conversationId: "conv-recover-integrations",
+      allowedIntegrations: ["slack", "github"],
+    });
+    const mgr = asTestManager();
+    mgr.activeGenerations.set(ctx.id, ctx);
+
+    expect(generationManager.getAllowedIntegrationsForConversation(ctx.conversationId)).toEqual([
+      "slack",
+      "github",
+    ]);
+    expect(mgr.conversationToGeneration.get(ctx.conversationId)).toBe(ctx.id);
   });
 
   it("builds workflow prompt sections only when workflow context is present", () => {

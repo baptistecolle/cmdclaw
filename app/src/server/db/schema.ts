@@ -237,6 +237,7 @@ export type PendingApproval = {
   integration: string;
   operation: string;
   command?: string;
+  decision?: "allow" | "deny";
 };
 
 // Auth state stored in generation

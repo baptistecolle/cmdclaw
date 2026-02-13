@@ -1,8 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
+const defaultPort = skipWebServer ? 3000 : 4173;
+const port = Number(process.env.PLAYWRIGHT_PORT ?? defaultPort);
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 const videoMode =
   process.env.PLAYWRIGHT_VIDEO === "off" ||
   process.env.PLAYWRIGHT_VIDEO === "on" ||

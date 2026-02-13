@@ -26,6 +26,7 @@ const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
 
 export async function getCliEnvForUser(userId: string): Promise<Record<string, string>> {
   const cliEnv: Record<string, string> = {};
+  const appUrl = env.APP_URL ?? env.NEXT_PUBLIC_APP_URL;
 
   // Get valid tokens, refreshing any that are expired or about to expire
   // This already filters by enabled integrations
@@ -83,11 +84,11 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
   if (slackRelaySecret) {
     cliEnv.SLACK_BOT_RELAY_SECRET = slackRelaySecret;
   }
-  if (env.APP_URL) {
+  if (appUrl) {
     const relayBaseUrl =
-      new URL(env.APP_URL).hostname === "localhost"
+      new URL(appUrl).hostname === "localhost"
         ? "https://localcan.baptistecolle.com"
-        : env.APP_URL;
+        : appUrl;
     cliEnv.SLACK_BOT_RELAY_URL = `${relayBaseUrl}/api/internal/slack/post-as-bot`;
   }
 

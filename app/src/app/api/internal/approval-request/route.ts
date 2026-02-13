@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { env } from "@/env";
+import { db } from "@/server/db/client";
+import { conversation } from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
+import { eq } from "drizzle-orm";
 
 export const runtime = "nodejs";
 
@@ -69,9 +72,18 @@ export async function POST(request: Request) {
       return Response.json({ decision: "deny" });
     }
 
-    const genId = generationManager.getGenerationForConversation(input.conversationId);
+    const inMemoryGenId = generationManager.getGenerationForConversation(input.conversationId);
+    const conv =
+      inMemoryGenId === undefined
+        ? await db.query.conversation.findFirst({
+            where: eq(conversation.id, input.conversationId),
+          })
+        : null;
+    const genId = inMemoryGenId ?? conv?.currentGenerationId ?? undefined;
     console.log("[Internal] Generation lookup:", {
       conversationId: input.conversationId,
+      inMemoryGenId: inMemoryGenId ?? "NOT FOUND",
+      dbGenId: conv?.currentGenerationId ?? "NOT FOUND",
       genId: genId ?? "NOT FOUND",
     });
 

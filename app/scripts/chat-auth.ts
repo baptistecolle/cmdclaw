@@ -82,13 +82,16 @@ async function main(): Promise<void> {
     const { user, session } = schemaModule;
 
     const minRemainingMinutes = parsePositiveInt(process.env.CHAT_AUTH_MIN_REMAINING_MINUTES, 10);
+    const email =
+      process.env.CHAT_AUTH_EMAIL || process.env.E2E_TEST_EMAIL || DEFAULT_CHAT_AUTH_EMAIL;
+    const name = process.env.CHAT_AUTH_NAME || DEFAULT_CHAT_AUTH_NAME;
 
     if (loaded?.token && loaded.serverUrl === serverUrl) {
       const existing = await auth.api.getSession({
         headers: new Headers({ Authorization: `Bearer ${loaded.token}` }),
       });
 
-      if (existing?.session) {
+      if (existing?.session && existing.user?.email === email) {
         const expiresAt = new Date(existing.session.expiresAt);
         if (Number.isFinite(expiresAt.getTime())) {
           const minRemainingMs = minRemainingMinutes * 60 * 1000;
@@ -97,12 +100,12 @@ async function main(): Promise<void> {
             return;
           }
         }
+      } else if (existing?.user?.email && existing.user.email !== email) {
+        console.log(
+          `[chat-auth] existing token is for ${existing.user.email}; creating session for ${email}`,
+        );
       }
     }
-
-    const email =
-      process.env.CHAT_AUTH_EMAIL || process.env.E2E_TEST_EMAIL || DEFAULT_CHAT_AUTH_EMAIL;
-    const name = process.env.CHAT_AUTH_NAME || DEFAULT_CHAT_AUTH_NAME;
     const now = new Date();
 
     const existingUser = await db.query.user.findFirst({

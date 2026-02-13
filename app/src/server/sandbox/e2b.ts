@@ -19,6 +19,16 @@ const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-agent-dev";
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const OPENCODE_PORT = 4096;
 
+function resolveSandboxAppUrl(): string {
+  const configuredUrl = env.E2B_CALLBACK_BASE_URL ?? env.APP_URL ?? env.NEXT_PUBLIC_APP_URL;
+  if (!configuredUrl) {
+    return "";
+  }
+  return new URL(configuredUrl).hostname === "localhost"
+    ? "https://localcan.baptistecolle.com"
+    : configuredUrl;
+}
+
 // Cache of active sandboxes by conversation ID
 interface SandboxState {
   sandbox: Sandbox;
@@ -195,10 +205,7 @@ export async function getOrCreateSandbox(
       envs: {
         ANTHROPIC_API_KEY: config.anthropicApiKey,
         ANVIL_API_KEY: env.ANVIL_API_KEY || "",
-        APP_URL:
-          (env.APP_URL && new URL(env.APP_URL).hostname === "localhost"
-            ? "https://localcan.baptistecolle.com"
-            : env.APP_URL) || "",
+        APP_URL: resolveSandboxAppUrl(),
         BAP_SERVER_SECRET: env.BAP_SERVER_SECRET || "",
         CONVERSATION_ID: config.conversationId,
         ...config.integrationEnvs,

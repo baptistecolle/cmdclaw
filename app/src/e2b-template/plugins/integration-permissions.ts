@@ -292,6 +292,30 @@ function isWriteOperation(integration: string, operation: string): boolean {
   return false;
 }
 
+function getCallbackBaseUrls(): string[] {
+  const rawCandidates = [
+    process.env.APP_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.E2B_CALLBACK_BASE_URL,
+  ].filter((value): value is string => Boolean(value && value.trim().length > 0));
+
+  const normalized = rawCandidates.map((value) => value.replace(/\/$/, ""));
+  const withLocalcan = new Set<string>(normalized);
+
+  for (const url of normalized) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+        withLocalcan.add("https://localcan.baptistecolle.com");
+      }
+    } catch {
+      // ignore invalid candidate
+    }
+  }
+
+  return Array.from(withLocalcan);
+}
+
 /**
  * Request approval from the server
  */
@@ -301,44 +325,55 @@ async function requestApproval(params: {
   command: string;
   toolInput: unknown;
 }): Promise<"allow" | "deny"> {
-  const serverUrl = process.env.APP_URL;
+  const serverUrls = getCallbackBaseUrls();
   const serverSecret = process.env.BAP_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
   const sandboxId = process.env.SANDBOX_ID;
 
-  if (!serverUrl || !conversationId) {
+  if (serverUrls.length === 0 || !conversationId) {
     console.error("[Plugin] Missing APP_URL or CONVERSATION_ID");
     return "deny";
   }
 
-  try {
-    const response = await fetch(`${serverUrl}/api/internal/approval-request`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        sandboxId: sandboxId || "unknown",
-        conversationId,
-        integration: params.integration,
-        operation: params.operation,
-        command: params.command,
-        toolInput: params.toolInput,
-        authHeader: serverSecret ? `Bearer ${serverSecret}` : undefined,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("[Plugin] Approval request failed:", response.status);
+  const attempt = async (index: number): Promise<"allow" | "deny"> => {
+    if (index >= serverUrls.length) {
       return "deny";
     }
+    const serverUrl = serverUrls[index]!;
+    try {
+      const response = await fetch(`${serverUrl}/api/internal/approval-request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sandboxId: sandboxId || "unknown",
+          conversationId,
+          integration: params.integration,
+          operation: params.operation,
+          command: params.command,
+          toolInput: params.toolInput,
+          authHeader: serverSecret ? `Bearer ${serverSecret}` : undefined,
+        }),
+      });
 
-    const result = await response.json();
-    return result.decision || "deny";
-  } catch (error) {
-    console.error("[Plugin] Approval request error:", error);
-    return "deny";
-  }
+      if (!response.ok) {
+        const bodyPreview = (await response.text()).slice(0, 200);
+        console.error(
+          `[Plugin] Approval request failed via ${serverUrl}: ${response.status} ${bodyPreview}`,
+        );
+        return attempt(index + 1);
+      }
+
+      const result = await response.json();
+      return result.decision || "deny";
+    } catch (error) {
+      console.error(`[Plugin] Approval request error via ${serverUrl}:`, error);
+      return attempt(index + 1);
+    }
+  };
+
+  return attempt(0);
 }
 
 /**
@@ -348,43 +383,56 @@ async function requestAuth(params: {
   integration: string;
   reason: string;
 }): Promise<{ success: boolean; tokens?: Record<string, string> }> {
-  const serverUrl = process.env.APP_URL;
+  const serverUrls = getCallbackBaseUrls();
   const serverSecret = process.env.BAP_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
 
-  if (!serverUrl || !conversationId) {
+  if (serverUrls.length === 0 || !conversationId) {
     console.error("[Plugin] Missing APP_URL or CONVERSATION_ID");
     return { success: false };
   }
 
-  try {
-    const response = await fetch(`${serverUrl}/api/internal/auth-request`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        conversationId,
-        integration: params.integration,
-        reason: params.reason,
-        authHeader: serverSecret ? `Bearer ${serverSecret}` : undefined,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("[Plugin] Auth request failed:", response.status);
+  const attempt = async (
+    index: number,
+  ): Promise<{ success: boolean; tokens?: Record<string, string> }> => {
+    if (index >= serverUrls.length) {
       return { success: false };
     }
+    const serverUrl = serverUrls[index]!;
+    try {
+      const response = await fetch(`${serverUrl}/api/internal/auth-request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId,
+          integration: params.integration,
+          reason: params.reason,
+          authHeader: serverSecret ? `Bearer ${serverSecret}` : undefined,
+        }),
+      });
 
-    const result = await response.json();
-    return {
-      success: result.success || false,
-      tokens: result.tokens,
-    };
-  } catch (error) {
-    console.error("[Plugin] Auth request error:", error);
-    return { success: false };
-  }
+      if (!response.ok) {
+        const bodyPreview = (await response.text()).slice(0, 200);
+        console.error(
+          `[Plugin] Auth request failed via ${serverUrl}: ${response.status} ${bodyPreview}`,
+        );
+        return attempt(index + 1);
+      }
+
+      const result = await response.json();
+      return {
+        success: result.success || false,
+        tokens: result.tokens,
+      };
+    } catch (error) {
+      console.error(`[Plugin] Auth request error via ${serverUrl}:`, error);
+      return attempt(index + 1);
+    }
+  };
+
+  return attempt(0);
 }
 
 /**
