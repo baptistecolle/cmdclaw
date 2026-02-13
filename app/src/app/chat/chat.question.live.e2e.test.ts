@@ -54,10 +54,6 @@ test.describe("@live chat question", () => {
     await expect(betaOption).toBeVisible({ timeout: responseTimeoutMs });
     await betaOption.click();
 
-    const submitAnswer = page.getByTestId("question-submit-answer").first();
-    await expect(submitAnswer).toBeEnabled({ timeout: responseTimeoutMs });
-    await submitAnswer.click();
-
     await expect
       .poll(async () => assistantMessages.count(), {
         timeout: responseTimeoutMs,

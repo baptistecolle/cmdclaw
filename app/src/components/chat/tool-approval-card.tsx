@@ -1,11 +1,28 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Check, X, Loader2, ShieldAlert, Code } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Check,
+  X,
+  Loader2,
+  Code,
+  CircleHelp,
+  SquareTerminal,
+  Code2,
+  Search,
+  Wrench,
+  Bot,
+} from "lucide-react";
 import Image from "next/image";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getIntegrationLogo, getIntegrationDisplayName } from "@/lib/integration-icons";
+import {
+  getIntegrationLogo,
+  getIntegrationDisplayName,
+  getIntegrationIcon,
+} from "@/lib/integration-icons";
 import { parseCliCommand } from "@/lib/parse-cli-command";
 import { cn } from "@/lib/utils";
 import type { PreviewProps } from "./previews";
@@ -147,17 +164,46 @@ export function ToolApprovalCard({
   onDeny,
   status,
   isLoading,
-  readonly = false,
 }: ToolApprovalCardProps) {
-  // Start collapsed for readonly (saved) approvals, expanded for pending
-  const [expanded, setExpanded] = useState(!readonly);
   const [showRawCommand, setShowRawCommand] = useState(false);
 
   const logo = getIntegrationLogo(integration);
+  const IntegrationIcon = getIntegrationIcon(integration);
   const displayName = getIntegrationDisplayName(integration);
   const isQuestionRequest =
     (operation === "question" || toolName.toLowerCase() === "question") &&
     integration.toLowerCase() === "bap";
+  const FallbackIcon = useMemo(() => {
+    if (isQuestionRequest) {
+      return CircleHelp;
+    }
+
+    const descriptor = `${toolName} ${operation}`.toLowerCase();
+    if (
+      descriptor.includes("bash") ||
+      descriptor.includes("command") ||
+      descriptor.includes("shell") ||
+      descriptor.includes("terminal")
+    ) {
+      return SquareTerminal;
+    }
+    if (descriptor.includes("code")) {
+      return Code2;
+    }
+    if (descriptor.includes("search")) {
+      return Search;
+    }
+    if (
+      descriptor.includes("write") ||
+      descriptor.includes("edit") ||
+      descriptor.includes("update") ||
+      descriptor.includes("create") ||
+      descriptor.includes("delete")
+    ) {
+      return Wrench;
+    }
+    return Bot;
+  }, [isQuestionRequest, operation, toolName]);
   const questionPayload = useMemo(
     () => (isQuestionRequest ? parseQuestionRequestPayload(toolInput) : null),
     [isQuestionRequest, toolInput],
@@ -166,13 +212,7 @@ export function ToolApprovalCard({
     if (!questionPayload) {
       return {};
     }
-    return questionPayload.questions.reduce<Record<number, string[]>>((acc, question, index) => {
-      const firstOption = question.options[0]?.label;
-      if (firstOption) {
-        acc[index] = [firstOption];
-      }
-      return acc;
-    }, {});
+    return questionPayload.questions.reduce<Record<number, string[]>>((acc) => acc, {});
   });
   const [typedAnswers, setTypedAnswers] = useState<Record<number, string>>({});
   const [typedMode, setTypedMode] = useState<Record<number, boolean>>(() => {
@@ -196,12 +236,6 @@ export function ToolApprovalCard({
         const existing = prev[index];
         if (Array.isArray(existing) && existing.length > 0) {
           next[index] = existing;
-          continue;
-        }
-
-        const firstOption = questionPayload.questions[index]?.options[0]?.label;
-        if (firstOption) {
-          next[index] = [firstOption];
         }
       }
       return next;
@@ -254,9 +288,6 @@ export function ToolApprovalCard({
       command: parsedCommand.rawCommand,
     };
   }, [parsedCommand]);
-  const handleToggleExpanded = useCallback(() => {
-    setExpanded((prev) => !prev);
-  }, []);
   const handleToggleRawCommand = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     setShowRawCommand((prev) => !prev);
@@ -291,11 +322,6 @@ export function ToolApprovalCard({
           return selected;
         }
 
-        const fallbackOption = question.options[0]?.label;
-        if (fallbackOption) {
-          return [fallbackOption];
-        }
-
         return [];
       });
 
@@ -303,25 +329,63 @@ export function ToolApprovalCard({
     },
     [onApprove, questionPayload, selectedOptions, typedAnswers, typedMode],
   );
-  const canSubmitQuestion = useMemo(() => {
-    if (!questionPayload) {
-      return true;
-    }
-
-    return questionPayload.questions.every((question, index) => {
-      if (typedMode[index]) {
-        const answer = typedAnswers[index]?.trim();
-        if (answer && answer.length > 0) {
-          return true;
-        }
+  const isQuestionAnswered = useCallback(
+    (
+      nextSelectedOptions: Record<number, string[]>,
+      nextTypedAnswers: Record<number, string>,
+      nextTypedMode: Record<number, boolean>,
+    ) => {
+      if (!questionPayload) {
+        return false;
       }
-      const selected = selectedOptions[index];
-      return (Array.isArray(selected) && selected.length > 0) || question.options.length > 0;
-    });
-  }, [questionPayload, selectedOptions, typedAnswers, typedMode]);
+
+      return questionPayload.questions.every((_, index) => {
+        if (nextTypedMode[index]) {
+          const answer = nextTypedAnswers[index]?.trim();
+          return !!answer;
+        }
+        const selected = nextSelectedOptions[index];
+        return Array.isArray(selected) && selected.length > 0;
+      });
+    },
+    [questionPayload],
+  );
+  const buildQuestionAnswers = useCallback(
+    (
+      nextSelectedOptions: Record<number, string[]>,
+      nextTypedAnswers: Record<number, string>,
+      nextTypedMode: Record<number, boolean>,
+    ): string[][] => {
+      if (!questionPayload) {
+        return [];
+      }
+
+      return questionPayload.questions.map((_, index) => {
+        if (nextTypedMode[index]) {
+          const answer = nextTypedAnswers[index]?.trim();
+          if (answer) {
+            return [answer];
+          }
+        }
+
+        const selected = nextSelectedOptions[index]
+          ?.map((value) => value.trim())
+          .filter((value) => value.length > 0);
+        if (selected && selected.length > 0) {
+          return selected;
+        }
+
+        return [];
+      });
+    },
+    [questionPayload],
+  );
   const handleSelectOption = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
+      if (isLoading || !questionPayload) {
+        return;
+      }
       const { questionIndex, optionLabel } = event.currentTarget.dataset;
       if (!questionIndex || !optionLabel) {
         return;
@@ -330,26 +394,38 @@ export function ToolApprovalCard({
       if (Number.isNaN(index)) {
         return;
       }
-      setSelectedOptions((prev) => {
-        const question = questionPayload?.questions[index];
-        if (!question) {
-          return prev;
-        }
+      const question = questionPayload.questions[index];
+      if (!question) {
+        return;
+      }
 
-        const previous = prev[index] ?? [];
-        if (question.multiple) {
-          const hasOption = previous.includes(optionLabel);
-          const nextOptions = hasOption
-            ? previous.filter((value) => value !== optionLabel)
-            : [...previous, optionLabel];
-          return { ...prev, [index]: nextOptions };
-        }
+      const previous = selectedOptions[index] ?? [];
+      const nextSelection = question.multiple
+        ? previous.includes(optionLabel)
+          ? previous.filter((value) => value !== optionLabel)
+          : [...previous, optionLabel]
+        : [optionLabel];
 
-        return { ...prev, [index]: [optionLabel] };
-      });
-      setTypedMode((prev) => ({ ...prev, [index]: false }));
+      const nextSelectedOptions = { ...selectedOptions, [index]: nextSelection };
+      const nextTypedMode = { ...typedMode, [index]: false };
+
+      setSelectedOptions(nextSelectedOptions);
+      setTypedMode(nextTypedMode);
+
+      if (isQuestionAnswered(nextSelectedOptions, typedAnswers, nextTypedMode)) {
+        onApprove(buildQuestionAnswers(nextSelectedOptions, typedAnswers, nextTypedMode));
+      }
     },
-    [questionPayload],
+    [
+      buildQuestionAnswers,
+      isLoading,
+      isQuestionAnswered,
+      onApprove,
+      questionPayload,
+      selectedOptions,
+      typedAnswers,
+      typedMode,
+    ],
   );
   const handleEnableTypedMode = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -375,6 +451,39 @@ export function ToolApprovalCard({
     }
     setTypedAnswers((prev) => ({ ...prev, [index]: value }));
   }, []);
+  const handleTypedAnswerKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== "Enter" || isLoading || !questionPayload) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+
+      const { questionIndex } = event.currentTarget.dataset;
+      if (!questionIndex) {
+        return;
+      }
+      const index = Number(questionIndex);
+      if (Number.isNaN(index)) {
+        return;
+      }
+
+      const nextTypedAnswers = { ...typedAnswers, [index]: event.currentTarget.value };
+      if (isQuestionAnswered(selectedOptions, nextTypedAnswers, typedMode)) {
+        onApprove(buildQuestionAnswers(selectedOptions, nextTypedAnswers, typedMode));
+      }
+    },
+    [
+      buildQuestionAnswers,
+      isLoading,
+      isQuestionAnswered,
+      onApprove,
+      questionPayload,
+      selectedOptions,
+      typedAnswers,
+      typedMode,
+    ],
+  );
   const handleStopPropagation = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
     event.stopPropagation();
   }, []);
@@ -383,24 +492,27 @@ export function ToolApprovalCard({
     <div
       className={cn(
         "rounded-lg border bg-card text-card-foreground",
-        status === "pending" && "border-amber-500/50 bg-amber-50/10",
         status === "approved" && "border-green-500/50",
         status === "denied" && "border-red-500/50",
       )}
     >
-      <button
-        onClick={handleToggleExpanded}
-        className="hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-      >
-        {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+      <div className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm">
         {logo ? (
           <Image src={logo} alt={displayName} width={16} height={16} className="h-4 w-4" />
+        ) : IntegrationIcon ? (
+          <IntegrationIcon className="text-muted-foreground h-4 w-4" />
         ) : (
-          <ShieldAlert className="h-4 w-4 text-amber-500" />
+          <FallbackIcon className="text-muted-foreground h-4 w-4" />
         )}
-        <span className="font-medium">{displayName}</span>
-        <span className="text-muted-foreground">wants to</span>
-        <span className="bg-muted rounded px-1.5 py-0.5 font-mono text-xs">{operation}</span>
+        {isQuestionRequest ? (
+          <span className="font-medium">Bap wants to ask a question</span>
+        ) : (
+          <>
+            <span className="font-medium">{displayName}</span>
+            <span className="text-muted-foreground">wants to</span>
+            <span className="bg-muted rounded px-1.5 py-0.5 font-mono text-xs">{operation}</span>
+          </>
+        )}
 
         <div className="flex-1" />
 
@@ -422,10 +534,9 @@ export function ToolApprovalCard({
             Denied
           </span>
         )}
-      </button>
+      </div>
 
-      {expanded && (
-        <div className="border-t px-3 py-3">
+      <div className="border-t px-3 py-3">
           {/* Formatted Preview */}
           {previewProps && <div className="mb-3">{renderPreview(integration, previewProps)}</div>}
 
@@ -516,8 +627,10 @@ export function ToolApprovalCard({
                             data-testid={`question-typed-input-${index}`}
                             value={typedAnswers[index] ?? ""}
                             onChange={handleTypedAnswerChange}
+                            onKeyDown={handleTypedAnswerKeyDown}
                             placeholder="Type your answer"
                             onClick={handleStopPropagation}
+                            className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
                           />
                         )}
                       </div>
@@ -551,23 +664,17 @@ export function ToolApprovalCard({
 
           {status === "pending" && questionPayload && (
             <div className="flex justify-end">
-              <Button
-                size="sm"
-                onClick={handleApproveClick}
-                disabled={isLoading || !canSubmitQuestion}
-                data-testid="question-submit-answer"
-              >
+              <Button variant="outline" size="sm" onClick={handleDenyClick} disabled={isLoading}>
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Check className="h-4 w-4" />
+                  <X className="h-4 w-4" />
                 )}
-                Submit answer
+                Dismiss
               </Button>
             </div>
           )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

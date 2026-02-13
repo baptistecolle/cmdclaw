@@ -14,6 +14,7 @@ import type { LLMBackend, ChatMessage, ContentBlock } from "@/server/ai/llm-back
 import type { IntegrationType } from "@/server/oauth/config";
 import type { SandboxBackend } from "@/server/sandbox/types";
 import { env } from "@/env";
+import { resolveDefaultOpencodeFreeModel } from "@/lib/zen-models";
 import { AnthropicBackend } from "@/server/ai/anthropic-backend";
 import { LocalLLMBackend } from "@/server/ai/local-backend";
 import { OpenAIBackend } from "@/server/ai/openai-backend";
@@ -76,6 +77,21 @@ import { createTraceId, logServerEvent } from "@/server/utils/observability";
 
 function parseMemoryFileType(input: unknown): MemoryFileType | undefined {
   return input === "daily" || input === "longterm" ? input : undefined;
+}
+
+let cachedDefaultWorkflowModelPromise: Promise<string> | undefined;
+
+async function resolveWorkflowModel(model?: string): Promise<string> {
+  const configured = model?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (!cachedDefaultWorkflowModelPromise) {
+    cachedDefaultWorkflowModelPromise = resolveDefaultOpencodeFreeModel();
+  }
+
+  return cachedDefaultWorkflowModelPromise;
 }
 
 // Event types for generation stream
@@ -704,6 +720,7 @@ class GenerationManager {
     triggerPayload: unknown;
   }): Promise<{ generationId: string; conversationId: string }> {
     const { content, userId, model } = params;
+    const resolvedModel = await resolveWorkflowModel(model);
 
     const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
     const [newConv] = await db
@@ -712,7 +729,7 @@ class GenerationManager {
         userId,
         title: title || "Workflow run",
         type: "workflow",
-        model: model ?? "claude-sonnet-4-20250514",
+        model: resolvedModel,
         autoApprove: params.autoApprove,
       })
       .returning();
@@ -758,7 +775,7 @@ class GenerationManager {
       startedAt: new Date(),
       lastSaveAt: new Date(),
       isNewConversation: true,
-      model: model ?? "claude-sonnet-4-20250514",
+      model: resolvedModel,
       userMessageContent: content,
       assistantMessageIds: new Set(),
       messageRoles: new Map(),

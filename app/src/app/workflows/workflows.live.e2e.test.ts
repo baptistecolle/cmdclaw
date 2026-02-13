@@ -45,15 +45,18 @@ test.describe("@live workflows", () => {
     await expect(promptInput).toBeVisible();
     await promptInput.fill(workflowInstruction);
 
-    await page.getByRole("switch").first().click();
-    await expect(page.getByText("Workflow is on")).toBeVisible();
+    const runNowButton = page.getByRole("button", { name: "Run now" });
+    if (await runNowButton.isDisabled()) {
+      await page.getByRole("switch").first().click();
+    }
+    await expect(runNowButton).toBeEnabled({ timeout: responseTimeoutMs });
 
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.getByText("Workflow saved.")).toBeVisible({ timeout: responseTimeoutMs });
 
     const initialRunHrefs = await getWorkflowRunHrefs(page);
 
-    await page.getByRole("button", { name: "Run now" }).click();
+    await runNowButton.click();
     await expect(page.getByText("Workflow run started.")).toBeVisible({
       timeout: responseTimeoutMs,
     });

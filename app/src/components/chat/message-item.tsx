@@ -413,51 +413,100 @@ export function MessageItem({
         (hasApprovals ? (
           // Segmented display with approvals between segments
           <div className="space-y-3">
-            {segments.map((segment, index) => {
-              // Get integrations used in this segment
-              const segmentIntegrations = Array.from(
-                new Set(
-                  segment.items
-                    .filter((item) => item.integration)
-                    .map((item) => item.integration as IntegrationType),
-                ),
-              );
+            {(() => {
+              const renderedSegments = [];
 
-              // Only last segment is expanded by default
-              const isExpanded = expandedSegments.has(segment.id);
+              for (let index = 0; index < segments.length; index += 1) {
+                const segment = segments[index];
+                const nextSegment = segments[index + 1];
+                const deferredApproval = segment.approval;
+                const shouldDeferApprovalAfterNextActivity =
+                  !!deferredApproval &&
+                  segment.items.length === 0 &&
+                  !!nextSegment &&
+                  nextSegment.items.length > 0 &&
+                  !nextSegment.approval;
 
-              return (
-                <div key={segment.id} className="space-y-3">
-                  {/* Activity trace for this segment */}
-                  {segment.items.length > 0 && (
-                    <CollapsedTrace
-                      messageId={`${id}-${segment.id}`}
-                      integrationsUsed={segmentIntegrations}
-                      hasError={hasError && index === segments.length - 1}
-                      activityItems={segment.items}
-                      defaultExpanded={isExpanded}
-                      onToggleExpand={segmentToggleHandlers.get(segment.id) ?? NOOP}
-                    />
-                  )}
+                if (shouldDeferApprovalAfterNextActivity && nextSegment && deferredApproval) {
+                  const nextSegmentIntegrations = Array.from(
+                    new Set(
+                      nextSegment.items
+                        .filter((item) => item.integration)
+                        .map((item) => item.integration as IntegrationType),
+                    ),
+                  );
+                  const isNextExpanded = expandedSegments.has(nextSegment.id);
 
-                  {/* Approval card (readonly, no buttons) */}
-                  {segment.approval && (
-                    <ToolApprovalCard
-                      toolUseId={segment.approval.toolUseId}
-                      toolName={segment.approval.toolName}
-                      toolInput={segment.approval.toolInput}
-                      integration={segment.approval.integration}
-                      operation={segment.approval.operation}
-                      command={segment.approval.command}
-                      status={segment.approval.status}
-                      onApprove={NOOP}
-                      onDeny={NOOP}
-                      readonly
-                    />
-                  )}
-                </div>
-              );
-            })}
+                  renderedSegments.push(
+                    <div key={`${segment.id}-${nextSegment.id}`} className="space-y-3">
+                      <CollapsedTrace
+                        messageId={`${id}-${nextSegment.id}`}
+                        integrationsUsed={nextSegmentIntegrations}
+                        hasError={hasError && index + 1 === segments.length - 1}
+                        activityItems={nextSegment.items}
+                        defaultExpanded={isNextExpanded}
+                        onToggleExpand={segmentToggleHandlers.get(nextSegment.id) ?? NOOP}
+                      />
+                      <ToolApprovalCard
+                        toolUseId={deferredApproval.toolUseId}
+                        toolName={deferredApproval.toolName}
+                        toolInput={deferredApproval.toolInput}
+                        integration={deferredApproval.integration}
+                        operation={deferredApproval.operation}
+                        command={deferredApproval.command}
+                        status={deferredApproval.status}
+                        onApprove={NOOP}
+                        onDeny={NOOP}
+                        readonly
+                      />
+                    </div>,
+                  );
+                  index += 1;
+                  continue;
+                }
+
+                const segmentIntegrations = Array.from(
+                  new Set(
+                    segment.items
+                      .filter((item) => item.integration)
+                      .map((item) => item.integration as IntegrationType),
+                  ),
+                );
+                const isExpanded = expandedSegments.has(segment.id);
+
+                renderedSegments.push(
+                  <div key={segment.id} className="space-y-3">
+                    {segment.items.length > 0 && (
+                      <CollapsedTrace
+                        messageId={`${id}-${segment.id}`}
+                        integrationsUsed={segmentIntegrations}
+                        hasError={hasError && index === segments.length - 1}
+                        activityItems={segment.items}
+                        defaultExpanded={isExpanded}
+                        onToggleExpand={segmentToggleHandlers.get(segment.id) ?? NOOP}
+                      />
+                    )}
+
+                    {segment.approval && (
+                      <ToolApprovalCard
+                        toolUseId={segment.approval.toolUseId}
+                        toolName={segment.approval.toolName}
+                        toolInput={segment.approval.toolInput}
+                        integration={segment.approval.integration}
+                        operation={segment.approval.operation}
+                        command={segment.approval.command}
+                        status={segment.approval.status}
+                        onApprove={NOOP}
+                        onDeny={NOOP}
+                        readonly
+                      />
+                    )}
+                  </div>,
+                );
+              }
+
+              return renderedSegments;
+            })()}
           </div>
         ) : (
           // Simple collapsed trace (no approvals)

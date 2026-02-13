@@ -1238,65 +1238,114 @@ export function ChatArea({ conversationId }: Props) {
                       </div>
                     </div>
                   )}
-                  {segments.map((segment, index) => {
-                    // Get integrations used in this segment
-                    const segmentIntegrations = Array.from(
-                      new Set(
-                        segment.items
-                          .filter((item) => item.integration)
-                          .map((item) => item.integration as IntegrationType),
-                      ),
-                    );
+                  {(() => {
+                    const renderedSegments = [];
 
-                    return (
-                      <div key={segment.id} className="space-y-4">
-                        {/* Only render activity feed if segment has items */}
-                        {segment.items.length > 0 && (
-                          <ActivityFeed
-                            items={segment.items}
-                            isStreaming={
-                              isStreaming &&
-                              index === segments.length - 1 &&
-                              !segment.approval &&
-                              !segment.auth
-                            }
-                            isExpanded={segment.isExpanded}
-                            onToggleExpand={segmentToggleHandlers.get(segment.id)!}
-                            integrationsUsed={segmentIntegrations}
-                          />
-                        )}
+                    for (let index = 0; index < segments.length; index += 1) {
+                      const segment = segments[index];
+                      const nextSegment = segments[index + 1];
+                      const deferredApproval = segment.approval;
+                      const shouldDeferApprovalAfterNextActivity =
+                        !!deferredApproval &&
+                        segment.items.length === 0 &&
+                        !!nextSegment &&
+                        nextSegment.items.length > 0 &&
+                        !nextSegment.approval &&
+                        !nextSegment.auth;
 
-                        {/* Render approval card if segment has one */}
-                        {segment.approval && (
-                          <ToolApprovalCard
-                            toolUseId={segment.approval.toolUseId}
-                            toolName={segment.approval.toolName}
-                            toolInput={segment.approval.toolInput}
-                            integration={segment.approval.integration}
-                            operation={segment.approval.operation}
-                            command={segment.approval.command}
-                            status={segment.approval.status}
-                            isLoading={isApproving}
-                            onApprove={segmentApproveHandlers.get(segment.id)!}
-                            onDeny={segmentDenyHandlers.get(segment.id)!}
-                          />
-                        )}
+                      if (shouldDeferApprovalAfterNextActivity && nextSegment && deferredApproval) {
+                        const nextSegmentIntegrations = Array.from(
+                          new Set(
+                            nextSegment.items
+                              .filter((item) => item.integration)
+                              .map((item) => item.integration as IntegrationType),
+                          ),
+                        );
 
-                        {/* Render auth request card if segment has one */}
-                        {segment.auth && (
-                          <AuthRequestCard
-                            integrations={segment.auth.integrations}
-                            connectedIntegrations={segment.auth.connectedIntegrations}
-                            reason={segment.auth.reason}
-                            status={segment.auth.status}
-                            isLoading={isSubmittingAuth}
-                            onConnect={handleAuthConnect}
-                            onCancel={handleAuthCancel}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+                        renderedSegments.push(
+                          <div key={`${segment.id}-${nextSegment.id}`} className="space-y-4">
+                            <ActivityFeed
+                              items={nextSegment.items}
+                              isStreaming={isStreaming && index + 1 === segments.length - 1}
+                              isExpanded={nextSegment.isExpanded}
+                              onToggleExpand={segmentToggleHandlers.get(nextSegment.id)!}
+                              integrationsUsed={nextSegmentIntegrations}
+                            />
+                            <ToolApprovalCard
+                              toolUseId={deferredApproval.toolUseId}
+                              toolName={deferredApproval.toolName}
+                              toolInput={deferredApproval.toolInput}
+                              integration={deferredApproval.integration}
+                              operation={deferredApproval.operation}
+                              command={deferredApproval.command}
+                              status={deferredApproval.status}
+                              isLoading={isApproving}
+                              onApprove={segmentApproveHandlers.get(segment.id)!}
+                              onDeny={segmentDenyHandlers.get(segment.id)!}
+                            />
+                          </div>,
+                        );
+                        index += 1;
+                        continue;
+                      }
+
+                      const segmentIntegrations = Array.from(
+                        new Set(
+                          segment.items
+                            .filter((item) => item.integration)
+                            .map((item) => item.integration as IntegrationType),
+                        ),
+                      );
+
+                      renderedSegments.push(
+                        <div key={segment.id} className="space-y-4">
+                          {segment.items.length > 0 && (
+                            <ActivityFeed
+                              items={segment.items}
+                              isStreaming={
+                                isStreaming &&
+                                index === segments.length - 1 &&
+                                !segment.approval &&
+                                !segment.auth
+                              }
+                              isExpanded={segment.isExpanded}
+                              onToggleExpand={segmentToggleHandlers.get(segment.id)!}
+                              integrationsUsed={segmentIntegrations}
+                            />
+                          )}
+
+                          {segment.approval && (
+                            <ToolApprovalCard
+                              toolUseId={segment.approval.toolUseId}
+                              toolName={segment.approval.toolName}
+                              toolInput={segment.approval.toolInput}
+                              integration={segment.approval.integration}
+                              operation={segment.approval.operation}
+                              command={segment.approval.command}
+                              status={segment.approval.status}
+                              isLoading={isApproving}
+                              onApprove={segmentApproveHandlers.get(segment.id)!}
+                              onDeny={segmentDenyHandlers.get(segment.id)!}
+                            />
+                          )}
+
+                          {segment.auth && (
+                            <AuthRequestCard
+                              integrations={segment.auth.integrations}
+                              connectedIntegrations={segment.auth.connectedIntegrations}
+                              reason={segment.auth.reason}
+                              status={segment.auth.status}
+                              isLoading={isSubmittingAuth}
+                              onConnect={handleAuthConnect}
+                              onCancel={handleAuthCancel}
+                            />
+                          )}
+                        </div>,
+                      );
+                    }
+
+                    return renderedSegments;
+                  })()}
                 </div>
               )}
             </>
