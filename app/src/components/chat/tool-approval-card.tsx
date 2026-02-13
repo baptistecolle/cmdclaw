@@ -537,143 +537,135 @@ export function ToolApprovalCard({
       </div>
 
       <div className="border-t px-3 py-3">
-          {/* Formatted Preview */}
-          {previewProps && <div className="mb-3">{renderPreview(integration, previewProps)}</div>}
+        {/* Formatted Preview */}
+        {previewProps && <div className="mb-3">{renderPreview(integration, previewProps)}</div>}
 
-          {/* Collapsible Raw Command Section */}
-          {command && (
-            <div className="mb-3">
-              <button
-                onClick={handleToggleRawCommand}
-                className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors"
-              >
-                <Code className="h-3 w-3" />
-                {showRawCommand ? "Hide" : "Show"} raw command
-                {showRawCommand ? (
-                  <ChevronDown className="h-3 w-3" />
-                ) : (
-                  <ChevronRight className="h-3 w-3" />
-                )}
-              </button>
-
-              {showRawCommand && (
-                <pre className="bg-muted mt-2 overflow-x-auto rounded p-2 font-mono text-xs">
-                  {command}
-                </pre>
+        {/* Collapsible Raw Command Section */}
+        {command && (
+          <div className="mb-3">
+            <button
+              onClick={handleToggleRawCommand}
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors"
+            >
+              <Code className="h-3 w-3" />
+              {showRawCommand ? "Hide" : "Show"} raw command
+              {showRawCommand ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
               )}
-            </div>
-          )}
+            </button>
 
-          {status === "pending" && questionPayload && (
-            <div className="mb-3 space-y-4">
-              {questionPayload.questions.map((question, index) => {
-                const canTypeOwnAnswer = question.custom !== false;
-                const useTypedAnswer = !!typedMode[index];
+            {showRawCommand && (
+              <pre className="bg-muted mt-2 overflow-x-auto rounded p-2 font-mono text-xs">
+                {command}
+              </pre>
+            )}
+          </div>
+        )}
 
-                return (
-                  <div key={`${question.header}-${question.question}`} className="space-y-2">
-                    <div>
-                      <p className="text-sm font-medium">{question.header}</p>
-                      <p className="text-muted-foreground text-sm">{question.question}</p>
-                    </div>
+        {status === "pending" && questionPayload && (
+          <div className="mb-3 space-y-4">
+            {questionPayload.questions.map((question, index) => {
+              const canTypeOwnAnswer = question.custom !== false;
+              const useTypedAnswer = !!typedMode[index];
 
-                    {question.options.length > 0 && (
-                      <div className="space-y-2">
-                        {question.options.map((option) => {
-                          const selected = selectedOptions[index] ?? [];
-                          const isSelected = !useTypedAnswer && selected.includes(option.label);
-                          return (
-                            <button
-                              key={option.label}
-                              type="button"
-                              data-question-index={String(index)}
-                              data-option-label={option.label}
-                              data-testid={`question-option-${index}-${option.label}`}
-                              className={cn(
-                                "hover:border-primary/70 w-full rounded-md border p-2 text-left text-sm transition-colors",
-                                isSelected ? "border-primary bg-primary/5" : "border-border",
-                              )}
-                              onClick={handleSelectOption}
-                            >
-                              <div className="font-medium">{option.label}</div>
-                              {option.description && (
-                                <div className="text-muted-foreground mt-0.5 text-xs">
-                                  {option.description}
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {canTypeOwnAnswer && (
-                      <div className="space-y-2">
-                        <button
-                          type="button"
-                          data-question-index={String(index)}
-                          data-testid={`question-typed-toggle-${index}`}
-                          className={cn(
-                            "hover:border-primary/70 w-full rounded-md border p-2 text-left text-sm transition-colors",
-                            useTypedAnswer ? "border-primary bg-primary/5" : "border-border",
-                          )}
-                          onClick={handleEnableTypedMode}
-                        >
-                          <div className="font-medium">Type your own answer</div>
-                        </button>
-                        {useTypedAnswer && (
-                          <Input
-                            data-question-index={String(index)}
-                            data-testid={`question-typed-input-${index}`}
-                            value={typedAnswers[index] ?? ""}
-                            onChange={handleTypedAnswerChange}
-                            onKeyDown={handleTypedAnswerKeyDown}
-                            placeholder="Type your answer"
-                            onClick={handleStopPropagation}
-                            className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
-                          />
-                        )}
-                      </div>
-                    )}
+              return (
+                <div key={`${question.header}-${question.question}`} className="space-y-2">
+                  <div>
+                    <p className="text-sm font-medium">{question.header}</p>
+                    <p className="text-muted-foreground text-sm">{question.question}</p>
                   </div>
-                );
-              })}
-            </div>
-          )}
 
-          {status === "pending" && !questionPayload && (
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={handleDenyClick} disabled={isLoading}>
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <X className="h-4 w-4" />
-                )}
-                Deny
-              </Button>
-              <Button size="sm" onClick={handleApproveClick} disabled={isLoading}>
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
-                Approve
-              </Button>
-            </div>
-          )}
+                  {question.options.length > 0 && (
+                    <div className="space-y-2">
+                      {question.options.map((option) => {
+                        const selected = selectedOptions[index] ?? [];
+                        const isSelected = !useTypedAnswer && selected.includes(option.label);
+                        return (
+                          <button
+                            key={option.label}
+                            type="button"
+                            data-question-index={String(index)}
+                            data-option-label={option.label}
+                            data-testid={`question-option-${index}-${option.label}`}
+                            className={cn(
+                              "hover:border-primary/70 w-full rounded-md border p-2 text-left text-sm transition-colors",
+                              isSelected ? "border-primary bg-primary/5" : "border-border",
+                            )}
+                            onClick={handleSelectOption}
+                          >
+                            <div className="font-medium">{option.label}</div>
+                            {option.description && (
+                              <div className="text-muted-foreground mt-0.5 text-xs">
+                                {option.description}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
-          {status === "pending" && questionPayload && (
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={handleDenyClick} disabled={isLoading}>
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <X className="h-4 w-4" />
-                )}
-                Dismiss
-              </Button>
-            </div>
-          )}
+                  {canTypeOwnAnswer && (
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        data-question-index={String(index)}
+                        data-testid={`question-typed-toggle-${index}`}
+                        className={cn(
+                          "hover:border-primary/70 w-full rounded-md border p-2 text-left text-sm transition-colors",
+                          useTypedAnswer ? "border-primary bg-primary/5" : "border-border",
+                        )}
+                        onClick={handleEnableTypedMode}
+                      >
+                        <div className="font-medium">Type your own answer</div>
+                      </button>
+                      {useTypedAnswer && (
+                        <Input
+                          data-question-index={String(index)}
+                          data-testid={`question-typed-input-${index}`}
+                          value={typedAnswers[index] ?? ""}
+                          onChange={handleTypedAnswerChange}
+                          onKeyDown={handleTypedAnswerKeyDown}
+                          placeholder="Type your answer"
+                          onClick={handleStopPropagation}
+                          className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {status === "pending" && !questionPayload && (
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={handleDenyClick} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+              Deny
+            </Button>
+            <Button size="sm" onClick={handleApproveClick} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              Approve
+            </Button>
+          </div>
+        )}
+
+        {status === "pending" && questionPayload && (
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={handleDenyClick} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+              Dismiss
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
