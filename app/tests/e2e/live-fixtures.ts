@@ -12,6 +12,38 @@ type LiveWorkerFixtures = {
   liveChatModel: string;
 };
 
+function collectNestedStringFields(payload: unknown, fieldName: string): string[] {
+  const values = new Set<string>();
+  const stack: unknown[] = [payload];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || typeof current !== "object") {
+      continue;
+    }
+
+    if (Array.isArray(current)) {
+      stack.push(...current);
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(current)) {
+      if (key === fieldName && typeof value === "string" && value.trim().length > 0) {
+        values.add(value);
+      }
+      if (value && typeof value === "object") {
+        stack.push(value);
+      }
+    }
+  }
+
+  return Array.from(values);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function killSandboxById(sandboxId: string): Promise<void> {
   const sandboxApi = Sandbox as unknown as {
     kill?: (id: string) => Promise<void>;
@@ -40,12 +72,13 @@ export const test = base.extend<LiveFixtures, LiveWorkerFixtures>({
   e2bSandboxCleanup: [
     async ({ page }, provideCleanup) => {
       const conversationIds = new Set<string>();
+      const generationIds = new Set<string>();
       const onResponse = (response: {
         url: () => string;
         request: () => { method: () => string };
         json: () => Promise<unknown>;
       }) => {
-        if (!response.url().includes("/api/rpc/generation/startGeneration")) {
+        if (!response.url().includes("startGeneration")) {
           return;
         }
         if (response.request().method() !== "POST") {
@@ -54,15 +87,11 @@ export const test = base.extend<LiveFixtures, LiveWorkerFixtures>({
         response
           .json()
           .then((payload) => {
-            const id =
-              payload &&
-              typeof payload === "object" &&
-              "conversationId" in payload &&
-              typeof payload.conversationId === "string"
-                ? payload.conversationId
-                : null;
-            if (id) {
+            for (const id of collectNestedStringFields(payload, "conversationId")) {
               conversationIds.add(id);
+            }
+            for (const id of collectNestedStringFields(payload, "generationId")) {
+              generationIds.add(id);
             }
           })
           .catch(() => {});
@@ -72,23 +101,48 @@ export const test = base.extend<LiveFixtures, LiveWorkerFixtures>({
       await provideCleanup();
       page.off("response", onResponse);
 
-      if (conversationIds.size === 0 || !process.env.E2B_API_KEY) {
+      if ((conversationIds.size === 0 && generationIds.size === 0) || !process.env.E2B_API_KEY) {
         return;
       }
 
-      const rows = await db.query.generation.findMany({
-        where: inArray(generation.conversationId, Array.from(conversationIds)),
-        columns: { sandboxId: true },
-      });
-      const sandboxIds = Array.from(
-        new Set(
-          rows
-            .map((row) => row.sandboxId)
-            .filter((sandboxId): sandboxId is string => Boolean(sandboxId)),
-        ),
-      );
+      const resolveSandboxIds = async (attempt: number): Promise<string[]> => {
+        const [rowsByGeneration, rowsByConversation] = await Promise.all([
+          generationIds.size > 0
+            ? db.query.generation.findMany({
+                where: inArray(generation.id, Array.from(generationIds)),
+                columns: { sandboxId: true },
+              })
+            : Promise.resolve([]),
+          conversationIds.size > 0
+            ? db.query.generation.findMany({
+                where: inArray(generation.conversationId, Array.from(conversationIds)),
+                columns: { sandboxId: true },
+              })
+            : Promise.resolve([]),
+        ]);
+
+        const sandboxIds = Array.from(
+          new Set(
+            [...rowsByGeneration, ...rowsByConversation]
+              .map((row) => row.sandboxId)
+              .filter((sandboxId): sandboxId is string => Boolean(sandboxId)),
+          ),
+        );
+
+        if (sandboxIds.length > 0 || attempt >= 5) {
+          return sandboxIds;
+        }
+
+        await sleep(1_000);
+        return resolveSandboxIds(attempt + 1);
+      };
+
+      const sandboxIds = await resolveSandboxIds(0);
 
       if (sandboxIds.length === 0) {
+        console.warn(
+          `[live-e2e] no sandbox IDs found for cleanup (generationIds=${generationIds.size}, conversationIds=${conversationIds.size})`,
+        );
         return;
       }
 
