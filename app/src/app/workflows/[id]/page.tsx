@@ -399,7 +399,11 @@ export default function WorkflowEditorPage() {
             <Play className="mr-2 h-4 w-4" />
             Run now
           </Button>
-          <Button onClick={handleSave} disabled={saving} className="w-full justify-center sm:w-auto">
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full justify-center sm:w-auto"
+          >
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Save
           </Button>

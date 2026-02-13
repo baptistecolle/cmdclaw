@@ -973,7 +973,9 @@ function IntegrationsPageContent() {
                             customIntegrationId={ci.id}
                             onToggle={handleToggleCustom}
                           />
-                          <span className="inline-block w-8 text-sm">{ci.enabled ? "On" : "Off"}</span>
+                          <span className="inline-block w-8 text-sm">
+                            {ci.enabled ? "On" : "Off"}
+                          </span>
                         </label>
                         <CustomIntegrationDisconnectButton
                           customIntegrationId={ci.id}

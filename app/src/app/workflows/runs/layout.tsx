@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/animate-ui/components/radix/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/animate-ui/components/radix/sidebar";
 import { WorkflowRunsSidebar } from "@/components/workflows/workflow-runs-sidebar";
 
 export default function WorkflowRunsLayout({ children }: { children: React.ReactNode }) {
