@@ -86,9 +86,7 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
   }
   if (appUrl) {
     const relayBaseUrl =
-      new URL(appUrl).hostname === "localhost"
-        ? "https://localcan.baptistecolle.com"
-        : appUrl;
+      new URL(appUrl).hostname === "localhost" ? "https://localcan.baptistecolle.com" : appUrl;
     cliEnv.SLACK_BOT_RELAY_URL = `${relayBaseUrl}/api/internal/slack/post-as-bot`;
   }
 

@@ -1208,9 +1208,11 @@ describe("generationManager transitions", () => {
     await Promise.resolve();
 
     expect(ctx.status).toBe("awaiting_approval");
-    const pendingApproval = ctx.pendingApproval as
-      | { integration?: string; operation?: string; toolUseId?: string }
-      | null;
+    const pendingApproval = ctx.pendingApproval as {
+      integration?: string;
+      operation?: string;
+      toolUseId?: string;
+    } | null;
     expect(pendingApproval?.integration).toBe("slack");
     expect(pendingApproval?.operation).toBe("send");
 
@@ -1225,9 +1227,9 @@ describe("generationManager transitions", () => {
       throw new Error("Expected pending approval to be set for slack send");
     }
 
-    await expect(generationManager.submitApproval(ctx.id, toolUseId, "deny", ctx.userId)).resolves.toBe(
-      true,
-    );
+    await expect(
+      generationManager.submitApproval(ctx.id, toolUseId, "deny", ctx.userId),
+    ).resolves.toBe(true);
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
         pendingApproval: expect.objectContaining({
@@ -1275,9 +1277,10 @@ describe("generationManager transitions", () => {
     await Promise.resolve();
 
     expect(ctx.status).toBe("awaiting_approval");
-    const pendingApproval = ctx.pendingApproval as
-      | { integration?: string; toolUseId?: string }
-      | null;
+    const pendingApproval = ctx.pendingApproval as {
+      integration?: string;
+      toolUseId?: string;
+    } | null;
     expect(pendingApproval?.integration).toBe("slack");
 
     const toolUseId = pendingApproval?.toolUseId;

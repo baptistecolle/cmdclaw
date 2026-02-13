@@ -1,5 +1,5 @@
 import type { RouterClient } from "@orpc/server";
-import { existsSync, readFileSync } from "node:fs";
+import { createReadStream, createWriteStream, existsSync, readFileSync } from "node:fs";
 import { basename, resolve, extname } from "node:path";
 import readline from "node:readline";
 import type { AppRouter } from "../src/server/orpc";
@@ -31,7 +31,6 @@ type Args = {
   token?: string;
   files: string[];
   autoApprove: boolean;
-  showThinking: boolean;
   validatePersistence: boolean;
   authOnly: boolean;
   resetAuth: boolean;
@@ -45,7 +44,6 @@ function parseArgs(argv: string[]): Args {
   const args: Args = {
     files: [],
     autoApprove: false,
-    showThinking: false,
     validatePersistence: true,
     authOnly: false,
     resetAuth: false,
@@ -81,9 +79,6 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--auto-approve":
         args.autoApprove = true;
-        break;
-      case "--show-thinking":
-        args.showThinking = true;
         break;
       case "--no-validate":
         args.validatePersistence = false;
@@ -134,7 +129,6 @@ function printHelp(): void {
   console.log("  -M, --model <id>          Model id to use (default resolves to a free model)");
   console.log("  --list-models             List free model ids and exit");
   console.log("  --auto-approve            Auto-approve tool calls");
-  console.log("  --show-thinking           Print thinking events");
   console.log("  --no-validate             Skip persisted message validation");
   console.log("  -q, --question-answer <v> Pre-answer OpenCode question prompts (repeatable)");
   console.log("  --auth                    Run auth flow and exit");
@@ -298,6 +292,45 @@ async function collectQuestionApprovalAnswers(
   return collectOne(0);
 }
 
+function isReadlineOpen(rl: readline.Interface | null): rl is readline.Interface {
+  if (!rl) {
+    return false;
+  }
+  return !(rl as readline.Interface & { closed?: boolean }).closed;
+}
+
+function createApprovalPrompt(rl: readline.Interface | null): {
+  rl: readline.Interface;
+  close: () => void;
+} | null {
+  if (isReadlineOpen(rl) && process.stdin.isTTY && process.stdout.isTTY) {
+    return {
+      rl,
+      close: () => {},
+    };
+  }
+
+  if (!process.stdout.isTTY) {
+    return null;
+  }
+
+  try {
+    const input = createReadStream("/dev/tty");
+    const output = createWriteStream("/dev/tty");
+    const ttyRl = readline.createInterface({ input, output });
+    return {
+      rl: ttyRl,
+      close: () => {
+        ttyRl.close();
+        input.close();
+        output.end();
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function runChatLoop(
   client: RouterClient<AppRouter>,
   rl: readline.Interface,
@@ -318,7 +351,22 @@ async function runChatLoop(
   }
 
   const runStep = async (): Promise<void> => {
-    const input = (await ask(rl, conversationId ? "followup> " : "chat> ")).trim();
+    let rawInput: string;
+    try {
+      rawInput = await ask(rl, conversationId ? "followup> " : "chat> ");
+    } catch (error) {
+      const isClosedReadline =
+        error instanceof Error &&
+        "code" in error &&
+        (error as Error & { code?: string }).code === "ERR_USE_AFTER_CLOSE";
+      if (isClosedReadline) {
+        console.log("Bye.");
+        return;
+      }
+      throw error;
+    }
+
+    const input = rawInput.trim();
     if (!input) {
       console.log("Bye.");
       return;
@@ -402,13 +450,12 @@ async function runGeneration(
         },
         onThinking: (thinking) => {
           runtime.handleThinking(thinking);
-          if (options.showThinking) {
-            process.stdout.write(`\n[thinking] ${thinking.content}\n`);
-          }
+          process.stdout.write(`\n[thinking] ${thinking.content}\n`);
         },
         onToolUse: (toolUse) => {
           runtime.handleToolUse(toolUse);
           process.stdout.write(`\n[tool_use] ${toolUse.toolName}\n`);
+          process.stdout.write(`[tool_input] ${JSON.stringify(toolUse.toolInput)}\n`);
         },
         onToolResult: (toolName, result, toolUseId) => {
           runtime.handleToolResult(toolName, result, toolUseId);
@@ -416,11 +463,20 @@ async function runGeneration(
             process.stdout.write(`\n[tool_result] ${toolName} ${JSON.stringify(result)}\n`);
           } else {
             process.stdout.write(`\n[tool_result] ${toolName}\n`);
+            process.stdout.write(`[tool_result_data] ${JSON.stringify(result)}\n`);
           }
         },
         onPendingApproval: async (approval) => {
           runtime.handlePendingApproval(approval);
           process.stdout.write(`\n[approval_needed] ${approval.toolName}\n`);
+          process.stdout.write(
+            `[approval_input] ${JSON.stringify({
+              integration: approval.integration,
+              operation: approval.operation,
+              command: approval.command,
+              toolInput: approval.toolInput,
+            })}\n`,
+          );
 
           const questionItems = parseQuestionApprovalInput(approval.toolInput);
           if (questionItems) {
@@ -441,7 +497,7 @@ async function runGeneration(
               return;
             }
 
-            if (options.autoApprove || !rl) {
+            if (options.autoApprove) {
               await client.generation.submitApproval({
                 generationId: approval.generationId,
                 toolUseId: approval.toolUseId,
@@ -451,7 +507,24 @@ async function runGeneration(
               return;
             }
 
-            const questionAnswers = await collectQuestionApprovalAnswers(rl, questionItems);
+            const approvalPrompt = createApprovalPrompt(rl);
+            if (!approvalPrompt) {
+              await client.generation.submitApproval({
+                generationId: approval.generationId,
+                toolUseId: approval.toolUseId,
+                decision: "approve",
+              });
+              process.stdout.write(" -> no interactive prompt available, using question defaults\n");
+              return;
+            }
+
+            const questionAnswers = await (async () => {
+              try {
+                return await collectQuestionApprovalAnswers(approvalPrompt.rl, questionItems);
+              } finally {
+                approvalPrompt.close();
+              }
+            })();
             await client.generation.submitApproval({
               generationId: approval.generationId,
               toolUseId: approval.toolUseId,
@@ -461,8 +534,19 @@ async function runGeneration(
             return;
           }
 
-          if (options.autoApprove || !rl) {
-            const decision = options.autoApprove ? "approve" : "deny";
+          if (options.autoApprove) {
+            process.stdout.write(" -> auto-approve\n");
+            await client.generation.submitApproval({
+              generationId: approval.generationId,
+              toolUseId: approval.toolUseId,
+              decision: "approve",
+            });
+            return;
+          }
+
+          const approvalPrompt = createApprovalPrompt(rl);
+          if (!approvalPrompt) {
+            const decision = "deny";
             process.stdout.write(` -> auto-${decision}\n`);
             await client.generation.submitApproval({
               generationId: approval.generationId,
@@ -472,7 +556,13 @@ async function runGeneration(
             return;
           }
 
-          const decision = (await ask(rl, "Approve? (y/n) ")).trim().toLowerCase();
+          const decision = await (async () => {
+            try {
+              return (await ask(approvalPrompt.rl, "Approve? (y/n) ")).trim().toLowerCase();
+            } finally {
+              approvalPrompt.close();
+            }
+          })();
           await client.generation.submitApproval({
             generationId: approval.generationId,
             toolUseId: approval.toolUseId,
