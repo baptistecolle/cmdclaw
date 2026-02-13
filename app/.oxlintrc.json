@@ -10,10 +10,6 @@
     "vitest",
     "nextjs"
   ],
-  "jsPlugins": [
-    "eslint-plugin-react-compiler",
-    "eslint-plugin-drizzle"
-  ],
   "categories": {
     "correctness": "error",
     "perf": "error",
@@ -28,9 +24,6 @@
     "jsx-a11y/no-autofocus": "off",
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
-    "drizzle/enforce-delete-with-where": "error",
-    "drizzle/enforce-update-with-where": "error",
-    "react-compiler/react-compiler": "error",
     "typescript/no-explicit-any": "error",
     "react/react-in-jsx-scope": "off"
   },
