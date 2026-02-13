@@ -8,13 +8,21 @@ import { env } from "@/env";
 import { authClient } from "@/lib/auth-client";
 
 const posthogKey = env.NEXT_PUBLIC_POSTHOG_KEY;
-const posthogHost = env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://app.posthog.com";
+const posthogUiHost = "https://eu.posthog.com";
+const posthogProxyPath = "/_bap_lattice";
 const isPosthogEnabled = Boolean(posthogKey);
 
 if (isPosthogEnabled) {
   posthogClientLib.init(posthogKey!, {
-    api_host: posthogHost,
+    api_host: posthogProxyPath,
+    ui_host: posthogUiHost,
     capture_pageview: false,
+    capture_exceptions: {
+      capture_unhandled_errors: true,
+      capture_unhandled_rejections: true,
+      capture_console_errors: true,
+    },
+    enable_recording_console_log: true,
   });
 }
 
