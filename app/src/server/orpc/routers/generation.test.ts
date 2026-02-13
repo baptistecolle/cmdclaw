@@ -167,6 +167,7 @@ describe("generationRouter", () => {
       "tool-1",
       "approve",
       "user-1",
+      undefined,
     );
     expect(generationManagerMock.submitAuthResult).toHaveBeenCalledWith(
       "gen-1",

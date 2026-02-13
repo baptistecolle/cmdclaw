@@ -1167,6 +1167,7 @@ class GenerationManager {
     toolUseId: string,
     decision: "approve" | "deny",
     userId: string,
+    questionAnswers?: string[][],
   ): Promise<boolean> {
     const ctx = this.activeGenerations.get(generationId);
     if (!ctx) {
@@ -1211,9 +1212,20 @@ class GenerationManager {
           }
           case "question": {
             if (decision === "approve") {
+              const normalizedAnswers =
+                questionAnswers
+                  ?.map((answers) =>
+                    answers
+                      .map((answer) => answer.trim())
+                      .filter((answer) => answer.length > 0),
+                  )
+                  .filter((answers) => answers.length > 0) ?? [];
               await ctx.opencodeClient.question.reply({
                 requestID: ctx.opencodePendingApprovalRequest.request.id,
-                answers: ctx.opencodePendingApprovalRequest.defaultAnswers,
+                answers:
+                  normalizedAnswers.length > 0
+                    ? normalizedAnswers
+                    : ctx.opencodePendingApprovalRequest.defaultAnswers,
               });
             } else {
               await ctx.opencodeClient.question.reject({
@@ -2940,12 +2952,13 @@ class GenerationManager {
     const patterns = request.patterns;
     const allPatternsAllowed = shouldAutoApproveOpenCodePermission(permissionType, patterns);
 
-    if (allPatternsAllowed) {
+    if (ctx.autoApprove || allPatternsAllowed) {
       console.log(
         "[GenerationManager] Auto-approving sandbox permission:",
         request.id,
         permissionType,
         patterns,
+        ctx.autoApprove ? "(conversation auto-approve enabled)" : "(allowlisted path)",
       );
       try {
         await client.permission.reply({

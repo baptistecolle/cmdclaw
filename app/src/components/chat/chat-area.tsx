@@ -946,7 +946,7 @@ export function ChatArea({ conversationId }: Props) {
 
   // Handle approval/denial of tool use
   const handleApprove = useCallback(
-    async (toolUseId: string) => {
+    async (toolUseId: string, questionAnswers?: string[][]) => {
       const genId = currentGenerationIdRef.current;
       if (!genId) {
         return;
@@ -957,6 +957,7 @@ export function ChatArea({ conversationId }: Props) {
           generationId: genId,
           toolUseId,
           decision: "approve",
+          questionAnswers,
         });
         if (runtimeRef.current) {
           runtimeRef.current.setApprovalStatus(toolUseId, "approved");
@@ -1067,14 +1068,14 @@ export function ChatArea({ conversationId }: Props) {
     }
   }, [submitAuthResult, segments, syncFromRuntime]);
   const segmentApproveHandlers = useMemo(() => {
-    const handlers = new Map<string, () => void>();
+    const handlers = new Map<string, (questionAnswers?: string[][]) => void>();
     for (const segment of segments) {
       const toolUseId = segment.approval?.toolUseId;
       if (!toolUseId) {
         continue;
       }
-      handlers.set(segment.id, () => {
-        void handleApprove(toolUseId);
+      handlers.set(segment.id, (questionAnswers?: string[][]) => {
+        void handleApprove(toolUseId, questionAnswers);
       });
     }
     return handlers;

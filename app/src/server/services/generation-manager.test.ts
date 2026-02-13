@@ -196,6 +196,7 @@ type GenerationManagerTestHarness = {
   importIntegrationSkillDraftsFromE2B: (...args: unknown[]) => Promise<void>;
   processOpencodeEvent: (...args: unknown[]) => Promise<void>;
   handleOpenCodeActionableEvent: (...args: unknown[]) => Promise<unknown>;
+  handleOpenCodePermissionAsked: (...args: unknown[]) => Promise<void>;
   importIntegrationSkillDraftsFromSandbox: (...args: unknown[]) => Promise<void>;
   waitForAuth: (...args: unknown[]) => Promise<{ success: boolean }>;
   waitForApproval: (...args: unknown[]) => Promise<string>;
@@ -388,6 +389,64 @@ describe("generationManager transitions", () => {
     });
   });
 
+  it("submits question answers selected in the frontend", async () => {
+    const questionReplyMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+
+    const ctx = createCtx({
+      status: "awaiting_approval",
+      pendingApproval: {
+        toolUseId: "question-3",
+        toolName: "Question",
+        toolInput: { id: "question-request-3" },
+        requestedAt: new Date().toISOString(),
+        integration: "Bap",
+        operation: "question",
+        command: "Choose one",
+      },
+      opencodeClient: {
+        question: {
+          reply: questionReplyMock,
+          reject: vi.fn(),
+        },
+        permission: {
+          reply: vi.fn(),
+        },
+      },
+      opencodePendingApprovalRequest: {
+        kind: "question",
+        request: {
+          id: "question-request-3",
+          sessionID: "session-3",
+          questions: [
+            {
+              header: "Choice",
+              question: "Pick one option",
+              options: [{ label: "A", description: "Option A" }],
+            },
+          ],
+        },
+        defaultAnswers: [["A"]],
+      },
+    });
+
+    const mgr = asTestManager();
+    mgr.activeGenerations.set(ctx.id, ctx);
+
+    const result = await generationManager.submitApproval(
+      ctx.id,
+      "question-3",
+      "approve",
+      ctx.userId,
+      [["  Coding/Development  "]],
+    );
+
+    expect(result).toBe(true);
+    expect(questionReplyMock).toHaveBeenCalledWith({
+      requestID: "question-request-3",
+      answers: [["Coding/Development"]],
+    });
+  });
+
   it("submits denied question approval and rejects OpenCode question", async () => {
     const callback = vi.fn();
     const questionReplyMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
@@ -507,6 +566,40 @@ describe("generationManager transitions", () => {
       toolUseId: "permission-1",
       decision: "approved",
     });
+  });
+
+  it("auto-approves OpenCode permission asks when conversation auto-approve is enabled", async () => {
+    const permissionReplyMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+    const ctx = createCtx({
+      autoApprove: true,
+      opencodeClient: {
+        permission: {
+          reply: permissionReplyMock,
+        },
+      },
+    });
+    const mgr = asTestManager();
+
+    await mgr.handleOpenCodePermissionAsked(
+      ctx,
+      {
+        permission: {
+          reply: permissionReplyMock,
+        },
+      },
+      {
+        id: "permission-request-auto-approve",
+        permission: "external_directory",
+        patterns: ["/tmp/non-allowlisted-path"],
+      },
+    );
+
+    expect(permissionReplyMock).toHaveBeenCalledWith({
+      requestID: "permission-request-auto-approve",
+      reply: "always",
+    });
+    expect(ctx.pendingApproval).toBeNull();
+    expect(ctx.status).toBe("running");
   });
 
   it("times out approval into paused status and emits status_change", async () => {

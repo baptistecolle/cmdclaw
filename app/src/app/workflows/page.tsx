@@ -158,7 +158,7 @@ export default function WorkflowsPage() {
     try {
       const result = await createWorkflow.mutateAsync({
         name: "",
-        triggerType: "schedule",
+        triggerType: "manual",
         prompt: "",
         allowedIntegrations: Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[],
       });

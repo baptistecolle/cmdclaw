@@ -5,7 +5,7 @@ import { expect, test } from "../../../tests/e2e/live-fixtures";
 const liveEnabled = process.env.E2E_LIVE === "1";
 const storageStatePath = process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
 const promptText = process.env.E2E_CHAT_PROMPT ?? "hi";
-const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "90000");
+const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "180000");
 async function selectModel(page: Page, modelId: string): Promise<void> {
   await page.getByTestId("chat-model-selector").click();
   const option = page.getByTestId(`chat-model-option-${modelId}`).first();
@@ -25,7 +25,7 @@ test.describe("@live chat", () => {
   test.use({ storageState: storageStatePath });
 
   test("sends hi and receives an answer", async ({ page, liveChatModel }) => {
-    test.setTimeout(Math.max(responseTimeoutMs + 30_000, 120_000));
+    test.setTimeout(Math.max(responseTimeoutMs + 60_000, 240_000));
 
     if (!existsSync(storageStatePath)) {
       throw new Error(

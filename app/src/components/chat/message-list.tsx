@@ -62,20 +62,28 @@ export function MessageList({ messages }: Props) {
     return null;
   }
 
+  const idCounts = new Map<string, number>();
+
   return (
     <div data-testid="chat-message-list" className="space-y-2">
-      {messages.map((message) => (
-        <MessageItem
-          key={message.id}
-          id={message.id}
-          role={message.role}
-          content={message.content}
-          parts={message.parts}
-          integrationsUsed={message.integrationsUsed}
-          attachments={message.attachments}
-          sandboxFiles={message.sandboxFiles}
-        />
-      ))}
+      {messages.map((message) => {
+        const count = (idCounts.get(message.id) ?? 0) + 1;
+        idCounts.set(message.id, count);
+        const messageKey = `${message.id}:${count}`;
+
+        return (
+          <MessageItem
+            key={messageKey}
+            id={message.id}
+            role={message.role}
+            content={message.content}
+            parts={message.parts}
+            integrationsUsed={message.integrationsUsed}
+            attachments={message.attachments}
+            sandboxFiles={message.sandboxFiles}
+          />
+        );
+      })}
     </div>
   );
 }

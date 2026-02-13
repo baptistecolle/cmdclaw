@@ -272,6 +272,7 @@ const submitApproval = protectedProcedure
       generationId: z.string(),
       toolUseId: z.string(),
       decision: z.enum(["approve", "deny"]),
+      questionAnswers: z.array(z.array(z.string())).optional(),
     }),
   )
   .output(z.object({ success: z.boolean() }))
@@ -281,6 +282,7 @@ const submitApproval = protectedProcedure
       input.toolUseId,
       input.decision,
       context.user.id,
+      input.questionAnswers,
     );
     return { success };
   });

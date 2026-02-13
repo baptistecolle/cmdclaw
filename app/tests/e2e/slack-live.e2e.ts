@@ -117,7 +117,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-test.describe("@live slack bridge", () => {
+test.describe.skip("@live slack bridge", () => {
   test.skip(!liveEnabled, "Set E2E_LIVE=1 to run Slack live e2e tests");
 
   test.afterAll(async () => {

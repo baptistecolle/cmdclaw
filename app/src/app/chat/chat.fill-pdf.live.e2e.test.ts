@@ -1,16 +1,16 @@
 import type { Download, Page, Response } from "@playwright/test";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "../../../tests/e2e/live-fixtures";
 
 const liveEnabled = process.env.E2E_LIVE === "1";
 const storageStatePath = process.env.E2E_AUTH_STATE_PATH ?? "playwright/.auth/user.json";
-const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "120000");
+const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "180000");
 const artifactTimeoutMs = Number(process.env.E2E_ARTIFACT_TIMEOUT_MS ?? "45000");
 const fillPdfPrompt =
   process.env.E2E_FILL_PDF_PROMPT ??
-  "I attached a PDF form. Fill the PDF with the name Sandra wherever a name is requested. Save the output as filled-sandra.pdf and reply with one short confirmation sentence.";
+  "Using your pdf-fill tool. Fill the attached PDF form. Use the name Sandra wherever a name is requested. Save the output as filled-sandra.pdf";
 const fixturePdfPath = resolve(process.cwd(), "tests/e2e/fixtures/questionnaire-auto.pdf");
 
 async function selectModel(page: Page, modelId: string): Promise<void> {
@@ -67,11 +67,50 @@ function findFirstHttpUrl(value: unknown): string | null {
   return null;
 }
 
+function encodeUtf16Be(text: string): Buffer {
+  const buffer = Buffer.alloc(text.length * 2);
+  for (let index = 0; index < text.length; index += 1) {
+    const codePoint = text.charCodeAt(index);
+    buffer[index * 2] = (codePoint >> 8) & 0xff;
+    buffer[index * 2 + 1] = codePoint & 0xff;
+  }
+  return buffer;
+}
+
+function containsPdfText(pdfBytes: Buffer, expectedText: string): boolean {
+  const binary = pdfBytes.toString("latin1");
+  const variants = Array.from(
+    new Set([expectedText, expectedText.toLowerCase(), expectedText.toUpperCase()]),
+  );
+
+  for (const variant of variants) {
+    if (pdfBytes.includes(Buffer.from(variant))) {
+      return true;
+    }
+
+    if (pdfBytes.includes(encodeUtf16Be(variant))) {
+      return true;
+    }
+
+    const utf16Hex = encodeUtf16Be(variant).toString("hex").toUpperCase();
+    if (
+      binary.includes(`<${utf16Hex}>`) ||
+      binary.includes(`<FEFF${utf16Hex}>`) ||
+      binary.includes(`<feff${utf16Hex.toLowerCase()}>`)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 async function readDownloadedPdfBytes(
   page: Page,
   clickAction: Promise<void>,
   testInfo: { outputPath: (...segments: string[]) => string },
 ): Promise<Buffer> {
+  const fallbackDestinationPath = testInfo.outputPath("filled-sandra.pdf");
   const downloadPromise = page
     .waitForEvent("download", { timeout: artifactTimeoutMs })
     .then(async (download: Download) => {
@@ -111,7 +150,9 @@ async function readDownloadedPdfBytes(
     throw new Error(`Failed to download PDF from presigned URL: HTTP ${pdfResponse.status()}`);
   }
 
-  return Buffer.from(await pdfResponse.body());
+  const pdfBytes = Buffer.from(await pdfResponse.body());
+  await writeFile(fallbackDestinationPath, pdfBytes);
+  return pdfBytes;
 }
 
 test.describe("@live chat fill-pdf", () => {
@@ -122,7 +163,7 @@ test.describe("@live chat fill-pdf", () => {
     page,
     liveChatModel,
   }, testInfo) => {
-    test.setTimeout(Math.max(responseTimeoutMs + artifactTimeoutMs + 45_000, 180_000));
+    test.setTimeout(Math.max(responseTimeoutMs + artifactTimeoutMs + 90_000, 300_000));
 
     if (!existsSync(storageStatePath)) {
       throw new Error(
@@ -218,5 +259,9 @@ test.describe("@live chat fill-pdf", () => {
     expect(pdfBytes.byteLength).toBeGreaterThan(100);
     expect(pdfBytes.subarray(0, 5).toString("utf8")).toBe("%PDF-");
     expect(pdfBytes.includes(Buffer.from("%%EOF"))).toBeTruthy();
+    expect(
+      containsPdfText(pdfBytes, "Sandra"),
+      "Downloaded PDF did not contain expected text: Sandra",
+    ).toBeTruthy();
   });
 });

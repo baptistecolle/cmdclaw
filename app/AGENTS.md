@@ -8,14 +8,10 @@
 
 ## Testing workflow
 - After implementing a feature, test it with `bun run chat` when possible.
-- If `bun run chat` is not sufficient to validate the change, clearly report that limitation.
+- If `bun run chat` is not sufficient to validate the change, clearly report that limitation. If applicable say how you would change `bun run chat` to support testing this feature
+- Don't forget to always typecheck and lint via `bun run check`
+- After large codebase change run `bun run test`
+- When creating a test always run to check if it correct. Maybe the test uncover a bug so stop if you think this is the case and report to the user
 
 ## Commit policy
 - Do not commit unless the user explicitly asks.
-
-## Chat CLI auth
-If `bun run chat` shows `You must be logged in`, the saved token has expired.
-
-1. Check whether a valid token exists in `chat-config.json`.
-2. If the token is missing or expired, ask the user to run `bun run chat --auth` in their terminal and approve the device code in the browser. The token is saved to `chat-config.json`.
-3. If the user provides a token directly, use `bun run chat --token <token>`.

@@ -4,6 +4,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ChatArea } from "@/components/chat/chat-area";
+import { ChatCopyButton } from "@/components/chat/chat-copy-button";
 import { Button } from "@/components/ui/button";
 import { useWorkflowRun } from "@/orpc/hooks";
 
@@ -64,6 +65,7 @@ export default function WorkflowRunPage() {
           <h2 className="text-sm font-medium">Workflow run</h2>
           <p className="text-muted-foreground font-mono text-xs">ID: {run.id}</p>
         </div>
+        <ChatCopyButton conversationId={run.conversationId} className="ml-auto" />
       </div>
       <div className="bg-background flex min-h-0 flex-1 overflow-hidden">
         <ChatArea conversationId={run.conversationId} />

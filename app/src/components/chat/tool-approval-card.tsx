@@ -2,8 +2,9 @@
 
 import { ChevronDown, ChevronRight, Check, X, Loader2, ShieldAlert, Code } from "lucide-react";
 import Image from "next/image";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { getIntegrationLogo, getIntegrationDisplayName } from "@/lib/integration-icons";
 import { parseCliCommand } from "@/lib/parse-cli-command";
 import { cn } from "@/lib/utils";
@@ -28,11 +29,83 @@ export interface ToolApprovalCardProps {
   integration: string;
   operation: string;
   command?: string;
-  onApprove: () => void;
+  onApprove: (questionAnswers?: string[][]) => void;
   onDeny: () => void;
   status: "pending" | "approved" | "denied";
   isLoading?: boolean;
   readonly?: boolean;
+}
+
+type QuestionOption = {
+  label: string;
+  description?: string;
+};
+
+type QuestionPrompt = {
+  header: string;
+  question: string;
+  options: QuestionOption[];
+  multiple?: boolean;
+  custom?: boolean;
+};
+
+type QuestionRequestPayload = {
+  questions: QuestionPrompt[];
+};
+
+function parseQuestionRequestPayload(input: unknown): QuestionRequestPayload | null {
+  if (typeof input !== "object" || input === null) {
+    return null;
+  }
+
+  const rawQuestions = (input as { questions?: unknown }).questions;
+  if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+    return null;
+  }
+
+  const questions: QuestionPrompt[] = [];
+  for (const rawQuestion of rawQuestions) {
+    if (typeof rawQuestion !== "object" || rawQuestion === null) {
+      return null;
+    }
+    const question = rawQuestion as {
+      header?: unknown;
+      question?: unknown;
+      options?: unknown;
+      multiple?: unknown;
+      custom?: unknown;
+    };
+
+    if (typeof question.header !== "string" || typeof question.question !== "string") {
+      return null;
+    }
+
+    const rawOptions = Array.isArray(question.options) ? question.options : [];
+    const options: QuestionOption[] = [];
+    for (const rawOption of rawOptions) {
+      if (typeof rawOption !== "object" || rawOption === null) {
+        continue;
+      }
+      const option = rawOption as { label?: unknown; description?: unknown };
+      if (typeof option.label !== "string" || option.label.length === 0) {
+        continue;
+      }
+      options.push({
+        label: option.label,
+        description: typeof option.description === "string" ? option.description : undefined,
+      });
+    }
+
+    questions.push({
+      header: question.header,
+      question: question.question,
+      options,
+      multiple: typeof question.multiple === "boolean" ? question.multiple : undefined,
+      custom: typeof question.custom === "boolean" ? question.custom : undefined,
+    });
+  }
+
+  return questions.length > 0 ? { questions } : null;
 }
 
 function renderPreview(integration: string, previewProps: PreviewProps) {
@@ -65,6 +138,8 @@ function renderPreview(integration: string, previewProps: PreviewProps) {
 }
 
 export function ToolApprovalCard({
+  toolName,
+  toolInput,
   integration,
   operation,
   command,
@@ -80,6 +155,83 @@ export function ToolApprovalCard({
 
   const logo = getIntegrationLogo(integration);
   const displayName = getIntegrationDisplayName(integration);
+  const isQuestionRequest =
+    (operation === "question" || toolName.toLowerCase() === "question") &&
+    integration.toLowerCase() === "bap";
+  const questionPayload = useMemo(
+    () => (isQuestionRequest ? parseQuestionRequestPayload(toolInput) : null),
+    [isQuestionRequest, toolInput],
+  );
+  const [selectedOptions, setSelectedOptions] = useState<Record<number, string[]>>(() => {
+    if (!questionPayload) {
+      return {};
+    }
+    return questionPayload.questions.reduce<Record<number, string[]>>((acc, question, index) => {
+      const firstOption = question.options[0]?.label;
+      if (firstOption) {
+        acc[index] = [firstOption];
+      }
+      return acc;
+    }, {});
+  });
+  const [typedAnswers, setTypedAnswers] = useState<Record<number, string>>({});
+  const [typedMode, setTypedMode] = useState<Record<number, boolean>>(() => {
+    if (!questionPayload) {
+      return {};
+    }
+    return questionPayload.questions.reduce<Record<number, boolean>>((acc, question, index) => {
+      acc[index] = question.options.length === 0;
+      return acc;
+    }, {});
+  });
+
+  useEffect(() => {
+    if (!questionPayload) {
+      return;
+    }
+
+    setSelectedOptions((prev) => {
+      const next: Record<number, string[]> = {};
+      for (let index = 0; index < questionPayload.questions.length; index += 1) {
+        const existing = prev[index];
+        if (Array.isArray(existing) && existing.length > 0) {
+          next[index] = existing;
+          continue;
+        }
+
+        const firstOption = questionPayload.questions[index]?.options[0]?.label;
+        if (firstOption) {
+          next[index] = [firstOption];
+        }
+      }
+      return next;
+    });
+
+    setTypedMode((prev) => {
+      const next: Record<number, boolean> = {};
+      for (let index = 0; index < questionPayload.questions.length; index += 1) {
+        const existing = prev[index];
+        if (typeof existing === "boolean") {
+          next[index] = existing;
+          continue;
+        }
+
+        next[index] = questionPayload.questions[index]?.options.length === 0;
+      }
+      return next;
+    });
+
+    setTypedAnswers((prev) => {
+      const next: Record<number, string> = {};
+      for (let index = 0; index < questionPayload.questions.length; index += 1) {
+        const existing = prev[index];
+        if (typeof existing === "string") {
+          next[index] = existing;
+        }
+      }
+      return next;
+    });
+  }, [questionPayload]);
 
   // Parse the command to extract structured data
   const parsedCommand = useMemo(() => {
@@ -119,10 +271,110 @@ export function ToolApprovalCard({
   const handleApproveClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
-      onApprove();
+      if (!questionPayload) {
+        onApprove();
+        return;
+      }
+
+      const answers = questionPayload.questions.map((question, index) => {
+        if (typedMode[index]) {
+          const answer = typedAnswers[index]?.trim();
+          if (answer) {
+            return [answer];
+          }
+        }
+
+        const selected = selectedOptions[index]
+          ?.map((value) => value.trim())
+          .filter((value) => value.length > 0);
+        if (selected && selected.length > 0) {
+          return selected;
+        }
+
+        const fallbackOption = question.options[0]?.label;
+        if (fallbackOption) {
+          return [fallbackOption];
+        }
+
+        return [];
+      });
+
+      onApprove(answers);
     },
-    [onApprove],
+    [onApprove, questionPayload, selectedOptions, typedAnswers, typedMode],
   );
+  const canSubmitQuestion = useMemo(() => {
+    if (!questionPayload) {
+      return true;
+    }
+
+    return questionPayload.questions.every((question, index) => {
+      if (typedMode[index]) {
+        const answer = typedAnswers[index]?.trim();
+        if (answer && answer.length > 0) {
+          return true;
+        }
+      }
+      const selected = selectedOptions[index];
+      return (Array.isArray(selected) && selected.length > 0) || question.options.length > 0;
+    });
+  }, [questionPayload, selectedOptions, typedAnswers, typedMode]);
+  const handleSelectOption = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const { questionIndex, optionLabel } = event.currentTarget.dataset;
+    if (!questionIndex || !optionLabel) {
+      return;
+    }
+    const index = Number(questionIndex);
+    if (Number.isNaN(index)) {
+      return;
+    }
+    setSelectedOptions((prev) => {
+      const question = questionPayload?.questions[index];
+      if (!question) {
+        return prev;
+      }
+
+      const previous = prev[index] ?? [];
+      if (question.multiple) {
+        const hasOption = previous.includes(optionLabel);
+        const nextOptions = hasOption
+          ? previous.filter((value) => value !== optionLabel)
+          : [...previous, optionLabel];
+        return { ...prev, [index]: nextOptions };
+      }
+
+      return { ...prev, [index]: [optionLabel] };
+    });
+    setTypedMode((prev) => ({ ...prev, [index]: false }));
+  }, [questionPayload]);
+  const handleEnableTypedMode = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const { questionIndex } = event.currentTarget.dataset;
+    if (!questionIndex) {
+      return;
+    }
+    const index = Number(questionIndex);
+    if (Number.isNaN(index)) {
+      return;
+    }
+    setTypedMode((prev) => ({ ...prev, [index]: true }));
+  }, []);
+  const handleTypedAnswerChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const { questionIndex } = event.currentTarget.dataset;
+    const value = event.currentTarget.value;
+    if (!questionIndex) {
+      return;
+    }
+    const index = Number(questionIndex);
+    if (Number.isNaN(index)) {
+      return;
+    }
+    setTypedAnswers((prev) => ({ ...prev, [index]: value }));
+  }, []);
+  const handleStopPropagation = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+  }, []);
 
   return (
     <div
@@ -198,7 +450,82 @@ export function ToolApprovalCard({
             </div>
           )}
 
-          {status === "pending" && (
+          {status === "pending" && questionPayload && (
+            <div className="mb-3 space-y-4">
+              {questionPayload.questions.map((question, index) => {
+                const canTypeOwnAnswer = question.custom !== false;
+                const useTypedAnswer = !!typedMode[index];
+
+                return (
+                  <div key={`${question.header}-${question.question}`} className="space-y-2">
+                    <div>
+                      <p className="text-sm font-medium">{question.header}</p>
+                      <p className="text-muted-foreground text-sm">{question.question}</p>
+                    </div>
+
+                    {question.options.length > 0 && (
+                      <div className="space-y-2">
+                        {question.options.map((option) => {
+                          const selected = selectedOptions[index] ?? [];
+                          const isSelected = !useTypedAnswer && selected.includes(option.label);
+                          return (
+                            <button
+                              key={option.label}
+                              type="button"
+                              data-question-index={String(index)}
+                              data-option-label={option.label}
+                              data-testid={`question-option-${index}-${option.label}`}
+                              className={cn(
+                                "hover:border-primary/70 w-full rounded-md border p-2 text-left text-sm transition-colors",
+                                isSelected ? "border-primary bg-primary/5" : "border-border",
+                              )}
+                              onClick={handleSelectOption}
+                            >
+                              <div className="font-medium">{option.label}</div>
+                              {option.description && (
+                                <div className="text-muted-foreground mt-0.5 text-xs">
+                                  {option.description}
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {canTypeOwnAnswer && (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          data-question-index={String(index)}
+                          data-testid={`question-typed-toggle-${index}`}
+                          className={cn(
+                            "hover:border-primary/70 w-full rounded-md border p-2 text-left text-sm transition-colors",
+                            useTypedAnswer ? "border-primary bg-primary/5" : "border-border",
+                          )}
+                          onClick={handleEnableTypedMode}
+                        >
+                          <div className="font-medium">Type your own answer</div>
+                        </button>
+                        {useTypedAnswer && (
+                          <Input
+                            data-question-index={String(index)}
+                            data-testid={`question-typed-input-${index}`}
+                            value={typedAnswers[index] ?? ""}
+                            onChange={handleTypedAnswerChange}
+                            placeholder="Type your answer"
+                            onClick={handleStopPropagation}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {status === "pending" && !questionPayload && (
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={handleDenyClick} disabled={isLoading}>
                 {isLoading ? (
@@ -215,6 +542,24 @@ export function ToolApprovalCard({
                   <Check className="h-4 w-4" />
                 )}
                 Approve
+              </Button>
+            </div>
+          )}
+
+          {status === "pending" && questionPayload && (
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={handleApproveClick}
+                disabled={isLoading || !canSubmitQuestion}
+                data-testid="question-submit-answer"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Submit answer
               </Button>
             </div>
           )}

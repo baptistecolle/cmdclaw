@@ -946,11 +946,13 @@ export function useSubmitApproval() {
       generationId,
       toolUseId,
       decision,
+      questionAnswers,
     }: {
       generationId: string;
       toolUseId: string;
       decision: "approve" | "deny";
-    }) => client.generation.submitApproval({ generationId, toolUseId, decision }),
+      questionAnswers?: string[][];
+    }) => client.generation.submitApproval({ generationId, toolUseId, decision, questionAnswers }),
   });
 }
 
