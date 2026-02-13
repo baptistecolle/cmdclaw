@@ -10,7 +10,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
+import { formatDistanceToNowStrict } from "date-fns";
 import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -29,7 +32,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -72,12 +84,38 @@ const testPanelDockExpanded = { width: "44rem" } as const;
 const testPanelDockTransition = { duration: 0.28, ease: "easeOut" } as const;
 const ACTIVE_TEST_RUN_STATUSES = new Set(["running", "awaiting_approval", "awaiting_auth"]);
 
-function formatDate(value?: Date | string | null) {
+function formatRelativeTime(value?: Date | string | null) {
   if (!value) {
-    return "—";
+    return "just now";
   }
+
   const date = typeof value === "string" ? new Date(value) : value;
-  return date.toLocaleString();
+  if (Number.isNaN(date.getTime())) {
+    return "just now";
+  }
+
+  const rawDistance = formatDistanceToNowStrict(date, { roundingMethod: "floor" });
+  const [amount, unit] = rawDistance.split(" ");
+  if (!amount || !unit || amount === "0") {
+    return "just now";
+  }
+
+  const shortUnit =
+    unit.startsWith("second")
+      ? "s"
+      : unit.startsWith("minute")
+        ? "m"
+        : unit.startsWith("hour")
+          ? "h"
+          : unit.startsWith("day")
+            ? "d"
+            : unit.startsWith("month")
+              ? "mo"
+              : unit.startsWith("year")
+                ? "y"
+                : unit;
+
+  return `${amount}${shortUnit} ago`;
 }
 
 function IntegrationToggleSwitch({
@@ -94,40 +132,6 @@ function IntegrationToggleSwitch({
   }, [integrationType, onToggle]);
 
   return <Switch checked={checked} onCheckedChange={handleCheckedChange} />;
-}
-
-type WorkflowRunListItem = {
-  id: string;
-  status: string;
-  startedAt?: Date | string | null;
-};
-
-function WorkflowRunRow({
-  run,
-  isSelected,
-  onSelect,
-}: {
-  run: WorkflowRunListItem;
-  isSelected: boolean;
-  onSelect: (runId: string) => void;
-}) {
-  const handleSelect = useCallback(() => {
-    onSelect(run.id);
-  }, [onSelect, run.id]);
-
-  return (
-    <button
-      type="button"
-      onClick={handleSelect}
-      className={cn(
-        "hover:bg-muted/50 flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs transition-colors",
-        isSelected ? "bg-muted" : "bg-muted/30",
-      )}
-    >
-      <span>{getWorkflowRunStatusLabel(run.status)}</span>
-      <span className="text-muted-foreground">{formatDate(run.startedAt)}</span>
-    </button>
-  );
 }
 
 export default function WorkflowEditorPage() {
@@ -156,6 +160,7 @@ export default function WorkflowEditorPage() {
   } | null>(null);
   const [testRunId, setTestRunId] = useState<string | null>(null);
   const [isTestPanelExpanded, setIsTestPanelExpanded] = useState(false);
+  const [isRunSelectorOpen, setIsRunSelectorOpen] = useState(false);
   const {
     data: selectedRun,
     isLoading: isSelectedRunLoading,
@@ -467,17 +472,9 @@ export default function WorkflowEditorPage() {
     setShowDisableAutoApproveDialog(false);
   }, []);
 
-  const handleRefreshRuns = useCallback(() => {
-    void refetchRuns();
-  }, [refetchRuns]);
-
   const handleSelectTestRun = useCallback((runId: string) => {
     setTestRunId(runId);
-  }, []);
-
-  const handleDiscardTestPanel = useCallback(() => {
-    setIsTestPanelExpanded(false);
-    setTestRunId(null);
+    setIsRunSelectorOpen(false);
   }, []);
 
   const handleToggleTestPanel = useCallback(() => {
@@ -543,7 +540,12 @@ export default function WorkflowEditorPage() {
       }
 
       // Keep the newly created run selected while runs list catches up.
-      if (selectedRun?.id === testRunId || isSelectedRunLoading || isStartingRun || triggerWorkflow.isPending) {
+      if (
+        selectedRun?.id === testRunId ||
+        isSelectedRunLoading ||
+        isStartingRun ||
+        triggerWorkflow.isPending
+      ) {
         return;
       }
     }
@@ -678,6 +680,11 @@ export default function WorkflowEditorPage() {
   }
 
   const workflowDisplayName = workflow.name.trim().length > 0 ? workflow.name : "New Workflow";
+  const selectedRunSummary =
+    runs?.find((run) => run.id === testRunId) ??
+    (selectedRun && selectedRun.id === testRunId
+      ? { id: selectedRun.id, status: selectedRun.status, startedAt: selectedRun.startedAt }
+      : null);
 
   return (
     <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden">
@@ -1056,7 +1063,58 @@ export default function WorkflowEditorPage() {
                       Live output for this workflow test.
                     </p>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex min-w-0 items-center gap-1">
+                    <Popover open={isRunSelectorOpen} onOpenChange={setIsRunSelectorOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          aria-expanded={isRunSelectorOpen}
+                          className="h-8 min-w-0 max-w-[17rem] justify-between"
+                          disabled={!runs || runs.length === 0}
+                        >
+                          <span className="truncate text-left text-xs">
+                            {selectedRunSummary
+                              ? `${formatRelativeTime(selectedRunSummary.startedAt)} • ${getWorkflowRunStatusLabel(selectedRunSummary.status)}`
+                              : "Load a previous run"}
+                          </span>
+                          <ChevronsUpDown className="text-muted-foreground ml-2 h-3.5 w-3.5 shrink-0" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="end">
+                        <Command>
+                          <CommandInput placeholder="Search runs..." className="h-9 text-xs" />
+                          <CommandList>
+                            <CommandEmpty>No runs yet.</CommandEmpty>
+                            <CommandGroup>
+                              {(runs ?? []).map((run) => {
+                                const isSelected = run.id === testRunId;
+                                return (
+                                  <CommandItem
+                                    key={run.id}
+                                    value={run.id}
+                                    onSelect={handleSelectTestRun}
+                                    className="gap-2 py-2"
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "h-3.5 w-3.5",
+                                        isSelected ? "opacity-100" : "opacity-0",
+                                      )}
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="truncate text-xs font-medium">
+                                        {formatRelativeTime(run.startedAt)} •{" "}
+                                        {getWorkflowRunStatusLabel(run.status)}
+                                      </div>
+                                    </div>
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {selectedRun?.conversationId ? (
                       <ChatCopyButton conversationId={selectedRun.conversationId} />
                     ) : null}
@@ -1073,9 +1131,6 @@ export default function WorkflowEditorPage() {
                       )}
                       Cancel run
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={handleDiscardTestPanel}>
-                      Discard
-                    </Button>
                   </div>
                 </div>
                 {isTestingLocked ? (
@@ -1085,7 +1140,7 @@ export default function WorkflowEditorPage() {
                 ) : null}
               </div>
 
-              <div className="bg-background min-h-0 flex-1 overflow-hidden">
+              <div className="bg-background flex min-h-0 flex-1 overflow-hidden">
                 {isSelectedRunLoading ? (
                   <div className="flex h-full items-center justify-center">
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -1109,33 +1164,6 @@ export default function WorkflowEditorPage() {
                 )}
               </div>
 
-              <div className="border-t p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-muted-foreground text-[11px] font-medium tracking-[0.12em] uppercase">
-                    Recent runs
-                  </p>
-                  <Button variant="ghost" size="sm" onClick={handleRefreshRuns}>
-                    Refresh
-                  </Button>
-                </div>
-                {runs && runs.length > 0 ? (
-                  <div className="max-h-44 space-y-1 overflow-auto pr-1">
-                    {runs.map((run) => {
-                      const isSelected = run.id === testRunId;
-                      return (
-                        <WorkflowRunRow
-                          key={run.id}
-                          run={run}
-                          isSelected={isSelected}
-                          onSelect={handleSelectTestRun}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No runs yet.</p>
-                )}
-              </div>
             </div>
           ) : null}
         </div>
