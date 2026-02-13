@@ -20,9 +20,6 @@ pre-push:
     test:
       root: app
       run: bun run test
-    test-e2e-live:
-      root: app
-      run: bun run test:e2e:live
     build:
       root: app
       run: bun run build

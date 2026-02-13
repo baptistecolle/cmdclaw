@@ -15,3 +15,5 @@
 
 ## Commit policy
 - Do not commit unless the user explicitly asks.
+
+- do not add uncessary environemtn variable to control behaviour ask user if you want to add variable to be sure it is really needed

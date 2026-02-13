@@ -1640,6 +1640,12 @@ class GenerationManager {
 
       // Store session ID
       ctx.sessionId = sessionId;
+      ctx.sandboxId = sandbox.sandboxId;
+
+      await db
+        .update(generation)
+        .set({ sandboxId: sandbox.sandboxId })
+        .where(eq(generation.id, ctx.id));
 
       // Record marker time for file collection and store sandbox reference
       ctx.generationMarkerTime = Date.now();
