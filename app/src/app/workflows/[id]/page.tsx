@@ -155,8 +155,11 @@ export default function WorkflowEditorPage() {
   } | null>(null);
   const [testRunId, setTestRunId] = useState<string | null>(null);
   const [isTestPanelExpanded, setIsTestPanelExpanded] = useState(false);
-  const { data: selectedRun, isLoading: isSelectedRunLoading, refetch: refetchSelectedRun } =
-    useWorkflowRun(testRunId ?? undefined);
+  const {
+    data: selectedRun,
+    isLoading: isSelectedRunLoading,
+    refetch: refetchSelectedRun,
+  } = useWorkflowRun(testRunId ?? undefined);
 
   // Schedule state (only used when triggerType is "schedule")
   const [scheduleType, setScheduleType] = useState<"interval" | "daily" | "weekly" | "monthly">(
@@ -590,236 +593,246 @@ export default function WorkflowEditorPage() {
           )}
 
           <div className="flex flex-col gap-5">
-        <section className="bg-card/20 w-full min-w-0 flex-1 rounded-xl p-5 md:p-6">
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Name</label>
-                  <input
-                    className="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
-                    value={name}
-                    onChange={handleNameChange}
-                    placeholder="Leave blank to auto generate"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Trigger</label>
-                  <Select value={triggerType} onValueChange={setTriggerType}>
-                    <SelectTrigger className="h-10 w-full bg-transparent">
-                      <SelectValue placeholder="Select a trigger" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRIGGERS.map((trigger) => (
-                        <SelectItem key={trigger.value} value={trigger.value}>
-                          {trigger.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <AnimatePresence initial={false} mode="wait">
-                {triggerType === "schedule" && (
-                  <motion.div
-                    key="schedule-settings"
-                    className="space-y-4"
-                    initial={scheduleMotionInitial}
-                    animate={scheduleMotionAnimate}
-                    exit={scheduleMotionExit}
-                    transition={scheduleMotionTransition}
-                    style={scheduleMotionStyle}
-                  >
+            <section className="bg-card/20 w-full min-w-0 flex-1 rounded-xl p-5 md:p-6">
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Frequency</label>
-                      <Select value={scheduleType} onValueChange={handleScheduleTypeChange}>
-                        <SelectTrigger className="bg-background h-10 w-full">
-                          <SelectValue placeholder="Select frequency" />
+                      <label className="text-sm font-medium">Name</label>
+                      <input
+                        className="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
+                        value={name}
+                        onChange={handleNameChange}
+                        placeholder="Leave blank to auto generate"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Trigger</label>
+                      <Select value={triggerType} onValueChange={setTriggerType}>
+                        <SelectTrigger className="h-10 w-full bg-transparent">
+                          <SelectValue placeholder="Select a trigger" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="interval">Every X hours</SelectItem>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
+                          {TRIGGERS.map((trigger) => (
+                            <SelectItem key={trigger.value} value={trigger.value}>
+                              {trigger.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
 
-                    {scheduleType === "interval" && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Run every</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min={1}
-                            max={168}
-                            className="bg-background h-10 w-24 rounded-md border px-3 text-sm"
-                            value={Math.max(1, Math.round(intervalMinutes / 60))}
-                            onChange={handleIntervalHoursChange}
-                          />
-                          <span className="text-muted-foreground text-sm">hours</span>
+                  <AnimatePresence initial={false} mode="wait">
+                    {triggerType === "schedule" && (
+                      <motion.div
+                        key="schedule-settings"
+                        className="space-y-4"
+                        initial={scheduleMotionInitial}
+                        animate={scheduleMotionAnimate}
+                        exit={scheduleMotionExit}
+                        transition={scheduleMotionTransition}
+                        style={scheduleMotionStyle}
+                      >
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Frequency</label>
+                          <Select value={scheduleType} onValueChange={handleScheduleTypeChange}>
+                            <SelectTrigger className="bg-background h-10 w-full">
+                              <SelectValue placeholder="Select frequency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="interval">Every X hours</SelectItem>
+                              <SelectItem value="daily">Daily</SelectItem>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                      </div>
-                    )}
 
-                    {(scheduleType === "daily" ||
-                      scheduleType === "weekly" ||
-                      scheduleType === "monthly") && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Time ({localTimezone})</label>
-                        <Input
-                          type="time"
-                          step={60}
-                          value={scheduleTime}
-                          onChange={handleScheduleTimeChange}
-                          className="bg-background h-10 w-36 appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                        />
-                      </div>
-                    )}
+                        {scheduleType === "interval" && (
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Run every</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min={1}
+                                max={168}
+                                className="bg-background h-10 w-24 rounded-md border px-3 text-sm"
+                                value={Math.max(1, Math.round(intervalMinutes / 60))}
+                                onChange={handleIntervalHoursChange}
+                              />
+                              <span className="text-muted-foreground text-sm">hours</span>
+                            </div>
+                          </div>
+                        )}
 
-                    {scheduleType === "weekly" && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Days of the week</label>
-                        <div className="flex flex-wrap gap-2">
-                          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => (
-                            <button
-                              key={day}
-                              type="button"
-                              data-day-index={index}
-                              className={cn(
-                                "h-9 w-12 rounded-md border text-sm font-medium transition-colors",
-                                scheduleDaysOfWeek.includes(index)
-                                  ? "border-primary bg-primary text-primary-foreground"
-                                  : "bg-background hover:bg-muted",
+                        {(scheduleType === "daily" ||
+                          scheduleType === "weekly" ||
+                          scheduleType === "monthly") && (
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Time ({localTimezone})</label>
+                            <Input
+                              type="time"
+                              step={60}
+                              value={scheduleTime}
+                              onChange={handleScheduleTimeChange}
+                              className="bg-background h-10 w-36 appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                            />
+                          </div>
+                        )}
+
+                        {scheduleType === "weekly" && (
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Days of the week</label>
+                            <div className="flex flex-wrap gap-2">
+                              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                                (day, index) => (
+                                  <button
+                                    key={day}
+                                    type="button"
+                                    data-day-index={index}
+                                    className={cn(
+                                      "h-9 w-12 rounded-md border text-sm font-medium transition-colors",
+                                      scheduleDaysOfWeek.includes(index)
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "bg-background hover:bg-muted",
+                                    )}
+                                    onClick={handleToggleWeekDay}
+                                  >
+                                    {day}
+                                  </button>
+                                ),
                               )}
-                              onClick={handleToggleWeekDay}
+                            </div>
+                          </div>
+                        )}
+
+                        {scheduleType === "monthly" && (
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Day of the month</label>
+                            <Select
+                              value={String(scheduleDayOfMonth)}
+                              onValueChange={handleScheduleDayOfMonthChange}
                             >
-                              {day}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                              <SelectTrigger className="bg-background h-10 w-24">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                                  <SelectItem key={day} value={String(day)}>
+                                    {day}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </motion.div>
                     )}
-
-                    {scheduleType === "monthly" && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Day of the month</label>
-                        <Select
-                          value={String(scheduleDayOfMonth)}
-                          onValueChange={handleScheduleDayOfMonthChange}
-                        >
-                          <SelectTrigger className="bg-background h-10 w-24">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                              <SelectItem key={day} value={String(day)}>
-                                {day}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Agent instructions</label>
-              <textarea
-                className="min-h-[180px] w-full rounded-md border bg-transparent px-3 py-2 text-sm"
-                value={prompt}
-                onChange={handlePromptChange}
-              />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <label className="text-sm font-medium">Allowed tools</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-sm">All tools allowed</span>
-                  <Switch checked={!restrictTools} onCheckedChange={handleRestrictToolsChange} />
+                  </AnimatePresence>
                 </div>
-              </div>
-              {!restrictTools ? (
-                <p className="text-muted-foreground text-sm">All tools are allowed.</p>
-              ) : (
-                <>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Agent instructions</label>
+                  <textarea
+                    className="min-h-[180px] w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+                    value={prompt}
+                    onChange={handlePromptChange}
+                  />
+                </div>
+
+                <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-muted-foreground text-xs">
-                      {allowedIntegrations.length}/{allIntegrationTypes.length} selected
-                    </p>
+                    <label className="text-sm font-medium">Allowed tools</label>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8"
-                        disabled={allowedIntegrations.length === allIntegrationTypes.length}
-                        onClick={handleSelectAllIntegrations}
-                      >
-                        Select all
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8"
-                        disabled={allowedIntegrations.length === 0}
-                        onClick={handleClearIntegrations}
-                      >
-                        Clear
-                      </Button>
+                      <span className="text-muted-foreground text-sm">All tools allowed</span>
+                      <Switch
+                        checked={!restrictTools}
+                        onCheckedChange={handleRestrictToolsChange}
+                      />
                     </div>
                   </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {(showAllIntegrations
-                      ? integrationEntries
-                      : integrationEntries.slice(0, 4)
-                    ).map(({ key, name: label, logo }) => (
-                      <label
-                        key={key}
-                        className={cn(
-                          "flex items-center gap-3 rounded-md bg-muted/30 p-3 text-sm transition-colors hover:bg-muted/50",
-                        )}
-                      >
-                        <IntegrationToggleSwitch
-                          integrationType={key}
-                          checked={allowedIntegrations.includes(key)}
-                          onToggle={handleToggleIntegrationChecked}
-                        />
-                        <Image src={logo} alt={label} width={16} height={16} className="h-4 w-4" />
-                        <span>{label}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {integrationEntries.length > 4 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleToggleShowAllIntegrations}
-                      className="text-muted-foreground"
-                    >
-                      {showAllIntegrations ? (
-                        <>
-                          <ChevronUp className="mr-1 h-4 w-4" />
-                          Show less
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="mr-1 h-4 w-4" />
-                          Show more ({integrationEntries.length - 4} more)
-                        </>
+                  {!restrictTools ? (
+                    <p className="text-muted-foreground text-sm">All tools are allowed.</p>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-muted-foreground text-xs">
+                          {allowedIntegrations.length}/{allIntegrationTypes.length} selected
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            disabled={allowedIntegrations.length === allIntegrationTypes.length}
+                            onClick={handleSelectAllIntegrations}
+                          >
+                            Select all
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            disabled={allowedIntegrations.length === 0}
+                            onClick={handleClearIntegrations}
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {(showAllIntegrations
+                          ? integrationEntries
+                          : integrationEntries.slice(0, 4)
+                        ).map(({ key, name: label, logo }) => (
+                          <label
+                            key={key}
+                            className={cn(
+                              "flex items-center gap-3 rounded-md bg-muted/30 p-3 text-sm transition-colors hover:bg-muted/50",
+                            )}
+                          >
+                            <IntegrationToggleSwitch
+                              integrationType={key}
+                              checked={allowedIntegrations.includes(key)}
+                              onToggle={handleToggleIntegrationChecked}
+                            />
+                            <Image
+                              src={logo}
+                              alt={label}
+                              width={16}
+                              height={16}
+                              className="h-4 w-4"
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {integrationEntries.length > 4 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleToggleShowAllIntegrations}
+                          className="text-muted-foreground"
+                        >
+                          {showAllIntegrations ? (
+                            <>
+                              <ChevronUp className="mr-1 h-4 w-4" />
+                              Show less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="mr-1 h-4 w-4" />
+                              Show more ({integrationEntries.length - 4} more)
+                            </>
+                          )}
+                        </Button>
                       )}
-                    </Button>
+                    </>
                   )}
-                </>
-              )}
-            </div>
-          </div>
-        </section>
-
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -855,7 +868,7 @@ export default function WorkflowEditorPage() {
                   isTestingLocked ? "text-emerald-500" : "text-muted-foreground/70",
                 )}
               />
-              <span className="[writing-mode:vertical-rl] rotate-180 text-[11px] tracking-[0.12em] uppercase">
+              <span className="rotate-180 text-[11px] tracking-[0.12em] uppercase [writing-mode:vertical-rl]">
                 Test run
               </span>
             </button>
@@ -870,7 +883,9 @@ export default function WorkflowEditorPage() {
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div>
                     <h3 className="text-sm font-semibold">Test run</h3>
-                    <p className="text-muted-foreground text-xs">Live output for this workflow test.</p>
+                    <p className="text-muted-foreground text-xs">
+                      Live output for this workflow test.
+                    </p>
                   </div>
                   <div className="flex items-center gap-1">
                     {selectedRun?.conversationId ? (
