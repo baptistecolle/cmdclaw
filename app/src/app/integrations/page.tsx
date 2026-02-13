@@ -16,8 +16,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useRef } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { getIntegrationActions } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import {
@@ -183,7 +183,7 @@ function IntegrationsPageFallback() {
 
 const integrationsPageFallbackNode = <IntegrationsPageFallback />;
 
-function IntegrationEnabledCheckbox({
+function IntegrationEnabledSwitch({
   integrationId,
   checked,
   onToggle,
@@ -193,13 +193,13 @@ function IntegrationEnabledCheckbox({
   onToggle: (id: string, enabled: boolean) => Promise<void>;
 }) {
   const handleCheckedChange = useCallback(
-    (value: boolean | "indeterminate") => {
-      void onToggle(integrationId, value === true);
+    (value: boolean) => {
+      void onToggle(integrationId, value);
     },
     [integrationId, onToggle],
   );
 
-  return <Checkbox checked={checked} onCheckedChange={handleCheckedChange} />;
+  return <Switch checked={checked} onCheckedChange={handleCheckedChange} />;
 }
 
 function IntegrationDisconnectButton({
@@ -241,7 +241,7 @@ function IntegrationConnectButton({
   );
 }
 
-function CustomIntegrationEnabledCheckbox({
+function CustomIntegrationEnabledSwitch({
   customIntegrationId,
   checked,
   onToggle,
@@ -251,13 +251,13 @@ function CustomIntegrationEnabledCheckbox({
   onToggle: (customIntegrationId: string, enabled: boolean) => Promise<void>;
 }) {
   const handleCheckedChange = useCallback(
-    (value: boolean | "indeterminate") => {
-      void onToggle(customIntegrationId, value === true);
+    (value: boolean) => {
+      void onToggle(customIntegrationId, value);
     },
     [customIntegrationId, onToggle],
   );
 
-  return <Checkbox checked={checked} onCheckedChange={handleCheckedChange} />;
+  return <Switch checked={checked} onCheckedChange={handleCheckedChange} />;
 }
 
 function CustomIntegrationDisconnectButton({
@@ -735,14 +735,14 @@ function IntegrationsPageContent() {
       )}
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="bg-muted flex gap-1 rounded-lg p-1">
+        <div className="bg-muted grid w-full grid-cols-3 gap-1 rounded-lg p-1 sm:flex sm:w-fit">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               data-tab={tab.id}
               onClick={handleTabClick}
               className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "min-w-0 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors sm:px-3 sm:text-sm",
                 activeTab === tab.id
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
@@ -751,7 +751,7 @@ function IntegrationsPageContent() {
               {tab.label}
               <span
                 className={cn(
-                  "ml-1.5 rounded-full px-1.5 py-0.5 text-xs",
+                  "ml-1 rounded-full px-1.5 py-0.5 text-[10px] sm:ml-1.5 sm:text-xs",
                   activeTab === tab.id
                     ? "bg-muted text-muted-foreground"
                     : "bg-muted-foreground/20 text-muted-foreground",
@@ -823,11 +823,12 @@ function IntegrationsPageContent() {
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                     {actions.length > 0 && (
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="w-full justify-between sm:w-auto"
                         data-integration-type={type}
                         onClick={handleToggleExpandedCard}
                       >
@@ -841,22 +842,24 @@ function IntegrationsPageContent() {
                       </Button>
                     )}
                     {isWhatsApp ? (
-                      <Button onClick={handleOpenWhatsAppIntegration}>
+                      <Button className="w-full sm:w-auto" onClick={handleOpenWhatsAppIntegration}>
                         {isWhatsAppConnected ? "Manage" : "Connect"}
                         <ExternalLink className="ml-2 h-4 w-4" />
                       </Button>
                     ) : integration ? (
                       <>
                         <label
-                          className="flex cursor-pointer items-center gap-2"
+                          className="flex cursor-pointer items-center gap-2 whitespace-nowrap"
                           onClick={handleStopPropagation}
                         >
-                          <IntegrationEnabledCheckbox
+                          <IntegrationEnabledSwitch
                             checked={integration.enabled}
                             integrationId={integration.id}
                             onToggle={handleToggle}
                           />
-                          <span className="text-sm">Enabled</span>
+                          <span className="inline-block w-8 text-sm">
+                            {integration.enabled ? "On" : "Off"}
+                          </span>
                         </label>
                         <IntegrationDisconnectButton
                           integrationId={integration.id}
@@ -961,16 +964,16 @@ function IntegrationsPageContent() {
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                     {ci.connected ? (
                       <>
-                        <label className="flex cursor-pointer items-center gap-2">
-                          <CustomIntegrationEnabledCheckbox
+                        <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap">
+                          <CustomIntegrationEnabledSwitch
                             checked={ci.enabled}
                             customIntegrationId={ci.id}
                             onToggle={handleToggleCustom}
                           />
-                          <span className="text-sm">Enabled</span>
+                          <span className="inline-block w-8 text-sm">{ci.enabled ? "On" : "Off"}</span>
                         </label>
                         <CustomIntegrationDisconnectButton
                           customIntegrationId={ci.id}

@@ -3,6 +3,7 @@
 import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { SidebarTrigger } from "@/components/animate-ui/components/radix/sidebar";
 import { ChatArea } from "@/components/chat/chat-area";
 import { ChatCopyButton } from "@/components/chat/chat-copy-button";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,8 @@ export default function WorkflowRunPage() {
   if (isLoading) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="flex items-center gap-3 border-b px-4 py-2">
+        <div className="flex items-center gap-2 border-b px-3 py-2 sm:px-4">
+          <SidebarTrigger className="md:hidden" />
           <div className="h-9 w-9" />
           <div>
             <h2 className="text-sm font-medium">Workflow run</h2>
@@ -31,31 +33,44 @@ export default function WorkflowRunPage() {
   }
 
   if (!run) {
-    return <div className="text-muted-foreground p-6 text-sm">Run not found.</div>;
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex h-12 items-center gap-2 border-b px-3 sm:px-4">
+          <SidebarTrigger className="md:hidden" />
+          <span className="text-sm font-medium">Workflow run</span>
+        </div>
+        <div className="text-muted-foreground p-6 text-sm">Run not found.</div>
+      </div>
+    );
   }
 
   if (!run.conversationId) {
     return (
-      <div className="space-y-4 p-6">
-        <div className="flex items-center gap-3">
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex items-center gap-2 border-b px-3 py-2 sm:px-4">
+          <SidebarTrigger className="md:hidden" />
           <Button variant="ghost" size="icon" asChild>
             <Link href={`/workflows/${run.workflowId}`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h2 className="text-lg font-semibold">Run details unavailable in chat view</h2>
+          <h2 className="text-sm font-medium">Workflow run</h2>
         </div>
-        <p className="text-muted-foreground text-sm">
-          This run does not have a linked conversation, so it cannot be opened in the chat
-          interface.
-        </p>
+        <div className="space-y-4 p-6">
+          <h3 className="text-lg font-semibold">Run details unavailable in chat view</h3>
+          <p className="text-muted-foreground text-sm">
+            This run does not have a linked conversation, so it cannot be opened in the chat
+            interface.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-3 border-b px-4 py-2">
+      <div className="flex items-center gap-2 border-b px-3 py-2 sm:px-4">
+        <SidebarTrigger className="md:hidden" />
         <Button variant="ghost" size="icon" asChild>
           <Link href={`/workflows/${run.workflowId}`}>
             <ArrowLeft className="h-4 w-4" />

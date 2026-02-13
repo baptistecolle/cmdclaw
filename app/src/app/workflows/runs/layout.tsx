@@ -1,14 +1,18 @@
 "use client";
 
+import {
+  SidebarInset,
+  SidebarProvider,
+} from "@/components/animate-ui/components/radix/sidebar";
 import { WorkflowRunsSidebar } from "@/components/workflows/workflow-runs-sidebar";
 
 export default function WorkflowRunsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-background flex h-full min-h-0 w-full flex-1 overflow-hidden">
-      <div className="flex h-full min-h-0 w-full flex-1">
-        <WorkflowRunsSidebar />
+    <SidebarProvider className="bg-background text-foreground h-full min-h-0 [--sidebar-width:20rem]">
+      <WorkflowRunsSidebar />
+      <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  useSidebar,
+} from "@/components/animate-ui/components/radix/sidebar";
 import { cn } from "@/lib/utils";
 import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
 import { useWorkflowList } from "@/orpc/hooks";
@@ -29,20 +35,27 @@ type WorkflowListItem = {
 export function WorkflowRunsSidebar() {
   const pathname = usePathname();
   const { data, isLoading } = useWorkflowList();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   const workflows = useMemo(() => {
     const list = Array.isArray(data) ? (data as WorkflowListItem[]) : [];
     return list.filter((wf) => Array.isArray(wf.recentRuns) && wf.recentRuns.length > 0);
   }, [data]);
 
+  const handleSelect = useCallback(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [isMobile, setOpenMobile]);
+
   return (
-    <aside className="bg-muted/20 flex h-full w-80 shrink-0 flex-col border-r">
-      <div className="border-b px-4 py-3">
+    <Sidebar className="border-r" containerClassName="bg-muted/20" collapsible="offcanvas">
+      <SidebarHeader className="gap-0 border-b px-4 py-3">
         <h2 className="text-sm font-semibold">Workflow runs</h2>
         <p className="text-muted-foreground mt-1 text-xs">Grouped by workflow</p>
-      </div>
+      </SidebarHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
+      <SidebarContent className="min-h-0 px-2 py-3">
         {isLoading ? (
           <div className="text-muted-foreground px-2 py-4 text-sm">Loading runs...</div>
         ) : workflows.length === 0 ? (
@@ -53,6 +66,7 @@ export function WorkflowRunsSidebar() {
               <section key={wf.id} className="space-y-1">
                 <Link
                   href={`/workflows/${wf.id}`}
+                  onClick={handleSelect}
                   className="hover:bg-muted block rounded-md px-2 py-1.5 text-sm font-medium"
                 >
                   {wf.name}
@@ -66,6 +80,7 @@ export function WorkflowRunsSidebar() {
                       <Link
                         key={run.id}
                         href={href}
+                        onClick={handleSelect}
                         className={cn(
                           "block rounded-md px-2 py-1.5 text-xs transition-colors",
                           isActive ? "bg-muted" : "hover:bg-muted/70",
@@ -90,7 +105,7 @@ export function WorkflowRunsSidebar() {
             ))}
           </div>
         )}
-      </div>
-    </aside>
+      </SidebarContent>
+    </Sidebar>
   );
 }

@@ -9,3 +9,20 @@ pre-commit:
     typecheck:
       root: app
       run: bun run typecheck
+
+pre-push:
+  parallel: false
+  commands:
+    check:
+      root: app
+      run: bun run check
+    test:
+      root: app
+      run: bun run test
+    test-e2e-live:
+      root: app
+      run: bun run test:e2e:live
+    build:
+      root: app
+      run: bun run build
+      

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { IconDisplay } from "@/components/ui/icon-picker";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useSkillList, useCreateSkill, useUpdateSkill, useDeleteSkill } from "@/orpc/hooks";
 
@@ -86,16 +86,38 @@ function SkillsPageContent() {
 
   const skillsList = Array.isArray(skills) ? skills : [];
 
+  const handleCardClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const skillId = event.currentTarget.dataset.skillId;
+      if (!skillId) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const interactiveElement = target.closest(
+          "a,button,input,textarea,select,label,[role='button'],[role='switch']",
+        );
+        if (interactiveElement) {
+          return;
+        }
+      }
+
+      router.push(`/skills/${skillId}`);
+    },
+    [router],
+  );
+
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold">Skills</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-1 text-sm sm:max-w-prose">
             Create custom skills to teach the AI agent new capabilities.
           </p>
         </div>
-        <Button onClick={handleCreate} disabled={isCreating}>
+        <Button onClick={handleCreate} disabled={isCreating} className="self-start">
           {isCreating ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -146,7 +168,12 @@ function SkillsPageContent() {
       ) : (
         <div className="space-y-4">
           {skillsList.map((skill) => (
-            <div key={skill.id} className="flex items-center justify-between rounded-lg border p-4">
+            <div
+              key={skill.id}
+              className="hover:bg-muted/20 flex cursor-pointer items-center justify-between rounded-lg border p-4 transition-colors"
+              data-skill-id={skill.id}
+              onClick={handleCardClick}
+            >
               <div className="flex items-center gap-4">
                 <div className="flex h-10 w-10 items-center justify-center">
                   <IconDisplay icon={skill.icon} />
@@ -160,12 +187,12 @@ function SkillsPageContent() {
 
               <div className="flex items-center gap-2">
                 <label className="flex cursor-pointer items-center gap-2">
-                  <SkillEnabledCheckbox
+                  <SkillEnabledSwitch
                     checked={skill.enabled}
                     skillId={skill.id}
                     onToggle={handleToggle}
                   />
-                  <span className="text-sm">Enabled</span>
+                  <span className="inline-block w-8 text-sm">{skill.enabled ? "On" : "Off"}</span>
                 </label>
                 <Button variant="ghost" size="icon" asChild>
                   <Link href={`/skills/${skill.id}`}>
@@ -194,7 +221,7 @@ export default function SkillsPage() {
   );
 }
 
-function SkillEnabledCheckbox({
+function SkillEnabledSwitch({
   checked,
   skillId,
   onToggle,
@@ -204,13 +231,13 @@ function SkillEnabledCheckbox({
   onToggle: (id: string, enabled: boolean) => Promise<void>;
 }) {
   const handleCheckedChange = useCallback(
-    (value: boolean | "indeterminate") => {
-      void onToggle(skillId, value === true);
+    (value: boolean) => {
+      void onToggle(skillId, value);
     },
     [onToggle, skillId],
   );
 
-  return <Checkbox checked={checked} onCheckedChange={handleCheckedChange} />;
+  return <Switch checked={checked} onCheckedChange={handleCheckedChange} />;
 }
 
 function SkillDeleteButton({

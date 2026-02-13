@@ -17,7 +17,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -63,7 +62,7 @@ function formatDate(value?: Date | string | null) {
   return date.toLocaleString();
 }
 
-function IntegrationToggleCheckbox({
+function IntegrationToggleSwitch({
   integrationType,
   checked,
   onToggle,
@@ -76,7 +75,7 @@ function IntegrationToggleCheckbox({
     onToggle(integrationType);
   }, [integrationType, onToggle]);
 
-  return <Checkbox checked={checked} onCheckedChange={handleCheckedChange} />;
+  return <Switch checked={checked} onCheckedChange={handleCheckedChange} />;
 }
 
 export default function WorkflowEditorPage() {
@@ -365,37 +364,42 @@ export default function WorkflowEditorPage() {
   return (
     <div className="min-h-[calc(100vh-8rem)] space-y-5 pb-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3 sm:items-center">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/workflows">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
+          <div className="min-w-0">
             <h2 className="text-xl font-semibold">{workflowDisplayName}</h2>
             <p className="text-muted-foreground text-sm">
               Configure trigger, agent instructions, and allowed tools.
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <div className="bg-muted/50 flex items-center gap-2 rounded-full px-3 py-1.5">
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
+          <div className="bg-muted/50 flex w-full items-center justify-between gap-2 rounded-full px-3 py-1.5 sm:w-auto sm:justify-start">
             <span className="text-muted-foreground text-sm">
               {status === "on" ? "Workflow is on" : "Workflow is off"}
             </span>
             <Switch checked={status === "on"} onCheckedChange={handleStatusChange} />
           </div>
-          <div className="bg-muted/50 flex items-center gap-2 rounded-full px-3 py-1.5">
+          <div className="bg-muted/50 flex w-full items-center justify-between gap-2 rounded-full px-3 py-1.5 sm:w-auto sm:justify-start">
             <span className="text-muted-foreground text-sm">
               {autoApprove ? "Auto-approve on" : "Auto-approve off"}
             </span>
             <Switch checked={autoApprove} onCheckedChange={handleAutoApproveChange} />
           </div>
-          <Button variant="secondary" onClick={handleRun} disabled={status !== "on"}>
+          <Button
+            variant="secondary"
+            onClick={handleRun}
+            disabled={status !== "on"}
+            className="w-full justify-center sm:w-auto"
+          >
             <Play className="mr-2 h-4 w-4" />
             Run now
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving} className="w-full justify-center sm:w-auto">
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Save
           </Button>
@@ -610,7 +614,7 @@ export default function WorkflowEditorPage() {
                           "flex items-center gap-3 rounded-md bg-muted/30 p-3 text-sm transition-colors hover:bg-muted/50",
                         )}
                       >
-                        <IntegrationToggleCheckbox
+                        <IntegrationToggleSwitch
                           integrationType={key}
                           checked={allowedIntegrations.includes(key)}
                           onToggle={handleToggleIntegrationChecked}

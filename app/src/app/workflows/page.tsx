@@ -2,6 +2,7 @@
 
 import { Loader2, Plus, Pencil, Trash2, Play, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -128,6 +129,7 @@ function WorkflowExpandButton({
 }
 
 export default function WorkflowsPage() {
+  const router = useRouter();
   const { data: workflows, isLoading, refetch } = useWorkflowList();
   const createWorkflow = useCreateWorkflow();
   const updateWorkflow = useUpdateWorkflow();
@@ -237,6 +239,28 @@ export default function WorkflowsPage() {
     }));
   }, []);
 
+  const handleCardClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const workflowId = event.currentTarget.dataset.workflowId;
+      if (!workflowId) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const interactiveElement = target.closest(
+          "a,button,input,textarea,select,label,[role='button'],[role='switch']",
+        );
+        if (interactiveElement) {
+          return;
+        }
+      }
+
+      router.push(`/workflows/${workflowId}`);
+    },
+    [router],
+  );
+
   const handleModalOverlayClick = useCallback(() => {
     setWorkflowToDelete(null);
   }, []);
@@ -248,14 +272,14 @@ export default function WorkflowsPage() {
   const workflowList = Array.isArray(workflows) ? workflows : [];
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold">Workflows</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-1 text-sm sm:max-w-prose">
             Automate agent runs based on external triggers.
           </p>
         </div>
-        <Button onClick={handleCreate} disabled={isCreating}>
+        <Button onClick={handleCreate} disabled={isCreating} className="self-start">
           {isCreating ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -307,7 +331,9 @@ export default function WorkflowsPage() {
           {workflowList.map((wf) => (
             <div
               key={wf.id}
-              className="border-border/30 bg-background/70 hover:bg-muted/20 rounded-md border px-5 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors"
+              className="border-border/30 bg-background/70 hover:bg-muted/20 cursor-pointer rounded-md border px-5 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors"
+              data-workflow-id={wf.id}
+              onClick={handleCardClick}
             >
               {(() => {
                 const recentRuns = Array.isArray(wf.recentRuns) ? wf.recentRuns : [];

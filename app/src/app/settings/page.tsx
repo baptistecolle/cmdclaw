@@ -28,9 +28,6 @@ export default function SettingsPage() {
   const [lastName, setLastName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [saving, setSaving] = useState(false);
-  const [linkCode, setLinkCode] = useState<string | null>(null);
-  const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
-  const [linkLoading, setLinkLoading] = useState(false);
   const [removingPhone, setRemovingPhone] = useState(false);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
@@ -84,31 +81,6 @@ export default function SettingsPage() {
     },
     [firstName, lastName, phoneNumber],
   );
-
-  const handleGenerateLinkCode = useCallback(async () => {
-    setLinkLoading(true);
-    try {
-      const res = await fetch("/api/whatsapp/link-code", { method: "POST" });
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-      const data = (await res.json()) as { code: string; expiresAt: string };
-      setLinkCode(data.code);
-      setLinkExpiresAt(data.expiresAt);
-      setNotification({
-        type: "success",
-        message: "WhatsApp link code generated",
-      });
-    } catch (error) {
-      console.error("Failed to generate link code:", error);
-      setNotification({
-        type: "error",
-        message: "Failed to generate link code",
-      });
-    } finally {
-      setLinkLoading(false);
-    }
-  }, []);
 
   const handleRemovePhoneNumber = useCallback(async () => {
     setRemovingPhone(true);
@@ -234,7 +206,6 @@ export default function SettingsPage() {
               onChange={handlePhoneNumberChange}
               placeholder="Enter your phone number"
             />
-            <p className="text-muted-foreground mt-1 text-xs">will be used for whatsapp</p>
             {phoneNumber ? (
               <Button
                 type="button"
@@ -268,35 +239,6 @@ export default function SettingsPage() {
           )}
         </Button>
       </form>
-
-      <div className="mt-10 border-t pt-6">
-        <h3 className="text-lg font-semibold">WhatsApp Linking</h3>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Generate a link code, then send it from your WhatsApp number to connect.
-        </p>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Button onClick={handleGenerateLinkCode} disabled={linkLoading}>
-            {linkLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              "Generate link code"
-            )}
-          </Button>
-          {linkCode && (
-            <div className="bg-muted/40 rounded-md border px-4 py-2 text-sm">
-              <div className="font-medium">Code: {linkCode}</div>
-              {linkExpiresAt && (
-                <div className="text-muted-foreground text-xs">
-                  Expires at {new Date(linkExpiresAt).toLocaleTimeString()}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
