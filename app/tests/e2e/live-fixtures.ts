@@ -7,7 +7,7 @@ type LiveFixtures = {
 
 export const test = base.extend<{}, LiveFixtures>({
   liveChatModel: [
-    async ({}, provideModel) => {
+    async (_unused, provideModel) => {
       const model = await resolveLiveE2EModel();
       await provideModel(model);
     },

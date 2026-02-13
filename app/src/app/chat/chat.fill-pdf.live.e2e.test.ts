@@ -19,7 +19,7 @@ async function selectModel(page: Page, modelId: string): Promise<void> {
 
   await expect(
     option,
-    `Model \"${modelId}\" is unavailable in the model picker. Ensure provider auth is connected for that model.`,
+    `Model "${modelId}" is unavailable in the model picker. Ensure provider auth is connected for that model.`,
   ).toBeVisible({ timeout: 10_000 });
 
   const expectedLabel = (await option.textContent())?.trim() || modelId;
@@ -126,12 +126,12 @@ test.describe("@live chat fill-pdf", () => {
 
     if (!existsSync(storageStatePath)) {
       throw new Error(
-        `Missing auth storage state at \"${storageStatePath}\". Generate it first before running @live e2e tests.`,
+        `Missing auth storage state at "${storageStatePath}". Generate it first before running @live e2e tests.`,
       );
     }
 
     if (!existsSync(fixturePdfPath)) {
-      throw new Error(`Missing test fixture PDF at \"${fixturePdfPath}\".`);
+      throw new Error(`Missing test fixture PDF at "${fixturePdfPath}".`);
     }
 
     await page.goto("/chat");

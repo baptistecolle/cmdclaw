@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { mswServer } from "@/test/msw/server";
 
 const {
   getSessionMock,
@@ -88,7 +90,6 @@ describe("GET /api/oauth/callback", () => {
     insertReturningMock.mockResolvedValue([{ id: "integration-1" }]);
     deleteWhereMock.mockResolvedValue(undefined);
     updateWhereMock.mockResolvedValue(undefined);
-    vi.stubGlobal("fetch", vi.fn());
 
     getOAuthConfigMock.mockReturnValue({
       clientId: "client-id",
@@ -157,11 +158,11 @@ describe("GET /api/oauth/callback", () => {
       redirectUrl: "/integrations",
     });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response("bad exchange", {
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () =>
+          new HttpResponse("bad exchange", {
             status: 400,
             headers: { "Content-Type": "text/plain" },
           }),
@@ -186,22 +187,16 @@ describe("GET /api/oauth/callback", () => {
       redirectUrl: "/settings/integrations",
     });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              authed_user: {
-                access_token: "xoxp-user-token",
-                refresh_token: "refresh",
-              },
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () =>
+          HttpResponse.json({
+            authed_user: {
+              access_token: "xoxp-user-token",
+              refresh_token: "refresh",
             },
-          ),
+          }),
       ),
     );
 
@@ -242,21 +237,15 @@ describe("GET /api/oauth/callback", () => {
       getUserInfo,
     });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              access_token: "sf-access",
-              refresh_token: "sf-refresh",
-              instance_url: "https://acme.my.salesforce.com",
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
+    mswServer.use(
+      http.post(
+        "https://login.salesforce.com/services/oauth2/token",
+        () =>
+          HttpResponse.json({
+            access_token: "sf-access",
+            refresh_token: "sf-refresh",
+            instance_url: "https://acme.my.salesforce.com",
+          }),
       ),
     );
 

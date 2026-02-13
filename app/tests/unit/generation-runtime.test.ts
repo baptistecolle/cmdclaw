@@ -72,10 +72,11 @@ describe("GenerationRuntime", () => {
     const approvalPart = message.parts.find((part) => part.type === "approval");
 
     expect(approvalPart).toBeDefined();
-    if (approvalPart?.type === "approval") {
-      expect(approvalPart.status).toBe("approved");
-      expect(approvalPart.toolUseId).toBe("tool-approval");
+    if (approvalPart?.type !== "approval") {
+      throw new Error("expected approval part");
     }
+    expect(approvalPart.status).toBe("approved");
+    expect(approvalPart.toolUseId).toBe("tool-approval");
   });
 
   test("handles auth flow transitions", () => {

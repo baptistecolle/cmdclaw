@@ -13,6 +13,7 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/**/*.{test,spec}.{ts,tsx}"],
     exclude: ["tests/e2e/**", "src/**/*.e2e.test.{ts,tsx}"],
     environment: "node",
+    setupFiles: ["src/test/vitest.setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],

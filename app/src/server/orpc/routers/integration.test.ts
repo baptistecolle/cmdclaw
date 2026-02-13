@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { mswServer } from "@/test/msw/server";
 
 function createProcedureStub() {
   const stub = {
@@ -110,7 +112,6 @@ function createContext() {
 describe("integrationRouter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal("fetch", vi.fn());
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 
@@ -274,14 +275,15 @@ describe("integrationRouter", () => {
       id: "integration-existing",
     });
 
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ access_token: "reddit-access" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+    let headers: Headers | undefined;
+    let body: URLSearchParams | undefined;
+    mswServer.use(
+      http.post("https://oauth.example.com/token", async ({ request }) => {
+        headers = request.headers;
+        body = new URLSearchParams(await request.text());
+        return HttpResponse.json({ access_token: "reddit-access" });
+      }),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     const state = encodeState({
       userId: "user-1",
@@ -295,16 +297,11 @@ describe("integrationRouter", () => {
       context,
     });
 
-    const requestInit = (fetchMock.mock.calls as unknown[][])[0]?.[1] as RequestInit | undefined;
-    expect(requestInit).toBeDefined();
-    const headers = requestInit?.headers as Record<string, string>;
-    const body = requestInit?.body as URLSearchParams;
-
-    expect(headers.Authorization).toMatch(/^Basic /);
-    expect(headers["User-Agent"]).toContain("bap-app");
-    expect(body.get("client_id")).toBeNull();
-    expect(body.get("client_secret")).toBeNull();
-    expect(body.get("code_verifier")).toBe("pkce-verifier");
+    expect(headers?.get("authorization")).toMatch(/^Basic /);
+    expect(headers?.get("user-agent")).toContain("bap-app");
+    expect(body?.get("client_id")).toBeNull();
+    expect(body?.get("client_secret")).toBeNull();
+    expect(body?.get("code_verifier")).toBe("pkce-verifier");
     expect(result).toEqual({
       success: true,
       integrationId: "integration-existing",
@@ -315,9 +312,11 @@ describe("integrationRouter", () => {
   it("throws when token exchange fails", async () => {
     const context = createContext();
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response("bad oauth request", { status: 400 })),
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () => new HttpResponse("bad oauth request", { status: 400 }),
+      ),
     );
 
     const state = encodeState({
@@ -340,14 +339,10 @@ describe("integrationRouter", () => {
   it("throws when slack callback does not include user token", async () => {
     const context = createContext();
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ access_token: "bot-token" }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () => HttpResponse.json({ access_token: "bot-token" }),
       ),
     );
 
@@ -370,17 +365,14 @@ describe("integrationRouter", () => {
     context.db.query.integration.findFirst.mockResolvedValue(null);
     context.mocks.insertReturningMock.mockResolvedValue([{ id: "integration-slack" }]);
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              authed_user: { access_token: "slack-user-token" },
-              refresh_token: "slack-refresh",
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () =>
+          HttpResponse.json({
+            authed_user: { access_token: "slack-user-token" },
+            refresh_token: "slack-refresh",
+          }),
       ),
     );
 
@@ -408,17 +400,14 @@ describe("integrationRouter", () => {
       id: "integration-existing",
     });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              access_token: "access-token",
-              refresh_token: "refresh-token",
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () =>
+          HttpResponse.json({
+            access_token: "access-token",
+            refresh_token: "refresh-token",
+          }),
       ),
     );
 
@@ -448,17 +437,14 @@ describe("integrationRouter", () => {
     context.db.query.integration.findFirst.mockResolvedValue(null);
     context.mocks.insertReturningMock.mockResolvedValue([{ id: "integration-new" }]);
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              access_token: "access-token",
-              refresh_token: "refresh-token",
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () =>
+          HttpResponse.json({
+            access_token: "access-token",
+            refresh_token: "refresh-token",
+          }),
       ),
     );
 
@@ -1140,14 +1126,10 @@ describe("integrationRouter", () => {
       clientSecret: "enc:client-secret",
     });
 
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ access_token: "token" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    mswServer.use(
+      http.post(/.*/, () => HttpResponse.json({ access_token: "token" }), { once: true }),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     const result = await integrationRouterAny.handleCustomCallback({
       input: {
@@ -1161,15 +1143,15 @@ describe("integrationRouter", () => {
       context,
     });
 
-    const requestInit = (fetchMock.mock.calls as unknown[][])[0]?.[1] as RequestInit | undefined;
-    expect(requestInit).toBeDefined();
-    const headers = requestInit?.headers as Record<string, string>;
-    const body = requestInit?.body as URLSearchParams;
+    const requestInit = (fetchSpy.mock.calls as unknown[][])[0]?.[1] as RequestInit | undefined;
+    const headers = requestInit?.headers as Record<string, string> | undefined;
+    const body = requestInit?.body as URLSearchParams | undefined;
 
-    expect(headers.Authorization).toMatch(/^Basic /);
-    expect(body.get("client_id")).toBeNull();
-    expect(body.get("client_secret")).toBeNull();
+    expect(headers?.Authorization).toMatch(/^Basic /);
+    expect(body?.get("client_id")).toBeNull();
+    expect(body?.get("client_secret")).toBeNull();
     expect(result).toEqual({ success: true, redirectUrl: "/custom" });
+    fetchSpy.mockRestore();
   });
 
   it("throws when custom callback token exchange fails", async () => {
@@ -1191,9 +1173,8 @@ describe("integrationRouter", () => {
       clientSecret: "enc:client-secret",
     });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response("token exchange failed", { status: 401 })),
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("token exchange failed", { status: 401 }),
     );
 
     await expect(

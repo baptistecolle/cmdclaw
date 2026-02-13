@@ -42,7 +42,7 @@ const EXCLUDED_PATTERNS = [
 ];
 
 function shellEscape(value: string): string {
-  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 function buildBase64ReadCommand(filePath: string): string {

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { mswServer } from "@/test/msw/server";
 
 const {
   updateMock,
@@ -68,16 +70,11 @@ vi.mock("drizzle-orm", async (importOriginal) => {
 
 import { getValidAccessToken, getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
 
-function mockFetchOk(payload: unknown) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(
-      async () =>
-        new Response(JSON.stringify(payload), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-    ),
+let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+function mockTokenResponse(payload: unknown, status = 200) {
+  mswServer.use(
+    http.post("https://oauth.example.com/token", () => HttpResponse.json(payload, { status })),
   );
 }
 
@@ -86,7 +83,7 @@ describe("token-refresh", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-02-12T12:00:00.000Z"));
     vi.clearAllMocks();
-    vi.stubGlobal("fetch", vi.fn());
+    fetchSpy = vi.spyOn(globalThis, "fetch");
 
     updateWhereMock.mockResolvedValue(undefined);
     selectWhereMock.mockResolvedValue([]);
@@ -108,7 +105,7 @@ describe("token-refresh", () => {
     });
 
     expect(token).toBe("current-token");
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(updateMock).not.toHaveBeenCalled();
   });
 
@@ -122,15 +119,29 @@ describe("token-refresh", () => {
     });
 
     expect(token).toBe("current-token");
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("refreshes at the expiry buffer edge", async () => {
-    mockFetchOk({
-      access_token: "new-access-token",
-      refresh_token: "new-refresh-token",
-      expires_in: 3600,
-    });
+    let capturedBody: URLSearchParams | undefined;
+    let capturedMethod: string | undefined;
+    const capturedHeaders: Record<string, string> = {};
+
+    mswServer.use(
+      http.post("https://oauth.example.com/token", async ({ request }) => {
+        capturedMethod = request.method;
+        for (const [key, value] of request.headers.entries()) {
+          capturedHeaders[key] = value;
+        }
+        capturedBody = new URLSearchParams(await request.text());
+
+        return HttpResponse.json({
+          access_token: "new-access-token",
+          refresh_token: "new-refresh-token",
+          expires_in: 3600,
+        });
+      }),
+    );
 
     const token = await getValidAccessToken({
       accessToken: "old-token",
@@ -141,19 +152,11 @@ describe("token-refresh", () => {
     });
 
     expect(token).toBe("new-access-token");
-
-    const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
-    const [, options] = fetchMock.mock.calls[0]!;
-    const body = options?.body as URLSearchParams;
-
-    expect(options?.method).toBe("POST");
-    expect(options?.headers).toEqual({
-      "Content-Type": "application/x-www-form-urlencoded",
-    });
-    expect(body.get("grant_type")).toBe("refresh_token");
-    expect(body.get("client_id")).toBe("client-id");
-    expect(body.get("client_secret")).toBe("client-secret");
-
+    expect(capturedMethod).toBe("POST");
+    expect(capturedHeaders["content-type"]).toBe("application/x-www-form-urlencoded");
+    expect(capturedBody?.get("grant_type")).toBe("refresh_token");
+    expect(capturedBody?.get("client_id")).toBe("client-id");
+    expect(capturedBody?.get("client_secret")).toBe("client-secret");
     expect(updateMock).toHaveBeenCalledOnce();
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -164,7 +167,16 @@ describe("token-refresh", () => {
   });
 
   it("uses provider-specific refresh headers for notion, airtable, and reddit", async () => {
-    mockFetchOk({ access_token: "new-token" });
+    const captured: Array<{ headers: Headers; body: URLSearchParams }> = [];
+    mswServer.use(
+      http.post("https://oauth.example.com/token", async ({ request }) => {
+        captured.push({
+          headers: request.headers,
+          body: new URLSearchParams(await request.text()),
+        });
+        return HttpResponse.json({ access_token: "new-token" });
+      }),
+    );
 
     await getValidAccessToken({
       accessToken: "old-notion",
@@ -190,29 +202,25 @@ describe("token-refresh", () => {
       type: "reddit",
     });
 
-    const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
-
-    for (const [index, provider] of ["notion", "airtable", "reddit"].entries()) {
-      const [, options] = fetchMock.mock.calls[index]!;
-      const headers = options?.headers as Record<string, string>;
-      const body = options?.body as URLSearchParams;
-
-      expect(headers.Authorization).toMatch(/^Basic /);
-      expect(body.get("client_id")).toBeNull();
-      expect(body.get("client_secret")).toBeNull();
-
-      if (provider === "reddit") {
-        expect(headers["User-Agent"]).toContain("bap-app:v1.0.0");
-      }
+    for (const [index] of ["notion", "airtable", "reddit"].entries()) {
+      const request = captured[index];
+      expect(request).toBeDefined();
+      expect(request!.headers.get("authorization")).toMatch(/^Basic /);
+      expect(request!.body.get("client_id")).toBeNull();
+      expect(request!.body.get("client_secret")).toBeNull();
     }
+
+    const redditRequest = captured[2];
+    expect(redditRequest).toBeDefined();
+    expect(redditRequest!.headers.get("user-agent")).toContain("bap-app:v1.0.0");
   });
 
   it("falls back to the existing token when refresh fails", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response("oauth failed", {
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () =>
+          new HttpResponse("oauth failed", {
             status: 500,
             headers: { "Content-Type": "text/plain" },
           }),
@@ -240,11 +248,11 @@ describe("token-refresh", () => {
     });
 
     expect(token).toBe("existing-token");
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("falls back to existing token when provider response is missing access token", async () => {
-    mockFetchOk({ refresh_token: "new-refresh-token", expires_in: 3600 });
+    mockTokenResponse({ refresh_token: "new-refresh-token", expires_in: 3600 });
 
     const token = await getValidAccessToken({
       accessToken: "existing-token",
@@ -328,7 +336,7 @@ describe("token-refresh", () => {
     expect(tokens.size).toBe(1);
     expect(tokens.get("cred-future")).toBe("future-token");
     expect(tokens.has("cred-api-key")).toBe(false);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("refreshes expiring custom oauth token with params auth", async () => {
@@ -349,25 +357,28 @@ describe("token-refresh", () => {
         },
       },
     ]);
-    mockFetchOk({
-      access_token: "new-custom-token",
-      expires_in: 1800,
-    });
+    let capturedHeaders: Headers | undefined;
+    let capturedBody: URLSearchParams | undefined;
+
+    mswServer.use(
+      http.post("https://custom.example.com/token", async ({ request }) => {
+        capturedHeaders = request.headers;
+        capturedBody = new URLSearchParams(await request.text());
+        return HttpResponse.json({
+          access_token: "new-custom-token",
+          expires_in: 1800,
+        });
+      }),
+    );
 
     const tokens = await getValidCustomTokens("user-1");
 
     expect(tokens.get("cred-expired")).toBe("new-custom-token");
     expect(decryptMock).toHaveBeenCalledWith("enc-client-id");
     expect(decryptMock).toHaveBeenCalledWith("enc-client-secret");
-
-    const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
-    const [, options] = fetchMock.mock.calls[0]!;
-    const headers = options?.headers as Record<string, string>;
-    const body = options?.body as URLSearchParams;
-
-    expect(headers.Authorization).toBeUndefined();
-    expect(body.get("client_id")).toBe("enc-client-id");
-    expect(body.get("client_secret")).toBe("enc-client-secret");
+    expect(capturedHeaders?.get("authorization")).toBeNull();
+    expect(capturedBody?.get("client_id")).toBe("enc-client-id");
+    expect(capturedBody?.get("client_secret")).toBe("enc-client-secret");
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
         accessToken: "new-custom-token",
@@ -394,24 +405,27 @@ describe("token-refresh", () => {
         },
       },
     ]);
-    mockFetchOk({
-      access_token: "new-header-token",
-      refresh_token: "new-header-refresh",
-      expires_in: 3600,
-    });
+    let capturedHeaders: Headers | undefined;
+    let capturedBody: URLSearchParams | undefined;
+
+    mswServer.use(
+      http.post("https://custom.example.com/token", async ({ request }) => {
+        capturedHeaders = request.headers;
+        capturedBody = new URLSearchParams(await request.text());
+        return HttpResponse.json({
+          access_token: "new-header-token",
+          refresh_token: "new-header-refresh",
+          expires_in: 3600,
+        });
+      }),
+    );
 
     const tokens = await getValidCustomTokens("user-1");
 
     expect(tokens.get("cred-header")).toBe("new-header-token");
-
-    const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
-    const [, options] = fetchMock.mock.calls[0]!;
-    const headers = options?.headers as Record<string, string>;
-    const body = options?.body as URLSearchParams;
-
-    expect(headers.Authorization).toMatch(/^Basic /);
-    expect(body.get("client_id")).toBeNull();
-    expect(body.get("client_secret")).toBeNull();
+    expect(capturedHeaders?.get("authorization")).toMatch(/^Basic /);
+    expect(capturedBody?.get("client_id")).toBeNull();
+    expect(capturedBody?.get("client_secret")).toBeNull();
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
         accessToken: "new-header-token",
@@ -437,11 +451,11 @@ describe("token-refresh", () => {
         },
       },
     ]);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response("invalid_grant", {
+    mswServer.use(
+      http.post(
+        "https://custom.example.com/token",
+        () =>
+          new HttpResponse("invalid_grant", {
             status: 400,
             headers: { "Content-Type": "text/plain" },
           }),
@@ -487,6 +501,6 @@ describe("token-refresh", () => {
 
     expect(tokens.get("cred-no-refresh")).toBe("existing-token");
     expect(tokens.get("cred-no-oauth-config")).toBe("existing-token-2");
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
