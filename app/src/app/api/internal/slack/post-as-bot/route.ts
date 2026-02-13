@@ -155,9 +155,7 @@ export async function POST(request: Request) {
     }
   }
 
-  let slackResult:
-    | Awaited<ReturnType<typeof postMessage>>
-    | undefined;
+  let slackResult: Awaited<ReturnType<typeof postMessage>> | undefined;
   try {
     slackResult = await postMessage(channel, text, threadTs);
   } catch (error) {
@@ -177,9 +175,7 @@ export async function POST(request: Request) {
   const slackOk = slackResult.body?.ok === true;
   if (!slackOk) {
     const slackError =
-      typeof slackResult.body?.error === "string"
-        ? (slackResult.body.error as string)
-        : undefined;
+      typeof slackResult.body?.error === "string" ? (slackResult.body.error as string) : undefined;
     const status = mapSlackFailureStatus(slackResult.httpStatus, slackError);
 
     return Response.json(

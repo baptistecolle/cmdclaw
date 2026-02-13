@@ -389,7 +389,9 @@ test.describe("@live chat slack", () => {
       );
     }
     if (terminalState === "auth_required") {
-      throw new Error("Slack auth was requested during test. The connected user is missing Slack auth.");
+      throw new Error(
+        "Slack auth was requested during test. The connected user is missing Slack auth.",
+      );
     }
     if (terminalState === "assistant_error") {
       throw new Error(`Assistant returned an error response: ${finalAssistantText}`);
