@@ -334,12 +334,12 @@ export function MessageItem({
   // For user messages, show simple bubble + attachments
   if (role === "user") {
     return (
-      <div data-testid="chat-message-user" className="py-4 space-y-2">
+      <div data-testid="chat-message-user" className="space-y-2 py-4">
         {attachments && attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
             {attachments.map((a) =>
               a.mimeType.startsWith("image/") && a.dataUrl ? (
-                <div key={getAttachmentKey(a)} className="relative group">
+                <div key={getAttachmentKey(a)} className="group relative">
                   <Image
                     src={a.dataUrl}
                     alt={a.name}
@@ -370,26 +370,26 @@ export function MessageItem({
               ) : (
                 <div
                   key={getAttachmentKey(a)}
-                  className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs"
+                  className="bg-muted flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs"
                 >
-                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                  <Paperclip className="text-muted-foreground h-3.5 w-3.5" />
                   <span className="max-w-[200px] truncate">{a.name}</span>
                   <button
                     type="button"
                     data-attachment-key={getAttachmentKey(a)}
                     onClick={handleAttachmentViewClick}
-                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
+                    className="hover:bg-background inline-flex items-center gap-1 rounded px-1.5 py-0.5"
                   >
-                    <Eye className="h-3 w-3 text-muted-foreground" />
+                    <Eye className="text-muted-foreground h-3 w-3" />
                     <span>View</span>
                   </button>
                   <button
                     type="button"
                     data-attachment-key={getAttachmentKey(a)}
                     onClick={handleAttachmentDownloadClick}
-                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background"
+                    className="hover:bg-background inline-flex items-center gap-1 rounded px-1.5 py-0.5"
                   >
-                    <Download className="h-3 w-3 text-muted-foreground" />
+                    <Download className="text-muted-foreground h-3 w-3" />
                     <span>Download</span>
                   </button>
                 </div>
@@ -405,7 +405,7 @@ export function MessageItem({
   return (
     <div
       data-testid={role === "assistant" ? "chat-message-assistant" : undefined}
-      className="py-4 space-y-3"
+      className="space-y-3 py-4"
     >
       {/* Show segmented trace if there are approvals, otherwise show collapsed trace */}
       {hasTrace &&
@@ -493,22 +493,22 @@ export function MessageItem({
 
       {/* Show sandbox files as downloadable attachments */}
       {sandboxFiles && sandboxFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           {sandboxFiles.map((file) => (
             <button
               key={file.fileId}
               data-file-id={file.fileId}
               onClick={handleSandboxFileClick}
-              className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm"
+              className="bg-muted hover:bg-muted/80 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors"
             >
-              <FileIcon className="w-4 h-4 text-muted-foreground" />
+              <FileIcon className="text-muted-foreground h-4 w-4" />
               <span className="font-medium">{file.filename}</span>
               {file.sizeBytes && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-muted-foreground text-xs">
                   ({formatFileSize(file.sizeBytes)})
                 </span>
               )}
-              <Download className="w-4 h-4 ml-1 text-muted-foreground" />
+              <Download className="text-muted-foreground ml-1 h-4 w-4" />
             </button>
           ))}
         </div>
@@ -516,7 +516,7 @@ export function MessageItem({
 
       {/* If no text and no trace, show empty indicator */}
       {!textContent && !hasTrace && !sandboxFiles?.length && (
-        <div className="text-sm text-muted-foreground italic">Task completed</div>
+        <div className="text-muted-foreground text-sm italic">Task completed</div>
       )}
     </div>
   );

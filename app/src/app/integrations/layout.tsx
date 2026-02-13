@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 export default function IntegrationsLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShell>
-      <div className="min-h-screen bg-background">
+      <div className="bg-background min-h-screen">
         <div className="container px-4 py-6">
           <main className="mx-auto max-w-4xl">{children}</main>
         </div>

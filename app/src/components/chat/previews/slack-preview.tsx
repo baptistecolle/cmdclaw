@@ -27,7 +27,7 @@ function SlackSendPreview({ args }: { args: Record<string, string | undefined> }
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="slack" size={16} />
         <span className="text-sm font-medium">{thread ? "Reply to Thread" : "Send Message"}</span>
         {thread && <PreviewBadge>In Thread</PreviewBadge>}
@@ -54,7 +54,7 @@ function SlackReactPreview({ args }: { args: Record<string, string | undefined> 
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="slack" size={16} />
         <span className="text-sm font-medium">Add Reaction</span>
       </div>
@@ -63,7 +63,7 @@ function SlackReactPreview({ args }: { args: Record<string, string | undefined> 
         <PreviewField label="Channel" value={channel} mono />
         <PreviewField label="Message" value={timestamp} mono />
         <div className="mt-2">
-          <span className="text-xs font-medium text-muted-foreground">Emoji: </span>
+          <span className="text-muted-foreground text-xs font-medium">Emoji: </span>
           <span className="text-lg">:{emoji}:</span>
         </div>
       </PreviewSection>
@@ -78,7 +78,7 @@ function SlackUploadPreview({ args }: { args: Record<string, string | undefined>
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="slack" size={16} />
         <span className="text-sm font-medium">Upload File</span>
       </div>

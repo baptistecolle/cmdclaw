@@ -12,7 +12,7 @@ type Props = {
 export function VoiceIndicator({ isRecording, isProcessing, error }: Props) {
   if (error) {
     return (
-      <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      <div className="bg-destructive/10 text-destructive flex items-center gap-2 rounded-lg px-3 py-2 text-sm">
         <Mic className="h-4 w-4" />
         <span>{error}</span>
       </div>
@@ -21,7 +21,7 @@ export function VoiceIndicator({ isRecording, isProcessing, error }: Props) {
 
   if (isProcessing) {
     return (
-      <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+      <div className="bg-muted text-muted-foreground flex items-center gap-2 rounded-lg px-3 py-2 text-sm">
         <Loader2 className="h-4 w-4 animate-spin" />
         <span>Transcribing...</span>
       </div>
@@ -54,7 +54,7 @@ export function VoiceHint({ className }: VoiceHintProps) {
 
   return (
     <div className={cn("text-xs text-muted-foreground", className)}>
-      Hold <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{shortcut}</kbd> to
+      Hold <kbd className="bg-muted rounded px-1.5 py-0.5 font-mono text-xs">{shortcut}</kbd> to
       record voice
     </div>
   );

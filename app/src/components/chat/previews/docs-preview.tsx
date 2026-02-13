@@ -23,22 +23,22 @@ function DocsCreatePreview({ args }: { args: Record<string, string | undefined> 
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_docs" size={16} />
         <span className="text-sm font-medium">Create Document</span>
       </div>
 
       <PreviewSection>
-        <div className="rounded border bg-white dark:bg-muted/30 p-4">
-          <div className="font-medium text-lg mb-2 pb-2 border-b">
+        <div className="dark:bg-muted/30 rounded border bg-white p-4">
+          <div className="mb-2 border-b pb-2 text-lg font-medium">
             {title || "Untitled Document"}
           </div>
 
           {content && (
-            <div className="text-sm text-muted-foreground whitespace-pre-wrap">{content}</div>
+            <div className="text-muted-foreground text-sm whitespace-pre-wrap">{content}</div>
           )}
 
-          {!content && <div className="text-sm text-muted-foreground italic">Empty document</div>}
+          {!content && <div className="text-muted-foreground text-sm italic">Empty document</div>}
         </div>
       </PreviewSection>
     </div>
@@ -57,7 +57,7 @@ function DocsAppendPreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_docs" size={16} />
         <span className="text-sm font-medium">Append to Document</span>
       </div>

@@ -17,33 +17,33 @@ export function ToolCallDisplay({ name, input, result }: Props) {
   }, []);
 
   return (
-    <div className="rounded-lg border bg-card text-card-foreground">
+    <div className="bg-card text-card-foreground rounded-lg border">
       <button
         onClick={handleToggleExpanded}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
+        className="hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
       >
         {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        <Wrench className="h-4 w-4 text-muted-foreground" />
+        <Wrench className="text-muted-foreground h-4 w-4" />
         <span className="flex-1 font-mono text-xs">{name}</span>
         {isComplete ? (
           <Check className="h-4 w-4 text-green-500" />
         ) : (
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
         )}
       </button>
 
       {expanded && (
         <div className="border-t px-3 py-2">
           <div className="mb-2">
-            <p className="text-xs font-medium text-muted-foreground">Input:</p>
-            <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
+            <p className="text-muted-foreground text-xs font-medium">Input:</p>
+            <pre className="bg-muted mt-1 overflow-x-auto rounded p-2 text-xs">
               {JSON.stringify(input, null, 2)}
             </pre>
           </div>
           {result !== undefined && (
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Result:</p>
-              <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-xs">
+              <p className="text-muted-foreground text-xs font-medium">Result:</p>
+              <pre className="bg-muted mt-1 max-h-48 overflow-auto rounded p-2 text-xs">
                 {typeof result === "string" ? result : JSON.stringify(result, null, 2)}
               </pre>
             </div>

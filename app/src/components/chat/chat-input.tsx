@@ -238,7 +238,7 @@ export function ChatInput({
           {attachments.map((a, i) => (
             <div
               key={`${a.file.name}-${a.file.lastModified}-${a.file.size}`}
-              className="group relative flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs"
+              className="group bg-background relative flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
             >
               {a.preview ? (
                 <Image
@@ -250,14 +250,14 @@ export function ChatInput({
                   className="h-8 w-8 rounded object-cover"
                 />
               ) : (
-                <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                <Paperclip className="text-muted-foreground h-3.5 w-3.5" />
               )}
               <span className="max-w-[120px] truncate">{a.file.name}</span>
               <button
                 type="button"
                 data-attachment-index={i}
                 onClick={handleRemoveAttachmentClick}
-                className="ml-0.5 rounded-full p-0.5 hover:bg-muted"
+                className="hover:bg-muted ml-0.5 rounded-full p-0.5"
               >
                 <X className="h-3 w-3" />
               </button>

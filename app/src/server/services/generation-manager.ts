@@ -943,11 +943,7 @@ class GenerationManager {
 
         yield { type: "status_change", status: genRecord.status };
 
-        const pollForTerminal = async function* (): AsyncGenerator<
-          GenerationEvent,
-          void,
-          unknown
-        > {
+        const pollForTerminal = async function* (): AsyncGenerator<GenerationEvent, void, unknown> {
           if (Date.now() - startedAt >= maxWaitMs) {
             return;
           }
@@ -1112,11 +1108,7 @@ class GenerationManager {
           setTimeout(resolve, 100);
         });
 
-      const streamEvents = async function* (): AsyncGenerator<
-        GenerationEvent,
-        void,
-        unknown
-      > {
+      const streamEvents = async function* (): AsyncGenerator<GenerationEvent, void, unknown> {
         if (isUnsubscribed) {
           return;
         }

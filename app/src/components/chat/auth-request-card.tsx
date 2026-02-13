@@ -71,7 +71,7 @@ export function AuthRequestCard({
     >
       <button
         onClick={handleToggleExpanded}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
+        className="hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
       >
         {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         <div className="flex items-center -space-x-1">
@@ -121,7 +121,7 @@ export function AuthRequestCard({
 
       {expanded && (
         <div className="border-t px-3 py-3">
-          {reason && <p className="mb-3 text-sm text-muted-foreground">{reason}</p>}
+          {reason && <p className="text-muted-foreground mb-3 text-sm">{reason}</p>}
 
           <div className="space-y-3">
             {integrations.map((integration) => {
@@ -160,7 +160,7 @@ export function AuthRequestCard({
                           onClick={handleCancelClick}
                           disabled={isLoading}
                         >
-                          <X className="h-4 w-4 mr-1" />
+                          <X className="mr-1 h-4 w-4" />
                           Cancel
                         </Button>
                         <Button
@@ -173,7 +173,7 @@ export function AuthRequestCard({
                           {isLoading ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Link2 className="h-4 w-4 mr-1" />
+                            <Link2 className="mr-1 h-4 w-4" />
                           )}
                           Connect
                         </Button>

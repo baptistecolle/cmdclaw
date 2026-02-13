@@ -162,15 +162,15 @@ export function DualPanelWorkspace({
 
       <div className="flex min-h-0 flex-1 md:hidden">
         {mobilePanel === "left" ? (
-          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background">
-            <div className="border-b px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <section className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border">
+            <div className="text-muted-foreground border-b px-4 py-2.5 text-xs font-semibold tracking-wide uppercase">
               {leftTitle}
             </div>
             <div className="min-h-0 flex-1">{left}</div>
           </section>
         ) : (
-          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background">
-            <div className="border-b px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <section className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border">
+            <div className="text-muted-foreground border-b px-4 py-2.5 text-xs font-semibold tracking-wide uppercase">
               {rightTitle}
             </div>
             <div className="min-h-0 flex-1">{right}</div>
@@ -180,10 +180,10 @@ export function DualPanelWorkspace({
 
       <div ref={containerRef} className="hidden min-h-0 flex-1 md:flex">
         <section
-          className="flex min-h-0 flex-col overflow-hidden rounded-l-xl border bg-background"
+          className="bg-background flex min-h-0 flex-col overflow-hidden rounded-l-xl border"
           style={leftPanelStyle}
         >
-          <div className="border-b px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="text-muted-foreground border-b px-4 py-2.5 text-xs font-semibold tracking-wide uppercase">
             {leftTitle}
           </div>
           <div className="min-h-0 flex-1">{left}</div>
@@ -198,15 +198,15 @@ export function DualPanelWorkspace({
           onKeyDown={handleSeparatorKeyDown}
           className="group relative w-3 cursor-col-resize"
         >
-          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-foreground/40" />
-          <div className="absolute top-1/2 left-1/2 h-12 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/80 transition-colors group-hover:bg-foreground/40" />
+          <div className="bg-border group-hover:bg-foreground/40 absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors" />
+          <div className="bg-border/80 group-hover:bg-foreground/40 absolute top-1/2 left-1/2 h-12 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors" />
         </div>
 
         <section
-          className="flex min-h-0 flex-col overflow-hidden rounded-r-xl border bg-background"
+          className="bg-background flex min-h-0 flex-col overflow-hidden rounded-r-xl border"
           style={rightPanelStyle}
         >
-          <div className="border-b px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="text-muted-foreground border-b px-4 py-2.5 text-xs font-semibold tracking-wide uppercase">
             {rightTitle}
           </div>
           <div className="min-h-0 flex-1">{right}</div>

@@ -1,6 +1,6 @@
+import { http, HttpResponse } from "msw";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@/test/msw/server";
 
 const {
@@ -188,15 +188,13 @@ describe("GET /api/oauth/callback", () => {
     });
 
     mswServer.use(
-      http.post(
-        "https://oauth.example.com/token",
-        () =>
-          HttpResponse.json({
-            authed_user: {
-              access_token: "xoxp-user-token",
-              refresh_token: "refresh",
-            },
-          }),
+      http.post("https://oauth.example.com/token", () =>
+        HttpResponse.json({
+          authed_user: {
+            access_token: "xoxp-user-token",
+            refresh_token: "refresh",
+          },
+        }),
       ),
     );
 
@@ -238,14 +236,12 @@ describe("GET /api/oauth/callback", () => {
     });
 
     mswServer.use(
-      http.post(
-        "https://login.salesforce.com/services/oauth2/token",
-        () =>
-          HttpResponse.json({
-            access_token: "sf-access",
-            refresh_token: "sf-refresh",
-            instance_url: "https://acme.my.salesforce.com",
-          }),
+      http.post("https://login.salesforce.com/services/oauth2/token", () =>
+        HttpResponse.json({
+          access_token: "sf-access",
+          refresh_token: "sf-refresh",
+          instance_url: "https://acme.my.salesforce.com",
+        }),
       ),
     );
 

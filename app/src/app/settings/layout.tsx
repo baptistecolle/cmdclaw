@@ -17,9 +17,9 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   return (
     <AppShell>
-      <div className="min-h-full bg-background">
-        <main className="mx-auto w-full max-w-4xl px-4 pb-10 pt-8 md:px-6 md:pt-10">
-          <nav className="sticky top-0 z-10 mb-6 flex gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="bg-background min-h-full">
+        <main className="mx-auto w-full max-w-4xl px-4 pt-8 pb-10 md:px-6 md:pt-10">
+          <nav className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 mb-6 flex gap-4 border-b backdrop-blur">
             {settingsTabs.map((tab) => {
               const isActive =
                 tab.href === "/settings" ? pathname === "/settings" : pathname.startsWith(tab.href);

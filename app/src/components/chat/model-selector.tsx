@@ -145,7 +145,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
           size="sm"
           disabled={disabled}
           data-testid="chat-model-selector"
-          className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground h-7 gap-1 px-2 text-xs"
         >
           {displayName}
           <ChevronDown className="h-3 w-3" />
@@ -161,7 +161,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
             onClick={handleModelSelect}
           >
             <span className="flex-1">{model.name}</span>
-            {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
+            {selectedModel === model.id && <Check className="text-foreground h-3.5 w-3.5" />}
           </DropdownMenuItem>
         ))}
 
@@ -177,7 +177,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
                 onClick={handleModelSelect}
               >
                 <span className="flex-1">{model.name}</span>
-                {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
+                {selectedModel === model.id && <Check className="text-foreground h-3.5 w-3.5" />}
               </DropdownMenuItem>
             ))}
           </>
@@ -186,7 +186,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="flex items-center gap-1.5">
           ChatGPT
-          {!isOpenAIConnected && <Lock className="h-3 w-3 text-muted-foreground" />}
+          {!isOpenAIConnected && <Lock className="text-muted-foreground h-3 w-3" />}
         </DropdownMenuLabel>
         {isOpenAIConnected ? (
           OPENAI_MODELS.map((model) => (
@@ -197,11 +197,11 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
               onClick={handleModelSelect}
             >
               <span className="flex-1">{model.name}</span>
-              {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
+              {selectedModel === model.id && <Check className="text-foreground h-3.5 w-3.5" />}
             </DropdownMenuItem>
           ))
         ) : (
-          <DropdownMenuItem className="text-xs text-muted-foreground" onClick={openSubscriptions}>
+          <DropdownMenuItem className="text-muted-foreground text-xs" onClick={openSubscriptions}>
             Connect in Settings to unlock
           </DropdownMenuItem>
         )}
@@ -209,7 +209,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="flex items-center gap-1.5">
           Gemini
-          {!isGoogleConnected && <Lock className="h-3 w-3 text-muted-foreground" />}
+          {!isGoogleConnected && <Lock className="text-muted-foreground h-3 w-3" />}
         </DropdownMenuLabel>
         {isGoogleConnected ? (
           GOOGLE_MODELS.map((model) => (
@@ -220,11 +220,11 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
               onClick={handleModelSelect}
             >
               <span className="flex-1">{model.name}</span>
-              {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
+              {selectedModel === model.id && <Check className="text-foreground h-3.5 w-3.5" />}
             </DropdownMenuItem>
           ))
         ) : (
-          <DropdownMenuItem className="text-xs text-muted-foreground" onClick={openSubscriptions}>
+          <DropdownMenuItem className="text-muted-foreground text-xs" onClick={openSubscriptions}>
             Connect in Settings to unlock
           </DropdownMenuItem>
         )}
@@ -232,7 +232,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="flex items-center gap-1.5">
           Kimi
-          {!isKimiConnected && <Lock className="h-3 w-3 text-muted-foreground" />}
+          {!isKimiConnected && <Lock className="text-muted-foreground h-3 w-3" />}
         </DropdownMenuLabel>
         {isKimiConnected ? (
           KIMI_MODELS.map((model) => (
@@ -243,11 +243,11 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
               onClick={handleModelSelect}
             >
               <span className="flex-1">{model.name}</span>
-              {selectedModel === model.id && <Check className="h-3.5 w-3.5 text-foreground" />}
+              {selectedModel === model.id && <Check className="text-foreground h-3.5 w-3.5" />}
             </DropdownMenuItem>
           ))
         ) : (
-          <DropdownMenuItem className="text-xs text-muted-foreground" onClick={openSubscriptions}>
+          <DropdownMenuItem className="text-muted-foreground text-xs" onClick={openSubscriptions}>
             Connect in Settings to unlock
           </DropdownMenuItem>
         )}

@@ -26,13 +26,13 @@ function DriveUploadPreview({ args }: { args: Record<string, string | undefined>
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_drive" size={16} />
         <span className="text-sm font-medium">Upload File</span>
       </div>
 
       <PreviewSection>
-        <div className="rounded border bg-muted/30 p-3">
+        <div className="bg-muted/30 rounded border p-3">
           <PreviewField label="File" value={file} />
           {name && <PreviewField label="Save as" value={name} />}
           {folder && <PreviewField label="Destination" value={folder} mono />}
@@ -48,13 +48,13 @@ function DriveMkdirPreview({ args }: { args: Record<string, string | undefined> 
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_drive" size={16} />
         <span className="text-sm font-medium">Create Folder</span>
       </div>
 
       <PreviewSection>
-        <div className="rounded border bg-muted/30 p-3 flex items-center gap-2">
+        <div className="bg-muted/30 flex items-center gap-2 rounded border p-3">
           <IntegrationLogo integration="google_drive" size={20} />
           <span className="font-medium">{name || "New Folder"}</span>
         </div>
@@ -69,7 +69,7 @@ function DriveDeletePreview({ positionalArgs }: { positionalArgs: string[] }) {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_drive" size={16} />
         <span className="text-sm font-medium">Delete Item</span>
         <PreviewBadge variant="danger">Destructive</PreviewBadge>

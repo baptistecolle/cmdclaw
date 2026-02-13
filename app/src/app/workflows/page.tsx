@@ -251,7 +251,7 @@ export default function WorkflowsPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Workflows</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Automate agent runs based on external triggers.
           </p>
         </div>
@@ -290,7 +290,7 @@ export default function WorkflowsPage() {
       ) : workflowList.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
           <h3 className="text-lg font-medium">No workflows yet</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Create your first workflow to run agents automatically.
           </p>
           <Button className="mt-4" onClick={handleCreate} disabled={isCreating}>
@@ -307,7 +307,7 @@ export default function WorkflowsPage() {
           {workflowList.map((wf) => (
             <div
               key={wf.id}
-              className="rounded-md border border-border/30 bg-background/70 px-5 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-muted/20"
+              className="border-border/30 bg-background/70 hover:bg-muted/20 rounded-md border px-5 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors"
             >
               {(() => {
                 const recentRuns = Array.isArray(wf.recentRuns) ? wf.recentRuns : [];
@@ -321,11 +321,11 @@ export default function WorkflowsPage() {
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-medium">{getWorkflowDisplayName(wf.name)}</h3>
-                          <span className="rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
+                          <span className="bg-muted/60 text-muted-foreground rounded-full px-2 py-0.5 text-xs">
                             {wf.triggerType}
                           </span>
                         </div>
-                        <div className="mt-1.5 text-xs text-muted-foreground">
+                        <div className="text-muted-foreground mt-1.5 text-xs">
                           Last run:{" "}
                           {wf.lastRunStatus ? getWorkflowRunStatusLabel(wf.lastRunStatus) : "—"} ·{" "}
                           {formatDate(wf.lastRunAt)}
@@ -333,7 +333,7 @@ export default function WorkflowsPage() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-2 rounded-full bg-muted/50 px-2.5 py-1">
+                        <div className="bg-muted/50 flex items-center gap-2 rounded-full px-2.5 py-1">
                           <WorkflowStatusSwitch
                             checked={wf.status === "on"}
                             workflowId={wf.id}
@@ -360,7 +360,7 @@ export default function WorkflowsPage() {
                     </div>
 
                     <div className="mt-4 space-y-2">
-                      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
+                      <div className="text-muted-foreground/80 text-[10px] font-medium tracking-[0.14em] uppercase">
                         Recent runs
                       </div>
                       {recentRuns.length > 0 ? (
@@ -369,15 +369,15 @@ export default function WorkflowsPage() {
                             <Link
                               key={run.id}
                               href={`/workflows/runs/${run.id}`}
-                              className="flex items-center justify-between rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted/45 hover:text-foreground"
+                              className="text-muted-foreground hover:bg-muted/45 hover:text-foreground flex items-center justify-between rounded-md px-2 py-1 text-sm transition-colors"
                             >
                               <div className="flex items-center gap-2">
-                                <span className="text-xs capitalize text-muted-foreground">
+                                <span className="text-muted-foreground text-xs capitalize">
                                   {run.source}
                                 </span>
                                 <span>{getWorkflowRunStatusLabel(run.status)}</span>
                               </div>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-muted-foreground text-xs">
                                 {formatDate(run.startedAt)}
                               </span>
                             </Link>
@@ -390,7 +390,7 @@ export default function WorkflowsPage() {
                           />
                         </div>
                       ) : (
-                        <div className="text-sm text-muted-foreground">No runs yet.</div>
+                        <div className="text-muted-foreground text-sm">No runs yet.</div>
                       )}
                     </div>
                   </>
@@ -407,11 +407,11 @@ export default function WorkflowsPage() {
           onClick={handleModalOverlayClick}
         >
           <div
-            className="w-full max-w-md rounded-lg border bg-background p-6 shadow-xl"
+            className="bg-background w-full max-w-md rounded-lg border p-6 shadow-xl"
             onClick={handleModalContentClick}
           >
             <h3 className="text-lg font-semibold">Delete workflow?</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-2 text-sm">
               This will permanently delete &quot;{workflowToDelete.name}&quot; and cannot be undone.
             </p>
             <div className="mt-6 flex items-center justify-end gap-2">

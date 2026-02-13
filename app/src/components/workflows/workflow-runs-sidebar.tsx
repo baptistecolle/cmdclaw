@@ -36,24 +36,24 @@ export function WorkflowRunsSidebar() {
   }, [data]);
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col border-r bg-muted/20">
+    <aside className="bg-muted/20 flex h-full w-80 shrink-0 flex-col border-r">
       <div className="border-b px-4 py-3">
         <h2 className="text-sm font-semibold">Workflow runs</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Grouped by workflow</p>
+        <p className="text-muted-foreground mt-1 text-xs">Grouped by workflow</p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
         {isLoading ? (
-          <div className="px-2 py-4 text-sm text-muted-foreground">Loading runs...</div>
+          <div className="text-muted-foreground px-2 py-4 text-sm">Loading runs...</div>
         ) : workflows.length === 0 ? (
-          <div className="px-2 py-4 text-sm text-muted-foreground">No runs yet.</div>
+          <div className="text-muted-foreground px-2 py-4 text-sm">No runs yet.</div>
         ) : (
           <div className="space-y-3">
             {workflows.map((wf) => (
               <section key={wf.id} className="space-y-1">
                 <Link
                   href={`/workflows/${wf.id}`}
-                  className="block rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted"
+                  className="hover:bg-muted block rounded-md px-2 py-1.5 text-sm font-medium"
                 >
                   {wf.name}
                 </Link>
@@ -75,11 +75,11 @@ export function WorkflowRunsSidebar() {
                           <span className="font-medium">
                             {getWorkflowRunStatusLabel(run.status)}
                           </span>
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          <span className="text-muted-foreground text-[10px] tracking-wide uppercase">
                             {run.source ?? "run"}
                           </span>
                         </div>
-                        <div className="mt-1 text-[11px] text-muted-foreground">
+                        <div className="text-muted-foreground mt-1 text-[11px]">
                           {formatDate(run.startedAt)}
                         </div>
                       </Link>

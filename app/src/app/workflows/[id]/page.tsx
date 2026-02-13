@@ -372,20 +372,20 @@ export default function WorkflowEditorPage() {
           </Button>
           <div>
             <h2 className="text-xl font-semibold">{workflowDisplayName}</h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Configure trigger, agent instructions, and allowed tools.
             </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <div className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5">
-            <span className="text-sm text-muted-foreground">
+          <div className="bg-muted/50 flex items-center gap-2 rounded-full px-3 py-1.5">
+            <span className="text-muted-foreground text-sm">
               {status === "on" ? "Workflow is on" : "Workflow is off"}
             </span>
             <Switch checked={status === "on"} onCheckedChange={handleStatusChange} />
           </div>
-          <div className="flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5">
-            <span className="text-sm text-muted-foreground">
+          <div className="bg-muted/50 flex items-center gap-2 rounded-full px-3 py-1.5">
+            <span className="text-muted-foreground text-sm">
               {autoApprove ? "Auto-approve on" : "Auto-approve off"}
             </span>
             <Switch checked={autoApprove} onCheckedChange={handleAutoApproveChange} />
@@ -415,7 +415,7 @@ export default function WorkflowEditorPage() {
       )}
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <section className="rounded-xl bg-card/20 p-5 md:p-6">
+        <section className="bg-card/20 rounded-xl p-5 md:p-6">
           <div className="space-y-8">
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -459,7 +459,7 @@ export default function WorkflowEditorPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Frequency</label>
                       <Select value={scheduleType} onValueChange={handleScheduleTypeChange}>
-                        <SelectTrigger className="h-10 w-full bg-background">
+                        <SelectTrigger className="bg-background h-10 w-full">
                           <SelectValue placeholder="Select frequency" />
                         </SelectTrigger>
                         <SelectContent>
@@ -479,11 +479,11 @@ export default function WorkflowEditorPage() {
                             type="number"
                             min={1}
                             max={168}
-                            className="h-10 w-24 rounded-md border bg-background px-3 text-sm"
+                            className="bg-background h-10 w-24 rounded-md border px-3 text-sm"
                             value={Math.max(1, Math.round(intervalMinutes / 60))}
                             onChange={handleIntervalHoursChange}
                           />
-                          <span className="text-sm text-muted-foreground">hours</span>
+                          <span className="text-muted-foreground text-sm">hours</span>
                         </div>
                       </div>
                     )}
@@ -498,7 +498,7 @@ export default function WorkflowEditorPage() {
                           step={60}
                           value={scheduleTime}
                           onChange={handleScheduleTimeChange}
-                          className="h-10 w-36 bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                          className="bg-background h-10 w-36 appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                         />
                       </div>
                     )}
@@ -534,7 +534,7 @@ export default function WorkflowEditorPage() {
                           value={String(scheduleDayOfMonth)}
                           onValueChange={handleScheduleDayOfMonthChange}
                         >
-                          <SelectTrigger className="h-10 w-24 bg-background">
+                          <SelectTrigger className="bg-background h-10 w-24">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -565,16 +565,16 @@ export default function WorkflowEditorPage() {
               <div className="flex items-center justify-between gap-3">
                 <label className="text-sm font-medium">Allowed tools</label>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">All tools allowed</span>
+                  <span className="text-muted-foreground text-sm">All tools allowed</span>
                   <Switch checked={!restrictTools} onCheckedChange={handleRestrictToolsChange} />
                 </div>
               </div>
               {!restrictTools ? (
-                <p className="text-sm text-muted-foreground">All tools are allowed.</p>
+                <p className="text-muted-foreground text-sm">All tools are allowed.</p>
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       {allowedIntegrations.length}/{allIntegrationTypes.length} selected
                     </p>
                     <div className="flex items-center gap-2">
@@ -645,11 +645,11 @@ export default function WorkflowEditorPage() {
           </div>
         </section>
 
-        <aside className="rounded-xl bg-card/20 p-5 md:p-6 xl:sticky xl:top-6">
+        <aside className="bg-card/20 rounded-xl p-5 md:p-6 xl:sticky xl:top-6">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold">Recent runs</h3>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Latest workflow runs and their status.
               </p>
             </div>
@@ -664,15 +664,15 @@ export default function WorkflowEditorPage() {
                 <Link
                   key={run.id}
                   href={`/workflows/runs/${run.id}`}
-                  className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+                  className="bg-muted/30 hover:bg-muted/50 flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors"
                 >
                   <span>{getWorkflowRunStatusLabel(run.status)}</span>
-                  <span className="text-xs text-muted-foreground">{formatDate(run.startedAt)}</span>
+                  <span className="text-muted-foreground text-xs">{formatDate(run.startedAt)}</span>
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No runs yet.</p>
+            <p className="text-muted-foreground text-sm">No runs yet.</p>
           )}
         </aside>
       </div>

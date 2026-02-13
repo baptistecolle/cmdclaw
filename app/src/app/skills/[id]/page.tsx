@@ -697,7 +697,7 @@ function SkillEditorPageContent() {
       {/* Skill copilot dual panel is disabled until it is ready. */}
       <div className="flex h-full min-h-0 flex-col p-4 md:p-6">
         {/* Header with back button and delete */}
-        <div className="mb-6 flex items-center justify-between shrink-0">
+        <div className="mb-6 flex shrink-0 items-center justify-between">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/skills">
               <ArrowLeft className="h-4 w-4" />
@@ -745,18 +745,18 @@ function SkillEditorPageContent() {
         </div>
 
         {/* Notion-style inline editable metadata */}
-        <div className="mb-6 space-y-2 shrink-0">
+        <div className="mb-6 shrink-0 space-y-2">
           {/* Icon and Display Name */}
           <div className="flex items-start gap-3">
             <IconPicker value={skillIcon} onChange={setSkillIcon}>
               <button
                 type="button"
-                className="flex h-12 w-12 items-center justify-center rounded-lg border bg-muted hover:bg-muted/80 transition-colors shrink-0"
+                className="bg-muted hover:bg-muted/80 flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border transition-colors"
               >
                 {skillIcon ? (
                   <span className="text-2xl">{skillIcon}</span>
                 ) : (
-                  <FileText className="h-6 w-6 text-muted-foreground" />
+                  <FileText className="text-muted-foreground h-6 w-6" />
                 )}
               </button>
             </IconPicker>
@@ -766,7 +766,7 @@ function SkillEditorPageContent() {
               value={skillDisplayName}
               onChange={handleDisplayNameInputChange}
               placeholder="Untitled Skill"
-              className="w-full bg-transparent text-3xl font-bold outline-none placeholder:text-muted-foreground/50 focus:outline-none pt-1"
+              className="placeholder:text-muted-foreground/50 w-full bg-transparent pt-1 text-3xl font-bold outline-none focus:outline-none"
             />
           </div>
 
@@ -780,13 +780,13 @@ function SkillEditorPageContent() {
                 onChange={handleSlugInputChange}
                 onBlur={handleStopEditingSlug}
                 onKeyDown={handleSlugInputKeyDown}
-                className="h-6 bg-transparent font-mono text-xs text-muted-foreground outline-none"
+                className="text-muted-foreground h-6 bg-transparent font-mono text-xs outline-none"
                 autoFocus
               />
             ) : (
               <button
                 onClick={handleStartEditingSlug}
-                className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                className="group text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
               >
                 <span className="font-mono">{skillSlug || "skill-slug"}</span>
                 <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100" />
@@ -804,13 +804,13 @@ function SkillEditorPageContent() {
               onBlur={handleStopEditingDescription}
               onKeyDown={handleDescriptionInputKeyDown}
               placeholder="Add a description..."
-              className="w-full bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/50"
+              className="text-muted-foreground placeholder:text-muted-foreground/50 w-full bg-transparent text-sm outline-none"
               autoFocus
             />
           ) : (
             <button
               onClick={handleStartEditingDescription}
-              className="text-left text-sm text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground text-left text-sm"
             >
               {skillDescription || (
                 <span className="text-muted-foreground/50">Add a description...</span>
@@ -820,7 +820,7 @@ function SkillEditorPageContent() {
         </div>
 
         {/* File tabs - subtle style, above editor */}
-        <div className="mb-3 flex items-center gap-1 border-b border-border/50 shrink-0">
+        <div className="border-border/50 mb-3 flex shrink-0 items-center gap-1 border-b">
           {/* Text files */}
           {skill.files
             .toSorted((a, b) => {
@@ -851,7 +851,7 @@ function SkillEditorPageContent() {
                     data-file-id={file.id}
                     data-file-path={file.path}
                     onClick={handlePromptDeleteFile}
-                    className="ml-0.5 rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
+                    className="hover:bg-muted ml-0.5 rounded p-0.5 opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 className="h-2.5 w-2.5" />
                   </button>
@@ -879,7 +879,7 @@ function SkillEditorPageContent() {
                   data-doc-id={doc.id}
                   data-doc-filename={doc.filename}
                   onClick={handlePromptDeleteDocument}
-                  className="ml-0.5 rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
+                  className="hover:bg-muted ml-0.5 rounded p-0.5 opacity-0 group-hover:opacity-100"
                 >
                   <Trash2 className="h-2.5 w-2.5" />
                 </button>
@@ -888,7 +888,7 @@ function SkillEditorPageContent() {
           })}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+              <button className="text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1.5 text-xs">
                 <Plus className="h-3 w-3" />
               </button>
             </DropdownMenuTrigger>
@@ -948,7 +948,7 @@ function SkillEditorPageContent() {
 
         {/* Add file input */}
         {showAddFile && (
-          <div className="mb-4 flex items-center gap-2 shrink-0">
+          <div className="mb-4 flex shrink-0 items-center gap-2">
             <Input
               placeholder="filename.md"
               value={newFilePath}
@@ -967,7 +967,7 @@ function SkillEditorPageContent() {
         )}
 
         {/* Editor/Content area */}
-        <div className="flex-1 min-h-0">
+        <div className="min-h-0 flex-1">
           {selectedFile && !selectedDocumentId && (
             <>
               {isSkillMd && editorMode === "rich" ? (
@@ -981,7 +981,7 @@ function SkillEditorPageContent() {
                 <textarea
                   value={serializeSkillContent(skillSlug, skillDescription, skillBody)}
                   onChange={handleMarkdownChange}
-                  className="h-full w-full rounded-lg border bg-background p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                  className="bg-background focus:ring-ring h-full w-full resize-none rounded-lg border p-4 font-mono text-sm focus:ring-2 focus:outline-none"
                   placeholder="---
 name: skill-name
 description: What this skill does
@@ -1031,7 +1031,7 @@ Add your skill instructions here..."
                 }
                 if (selectedDoc.mimeType.startsWith("image/")) {
                   return (
-                    <div className="flex h-full items-center justify-center overflow-auto rounded-lg border bg-muted/30 p-4">
+                    <div className="bg-muted/30 flex h-full items-center justify-center overflow-auto rounded-lg border p-4">
                       <NextImage
                         src={documentUrl}
                         alt={selectedDoc.filename}
@@ -1048,11 +1048,11 @@ Add your skill instructions here..."
               // Non-viewable document - show download prompt
               const Icon = getDocumentIcon(selectedDoc.mimeType);
               return (
-                <div className="flex h-full flex-col items-center justify-center gap-4 rounded-lg border bg-muted/30">
-                  <Icon className="h-16 w-16 text-muted-foreground" />
+                <div className="bg-muted/30 flex h-full flex-col items-center justify-center gap-4 rounded-lg border">
+                  <Icon className="text-muted-foreground h-16 w-16" />
                   <div className="text-center">
                     <p className="font-medium">{selectedDoc.filename}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       {formatFileSize(selectedDoc.sizeBytes)}
                     </p>
                   </div>
@@ -1068,9 +1068,9 @@ Add your skill instructions here..."
         {/* Delete document confirmation modal */}
         {documentToDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="mx-4 w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
+            <div className="bg-background mx-4 w-full max-w-sm rounded-lg border p-6 shadow-lg">
               <h3 className="text-lg font-semibold">Delete document</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="text-muted-foreground mt-2 text-sm">
                 Are you sure you want to delete &quot;{documentToDelete.filename}&quot;? This action
                 cannot be undone.
               </p>
@@ -1089,9 +1089,9 @@ Add your skill instructions here..."
         {/* Delete file confirmation modal */}
         {fileToDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="mx-4 w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
+            <div className="bg-background mx-4 w-full max-w-sm rounded-lg border p-6 shadow-lg">
               <h3 className="text-lg font-semibold">Delete file</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="text-muted-foreground mt-2 text-sm">
                 Are you sure you want to delete &quot;{fileToDelete.path}
                 &quot;? This action cannot be undone.
               </p>

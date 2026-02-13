@@ -309,7 +309,7 @@ function CustomIntegrationDeleteButton({
 
   return (
     <Button variant="ghost" size="sm" onClick={handleClick}>
-      <Trash2 className="h-4 w-4 text-destructive" />
+      <Trash2 className="text-destructive h-4 w-4" />
     </Button>
   );
 }
@@ -711,7 +711,7 @@ function IntegrationsPageContent() {
     <div>
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Integrations</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Connect your accounts to let the AI assistant help you with tasks.
         </p>
       </div>
@@ -735,7 +735,7 @@ function IntegrationsPageContent() {
       )}
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-1 rounded-lg bg-muted p-1">
+        <div className="bg-muted flex gap-1 rounded-lg p-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -764,7 +764,7 @@ function IntegrationsPageContent() {
         </div>
 
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder="Search integrations..."
             value={searchQuery}
@@ -775,9 +775,9 @@ function IntegrationsPageContent() {
       </div>
 
       {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading integrations...</div>
+        <div className="text-muted-foreground text-sm">Loading integrations...</div>
       ) : filteredIntegrations.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">
+        <div className="text-muted-foreground py-8 text-center text-sm">
           {searchQuery
             ? "No integrations found matching your search."
             : activeTab === "connected"
@@ -795,7 +795,7 @@ function IntegrationsPageContent() {
             const actions = isWhatsApp ? [] : getIntegrationActions(type);
 
             return (
-              <div key={type} className="rounded-lg border overflow-hidden">
+              <div key={type} className="overflow-hidden rounded-lg border">
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                     <div
@@ -809,16 +809,16 @@ function IntegrationsPageContent() {
                     <div className="min-w-0">
                       <h3 className="font-medium">{config.name}</h3>
                       {integration ? (
-                        <p className="truncate text-sm text-muted-foreground">
+                        <p className="text-muted-foreground truncate text-sm">
                           Connected as{" "}
                           <span className="font-medium">{integration.displayName}</span>
                         </p>
                       ) : isWhatsAppConnected ? (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-muted-foreground text-sm">
                           Bridge is connected. Open to manage QR/linking.
                         </p>
                       ) : (
-                        <p className="text-sm text-muted-foreground">{config.description}</p>
+                        <p className="text-muted-foreground text-sm">{config.description}</p>
                       )}
                     </div>
                   </div>
@@ -882,8 +882,8 @@ function IntegrationsPageContent() {
                 >
                   <div className="overflow-hidden">
                     {actions.length > 0 && (
-                      <div className="border-t px-4 py-3 bg-muted/30">
-                        <p className="text-xs text-muted-foreground mb-2">Available actions:</p>
+                      <div className="bg-muted/30 border-t px-4 py-3">
+                        <p className="text-muted-foreground mb-2 text-xs">Available actions:</p>
                         <div className="flex flex-wrap gap-2">
                           {actions.map((action) => (
                             <span
@@ -909,7 +909,7 @@ function IntegrationsPageContent() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Custom Integrations</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-sm">
               Add your own API integrations with custom credentials.
             </p>
           </div>
@@ -922,10 +922,10 @@ function IntegrationsPageContent() {
         {customIntegrations && customIntegrations.length > 0 ? (
           <div className="space-y-4">
             {customIntegrations.map((ci) => (
-              <div key={ci.id} className="rounded-lg border overflow-hidden">
+              <div key={ci.id} className="overflow-hidden rounded-lg border">
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                    <div className="flex shrink-0 items-center justify-center rounded-lg p-2 shadow-sm border bg-white dark:bg-gray-800">
+                    <div className="flex shrink-0 items-center justify-center rounded-lg border bg-white p-2 shadow-sm dark:bg-gray-800">
                       {ci.iconUrl ? (
                         <Image src={ci.iconUrl} alt={ci.name} width={24} height={24} />
                       ) : (
@@ -934,7 +934,7 @@ function IntegrationsPageContent() {
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-medium">{ci.name}</h3>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-muted-foreground text-sm">
                         {ci.connected ? (
                           <>
                             Connected
@@ -983,7 +983,7 @@ function IntegrationsPageContent() {
                         onConnect={handleConnectCustomOAuth}
                       />
                     ) : (
-                      <span className="text-xs text-muted-foreground">Credentials saved</span>
+                      <span className="text-muted-foreground text-xs">Credentials saved</span>
                     )}
                     {!ci.isBuiltIn && (
                       <CustomIntegrationDeleteButton
@@ -997,7 +997,7 @@ function IntegrationsPageContent() {
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-sm text-muted-foreground">
+          <div className="text-muted-foreground py-8 text-center text-sm">
             No custom integrations yet. Click &quot;Add Custom&quot; to create one.
           </div>
         )}
@@ -1010,11 +1010,11 @@ function IntegrationsPageContent() {
           onClick={handleHideAddCustom}
         >
           <div
-            className="w-full max-w-lg rounded-lg bg-background p-6 shadow-xl"
+            className="bg-background w-full max-w-lg rounded-lg p-6 shadow-xl"
             onClick={handleDialogContentClick}
           >
             <h3 className="mb-4 text-lg font-semibold">Add Custom Integration</h3>
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto">
               <div>
                 <label className="text-sm font-medium">Slug</label>
                 <Input
@@ -1050,7 +1050,7 @@ function IntegrationsPageContent() {
               <div>
                 <label className="text-sm font-medium">Auth Type</label>
                 <select
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  className="bg-background w-full rounded-md border px-3 py-2 text-sm"
                   value={customForm.authType}
                   onChange={handleCustomAuthTypeChange}
                 >

@@ -18,13 +18,13 @@ function GmailSendPreview({ args }: { args: Record<string, string | undefined> }
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="gmail" size={16} />
         <span className="text-sm font-medium">Send Email</span>
       </div>
 
       {/* Email header style */}
-      <div className="rounded-t border border-b-0 bg-muted/50 p-3 text-sm">
+      <div className="bg-muted/50 rounded-t border border-b-0 p-3 text-sm">
         <div className="grid grid-cols-[60px_1fr] gap-1">
           <span className="text-muted-foreground">To:</span>
           <span className="font-medium">{to || "—"}</span>
@@ -49,7 +49,7 @@ function GmailSendPreview({ args }: { args: Record<string, string | undefined> }
       </div>
 
       {/* Email body */}
-      <div className="rounded-b border bg-background p-3">
+      <div className="bg-background rounded-b border p-3">
         <div className="text-sm whitespace-pre-wrap">{body || "(no content)"}</div>
       </div>
     </div>

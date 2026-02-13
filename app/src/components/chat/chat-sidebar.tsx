@@ -77,7 +77,7 @@ export function ChatSidebar() {
       <SidebarHeader>
         <Button
           variant="outline"
-          className="w-full justify-start gap-2 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+          className="w-full justify-start gap-2 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
           onClick={handleCreateNewChat}
         >
           <Plus className="h-4 w-4 shrink-0" />
@@ -91,9 +91,9 @@ export function ChatSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {isLoading ? (
-                <div className="px-2 py-4 text-sm text-muted-foreground">Loading...</div>
+                <div className="text-muted-foreground px-2 py-4 text-sm">Loading...</div>
               ) : data?.conversations.length === 0 ? (
-                <div className="px-2 py-4 text-sm text-muted-foreground">No conversations yet</div>
+                <div className="text-muted-foreground px-2 py-4 text-sm">No conversations yet</div>
               ) : (
                 data?.conversations.map((conv) => (
                   <SidebarMenuItem key={conv.id}>
@@ -109,7 +109,7 @@ export function ChatSidebar() {
                         className="flex min-w-0 flex-1 flex-col items-start gap-0.5"
                       >
                         <span className="w-full truncate">{conv.title || "Untitled"}</span>
-                        <span className="w-full truncate text-xs text-muted-foreground">
+                        <span className="text-muted-foreground w-full truncate text-xs">
                           {formatDistanceToNow(new Date(conv.updatedAt), {
                             addSuffix: true,
                           })}
@@ -120,7 +120,7 @@ export function ChatSidebar() {
                       <DropdownMenuTrigger asChild>
                         <SidebarMenuAction
                           showOnHover
-                          className="focus:ring-0 focus:outline-none focus-visible:ring-0 border-0 data-[state=open]:bg-transparent"
+                          className="border-0 focus:ring-0 focus:outline-none focus-visible:ring-0 data-[state=open]:bg-transparent"
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </SidebarMenuAction>

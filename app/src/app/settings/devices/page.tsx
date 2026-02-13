@@ -79,7 +79,7 @@ export default function DevicesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -88,7 +88,7 @@ export default function DevicesPage() {
     <div>
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Connected Devices</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Manage devices running the Bap daemon. Devices can execute commands and proxy local LLM
           requests.
         </p>
@@ -96,12 +96,12 @@ export default function DevicesPage() {
 
       {devices.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
-          <Monitor className="mx-auto h-10 w-10 text-muted-foreground/50" />
+          <Monitor className="text-muted-foreground/50 mx-auto h-10 w-10" />
           <h3 className="mt-3 text-sm font-medium">No devices connected</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Install the Bap daemon on your machine to connect it as a compute backend.
           </p>
-          <pre className="mx-auto mt-4 w-fit rounded bg-muted px-4 py-2 text-sm font-mono">
+          <pre className="bg-muted mx-auto mt-4 w-fit rounded px-4 py-2 font-mono text-sm">
             curl -fsSL https://heybap.com/i | sh
           </pre>
         </div>
@@ -113,8 +113,8 @@ export default function DevicesPage() {
               className="flex items-center justify-between rounded-lg border p-4"
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                  <Monitor className="h-5 w-5 text-muted-foreground" />
+                <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
+                  <Monitor className="text-muted-foreground h-5 w-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -125,13 +125,13 @@ export default function DevicesPage() {
                         Online
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="text-muted-foreground flex items-center gap-1 text-xs">
                         <WifiOff className="h-3 w-3" />
                         Offline
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-muted-foreground text-xs">
                     {device.platform}
                     {device.lastSeenAt && !device.isOnline && (
                       <> &middot; Last seen {new Date(device.lastSeenAt).toLocaleDateString()}</>

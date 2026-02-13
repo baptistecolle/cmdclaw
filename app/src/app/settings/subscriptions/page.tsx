@@ -250,7 +250,7 @@ export default function SubscriptionsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -264,7 +264,7 @@ export default function SubscriptionsPage() {
       </Suspense>
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Subscriptions</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Connect your existing AI subscriptions to use additional models in Bap.
         </p>
       </div>
@@ -313,9 +313,9 @@ export default function SubscriptionsPage() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{provider.description}</p>
+                  <p className="text-muted-foreground mt-1 text-sm">{provider.description}</p>
                   {provider.authType === "api_key" && provider.apiKeyHelp ? (
-                    <p className="mt-1 text-xs text-muted-foreground">{provider.apiKeyHelp}</p>
+                    <p className="text-muted-foreground mt-1 text-xs">{provider.apiKeyHelp}</p>
                   ) : null}
                 </div>
 
@@ -335,7 +335,7 @@ export default function SubscriptionsPage() {
         })}
       </div>
 
-      <div className="mt-6 rounded-lg border border-muted bg-muted/30 p-4">
+      <div className="border-muted bg-muted/30 mt-6 rounded-lg border p-4">
         <div className="flex items-start gap-2">
           <Image
             src="/integrations/anthropic.svg"
@@ -344,7 +344,7 @@ export default function SubscriptionsPage() {
             height={16}
             className="mt-0.5 h-4 w-auto shrink-0 dark:invert"
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Anthropic models (Claude) are always available through Bap&apos;s platform. Connecting a
             subscription gives you access to additional models from that provider.
           </p>

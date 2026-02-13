@@ -21,11 +21,11 @@ export function ThinkingPartDisplay({ content, isStreaming, defaultExpanded = fa
   const preview = firstLine.slice(0, 80) + (firstLine.length > 80 ? "..." : "");
 
   return (
-    <div className="rounded-lg border border-muted-foreground/20 bg-muted/50">
+    <div className="border-muted-foreground/20 bg-muted/50 rounded-lg border">
       {/* Header - always visible */}
       <button
         onClick={handleToggleExpanded}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/80 transition-colors"
+        className="text-muted-foreground hover:bg-muted/80 flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
       >
         <ChevronRight
           className={cn(
@@ -39,9 +39,9 @@ export function ThinkingPartDisplay({ content, isStreaming, defaultExpanded = fa
           <div className="flex items-center gap-2">
             <span className="italic">Thinking</span>
             <div className="flex gap-1">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50" />
+              <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
+              <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
+              <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full" />
             </div>
           </div>
         ) : (
@@ -53,10 +53,10 @@ export function ThinkingPartDisplay({ content, isStreaming, defaultExpanded = fa
 
       {/* Content - collapsible */}
       {isExpanded && (
-        <div className="border-t border-muted-foreground/20 px-3 py-2">
-          <p className="whitespace-pre-wrap text-sm text-muted-foreground italic">{content}</p>
+        <div className="border-muted-foreground/20 border-t px-3 py-2">
+          <p className="text-muted-foreground text-sm whitespace-pre-wrap italic">{content}</p>
           {isStreaming && (
-            <span className="inline-block h-4 w-1 animate-pulse bg-muted-foreground/50" />
+            <span className="bg-muted-foreground/50 inline-block h-4 w-1 animate-pulse" />
           )}
         </div>
       )}

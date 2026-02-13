@@ -159,8 +159,8 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
   );
   const slotAfter = useMemo(
     () => (
-      <EditorCommand className="z-50 h-auto max-h-[330px] overflow-y-auto rounded-md border bg-background px-1 py-2 shadow-md">
-        <EditorCommandEmpty className="px-2 text-sm text-muted-foreground">
+      <EditorCommand className="bg-background z-50 h-auto max-h-[330px] overflow-y-auto rounded-md border px-1 py-2 shadow-md">
+        <EditorCommandEmpty className="text-muted-foreground px-2 text-sm">
           No results
         </EditorCommandEmpty>
         <EditorCommandList>
@@ -169,14 +169,14 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
               key={item.title}
               value={item.title}
               onCommand={item.command}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer aria-selected:bg-accent"
+              className="hover:bg-accent aria-selected:bg-accent flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
+              <div className="bg-background flex h-10 w-10 items-center justify-center rounded-md border">
                 {item.icon}
               </div>
               <div>
                 <p className="font-medium">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{item.description}</p>
+                <p className="text-muted-foreground text-xs">{item.description}</p>
               </div>
             </EditorCommandItem>
           ))}
@@ -220,17 +220,17 @@ export function SkillEditor({ content, onChange, editorKey, className }: SkillEd
         onUpdate={handleEditorUpdate}
         slotAfter={slotAfter}
       >
-        <EditorBubble className="flex w-fit max-w-[90vw] overflow-hidden rounded-md border bg-background shadow-xl">
-          <EditorBubbleItem onSelect={handleSelectBold} className="p-2 hover:bg-accent">
+        <EditorBubble className="bg-background flex w-fit max-w-[90vw] overflow-hidden rounded-md border shadow-xl">
+          <EditorBubbleItem onSelect={handleSelectBold} className="hover:bg-accent p-2">
             <Bold className="h-4 w-4" />
           </EditorBubbleItem>
-          <EditorBubbleItem onSelect={handleSelectItalic} className="p-2 hover:bg-accent">
+          <EditorBubbleItem onSelect={handleSelectItalic} className="hover:bg-accent p-2">
             <Italic className="h-4 w-4" />
           </EditorBubbleItem>
-          <EditorBubbleItem onSelect={handleSelectStrike} className="p-2 hover:bg-accent">
+          <EditorBubbleItem onSelect={handleSelectStrike} className="hover:bg-accent p-2">
             <Strikethrough className="h-4 w-4" />
           </EditorBubbleItem>
-          <EditorBubbleItem onSelect={handleSelectCode} className="p-2 hover:bg-accent">
+          <EditorBubbleItem onSelect={handleSelectCode} className="hover:bg-accent p-2">
             <Code className="h-4 w-4" />
           </EditorBubbleItem>
         </EditorBubble>

@@ -42,7 +42,7 @@ function AppleIcon() {
 
 function LastUsedBadge() {
   return (
-    <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+    <span className="bg-muted text-muted-foreground ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium">
       Last used
     </span>
   );
@@ -50,11 +50,11 @@ function LastUsedBadge() {
 
 function LoginLoadingCard() {
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
+    <div className="bg-card mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border p-6 shadow-sm">
       <div className="space-y-1 text-center">
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Bap</p>
+        <p className="text-muted-foreground text-xs font-medium tracking-[0.14em] uppercase">Bap</p>
         <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground text-sm">Loading...</p>
       </div>
     </div>
   );
@@ -156,11 +156,11 @@ function LoginContent() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm">
+    <div className="bg-card mx-auto flex w-full max-w-lg flex-col gap-6 rounded-2xl border p-6 shadow-sm">
       <div className="space-y-1 text-center">
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Bap</p>
+        <p className="text-muted-foreground text-xs font-medium tracking-[0.14em] uppercase">Bap</p>
         <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-        <p className="text-sm text-muted-foreground">Enter your email to get a magic link.</p>
+        <p className="text-muted-foreground text-sm">Enter your email to get a magic link.</p>
       </div>
 
       <div className="space-y-4">
@@ -182,12 +182,12 @@ function LoginContent() {
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+            <span className="bg-card text-muted-foreground px-2">Or continue with</span>
           </div>
         </div>
 
         <form onSubmit={requestMagicLink} className="space-y-3">
-          <label className="text-sm font-medium text-muted-foreground" htmlFor="email">
+          <label className="text-muted-foreground text-sm font-medium" htmlFor="email">
             Email
           </label>
           <Input
@@ -216,7 +216,7 @@ function LoginContent() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-xl border p-3 text-sm">
           {error}
         </div>
       )}
@@ -226,7 +226,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-background px-4 py-12 flex items-center justify-center">
+    <div className="bg-background flex min-h-screen items-center justify-center px-4 py-12">
       <Suspense fallback={loginFallbackNode}>
         <LoginContent />
       </Suspense>

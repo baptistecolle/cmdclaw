@@ -72,8 +72,8 @@ const otherIntegrations: IntegrationType[] = [
 
 function OnboardingIntegrationsFallback() {
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    <div className="flex min-h-screen items-center justify-center">
+      <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
     </div>
   );
 }
@@ -115,24 +115,24 @@ function IntegrationIconButton({
     >
       {isConnected && (
         <div className="absolute -top-1.5 -right-1.5">
-          <CheckCircle2 className="h-5 w-5 text-green-500 fill-background" />
+          <CheckCircle2 className="fill-background h-5 w-5 text-green-500" />
         </div>
       )}
       {isRecommended && !isConnected && (
-        <span className="text-[10px] font-medium text-primary">Recommended</span>
+        <span className="text-primary text-[10px] font-medium">Recommended</span>
       )}
       {isConnecting ? (
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
       ) : isRecommended ? (
-        <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-white dark:bg-gray-800 border shadow-sm">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg border bg-white shadow-sm dark:bg-gray-800">
           <Image src={config.icon} alt={config.name} width={32} height={32} />
         </div>
       ) : (
-        <div className="flex items-center justify-center w-8 h-8">
+        <div className="flex h-8 w-8 items-center justify-center">
           <Image src={config.icon} alt={config.name} width={32} height={32} />
         </div>
       )}
-      <span className="text-xs font-medium text-muted-foreground">{config.name}</span>
+      <span className="text-muted-foreground text-xs font-medium">{config.name}</span>
     </button>
   );
 }
@@ -212,18 +212,18 @@ function OnboardingIntegrationsContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="bg-background flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight mb-2">Connect your tools</h1>
+        <div className="mb-8 text-center">
+          <h1 className="mb-2 text-2xl font-semibold tracking-tight">Connect your tools</h1>
           <p className="text-muted-foreground">
             Connect your apps to let the AI assistant help you with tasks like reading emails,
             scheduling meetings, and managing documents.
           </p>
         </div>
 
-        <div className="bg-card rounded-2xl border p-6 mb-6">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+        <div className="bg-card mb-6 rounded-2xl border p-6">
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
             {recommendedIntegrations.map((type) => (
               <IntegrationIconButton
                 key={type}
@@ -241,11 +241,11 @@ function OnboardingIntegrationsContent() {
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">More integrations</span>
+              <span className="bg-card text-muted-foreground px-2">More integrations</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+          <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
             {otherIntegrations.map((type) => (
               <IntegrationIconButton
                 key={type}
@@ -259,7 +259,7 @@ function OnboardingIntegrationsContent() {
           </div>
         </div>
 
-        <div className="flex gap-3 justify-center">
+        <div className="flex justify-center gap-3">
           <Button variant="ghost" onClick={handleSkip} disabled={completeOnboarding.isPending}>
             Skip for now
           </Button>

@@ -19,7 +19,7 @@ export default function WorkflowRunPage() {
           <div className="h-9 w-9" />
           <div>
             <h2 className="text-sm font-medium">Workflow run</h2>
-            <p className="font-mono text-xs text-muted-foreground">ID: {runId}</p>
+            <p className="text-muted-foreground font-mono text-xs">ID: {runId}</p>
           </div>
         </div>
         <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -30,7 +30,7 @@ export default function WorkflowRunPage() {
   }
 
   if (!run) {
-    return <div className="p-6 text-sm text-muted-foreground">Run not found.</div>;
+    return <div className="text-muted-foreground p-6 text-sm">Run not found.</div>;
   }
 
   if (!run.conversationId) {
@@ -44,7 +44,7 @@ export default function WorkflowRunPage() {
           </Button>
           <h2 className="text-lg font-semibold">Run details unavailable in chat view</h2>
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           This run does not have a linked conversation, so it cannot be opened in the chat
           interface.
         </p>
@@ -62,10 +62,10 @@ export default function WorkflowRunPage() {
         </Button>
         <div>
           <h2 className="text-sm font-medium">Workflow run</h2>
-          <p className="text-xs text-muted-foreground font-mono">ID: {run.id}</p>
+          <p className="text-muted-foreground font-mono text-xs">ID: {run.id}</p>
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
+      <div className="bg-background flex min-h-0 flex-1 overflow-hidden">
         <ChatArea conversationId={run.conversationId} />
       </div>
     </div>

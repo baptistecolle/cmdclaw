@@ -24,23 +24,23 @@ function NotionCreatePreview({ args }: { args: Record<string, string | undefined
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="notion" size={16} />
         <span className="text-sm font-medium">Create Page</span>
       </div>
 
       <PreviewSection>
-        <div className="rounded border bg-white dark:bg-muted/30 p-4">
-          <div className="font-medium text-lg mb-2">{title || "Untitled"}</div>
+        <div className="dark:bg-muted/30 rounded border bg-white p-4">
+          <div className="mb-2 text-lg font-medium">{title || "Untitled"}</div>
 
           {parent && (
-            <div className="text-xs text-muted-foreground mb-2">
+            <div className="text-muted-foreground mb-2 text-xs">
               In: <span className="font-mono">{parent}</span>
             </div>
           )}
 
           {content && (
-            <div className="text-sm text-muted-foreground whitespace-pre-wrap border-t pt-2 mt-2">
+            <div className="text-muted-foreground mt-2 border-t pt-2 text-sm whitespace-pre-wrap">
               {content}
             </div>
           )}
@@ -62,7 +62,7 @@ function NotionAppendPreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="notion" size={16} />
         <span className="text-sm font-medium">Append to Page</span>
       </div>

@@ -35,7 +35,7 @@ function MarkdownFileButton({
   return (
     <button onClick={handleClick} className={className}>
       {label}
-      <Download className="w-3 h-3" />
+      <Download className="h-3 w-3" />
     </button>
   );
 }
@@ -82,7 +82,7 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
               key={`${path}-${match.index}`}
               file={file}
               label={path}
-              className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+              className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
               onFileClick={onFileClick}
             />,
           );
@@ -129,7 +129,7 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
               <MarkdownFileButton
                 file={file}
                 label={children}
-                className="inline-flex items-center gap-1 bg-muted px-1 rounded text-primary hover:underline font-mono text-sm"
+                className="bg-muted text-primary inline-flex items-center gap-1 rounded px-1 font-mono text-sm hover:underline"
                 onFileClick={onFileClick}
               />
             );
@@ -144,8 +144,8 @@ export function MessageBubble({ role, content, className, sandboxFiles, onFileCl
   if (isUser) {
     return (
       <div data-testid="chat-bubble-user" className={cn("flex justify-end", className)}>
-        <div className="max-w-[80%] rounded-lg bg-primary px-4 py-2 text-primary-foreground">
-          <p className="whitespace-pre-wrap text-sm">{content}</p>
+        <div className="bg-primary text-primary-foreground max-w-[80%] rounded-lg px-4 py-2">
+          <p className="text-sm whitespace-pre-wrap">{content}</p>
         </div>
       </div>
     );

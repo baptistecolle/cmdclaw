@@ -135,7 +135,7 @@ export function ToolApprovalCard({
     >
       <button
         onClick={handleToggleExpanded}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
+        className="hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
       >
         {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         {logo ? (
@@ -145,7 +145,7 @@ export function ToolApprovalCard({
         )}
         <span className="font-medium">{displayName}</span>
         <span className="text-muted-foreground">wants to</span>
-        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{operation}</span>
+        <span className="bg-muted rounded px-1.5 py-0.5 font-mono text-xs">{operation}</span>
 
         <div className="flex-1" />
 
@@ -179,7 +179,7 @@ export function ToolApprovalCard({
             <div className="mb-3">
               <button
                 onClick={handleToggleRawCommand}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors"
               >
                 <Code className="h-3 w-3" />
                 {showRawCommand ? "Hide" : "Show"} raw command
@@ -191,7 +191,7 @@ export function ToolApprovalCard({
               </button>
 
               {showRawCommand && (
-                <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 font-mono text-xs">
+                <pre className="bg-muted mt-2 overflow-x-auto rounded p-2 font-mono text-xs">
                   {command}
                 </pre>
               )}

@@ -63,14 +63,14 @@ function ConnectDevicePageContent() {
 
   return (
     <AppShell>
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="bg-background flex min-h-screen items-center justify-center">
         <div className="w-full max-w-md px-4">
-          <div className="text-center mb-8">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-muted">
-              <Monitor className="h-7 w-7 text-muted-foreground" />
+          <div className="mb-8 text-center">
+            <div className="bg-muted mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl">
+              <Monitor className="text-muted-foreground h-7 w-7" />
             </div>
             <h1 className="text-2xl font-semibold">Connect Device</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-2 text-sm">
               Enter the code shown on your device to connect it as a compute backend.
             </p>
           </div>
@@ -95,14 +95,14 @@ function ConnectDevicePageContent() {
                   onChange={handleCodeChange}
                   placeholder="ABCD1234"
                   maxLength={12}
-                  className="text-center text-lg font-mono tracking-widest"
+                  className="text-center font-mono text-lg tracking-widest"
                   autoFocus
                   disabled={status === "submitting"}
                 />
               </div>
 
               {status === "error" && (
-                <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                <div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center gap-2 rounded-lg border p-3 text-sm">
                   <XCircle className="h-4 w-4 shrink-0" />
                   {errorMsg}
                 </div>

@@ -1191,27 +1191,27 @@ export function ChatArea({ conversationId }: Props) {
   }
 
   return (
-    <div className="flex flex-1 flex-col min-h-0">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 min-h-0"
+        className="min-h-0 flex-1 overflow-y-auto p-4"
       >
         <div className="mx-auto max-w-3xl">
           {streamError && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <div className="border-destructive/30 bg-destructive/10 text-destructive mb-4 flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
               <AlertCircle className="mt-0.5 h-4 w-4" />
               <span>{streamError}</span>
             </div>
           )}
           {messages.length === 0 && !isStreaming ? (
             <div className="flex h-[60vh] flex-col items-center justify-center gap-4 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                <MessageSquare className="h-8 w-8 text-muted-foreground" />
+              <div className="bg-muted flex h-16 w-16 items-center justify-center rounded-full">
+                <MessageSquare className="text-muted-foreground h-8 w-8" />
               </div>
               <div>
                 <h2 className="text-xl font-semibold">How can I help you?</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-sm">
                   Ask me anything or use your connected integrations
                 </p>
               </div>
@@ -1221,18 +1221,18 @@ export function ChatArea({ conversationId }: Props) {
               <MessageList messages={messages} />
 
               {(isStreaming || segments.length > 0) && (
-                <div className="py-4 space-y-4">
+                <div className="space-y-4 py-4">
                   {isStreaming && segments.length === 0 && (
-                    <div className="rounded-lg border border-border/50 bg-muted/30">
+                    <div className="border-border/50 bg-muted/30 rounded-lg border">
                       <div className="flex items-center gap-2 px-3 py-2">
-                        <Activity className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
+                        <Activity className="text-muted-foreground h-4 w-4" />
+                        <span className="text-muted-foreground text-sm">
                           {getAgentInitLabel(agentInitStatus)}
                         </span>
-                        <div className="flex gap-1 ml-auto">
-                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.3s]" />
-                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />
-                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50" />
+                        <div className="ml-auto flex gap-1">
+                          <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
+                          <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
+                          <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full" />
                         </div>
                       </div>
                     </div>
@@ -1305,7 +1305,7 @@ export function ChatArea({ conversationId }: Props) {
         </div>
       </div>
 
-      <div className="border-t bg-background p-4">
+      <div className="bg-background border-t p-4">
         <div className="mx-auto max-w-4xl space-y-2">
           {(isRecording || isProcessingVoice || voiceError) && (
             <VoiceIndicator
@@ -1345,7 +1345,7 @@ export function ChatArea({ conversationId }: Props) {
               />
               <label
                 htmlFor="auto-approve"
-                className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none"
+                className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs select-none"
               >
                 <CircleCheck className="h-3.5 w-3.5" />
                 <span>Auto-approve</span>

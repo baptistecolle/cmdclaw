@@ -39,14 +39,14 @@ function LinearCreatePreview({ args }: { args: Record<string, string | undefined
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="linear" size={16} />
         <span className="text-sm font-medium">Create Issue</span>
       </div>
 
       <PreviewSection>
-        <div className="rounded border bg-muted/30 p-3">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="bg-muted/30 rounded border p-3">
+          <div className="mb-2 flex items-center gap-2">
             <IntegrationLogo integration="linear" size={16} />
             <span className="font-medium">{title || "Untitled Issue"}</span>
             {priorityInfo && (
@@ -55,7 +55,7 @@ function LinearCreatePreview({ args }: { args: Record<string, string | undefined
           </div>
 
           {team && (
-            <div className="text-xs text-muted-foreground">
+            <div className="text-muted-foreground text-xs">
               Team: <span className="font-mono">{team}</span>
             </div>
           )}
@@ -85,7 +85,7 @@ function LinearUpdatePreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="linear" size={16} />
         <span className="text-sm font-medium">Update Issue</span>
       </div>

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mswServer } from "@/test/msw/server";
 
 function createProcedureStub() {
@@ -340,9 +340,8 @@ describe("integrationRouter", () => {
     const context = createContext();
 
     mswServer.use(
-      http.post(
-        "https://oauth.example.com/token",
-        () => HttpResponse.json({ access_token: "bot-token" }),
+      http.post("https://oauth.example.com/token", () =>
+        HttpResponse.json({ access_token: "bot-token" }),
       ),
     );
 
@@ -366,13 +365,11 @@ describe("integrationRouter", () => {
     context.mocks.insertReturningMock.mockResolvedValue([{ id: "integration-slack" }]);
 
     mswServer.use(
-      http.post(
-        "https://oauth.example.com/token",
-        () =>
-          HttpResponse.json({
-            authed_user: { access_token: "slack-user-token" },
-            refresh_token: "slack-refresh",
-          }),
+      http.post("https://oauth.example.com/token", () =>
+        HttpResponse.json({
+          authed_user: { access_token: "slack-user-token" },
+          refresh_token: "slack-refresh",
+        }),
       ),
     );
 
@@ -401,13 +398,11 @@ describe("integrationRouter", () => {
     });
 
     mswServer.use(
-      http.post(
-        "https://oauth.example.com/token",
-        () =>
-          HttpResponse.json({
-            access_token: "access-token",
-            refresh_token: "refresh-token",
-          }),
+      http.post("https://oauth.example.com/token", () =>
+        HttpResponse.json({
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+        }),
       ),
     );
 
@@ -438,13 +433,11 @@ describe("integrationRouter", () => {
     context.mocks.insertReturningMock.mockResolvedValue([{ id: "integration-new" }]);
 
     mswServer.use(
-      http.post(
-        "https://oauth.example.com/token",
-        () =>
-          HttpResponse.json({
-            access_token: "access-token",
-            refresh_token: "refresh-token",
-          }),
+      http.post("https://oauth.example.com/token", () =>
+        HttpResponse.json({
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+        }),
       ),
     );
 

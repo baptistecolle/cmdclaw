@@ -91,7 +91,7 @@ function SkillsPageContent() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Skills</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Create custom skills to teach the AI agent new capabilities.
           </p>
         </div>
@@ -129,9 +129,9 @@ function SkillsPageContent() {
         </div>
       ) : skillsList.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
-          <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
+          <FileText className="text-muted-foreground/50 mx-auto h-12 w-12" />
           <h3 className="mt-4 text-lg font-medium">No skills yet</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Create your first skill to teach the AI agent new capabilities.
           </p>
           <Button className="mt-4" onClick={handleCreate} disabled={isCreating}>
@@ -153,8 +153,8 @@ function SkillsPageContent() {
                 </div>
                 <div>
                   <h3 className="font-medium">{skill.displayName}</h3>
-                  <p className="text-xs text-muted-foreground font-mono">{skill.name}</p>
-                  <p className="text-sm text-muted-foreground line-clamp-1">{skill.description}</p>
+                  <p className="text-muted-foreground font-mono text-xs">{skill.name}</p>
+                  <p className="text-muted-foreground line-clamp-1 text-sm">{skill.description}</p>
                 </div>
               </div>
 

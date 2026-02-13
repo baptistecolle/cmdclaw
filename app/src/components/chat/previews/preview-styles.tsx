@@ -79,7 +79,7 @@ export function PreviewField({ label, value, mono, className }: PreviewFieldProp
 
   return (
     <div className={cn("mb-2", className)}>
-      <span className="text-xs font-medium text-muted-foreground">{label}: </span>
+      <span className="text-muted-foreground text-xs font-medium">{label}: </span>
       <span className={cn("text-sm", mono && "font-mono")}>{value}</span>
     </div>
   );
@@ -94,7 +94,7 @@ interface PreviewSectionProps {
 export function PreviewSection({ title, children, className }: PreviewSectionProps) {
   return (
     <div className={cn("mb-3", className)}>
-      {title && <p className="text-xs font-medium text-muted-foreground mb-1">{title}</p>}
+      {title && <p className="text-muted-foreground mb-1 text-xs font-medium">{title}</p>}
       {children}
     </div>
   );

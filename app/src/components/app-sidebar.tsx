@@ -203,7 +203,7 @@ export function AppSidebar() {
               </Button>
               {reportAttachment && (
                 <>
-                  <span className="max-w-[180px] truncate text-xs text-muted-foreground">
+                  <span className="text-muted-foreground max-w-[180px] truncate text-xs">
                     {reportAttachment.name}
                   </span>
                   <Button type="button" variant="ghost" onClick={clearAttachment}>
@@ -212,7 +212,7 @@ export function AppSidebar() {
                 </>
               )}
             </div>
-            {reportError && <p className="mt-2 text-xs text-destructive">{reportError}</p>}
+            {reportError && <p className="text-destructive mt-2 text-xs">{reportError}</p>}
           </div>
           <SheetFooter className="border-t">
             <Button variant="outline" onClick={closeReportSheet} disabled={isSubmittingReport}>
@@ -225,7 +225,7 @@ export function AppSidebar() {
         </SheetContent>
       </Sheet>
 
-      <div className="flex h-screen w-14 flex-col items-center border-r bg-sidebar py-3 shrink-0">
+      <div className="bg-sidebar flex h-screen w-14 shrink-0 flex-col items-center border-r py-3">
         {/* Logo */}
         <Link
           href="/chat"
@@ -301,7 +301,7 @@ export function AppSidebar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground hover:ring-2 hover:ring-sidebar-accent-foreground/20 transition-all"
+              className="bg-sidebar-accent text-sidebar-accent-foreground hover:ring-sidebar-accent-foreground/20 flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all hover:ring-2"
               title={userEmail}
             >
               {avatarInitial}
@@ -311,7 +311,7 @@ export function AppSidebar() {
             {userEmail && (
               <>
                 <DropdownMenuLabel className="font-normal">
-                  <span className="text-xs text-muted-foreground">{userEmail}</span>
+                  <span className="text-muted-foreground text-xs">{userEmail}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
               </>

@@ -8,7 +8,7 @@ export function GenericPreview({ operation, args, positionalArgs }: PreviewProps
   if (!hasArgs && !hasPositional) {
     return (
       <PreviewSection>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Operation: <span className="font-mono">{operation}</span>
         </p>
       </PreviewSection>
@@ -22,7 +22,7 @@ export function GenericPreview({ operation, args, positionalArgs }: PreviewProps
           {positionalArgs.map((arg) => (
             <span
               key={arg}
-              className="inline-block mr-2 mb-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs"
+              className="bg-muted mr-2 mb-1 inline-block rounded px-1.5 py-0.5 font-mono text-xs"
             >
               {arg}
             </span>

@@ -160,14 +160,14 @@ export default function SettingsPage() {
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
       </div>
     );
   }
 
   if (status === "error" || !user) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+      <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-4 text-sm">
         Unable to load your account. Please try again.
       </div>
     );
@@ -177,7 +177,7 @@ export default function SettingsPage() {
     <div>
       <div className="mb-6">
         <h2 className="text-xl font-semibold">General Settings</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Manage your account information.</p>
+        <p className="text-muted-foreground mt-1 text-sm">Manage your account information.</p>
       </div>
 
       {notification && (
@@ -199,7 +199,7 @@ export default function SettingsPage() {
           <div>
             <label className="mb-2 block text-sm font-medium">Email</label>
             <Input type="email" value={user.email} disabled className="bg-muted/50" />
-            <p className="mt-1 text-xs text-muted-foreground">Email cannot be changed.</p>
+            <p className="text-muted-foreground mt-1 text-xs">Email cannot be changed.</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -234,7 +234,7 @@ export default function SettingsPage() {
               onChange={handlePhoneNumberChange}
               placeholder="Enter your phone number"
             />
-            <p className="mt-1 text-xs text-muted-foreground">will be used for whatsapp</p>
+            <p className="text-muted-foreground mt-1 text-xs">will be used for whatsapp</p>
             {phoneNumber ? (
               <Button
                 type="button"
@@ -271,7 +271,7 @@ export default function SettingsPage() {
 
       <div className="mt-10 border-t pt-6">
         <h3 className="text-lg font-semibold">WhatsApp Linking</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Generate a link code, then send it from your WhatsApp number to connect.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -286,10 +286,10 @@ export default function SettingsPage() {
             )}
           </Button>
           {linkCode && (
-            <div className="rounded-md border bg-muted/40 px-4 py-2 text-sm">
+            <div className="bg-muted/40 rounded-md border px-4 py-2 text-sm">
               <div className="font-medium">Code: {linkCode}</div>
               {linkExpiresAt && (
-                <div className="text-xs text-muted-foreground">
+                <div className="text-muted-foreground text-xs">
                   Expires at {new Date(linkExpiresAt).toLocaleTimeString()}
                 </div>
               )}

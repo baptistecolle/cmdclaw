@@ -90,7 +90,7 @@ function CopyButton() {
   return (
     <button
       onClick={handleCopy}
-      className="ml-auto flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+      className="text-muted-foreground hover:bg-muted hover:text-foreground ml-auto flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors"
       title="Copy chat as Markdown"
     >
       {copied ? (
@@ -124,8 +124,8 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   // Show loading while checking onboarding status
   if (userLoading || (user && !user.onboardedAt)) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="bg-background flex h-screen items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -139,7 +139,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
             <SidebarTrigger />
             <span className="text-sm font-medium">Chat</span>
             {isAdmin && conversationId && (
-              <span className="text-xs text-muted-foreground font-mono">ID: {conversationId}</span>
+              <span className="text-muted-foreground font-mono text-xs">ID: {conversationId}</span>
             )}
             {isAdmin && <CopyButton />}
           </header>

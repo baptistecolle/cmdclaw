@@ -56,7 +56,7 @@ export function CollapsedTrace({
       {/* Header - always visible */}
       <button
         onClick={handleToggle}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/30 transition-colors"
+        className="hover:bg-muted/30 flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
       >
         <ChevronRight
           className={cn(
@@ -86,7 +86,7 @@ export function CollapsedTrace({
 
         <IntegrationBadges integrations={integrationsUsed} size="sm" />
 
-        <div className="flex items-center gap-1 text-xs text-muted-foreground/60 ml-2">
+        <div className="text-muted-foreground/60 ml-2 flex items-center gap-1 text-xs">
           <Eye className="h-3 w-3" />
           <span>View</span>
         </div>
@@ -102,7 +102,7 @@ export function CollapsedTrace({
             transition={COLLAPSED_TRACE_EXPANDED_TRANSITION}
             className="overflow-hidden"
           >
-            <div className="border-t border-border/30 px-3 py-2 max-h-[300px] overflow-y-auto">
+            <div className="border-border/30 max-h-[300px] overflow-y-auto border-t px-3 py-2">
               {activityItems.length > 0 ? (
                 <div className="space-y-0.5">
                   {activityItems.map((item) => (
@@ -110,7 +110,7 @@ export function CollapsedTrace({
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground italic">
+                <p className="text-muted-foreground text-xs italic">
                   Activity details not available
                 </p>
               )}

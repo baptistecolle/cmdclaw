@@ -45,14 +45,14 @@ function HubspotCreatePreview({ args, objectType, objectLabel }: HubspotPreviewC
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="hubspot" size={16} />
         <span className="text-sm font-medium">Create {objectLabel}</span>
       </div>
 
       <PreviewSection>
-        <div className="rounded border bg-muted/30 p-3">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="bg-muted/30 rounded border p-3">
+          <div className="mb-2 flex items-center gap-2">
             <IntegrationLogo integration="hubspot" size={16} />
             <span className="font-medium">{getPrimaryField(objectType!, args)}</span>
           </div>
@@ -81,13 +81,13 @@ function HubspotUpdatePreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="hubspot" size={16} />
         <span className="text-sm font-medium">Update {objectLabel}</span>
       </div>
 
       <PreviewSection>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+        <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm">
           <IntegrationLogo integration="hubspot" size={16} />
           <span className="font-mono">{id || "Unknown ID"}</span>
         </div>
@@ -110,7 +110,7 @@ function HubspotCompletePreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="hubspot" size={16} />
         <span className="text-sm font-medium">Complete {objectLabel}</span>
       </div>
@@ -197,10 +197,10 @@ function PropertiesPreview({ properties }: { properties: string }) {
 
   if (typeof parsed === "object" && parsed !== null) {
     return (
-      <div className="rounded border bg-muted/30 divide-y">
+      <div className="bg-muted/30 divide-y rounded border">
         {Object.entries(parsed).map(([key, value]) => (
           <div key={key} className="flex px-3 py-2 text-sm">
-            <span className="font-medium text-muted-foreground w-32 shrink-0">{key}</span>
+            <span className="text-muted-foreground w-32 shrink-0 font-medium">{key}</span>
             <span className="break-words">{String(value)}</span>
           </div>
         ))}
@@ -208,5 +208,5 @@ function PropertiesPreview({ properties }: { properties: string }) {
     );
   }
 
-  return <pre className="rounded bg-muted p-2 text-xs overflow-x-auto">{properties}</pre>;
+  return <pre className="bg-muted overflow-x-auto rounded p-2 text-xs">{properties}</pre>;
 }

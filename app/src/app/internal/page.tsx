@@ -14,10 +14,10 @@ const internalPages = [
 
 export default function InternalPage() {
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-3 mb-8">
-          <Wrench className="h-8 w-8 text-muted-foreground" />
+    <div className="bg-background min-h-screen p-8">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-8 flex items-center gap-3">
+          <Wrench className="text-muted-foreground h-8 w-8" />
           <div>
             <h1 className="text-2xl font-bold">Internal Tools</h1>
             <p className="text-muted-foreground">Development and debugging utilities</p>
@@ -29,12 +29,12 @@ export default function InternalPage() {
             <Link
               key={page.href}
               href={page.href}
-              className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-accent transition-colors"
+              className="bg-card hover:bg-accent flex items-center gap-4 rounded-lg border p-4 transition-colors"
             >
-              <page.icon className="h-6 w-6 text-muted-foreground" />
+              <page.icon className="text-muted-foreground h-6 w-6" />
               <div>
                 <h2 className="font-medium">{page.title}</h2>
-                <p className="text-sm text-muted-foreground">{page.description}</p>
+                <p className="text-muted-foreground text-sm">{page.description}</p>
               </div>
             </Link>
           ))}

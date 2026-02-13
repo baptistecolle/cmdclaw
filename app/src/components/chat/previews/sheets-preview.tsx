@@ -29,13 +29,13 @@ function SheetsCreatePreview({ args }: { args: Record<string, string | undefined
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Create Spreadsheet</span>
       </div>
 
       <PreviewSection>
-        <div className="rounded border bg-muted/30 p-3 flex items-center gap-2">
+        <div className="bg-muted/30 flex items-center gap-2 rounded border p-3">
           <IntegrationLogo integration="google_sheets" size={20} />
           <span className="font-medium">{title || "Untitled Spreadsheet"}</span>
         </div>
@@ -57,7 +57,7 @@ function SheetsAppendPreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Append Rows</span>
       </div>
@@ -89,7 +89,7 @@ function SheetsUpdatePreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Update Cells</span>
       </div>
@@ -120,7 +120,7 @@ function SheetsClearPreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Clear Cells</span>
         <PreviewBadge variant="danger">Destructive</PreviewBadge>
@@ -146,7 +146,7 @@ function SheetsAddSheetPreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_sheets" size={16} />
         <span className="text-sm font-medium">Add Sheet</span>
       </div>
@@ -170,24 +170,24 @@ function ValuesPreview({ values }: { values: string }) {
   if (Array.isArray(parsed)) {
     return (
       <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+        <table className="w-full border-collapse text-sm">
           <tbody>
             {parsed.slice(0, 5).map((row) => (
               <tr key={JSON.stringify(row)}>
                 {Array.isArray(row) ? (
                   row.map((cell) => (
-                    <td key={String(cell)} className="border px-2 py-1 bg-muted/30">
+                    <td key={String(cell)} className="bg-muted/30 border px-2 py-1">
                       {String(cell)}
                     </td>
                   ))
                 ) : (
-                  <td className="border px-2 py-1 bg-muted/30">{String(row)}</td>
+                  <td className="bg-muted/30 border px-2 py-1">{String(row)}</td>
                 )}
               </tr>
             ))}
             {parsed.length > 5 && (
               <tr>
-                <td className="border px-2 py-1 text-muted-foreground text-center" colSpan={100}>
+                <td className="text-muted-foreground border px-2 py-1 text-center" colSpan={100}>
                   ... and {parsed.length - 5} more rows
                 </td>
               </tr>

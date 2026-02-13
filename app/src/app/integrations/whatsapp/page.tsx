@@ -141,7 +141,7 @@ export default function WhatsAppIntegrationPage() {
     <div>
       <div className="mb-6">
         <h2 className="text-xl font-semibold">WhatsApp</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Pair WhatsApp with a QR code, then link your own number with a code.
         </p>
       </div>
@@ -164,7 +164,7 @@ export default function WhatsAppIntegrationPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-lg font-semibold">Bridge Pairing</h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Connect the app bridge to a WhatsApp account by scanning the QR code.
               </p>
             </div>
@@ -180,18 +180,18 @@ export default function WhatsAppIntegrationPage() {
             </Button>
           </div>
 
-          <div className="mt-4 rounded-lg border bg-muted/20 p-4">
-            <div className="text-sm text-muted-foreground">
+          <div className="bg-muted/20 mt-4 rounded-lg border p-4">
+            <div className="text-muted-foreground text-sm">
               Status:{" "}
-              <span className="font-medium text-foreground">{waStatus?.status ?? "unknown"}</span>
+              <span className="text-foreground font-medium">{waStatus?.status ?? "unknown"}</span>
             </div>
             {forbidden && (
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="text-muted-foreground mt-2 text-sm">
                 Only admins can pair the shared WhatsApp bridge.
               </p>
             )}
             {waStatus?.lastError && (
-              <div className="mt-1 text-sm text-destructive">{waStatus.lastError}</div>
+              <div className="text-destructive mt-1 text-sm">{waStatus.lastError}</div>
             )}
             {waQrDataUrl ? (
               <div className="mt-4 flex flex-col items-start gap-2">
@@ -203,12 +203,12 @@ export default function WhatsAppIntegrationPage() {
                   unoptimized
                   className="h-60 w-60 rounded-md border bg-white p-2"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Scan this in WhatsApp: Settings {"->"} Linked Devices {"->"} Link a Device.
                 </p>
               </div>
             ) : (
-              <p className="mt-4 text-xs text-muted-foreground">
+              <p className="text-muted-foreground mt-4 text-xs">
                 QR code will appear here when pairing is available.
               </p>
             )}
@@ -217,7 +217,7 @@ export default function WhatsAppIntegrationPage() {
 
         <div className="rounded-lg border p-6">
           <h3 className="text-lg font-semibold">User Linking Code</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Generate your code and send it from your WhatsApp number to complete account linking.
           </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -232,10 +232,10 @@ export default function WhatsAppIntegrationPage() {
               )}
             </Button>
             {linkCode && (
-              <div className="rounded-md border bg-muted/40 px-4 py-2 text-sm">
+              <div className="bg-muted/40 rounded-md border px-4 py-2 text-sm">
                 <div className="font-medium">Code: {linkCode}</div>
                 {linkExpiresAt && (
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-muted-foreground text-xs">
                     Expires at {new Date(linkExpiresAt).toLocaleTimeString()}
                   </div>
                 )}

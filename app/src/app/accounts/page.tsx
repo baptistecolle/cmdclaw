@@ -15,11 +15,11 @@ type InfoRowProps = {
 
 function InfoRow({ label, value }: InfoRowProps) {
   return (
-    <div className="rounded-lg border bg-muted/50 px-3 py-2">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="bg-muted/50 rounded-lg border px-3 py-2">
+      <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.14em] uppercase">
         {label}
       </p>
-      <p className="break-all text-sm font-medium">{value}</p>
+      <p className="text-sm font-medium break-all">{value}</p>
     </div>
   );
 }
@@ -43,11 +43,11 @@ export default function AccountsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="bg-card rounded-xl border p-6 shadow-sm">
         <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Account</h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Quick snapshot of who is signed in right now.
             </p>
           </div>
@@ -59,27 +59,27 @@ export default function AccountsPage() {
         <div className="mt-5 space-y-4">
           {status === "loading" && (
             <div
-              className="h-28 animate-pulse rounded-lg bg-muted/70"
+              className="bg-muted/70 h-28 animate-pulse rounded-lg"
               aria-label="Loading session"
             />
           )}
 
           {status === "error" && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-3 text-sm">
               Unable to load your session right now. Please try again in a moment.
             </div>
           )}
 
           {status === "ready" && user && (
-            <div className="space-y-4 rounded-xl border bg-muted/50 p-4">
+            <div className="bg-muted/50 space-y-4 rounded-xl border p-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.14em] uppercase">
                   Signed in as
                 </p>
-                <p className="text-lg font-semibold leading-tight">
+                <p className="text-lg leading-tight font-semibold">
                   {user.name || user.email || "Current user"}
                 </p>
-                {user.email && <p className="text-sm text-muted-foreground">{user.email}</p>}
+                {user.email && <p className="text-muted-foreground text-sm">{user.email}</p>}
               </div>
 
               <Separator />
@@ -103,8 +103,8 @@ export default function AccountsPage() {
           )}
 
           {status === "ready" && !user && (
-            <div className="space-y-3 rounded-lg border bg-muted/50 p-4">
-              <p className="text-sm text-muted-foreground">
+            <div className="bg-muted/50 space-y-3 rounded-lg border p-4">
+              <p className="text-muted-foreground text-sm">
                 No user is currently signed in. Use the login link to start a session.
               </p>
               <Button asChild size="sm">

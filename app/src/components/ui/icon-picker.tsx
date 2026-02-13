@@ -49,7 +49,7 @@ export function IconPicker({ value, onChange, children }: IconPickerProps) {
         {children || (
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-lg border bg-muted hover:bg-muted/80 transition-colors"
+            className="bg-muted hover:bg-muted/80 flex h-10 w-10 items-center justify-center rounded-lg border transition-colors"
           >
             <IconDisplay icon={value} />
           </button>
@@ -61,7 +61,7 @@ export function IconPicker({ value, onChange, children }: IconPickerProps) {
           {value && (
             <button
               onClick={handleRemove}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground text-xs"
             >
               Remove
             </button>

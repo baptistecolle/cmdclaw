@@ -135,7 +135,7 @@ export function ActivityItem({ item }: Props) {
       return <ToolIcon className="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />;
     }
 
-    return <Wrench className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />;
+    return <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />;
   };
 
   const getStatusIcon = () => {
@@ -145,13 +145,13 @@ export function ActivityItem({ item }: Props) {
 
     switch (status) {
       case "running":
-        return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" />;
+        return <Loader2 className="text-muted-foreground h-3 w-3 flex-shrink-0 animate-spin" />;
       case "complete":
-        return <Check className="h-3 w-3 text-green-500 flex-shrink-0" />;
+        return <Check className="h-3 w-3 flex-shrink-0 text-green-500" />;
       case "error":
-        return <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />;
+        return <AlertCircle className="h-3 w-3 flex-shrink-0 text-red-500" />;
       case "interrupted":
-        return <StopCircle className="h-3 w-3 text-orange-500 flex-shrink-0" />;
+        return <StopCircle className="h-3 w-3 flex-shrink-0 text-orange-500" />;
       default:
         return null;
     }
@@ -160,7 +160,7 @@ export function ActivityItem({ item }: Props) {
   // Render text content (agent response)
   if (type === "text") {
     return (
-      <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 max-w-none py-0.5 text-foreground text-xs">
+      <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 text-foreground max-w-none py-0.5 text-xs">
         <ReactMarkdown>{content}</ReactMarkdown>
       </div>
     );
@@ -169,7 +169,7 @@ export function ActivityItem({ item }: Props) {
   // Render thinking content
   if (type === "thinking") {
     return (
-      <div className="text-xs text-muted-foreground italic whitespace-pre-wrap py-0.5">
+      <div className="text-muted-foreground py-0.5 text-xs whitespace-pre-wrap italic">
         {content}
       </div>
     );
@@ -178,7 +178,7 @@ export function ActivityItem({ item }: Props) {
   // Render system message (interruption, etc.)
   if (type === "system") {
     return (
-      <div className="text-xs py-0.5 flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
+      <div className="flex items-center gap-1.5 py-0.5 text-xs text-orange-600 dark:text-orange-400">
         <StopCircle className="h-3.5 w-3.5 flex-shrink-0" />
         <span className="font-medium">{content}</span>
       </div>
@@ -201,19 +201,19 @@ export function ActivityItem({ item }: Props) {
   const formattedResult = formatValue(result);
 
   return (
-    <div className="text-xs py-0.5">
+    <div className="py-0.5 text-xs">
       <div className="flex items-center gap-1.5">
         {getIcon()}
-        <span className="font-mono text-foreground">{displayName}</span>
+        <span className="text-foreground font-mono">{displayName}</span>
         {getStatusIcon()}
       </div>
       {formattedInput && (
-        <pre className="text-muted-foreground whitespace-pre-wrap ml-5 mt-0.5 font-mono">
+        <pre className="text-muted-foreground mt-0.5 ml-5 font-mono whitespace-pre-wrap">
           {formattedInput}
         </pre>
       )}
       {formattedResult && (
-        <pre className="text-muted-foreground whitespace-pre-wrap ml-5 mt-0.5 font-mono">
+        <pre className="text-muted-foreground mt-0.5 ml-5 font-mono whitespace-pre-wrap">
           {formattedResult}
         </pre>
       )}

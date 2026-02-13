@@ -18,19 +18,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AppShell>
-      <div className="min-h-full bg-background">
-        <main className="mx-auto w-full max-w-4xl px-4 pb-10 pt-8 md:px-6 md:pt-10">
+      <div className="bg-background min-h-full">
+        <main className="mx-auto w-full max-w-4xl px-4 pt-8 pb-10 md:px-6 md:pt-10">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
             </div>
           ) : !isAdmin ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+            <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-4 text-sm">
               You do not have access to this section.
             </div>
           ) : (
             <>
-              <nav className="sticky top-0 z-10 mb-6 flex gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+              <nav className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 mb-6 flex gap-4 border-b backdrop-blur">
                 {adminTabs.map((tab) => {
                   const isActive =
                     tab.href === "/admin" ? pathname === "/admin" : pathname.startsWith(tab.href);

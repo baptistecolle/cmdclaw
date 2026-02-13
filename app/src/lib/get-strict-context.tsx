@@ -1,11 +1,6 @@
 import * as React from "react";
 
-function getStrictContext<T>(
-  name?: string,
-): readonly [
-  React.Provider<T | undefined>,
-  () => T,
-] {
+function getStrictContext<T>(name?: string): readonly [React.Provider<T | undefined>, () => T] {
   const Context = React.createContext<T | undefined>(undefined);
 
   const useSafeContext = () => {

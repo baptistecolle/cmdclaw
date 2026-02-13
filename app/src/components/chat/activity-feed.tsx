@@ -70,14 +70,14 @@ export function ActivityFeed({
   if (items.length === 0) {
     // Show initial loading state
     return (
-      <div className="rounded-lg border border-border/50 bg-muted/30">
+      <div className="border-border/50 bg-muted/30 rounded-lg border">
         <div className="flex items-center gap-2 px-3 py-2">
-          <Activity className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Processing...</span>
-          <div className="flex gap-1 ml-auto">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.3s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50" />
+          <Activity className="text-muted-foreground h-4 w-4" />
+          <span className="text-muted-foreground text-sm">Processing...</span>
+          <div className="ml-auto flex gap-1">
+            <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
+            <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
+            <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full" />
           </div>
         </div>
       </div>
@@ -85,27 +85,27 @@ export function ActivityFeed({
   }
 
   return (
-    <div className="rounded-lg border border-border/50 bg-muted/30 overflow-hidden">
+    <div className="border-border/50 bg-muted/30 overflow-hidden rounded-lg border">
       {/* Header */}
       <button
         onClick={onToggleExpand}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50 transition-colors border-b border-border/30"
+        className="hover:bg-muted/50 border-border/30 flex w-full items-center gap-2 border-b px-3 py-2 text-left text-sm transition-colors"
       >
-        <Activity className="h-4 w-4 text-muted-foreground" />
+        <Activity className="text-muted-foreground h-4 w-4" />
         <span className="text-muted-foreground font-medium">Activity</span>
         {isStreaming && (
-          <div className="flex gap-1 ml-1">
+          <div className="ml-1 flex gap-1">
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.3s]" />
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]" />
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-500" />
           </div>
         )}
         <div className="flex-1" />
-        <span className="text-xs text-muted-foreground/60">{items.length} items</span>
+        <span className="text-muted-foreground/60 text-xs">{items.length} items</span>
         {isExpanded ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          <ChevronUp className="text-muted-foreground h-4 w-4" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          <ChevronDown className="text-muted-foreground h-4 w-4" />
         )}
       </button>
 
@@ -143,7 +143,7 @@ export function ActivityFeed({
 
       {/* Integration badges footer */}
       {integrationsUsed.length > 0 && (
-        <div className="px-3 py-1.5 border-t border-border/30 bg-muted/20">
+        <div className="border-border/30 bg-muted/20 border-t px-3 py-1.5">
           <IntegrationBadges integrations={integrationsUsed} size="sm" />
         </div>
       )}

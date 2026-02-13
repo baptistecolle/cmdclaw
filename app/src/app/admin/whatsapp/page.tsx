@@ -81,16 +81,16 @@ export default function AdminWhatsAppPage() {
     <div>
       <div className="mb-6">
         <h2 className="text-xl font-semibold">WhatsApp Settings</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Connect the shared WhatsApp number for the whole app.
         </p>
       </div>
 
-      <div className="rounded-lg border border-border/60 bg-muted/20 p-6">
+      <div className="border-border/60 bg-muted/20 rounded-lg border p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold">Connection</h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Reconnect and monitor the WhatsApp bridge status.
             </p>
           </div>
@@ -106,13 +106,13 @@ export default function AdminWhatsAppPage() {
           </Button>
         </div>
 
-        <div className="mt-4 rounded-lg border bg-background p-4">
-          <div className="text-sm text-muted-foreground">
+        <div className="bg-background mt-4 rounded-lg border p-4">
+          <div className="text-muted-foreground text-sm">
             Status:{" "}
-            <span className="font-medium text-foreground">{waStatus?.status ?? "unknown"}</span>
+            <span className="text-foreground font-medium">{waStatus?.status ?? "unknown"}</span>
           </div>
           {waStatus?.lastError && (
-            <div className="mt-1 text-sm text-destructive">{waStatus.lastError}</div>
+            <div className="text-destructive mt-1 text-sm">{waStatus.lastError}</div>
           )}
           {waQrDataUrl ? (
             <div className="mt-4 flex flex-col items-start gap-2">
@@ -124,12 +124,12 @@ export default function AdminWhatsAppPage() {
                 unoptimized
                 className="h-56 w-56"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Scan this QR code in WhatsApp {"->"} Linked devices.
               </p>
             </div>
           ) : (
-            <p className="mt-4 text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-4 text-xs">
               QR code will appear here when WhatsApp is ready to pair.
             </p>
           )}

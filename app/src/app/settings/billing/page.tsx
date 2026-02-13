@@ -26,7 +26,7 @@ export default function BillingPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -35,7 +35,7 @@ export default function BillingPage() {
     <div>
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Billing</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Manage your subscription and billing information.
         </p>
       </div>
@@ -65,7 +65,7 @@ export default function BillingPage() {
                   )}
                 </span>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="text-muted-foreground mt-1 text-sm">
                 {isPro
                   ? "You have access to E2B cloud sandboxes and increased message limits."
                   : "You're on the free plan with BYOC (Bring Your Own Compute) only."}
@@ -82,10 +82,10 @@ export default function BillingPage() {
               <h3 className="font-medium">Free</h3>
               <div className="mt-1 text-2xl font-bold">
                 $0
-                <span className="text-sm font-normal text-muted-foreground">/month</span>
+                <span className="text-muted-foreground text-sm font-normal">/month</span>
               </div>
             </div>
-            <ul className="space-y-2 text-sm text-muted-foreground">
+            <ul className="text-muted-foreground space-y-2 text-sm">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                 BYOC (Bring Your Own Compute)
@@ -96,8 +96,8 @@ export default function BillingPage() {
               </li>
             </ul>
             {!isPro && (
-              <div className="mt-4 pt-4 border-t">
-                <span className="text-xs text-muted-foreground">Current plan</span>
+              <div className="mt-4 border-t pt-4">
+                <span className="text-muted-foreground text-xs">Current plan</span>
               </div>
             )}
           </div>
@@ -111,10 +111,10 @@ export default function BillingPage() {
               </div>
               <div className="mt-1 text-2xl font-bold">
                 €30
-                <span className="text-sm font-normal text-muted-foreground">/month</span>
+                <span className="text-muted-foreground text-sm font-normal">/month</span>
               </div>
             </div>
-            <ul className="space-y-2 text-sm text-muted-foreground">
+            <ul className="text-muted-foreground space-y-2 text-sm">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                 Everything in Free
@@ -128,7 +128,7 @@ export default function BillingPage() {
                 10,000 messages/month included
               </li>
             </ul>
-            <div className="mt-4 pt-4 border-t">
+            <div className="mt-4 border-t pt-4">
               {isPro ? (
                 <span className="text-xs text-purple-600 dark:text-purple-400">Current plan</span>
               ) : (
@@ -143,7 +143,7 @@ export default function BillingPage() {
         {/* Billing Actions */}
         {isPro && (
           <div className="rounded-lg border p-5">
-            <h3 className="font-medium mb-4">Manage Subscription</h3>
+            <h3 className="mb-4 font-medium">Manage Subscription</h3>
             <div className="flex flex-wrap gap-3">
               <Button variant="outline" size="sm" onClick={handleManageBilling}>
                 <CreditCard className="mr-2 h-4 w-4" />
@@ -162,8 +162,8 @@ export default function BillingPage() {
         )}
       </div>
 
-      <div className="mt-6 rounded-lg border border-muted bg-muted/30 p-4">
-        <p className="text-xs text-muted-foreground">
+      <div className="border-muted bg-muted/30 mt-6 rounded-lg border p-4">
+        <p className="text-muted-foreground text-xs">
           Billing is handled securely through Stripe. You can manage your payment methods, view
           invoices, and update your subscription at any time.
         </p>

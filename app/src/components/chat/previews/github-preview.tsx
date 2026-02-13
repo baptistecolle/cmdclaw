@@ -18,14 +18,14 @@ function GithubCreateIssuePreview({ args }: { args: Record<string, string | unde
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="github" size={16} />
         <span className="text-sm font-medium">Create Issue</span>
       </div>
 
       <PreviewSection>
-        <div className="rounded border bg-muted/30 p-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+        <div className="bg-muted/30 rounded border p-3">
+          <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm">
             <IntegrationLogo integration="github" size={16} />
             <span className="font-mono">
               {owner}/{repo}
@@ -35,11 +35,11 @@ function GithubCreateIssuePreview({ args }: { args: Record<string, string | unde
           <div className="font-medium">{title || "Untitled Issue"}</div>
 
           {labels && (
-            <div className="flex gap-1 mt-2">
+            <div className="mt-2 flex gap-1">
               {labels.split(",").map((label) => (
                 <span
                   key={label.trim()}
-                  className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted"
+                  className="bg-muted inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                 >
                   {label.trim()}
                 </span>

@@ -30,18 +30,18 @@ function CalendarCreatePreview({ args }: { args: Record<string, string | undefin
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_calendar" size={16} />
         <span className="text-sm font-medium">Create Event</span>
       </div>
 
       <PreviewSection>
-        <div className="rounded border bg-muted/30 p-3">
-          <div className="font-medium text-base mb-2">{summary || "Untitled Event"}</div>
+        <div className="bg-muted/30 rounded border p-3">
+          <div className="mb-2 text-base font-medium">{summary || "Untitled Event"}</div>
 
           <div className="space-y-1 text-sm">
             {(start || end) && (
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="text-muted-foreground flex items-center gap-2">
                 <Calendar className="h-3.5 w-3.5" />
                 <span>
                   {formatDateTime(start)} {end && `— ${formatDateTime(end)}`}
@@ -74,7 +74,7 @@ function CalendarUpdatePreview({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_calendar" size={16} />
         <span className="text-sm font-medium">Update Event</span>
       </div>
@@ -99,7 +99,7 @@ function CalendarDeletePreview({ positionalArgs }: { positionalArgs: string[] })
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <IntegrationLogo integration="google_calendar" size={16} />
         <span className="text-sm font-medium">Delete Event</span>
         <PreviewBadge variant="danger">Destructive</PreviewBadge>

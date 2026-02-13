@@ -11,9 +11,9 @@ export default function PrivacyPolicyPage() {
       <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
         Privacy Policy
       </h1>
-      <p className="text-xl text-muted-foreground mt-2">Last updated: January 14, 2026</p>
+      <p className="text-muted-foreground mt-2 text-xl">Last updated: January 14, 2026</p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 1 - Legal Notice
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
         For any inquiries, please contact us by email at baptiste@heybap.com.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 2 - Scope of Application
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -44,7 +44,7 @@ export default function PrivacyPolicyPage() {
         agreed upon between the Company and the respective Client.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 3 - Description of Services
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -56,7 +56,7 @@ export default function PrivacyPolicyPage() {
         Site.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 4 - Registration Requirements
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -85,7 +85,7 @@ export default function PrivacyPolicyPage() {
         information.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 5 - Orders
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -112,7 +112,7 @@ export default function PrivacyPolicyPage() {
         abnormally high level of ordering.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 6 - Obligations of the Service Provider
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -144,7 +144,7 @@ export default function PrivacyPolicyPage() {
         via the Site before they occur, unless such interruptions are of an urgent nature.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 7 - Obligations of the Client
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -167,7 +167,7 @@ export default function PrivacyPolicyPage() {
         of the infringing Client.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 8 - Complaints
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -185,7 +185,7 @@ export default function PrivacyPolicyPage() {
         1221, 1222, and 1223 of the Civil Code.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 9 - Liability of the Service Provider
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -229,7 +229,7 @@ export default function PrivacyPolicyPage() {
         Client became aware or is presumed to have become aware of the harmful event.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 10 - Recording Systems
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -242,7 +242,7 @@ export default function PrivacyPolicyPage() {
         waive the right to challenge them in the event of a dispute.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 11 - Personal Data
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -251,7 +251,7 @@ export default function PrivacyPolicyPage() {
         the Site at any time.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 12 - Hyperlinks
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -268,7 +268,7 @@ export default function PrivacyPolicyPage() {
         authorization of the Service Provider.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 13 - Intellectual Property
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -291,7 +291,7 @@ export default function PrivacyPolicyPage() {
         which it is the full owner, to download and print it for personal and non-commercial use.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 14 - Duration, Suspension, Termination
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -313,7 +313,7 @@ export default function PrivacyPolicyPage() {
         written notification indicating the nature of the breach and the need to remedy it.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 15 - Confidentiality
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -328,7 +328,7 @@ export default function PrivacyPolicyPage() {
         expiration or termination.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 16 - Notifications
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -346,7 +346,7 @@ export default function PrivacyPolicyPage() {
         be deemed to have been made on the date of sending the email.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 17 - Severability and No Waiver
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -357,7 +357,7 @@ export default function PrivacyPolicyPage() {
         construed as a waiver.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 18 - Modification
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -370,7 +370,7 @@ export default function PrivacyPolicyPage() {
         Clients by email and must be accepted by them upon their next login to the Site.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 19 - Disputes
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
@@ -382,7 +382,7 @@ export default function PrivacyPolicyPage() {
         submitted to the court of Paris.
       </p>
 
-      <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight mt-10 first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Article 20 - Applicable Law &amp; Contract Language
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
