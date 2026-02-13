@@ -15,7 +15,7 @@ import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatArea } from "@/components/chat/chat-area";
 import { ChatCopyButton } from "@/components/chat/chat-copy-button";
 import {
@@ -147,7 +147,8 @@ export default function WorkflowEditorPage() {
   const [status, setStatus] = useState<"on" | "off">("off");
   const [autoApprove, setAutoApprove] = useState(true);
   const [showDisableAutoApproveDialog, setShowDisableAutoApproveDialog] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isStartingRun, setIsStartingRun] = useState(false);
   const [showAllIntegrations, setShowAllIntegrations] = useState(false);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
@@ -160,6 +161,10 @@ export default function WorkflowEditorPage() {
     isLoading: isSelectedRunLoading,
     refetch: refetchSelectedRun,
   } = useWorkflowRun(testRunId ?? undefined);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasInitializedEditorRef = useRef(false);
+  const initializedWorkflowIdRef = useRef<string | null>(null);
+  const lastSavedPayloadRef = useRef<string | null>(null);
 
   // Schedule state (only used when triggerType is "schedule")
   const [scheduleType, setScheduleType] = useState<"interval" | "daily" | "weekly" | "monthly">(
@@ -173,11 +178,152 @@ export default function WorkflowEditorPage() {
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     [],
   );
+  const integrationEntries = useMemo(
+    () =>
+      (Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[]).map((key) => ({
+        key,
+        name: INTEGRATION_DISPLAY_NAMES[key],
+        logo: INTEGRATION_LOGOS[key],
+      })),
+    [],
+  );
+  const allIntegrationTypes = useMemo(
+    () => integrationEntries.map((entry) => entry.key),
+    [integrationEntries],
+  );
+  const activeRun = useMemo(
+    () => runs?.find((run) => ACTIVE_TEST_RUN_STATUSES.has(run.status)) ?? null,
+    [runs],
+  );
+  const {
+    data: activeRunDetails,
+    refetch: refetchActiveRunDetails,
+    isLoading: isActiveRunDetailsLoading,
+  } = useWorkflowRun(activeRun?.id);
+
+  const buildSchedule = useCallback((): WorkflowSchedule | null => {
+    if (triggerType !== "schedule") {
+      return null;
+    }
+
+    switch (scheduleType) {
+      case "interval":
+        return {
+          type: "interval",
+          intervalMinutes: Math.max(60, Math.round(intervalMinutes / 60) * 60),
+        };
+      case "daily":
+        return {
+          type: "daily",
+          time: scheduleTime.slice(0, 5),
+          timezone: localTimezone,
+        };
+      case "weekly":
+        return {
+          type: "weekly",
+          time: scheduleTime.slice(0, 5),
+          daysOfWeek: scheduleDaysOfWeek,
+          timezone: localTimezone,
+        };
+      case "monthly":
+        return {
+          type: "monthly",
+          time: scheduleTime.slice(0, 5),
+          dayOfMonth: scheduleDayOfMonth,
+          timezone: localTimezone,
+        };
+      default:
+        return null;
+    }
+  }, [
+    intervalMinutes,
+    localTimezone,
+    scheduleDayOfMonth,
+    scheduleDaysOfWeek,
+    scheduleTime,
+    scheduleType,
+    triggerType,
+  ]);
+
+  const getWorkflowUpdateInput = useCallback(() => {
+    if (!workflowId) {
+      return null;
+    }
+    return {
+      id: workflowId,
+      name,
+      status,
+      triggerType,
+      prompt,
+      autoApprove,
+      allowedIntegrations: restrictTools ? allowedIntegrations : allIntegrationTypes,
+      schedule: buildSchedule(),
+    };
+  }, [
+    allIntegrationTypes,
+    allowedIntegrations,
+    autoApprove,
+    buildSchedule,
+    name,
+    prompt,
+    restrictTools,
+    status,
+    triggerType,
+    workflowId,
+  ]);
+
+  const getWorkflowPayloadSignature = useCallback(
+    (input: NonNullable<ReturnType<typeof getWorkflowUpdateInput>>) =>
+      JSON.stringify({
+        ...input,
+        allowedIntegrations: [...input.allowedIntegrations].toSorted(),
+        schedule:
+          input.schedule?.type === "weekly"
+            ? {
+                ...input.schedule,
+                daysOfWeek: [...input.schedule.daysOfWeek].toSorted(),
+              }
+            : input.schedule,
+      }),
+    [],
+  );
+
+  const persistWorkflow = useCallback(
+    async (options?: { force?: boolean }) => {
+      const input = getWorkflowUpdateInput();
+      if (!input) {
+        return false;
+      }
+
+      const signature = getWorkflowPayloadSignature(input);
+      if (!options?.force && signature === lastSavedPayloadRef.current) {
+        return true;
+      }
+
+      setIsSaving(true);
+      try {
+        await updateWorkflow.mutateAsync(input);
+        lastSavedPayloadRef.current = signature;
+        return true;
+      } catch (error) {
+        console.error("Failed to update workflow:", error);
+        setNotification({ type: "error", message: "Failed to save workflow." });
+        return false;
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [getWorkflowPayloadSignature, getWorkflowUpdateInput, updateWorkflow],
+  );
 
   useEffect(() => {
     if (!workflow) {
       return;
     }
+    if (initializedWorkflowIdRef.current === workflow.id) {
+      return;
+    }
+
     const availableIntegrationTypes = Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[];
     const workflowAllowedIntegrations = (workflow.allowedIntegrations ?? []) as IntegrationType[];
     const hasRestriction =
@@ -212,7 +358,24 @@ export default function WorkflowEditorPage() {
         setScheduleDayOfMonth(schedule.dayOfMonth);
       }
     }
-  }, [workflow]);
+    initializedWorkflowIdRef.current = workflow.id;
+    hasInitializedEditorRef.current = true;
+
+    const payloadFromWorkflow = {
+      id: workflow.id,
+      name: workflow.name,
+      status: workflow.status,
+      triggerType: workflow.triggerType,
+      prompt: workflow.prompt,
+      autoApprove: workflow.autoApprove ?? true,
+      allowedIntegrations:
+        hasRestriction || workflowAllowedIntegrations.length === 0
+          ? workflowAllowedIntegrations
+          : availableIntegrationTypes,
+      schedule: schedule,
+    } as const;
+    lastSavedPayloadRef.current = getWorkflowPayloadSignature(payloadFromWorkflow);
+  }, [getWorkflowPayloadSignature, workflow]);
 
   useEffect(() => {
     if (!notification) {
@@ -222,19 +385,6 @@ export default function WorkflowEditorPage() {
     return () => clearTimeout(timer);
   }, [notification]);
 
-  const integrationEntries = useMemo(
-    () =>
-      (Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[]).map((key) => ({
-        key,
-        name: INTEGRATION_DISPLAY_NAMES[key],
-        logo: INTEGRATION_LOGOS[key],
-      })),
-    [],
-  );
-  const allIntegrationTypes = useMemo(
-    () => integrationEntries.map((entry) => entry.key),
-    [integrationEntries],
-  );
   const handleStatusChange = useCallback((checked: boolean) => {
     setStatus(checked ? "on" : "off");
   }, []);
@@ -334,11 +484,6 @@ export default function WorkflowEditorPage() {
     setIsTestPanelExpanded((prev) => !prev);
   }, []);
 
-  const activeRun = useMemo(
-    () => runs?.find((run) => ACTIVE_TEST_RUN_STATUSES.has(run.status)) ?? null,
-    [runs],
-  );
-
   const cancelTargetRunId = activeRun?.id ?? testRunId ?? null;
   const { data: cancelTargetRun } = useWorkflowRun(cancelTargetRunId ?? undefined);
 
@@ -346,6 +491,44 @@ export default function WorkflowEditorPage() {
   const canCancelRun = Boolean(
     cancelTargetRun?.generationId && ACTIVE_TEST_RUN_STATUSES.has(cancelTargetRun.status),
   );
+  const hasAgentInstructions = prompt.trim().length > 0;
+
+  useEffect(() => {
+    if (!hasInitializedEditorRef.current) {
+      return;
+    }
+    if (!workflowId) {
+      return;
+    }
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      void persistWorkflow();
+    }, 1000);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [
+    allowedIntegrations,
+    autoApprove,
+    buildSchedule,
+    name,
+    persistWorkflow,
+    prompt,
+    restrictTools,
+    scheduleDayOfMonth,
+    scheduleDaysOfWeek,
+    scheduleTime,
+    scheduleType,
+    status,
+    triggerType,
+    workflowId,
+  ]);
 
   useEffect(() => {
     if (!runs || runs.length === 0) {
@@ -353,9 +536,16 @@ export default function WorkflowEditorPage() {
       return;
     }
 
-    const selectedRunStillExists = Boolean(testRunId && runs.some((run) => run.id === testRunId));
-    if (selectedRunStillExists) {
-      return;
+    if (testRunId) {
+      const selectedRunStillExists = runs.some((run) => run.id === testRunId);
+      if (selectedRunStillExists) {
+        return;
+      }
+
+      // Keep the newly created run selected while runs list catches up.
+      if (selectedRun?.id === testRunId || isSelectedRunLoading || isStartingRun || triggerWorkflow.isPending) {
+        return;
+      }
     }
 
     if (activeRun) {
@@ -364,7 +554,15 @@ export default function WorkflowEditorPage() {
     }
 
     setTestRunId(runs[0]!.id);
-  }, [activeRun, runs, testRunId]);
+  }, [
+    activeRun,
+    isSelectedRunLoading,
+    isStartingRun,
+    runs,
+    selectedRun,
+    testRunId,
+    triggerWorkflow.isPending,
+  ]);
 
   useEffect(() => {
     if (!activeRun) {
@@ -381,101 +579,46 @@ export default function WorkflowEditorPage() {
     return () => clearInterval(interval);
   }, [activeRun, refetchRuns, refetchSelectedRun, testRunId]);
 
-  const buildSchedule = useCallback((): WorkflowSchedule | null => {
-    if (triggerType !== "schedule") {
-      return null;
-    }
-
-    switch (scheduleType) {
-      case "interval":
-        return {
-          type: "interval",
-          intervalMinutes: Math.max(60, Math.round(intervalMinutes / 60) * 60),
-        };
-      case "daily":
-        return {
-          type: "daily",
-          time: scheduleTime.slice(0, 5),
-          timezone: localTimezone,
-        };
-      case "weekly":
-        return {
-          type: "weekly",
-          time: scheduleTime.slice(0, 5),
-          daysOfWeek: scheduleDaysOfWeek,
-          timezone: localTimezone,
-        };
-      case "monthly":
-        return {
-          type: "monthly",
-          time: scheduleTime.slice(0, 5),
-          dayOfMonth: scheduleDayOfMonth,
-          timezone: localTimezone,
-        };
-      default:
-        return null;
-    }
-  }, [
-    intervalMinutes,
-    localTimezone,
-    scheduleDayOfMonth,
-    scheduleDaysOfWeek,
-    scheduleTime,
-    scheduleType,
-    triggerType,
-  ]);
-
-  const handleSave = useCallback(async () => {
-    if (!workflowId) {
-      return;
-    }
-    setSaving(true);
-    try {
-      await updateWorkflow.mutateAsync({
-        id: workflowId,
-        name,
-        status,
-        triggerType,
-        prompt,
-        autoApprove,
-        allowedIntegrations: restrictTools ? allowedIntegrations : allIntegrationTypes,
-        schedule: buildSchedule(),
-      });
-      setNotification({ type: "success", message: "Workflow saved." });
-    } catch (error) {
-      console.error("Failed to update workflow:", error);
-      setNotification({ type: "error", message: "Failed to save workflow." });
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    allIntegrationTypes,
-    allowedIntegrations,
-    autoApprove,
-    name,
-    prompt,
-    restrictTools,
-    status,
-    triggerType,
-    updateWorkflow,
-    workflowId,
-    buildSchedule,
-  ]);
-
   const handleRun = useCallback(async () => {
-    if (!workflowId) {
+    if (!workflowId || isStartingRun) {
       return;
     }
-    if (activeRun) {
-      setTestRunId(activeRun.id);
-      setIsTestPanelExpanded(true);
-      setNotification({
-        type: "success",
-        message: "A test run is already in progress. Opened it in the test sidebar.",
-      });
-      return;
-    }
+
+    setIsStartingRun(true);
     try {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      const saveSucceeded = await persistWorkflow({ force: true });
+      if (!saveSucceeded) {
+        setNotification({ type: "error", message: "Failed to save workflow before test run." });
+        return;
+      }
+
+      if (activeRun) {
+        const currentActiveRun =
+          activeRunDetails?.id === activeRun.id
+            ? activeRunDetails
+            : (await refetchActiveRunDetails()).data;
+
+        if (!currentActiveRun?.generationId) {
+          setNotification({
+            type: "error",
+            message: "Could not cancel the previous active run.",
+          });
+          return;
+        }
+
+        const cancelResult = await cancelGeneration.mutateAsync(currentActiveRun.generationId);
+        if (!cancelResult.success) {
+          setNotification({
+            type: "error",
+            message: "Previous run could not be cancelled. Please try again.",
+          });
+          return;
+        }
+      }
+
       const result = await triggerWorkflow.mutateAsync({ id: workflowId, payload: {} });
       setTestRunId(result.runId);
       setIsTestPanelExpanded(true);
@@ -484,8 +627,20 @@ export default function WorkflowEditorPage() {
     } catch (error) {
       console.error("Failed to run workflow:", error);
       setNotification({ type: "error", message: "Failed to start run." });
+    } finally {
+      setIsStartingRun(false);
     }
-  }, [activeRun, refetchRuns, triggerWorkflow, workflowId]);
+  }, [
+    activeRun,
+    activeRunDetails,
+    cancelGeneration,
+    isStartingRun,
+    persistWorkflow,
+    refetchActiveRunDetails,
+    refetchRuns,
+    triggerWorkflow,
+    workflowId,
+  ]);
 
   const handleCancelRun = useCallback(async () => {
     if (!cancelTargetRun?.generationId) {
@@ -563,19 +718,33 @@ export default function WorkflowEditorPage() {
               <Button
                 variant="secondary"
                 onClick={handleRun}
-                disabled={(!activeRun && status !== "on") || triggerWorkflow.isPending}
+                disabled={
+                  !hasAgentInstructions ||
+                  (!activeRun && status !== "on") ||
+                  triggerWorkflow.isPending ||
+                  isStartingRun ||
+                  isActiveRunDetailsLoading
+                }
               >
-                {triggerWorkflow.isPending ? (
+                {triggerWorkflow.isPending || isStartingRun ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Play className="mr-2 h-4 w-4" />
                 )}
                 Test now
               </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Save
-              </Button>
+              <span
+                className={cn(
+                  "text-xs transition-opacity",
+                  isSaving
+                    ? "text-muted-foreground opacity-100"
+                    : notification?.type === "error"
+                      ? "text-red-600 opacity-100 dark:text-red-400"
+                      : "text-muted-foreground opacity-0",
+                )}
+              >
+                {isSaving ? "Saving..." : notification?.type === "error" ? "Save failed" : "Saved"}
+              </span>
             </div>
           </div>
 
@@ -891,29 +1060,27 @@ export default function WorkflowEditorPage() {
                     {selectedRun?.conversationId ? (
                       <ChatCopyButton conversationId={selectedRun.conversationId} />
                     ) : null}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleCancelRun}
+                      disabled={!canCancelRun || cancelGeneration.isPending}
+                    >
+                      {cancelGeneration.isPending ? (
+                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Square className="mr-2 h-3.5 w-3.5" />
+                      )}
+                      Cancel run
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={handleDiscardTestPanel}>
                       Discard
                     </Button>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleCancelRun}
-                    disabled={!canCancelRun || cancelGeneration.isPending}
-                  >
-                    {cancelGeneration.isPending ? (
-                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Square className="mr-2 h-3.5 w-3.5" />
-                    )}
-                    Cancel run
-                  </Button>
-                </div>
                 {isTestingLocked ? (
                   <p className="text-muted-foreground mt-2 text-xs">
-                    One test run is active. Cancel it before starting another test run.
+                    Starting a new test run will cancel the currently active one.
                   </p>
                 ) : null}
               </div>

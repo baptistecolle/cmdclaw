@@ -33,16 +33,12 @@ test.describe("@live workflows", () => {
 
     const promptInput = page.locator("textarea").first();
     await expect(promptInput).toBeVisible();
-    await promptInput.fill(workflowInstruction);
-
     const runNowButton = page.getByRole("button", { name: "Test now" });
-    if (await runNowButton.isDisabled()) {
-      await page.getByRole("switch").first().click();
-    }
-    await expect(runNowButton).toBeEnabled({ timeout: responseTimeoutMs });
+    await expect(runNowButton).toBeDisabled();
 
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Workflow saved.")).toBeVisible({ timeout: responseTimeoutMs });
+    await promptInput.fill(workflowInstruction);
+    await page.getByRole("switch").first().click();
+    await expect(runNowButton).toBeEnabled({ timeout: responseTimeoutMs });
 
     await runNowButton.click();
     await expect(page).toHaveURL(/\/workflows\/[^/?#]+(?:\?.*)?$/);
