@@ -13,11 +13,11 @@
   },
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "concurrently -k -s first \"bun run --cwd ../app dev\" \"wait-on tcp:3000 && cross-env NODE_ENV=development NEXT_DEV_URL=http://localhost:3000 electron .\"",
+    "dev": "concurrently -k -s first \"bun run --cwd ../app dev\" \"wait-on tcp:3000 && cross-env NODE_ENV=development NEXT_DEV_URL=http://localhost:3000 node ./scripts/run-electron.mjs\"",
     "app:build": "cross-env NEXT_PRIVATE_STANDALONE=true bun run --cwd ../app build",
     "app:prepare": "node ./scripts/prepare-app.mjs",
     "build": "bun run app:build && bun run app:prepare",
-    "start": "cross-env NODE_ENV=production electron .",
+    "start": "cross-env NODE_ENV=production node ./scripts/run-electron.mjs",
     "dist": "bun run build && electron-builder",
     "dist:mac": "bun run build && electron-builder --mac",
     "dist:win": "bun run build && electron-builder --win",
@@ -32,7 +32,7 @@
     "wait-on": "latest"
   },
   "build": {
-    "appId": "li.slack.bap.desktop",
+    "appId": "com.heybap.desktop",
     "productName": "Bap",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "copyright": "Copyright (c) 2026 Bap. All rights reserved.",

@@ -4,11 +4,16 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 let serverProcess = null;
+const desktopRoot = path.resolve(__dirname, "..");
+const iconPngPath = path.join(desktopRoot, "build", "icons", "icon-512.png");
+
+app.setName("Bap");
 
 function createWindow(startUrl) {
   const win = new BrowserWindow({
     width: 1400,
     height: 920,
+    ...(fs.existsSync(iconPngPath) ? { icon: iconPngPath } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -25,7 +30,6 @@ function getFreePort() {
 }
 
 function startBundledNextServer() {
-  const desktopRoot = path.resolve(__dirname, "..");
   const serverEntry = path.join(desktopRoot, "app-bundle", "standalone", "server.js");
 
   if (!fs.existsSync(serverEntry)) {
@@ -66,6 +70,10 @@ app.on("before-quit", () => {
 });
 
 app.whenReady().then(() => {
+  if (process.platform === "darwin" && app.dock && fs.existsSync(iconPngPath)) {
+    app.dock.setIcon(iconPngPath);
+  }
+
   const devUrl = process.env.NEXT_DEV_URL;
   const startUrl = devUrl || startBundledNextServer();
   createWindow(startUrl);
