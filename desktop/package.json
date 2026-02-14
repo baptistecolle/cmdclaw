@@ -1,0 +1,73 @@
+{
+  "name": "bap-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron desktop wrapper for Bap web app",
+  "homepage": "https://app.heybap.com",
+  "bugs": {
+    "url": "https://app.heybap.com/support"
+  },
+  "author": {
+    "name": "Baptiste Colle",
+    "email": "baptiste@heybap.com"
+  },
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k -s first \"bun run --cwd ../app dev\" \"wait-on tcp:3000 && cross-env NODE_ENV=development NEXT_DEV_URL=http://localhost:3000 electron .\"",
+    "app:build": "cross-env NEXT_PRIVATE_STANDALONE=true bun run --cwd ../app build",
+    "app:prepare": "node ./scripts/prepare-app.mjs",
+    "build": "bun run app:build && bun run app:prepare",
+    "start": "cross-env NODE_ENV=production electron .",
+    "dist": "bun run build && electron-builder",
+    "dist:mac": "bun run build && electron-builder --mac",
+    "dist:win": "bun run build && electron-builder --win",
+    "dist:linux": "bun run build && electron-builder --linux",
+    "dist:all": "bun run build && electron-builder --mac --win --linux"
+  },
+  "devDependencies": {
+    "concurrently": "latest",
+    "cross-env": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "wait-on": "latest"
+  },
+  "build": {
+    "appId": "li.slack.bap.desktop",
+    "productName": "Bap",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "copyright": "Copyright (c) 2026 Bap. All rights reserved.",
+    "icon": "build/icons/icon-512.png",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": true,
+    "files": [
+      "electron/**/*",
+      "app-bundle/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icons/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "build/icons/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "category": "Utility",
+      "maintainer": "Baptiste Colle <baptiste@heybap.com>",
+      "icon": "build/icons/icon-512.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
+  }
+}

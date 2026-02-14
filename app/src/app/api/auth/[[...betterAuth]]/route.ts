@@ -8,6 +8,7 @@ const trustedOrigins = [
   "https://app.heybap.com",
   "https://www.heybap.com",
   `http://localhost:${process.env.PORT ?? 3000}`,
+  `http://127.0.0.1:${process.env.PORT ?? 3000}`,
 ];
 
 function getCorsHeaders(origin: string | null) {

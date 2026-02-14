@@ -53,6 +53,7 @@ export const auth = betterAuth({
     "https://www.heybap.com",
     "https://app.heybap.com",
     `http://localhost:${process.env.PORT ?? 3000}`,
+    `http://127.0.0.1:${process.env.PORT ?? 3000}`,
     "https://localcan.baptistecolle.com",
     "bap://",
   ],
