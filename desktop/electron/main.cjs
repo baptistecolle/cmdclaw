@@ -1,9 +1,12 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, dialog } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
+const http = require("node:http");
+const net = require("node:net");
 const path = require("node:path");
 
 let serverProcess = null;
+let mainWindow = null;
 const desktopRoot = path.resolve(__dirname, "..");
 const iconPngPath = path.join(desktopRoot, "build", "icons", "icon-512.png");
 
@@ -25,26 +28,82 @@ function createWindow(startUrl) {
   win.loadURL(startUrl);
 }
 
-function getFreePort() {
-  return 3412;
+async function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() => {
+        if (address && typeof address === "object") {
+          resolve(address.port);
+          return;
+        }
+        reject(new Error("Failed to resolve a free local port"));
+      });
+    });
+  });
 }
 
-function startBundledNextServer() {
-  const serverEntry = path.join(desktopRoot, "app-bundle", "standalone", "server.js");
+function waitForServerReady(url, timeoutMs = 20000) {
+  const start = Date.now();
 
-  if (!fs.existsSync(serverEntry)) {
-    throw new Error(
-      `Cannot find bundled Next server at ${serverEntry}. Run: bun run build in /desktop`
-    );
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const req = http.get(url, (res) => {
+        res.resume();
+        resolve();
+      });
+
+      req.on("error", () => {
+        if (Date.now() - start >= timeoutMs) {
+          reject(new Error(`Timed out waiting for server at ${url}`));
+          return;
+        }
+        setTimeout(check, 250);
+      });
+    };
+
+    check();
+  });
+}
+
+function resolveBundledServerEntry() {
+  const relativeServerPath = path.join("app-bundle", "standalone", "server.js");
+
+  const candidates = app.isPackaged
+    ? [
+        path.join(process.resourcesPath, "app.asar.unpacked", relativeServerPath),
+        path.join(process.resourcesPath, "app.asar", relativeServerPath),
+      ]
+    : [path.join(desktopRoot, relativeServerPath)];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
   }
 
-  const port = String(process.env.PORT || getFreePort());
-  const host = process.env.HOST || "127.0.0.1";
+  throw new Error(
+    `Cannot find bundled Next server. Looked in: ${candidates.join(", ")}. Run: bun run build in /desktop`
+  );
+}
 
-  serverProcess = spawn(process.execPath, [serverEntry], {
+async function startBundledNextServer() {
+  const serverEntry = resolveBundledServerEntry();
+
+  const port = String(process.env.PORT || (await getFreePort()));
+  const host = process.env.HOST || "127.0.0.1";
+  const startUrl = `http://${host}:${port}`;
+  const nodeExecPath =
+    app.isPackaged && process.helperExecPath ? process.helperExecPath : process.execPath;
+
+  serverProcess = spawn(nodeExecPath, [serverEntry], {
     cwd: path.dirname(serverEntry),
     env: {
       ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
       NODE_ENV: "production",
       PORT: port,
       HOSTNAME: host,
@@ -59,7 +118,8 @@ function startBundledNextServer() {
     }
   });
 
-  return `http://${host}:${port}`;
+  await waitForServerReady(startUrl);
+  return startUrl;
 }
 
 app.on("before-quit", () => {
@@ -69,20 +129,42 @@ app.on("before-quit", () => {
   }
 });
 
-app.whenReady().then(() => {
-  if (process.platform === "darwin" && app.dock && fs.existsSync(iconPngPath)) {
-    app.dock.setIcon(iconPngPath);
-  }
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
 
-  const devUrl = process.env.NEXT_DEV_URL;
-  const startUrl = devUrl || startBundledNextServer();
-  createWindow(startUrl);
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow(startUrl);
+app.on("second-instance", () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
     }
-  });
+    mainWindow.focus();
+  }
+});
+
+app.whenReady().then(async () => {
+  try {
+    if (process.platform === "darwin" && app.dock && fs.existsSync(iconPngPath)) {
+      app.dock.setIcon(iconPngPath);
+    }
+
+    const devUrl = process.env.NEXT_DEV_URL;
+    const startUrl = devUrl || (await startBundledNextServer());
+    createWindow(startUrl);
+    mainWindow = BrowserWindow.getAllWindows()[0] || null;
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow(startUrl);
+        mainWindow = BrowserWindow.getAllWindows()[0] || null;
+      }
+    });
+  } catch (error) {
+    const message = error && error.stack ? error.stack : String(error);
+    dialog.showErrorBox("Bap failed to start", message);
+    app.quit();
+  }
 });
 
 app.on("window-all-closed", () => {

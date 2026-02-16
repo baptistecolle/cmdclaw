@@ -41,6 +41,9 @@
       "output": "dist"
     },
     "asar": true,
+    "asarUnpack": [
+      "app-bundle/**/*"
+    ],
     "files": [
       "electron/**/*",
       "app-bundle/**/*",
