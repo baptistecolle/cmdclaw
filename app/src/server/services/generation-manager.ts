@@ -247,6 +247,7 @@ interface GenerationContext {
   sandbox?: SandboxBackend;
   e2bSandbox?: import("e2b").Sandbox;
   sentFilePaths?: Set<string>;
+  userStagedFilePaths?: Set<string>;
   uploadedSandboxFileIds?: Set<string>;
   agentInitStartedAt?: number;
   agentInitReadyAt?: number;
@@ -685,6 +686,7 @@ class GenerationManager {
       allowedIntegrations: params.allowedIntegrations,
       autoApprove: conv.autoApprove,
       attachments: params.attachments,
+      userStagedFilePaths: new Set(),
       uploadedSandboxFileIds: new Set(),
       agentInitStartedAt: undefined,
       agentInitReadyAt: undefined,
@@ -819,6 +821,7 @@ class GenerationManager {
       workflowPromptDo: params.workflowPromptDo ?? undefined,
       workflowPromptDont: params.workflowPromptDont ?? undefined,
       triggerPayload: params.triggerPayload,
+      userStagedFilePaths: new Set(),
       uploadedSandboxFileIds: new Set(),
       agentInitStartedAt: undefined,
       agentInitReadyAt: undefined,
@@ -1785,6 +1788,7 @@ class GenerationManager {
       ctx.generationMarkerTime = Date.now();
       ctx.e2bSandbox = sandbox;
       ctx.sentFilePaths = new Set();
+      ctx.userStagedFilePaths = new Set();
 
       // Write skills to sandbox
       const writtenSkills = await writeSkillsToSandbox(sandbox, ctx.userId);
@@ -1937,6 +1941,7 @@ class GenerationManager {
                   buffer.byteOffset + buffer.byteLength,
                 ) as ArrayBuffer,
               );
+              ctx.userStagedFilePaths?.add(sandboxPath);
               promptParts.push({
                 type: "text",
                 text: `The user uploaded a file: ${sandboxPath} (${a.mimeType}). You can read and process it using the sandbox tools.`,
@@ -2098,7 +2103,7 @@ class GenerationManager {
           const newFiles = await collectNewE2BFiles(
             ctx.e2bSandbox,
             ctx.generationMarkerTime,
-            Array.from(ctx.sentFilePaths || []),
+            Array.from(new Set([...(ctx.sentFilePaths ?? []), ...(ctx.userStagedFilePaths ?? [])])),
           );
 
           console.log(`[GenerationManager] Found ${newFiles.length} new files in E2B sandbox`);
@@ -2184,6 +2189,7 @@ class GenerationManager {
       ctx.generationMarkerTime = Date.now();
       ctx.sandbox = sandbox;
       ctx.sentFilePaths = new Set();
+      ctx.userStagedFilePaths = new Set();
 
       // Sync memory files to sandbox
       try {
@@ -4287,10 +4293,11 @@ class GenerationManager {
         if (status === "completed" && ctx.sandbox && ctx.generationMarkerTime) {
           try {
             const excludePaths = Array.from(ctx.sentFilePaths || []);
+            const stagedPaths = Array.from(ctx.userStagedFilePaths || []);
             const newFiles = await collectNewSandboxFiles(
               ctx.sandbox,
               ctx.generationMarkerTime,
-              excludePaths,
+              Array.from(new Set([...excludePaths, ...stagedPaths])),
             );
 
             await Promise.all(

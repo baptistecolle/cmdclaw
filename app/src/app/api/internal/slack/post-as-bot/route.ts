@@ -1,5 +1,7 @@
+import { and, eq, inArray } from "drizzle-orm";
 import { env } from "@/env";
-import { generationManager } from "@/server/services/generation-manager";
+import { db } from "@/server/db/client";
+import { conversation, workflow, workflowRun } from "@/server/db/schema";
 
 export const runtime = "nodejs";
 
@@ -134,16 +136,45 @@ export async function POST(request: Request) {
   }
 
   if (conversationId) {
-    const genId = generationManager.getGenerationForConversation(conversationId);
-    if (!genId) {
+    const conv = await db.query.conversation.findFirst({
+      where: eq(conversation.id, conversationId),
+      columns: { currentGenerationId: true },
+    });
+    const currentGenerationId = conv?.currentGenerationId ?? undefined;
+    if (!currentGenerationId) {
       return Response.json(
         { ok: false, error: "No active generation for conversation" },
         { status: 403 },
       );
     }
 
-    const allowedIntegrations =
-      generationManager.getAllowedIntegrationsForConversation(conversationId);
+    const activeGeneration = await db.query.generation.findFirst({
+      where: (fields) =>
+        and(
+          eq(fields.id, currentGenerationId),
+          inArray(fields.status, ["running", "awaiting_approval", "awaiting_auth", "paused"]),
+        ),
+      columns: { id: true },
+    });
+    if (!activeGeneration) {
+      return Response.json(
+        { ok: false, error: "No active generation for conversation" },
+        { status: 403 },
+      );
+    }
+
+    const linkedRun = await db.query.workflowRun.findFirst({
+      where: eq(workflowRun.generationId, currentGenerationId),
+      columns: { workflowId: true },
+    });
+    const wf = linkedRun
+      ? await db.query.workflow.findFirst({
+          where: eq(workflow.id, linkedRun.workflowId),
+          columns: { allowedIntegrations: true },
+        })
+      : undefined;
+    const allowedIntegrations = wf?.allowedIntegrations ?? null;
+
     if (allowedIntegrations && !allowedIntegrations.includes("slack")) {
       return Response.json(
         {

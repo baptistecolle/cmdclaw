@@ -1487,6 +1487,11 @@ describe("generationManager transitions", () => {
     await mgr.runOpenCodeGeneration(ctx);
 
     expect(promptMock).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(collectNewE2BFiles)).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(Number),
+      expect.arrayContaining(["/home/user/uploads/notes.txt"]),
+    );
     expect(vi.mocked(uploadSandboxFile)).toHaveBeenCalled();
     expect(finishSpy).toHaveBeenCalledWith(ctx, "completed");
     expect(ctx.uploadedSandboxFileIds?.has("sandbox-file-1")).toBe(true);
