@@ -1,0 +1,21 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./data:/app/data
+
+  playwright-monitor:
+    build:
+      context: ../..
+      dockerfile: infra/uptime-kuma/monitor-runner/Dockerfile
+    container_name: playwright-monitor
+    restart: unless-stopped
+    depends_on:
+      - uptime-kuma
+    working_dir: /workspace/app
+    volumes:
+      - ../../app:/workspace/app
