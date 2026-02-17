@@ -63,6 +63,7 @@ import {
   useWorkflowRuns,
   useWorkflowRun,
   useCancelGeneration,
+  useSubmitApproval,
   useTriggerWorkflow,
   type WorkflowSchedule,
 } from "@/orpc/hooks";
@@ -87,6 +88,53 @@ const mobileTestPanelAnimate = { opacity: 1, y: 0 } as const;
 const mobileTestPanelExit = { opacity: 0, y: 16 } as const;
 const mobileTestPanelTransition = { duration: 0.2, ease: "easeOut" } as const;
 const ACTIVE_TEST_RUN_STATUSES = new Set(["running", "awaiting_approval", "awaiting_auth"]);
+
+type PendingApprovalSummary = {
+  toolUseId: string;
+  integration: string;
+  operation: string;
+  command?: string;
+};
+
+function getPendingApprovalSummaryFromRun(run: {
+  status: string;
+  events: Array<{ type: string; payload: unknown }>;
+}): PendingApprovalSummary | null {
+  if (run.status !== "awaiting_approval") {
+    return null;
+  }
+
+  for (let i = run.events.length - 1; i >= 0; i -= 1) {
+    const event = run.events[i];
+    if (
+      !event ||
+      event.type !== "pending_approval" ||
+      !event.payload ||
+      typeof event.payload !== "object"
+    ) {
+      continue;
+    }
+
+    const payload = event.payload as Record<string, unknown>;
+    const toolUseId = typeof payload.toolUseId === "string" ? payload.toolUseId : null;
+    const integration = typeof payload.integration === "string" ? payload.integration : null;
+    const operation = typeof payload.operation === "string" ? payload.operation : null;
+    const command = typeof payload.command === "string" ? payload.command : undefined;
+
+    if (!toolUseId || !integration || !operation) {
+      continue;
+    }
+
+    return {
+      toolUseId,
+      integration,
+      operation,
+      command,
+    };
+  }
+
+  return null;
+}
 
 function formatRelativeTime(value?: Date | string | null) {
   if (!value) {
@@ -145,6 +193,7 @@ export default function WorkflowEditorPage() {
   const updateWorkflow = useUpdateWorkflow();
   const triggerWorkflow = useTriggerWorkflow();
   const cancelGeneration = useCancelGeneration();
+  const submitApproval = useSubmitApproval();
 
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState(TRIGGERS[0].value);
@@ -491,6 +540,7 @@ export default function WorkflowEditorPage() {
   const canCancelRun = Boolean(
     cancelTargetRun?.generationId && ACTIVE_TEST_RUN_STATUSES.has(cancelTargetRun.status),
   );
+  const pendingApprovalSummary = selectedRun ? getPendingApprovalSummaryFromRun(selectedRun) : null;
   const hasAgentInstructions = prompt.trim().length > 0;
 
   useEffect(() => {
@@ -674,6 +724,59 @@ export default function WorkflowEditorPage() {
     }
   }, [cancelGeneration, cancelTargetRun?.generationId, refetchRuns, refetchSelectedRun]);
 
+  const handleSubmitRunApproval = useCallback(
+    async (decision: "approve" | "deny") => {
+      if (!selectedRun?.generationId || !pendingApprovalSummary?.toolUseId) {
+        setNotification({
+          type: "error",
+          message: "No pending approval found for this run.",
+        });
+        return;
+      }
+
+      try {
+        const result = await submitApproval.mutateAsync({
+          generationId: selectedRun.generationId,
+          toolUseId: pendingApprovalSummary.toolUseId,
+          decision,
+        });
+
+        if (!result.success) {
+          setNotification({
+            type: "error",
+            message: "Approval was not applied. The request may have expired.",
+          });
+          return;
+        }
+
+        setNotification({
+          type: "success",
+          message: decision === "approve" ? "Action approved." : "Action denied.",
+        });
+        await Promise.all([refetchRuns(), refetchSelectedRun()]);
+      } catch (error) {
+        console.error("Failed to submit workflow approval:", error);
+        setNotification({
+          type: "error",
+          message: "Failed to submit approval.",
+        });
+      }
+    },
+    [
+      pendingApprovalSummary?.toolUseId,
+      refetchRuns,
+      refetchSelectedRun,
+      selectedRun?.generationId,
+      submitApproval,
+    ],
+  );
+  const handleApproveRun = useCallback(() => {
+    void handleSubmitRunApproval("approve");
+  }, [handleSubmitRunApproval]);
+  const handleDenyRun = useCallback(() => {
+    void handleSubmitRunApproval("deny");
+  }, [handleSubmitRunApproval]);
+
   if (isLoading || !workflow) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -770,6 +873,35 @@ export default function WorkflowEditorPage() {
           <p className="text-muted-foreground mt-2 text-xs">
             Starting a new test run will cancel the currently active one.
           </p>
+        ) : null}
+        {pendingApprovalSummary ? (
+          <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+            <p className="text-sm font-medium">Approval required</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {pendingApprovalSummary.integration} {pendingApprovalSummary.operation}
+            </p>
+            {pendingApprovalSummary.command ? (
+              <code className="bg-background/80 mt-2 block overflow-x-auto rounded px-2 py-1 text-xs">
+                {pendingApprovalSummary.command}
+              </code>
+            ) : null}
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" onClick={handleApproveRun} disabled={submitApproval.isPending}>
+                {submitApproval.isPending ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : null}
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDenyRun}
+                disabled={submitApproval.isPending}
+              >
+                Deny
+              </Button>
+            </div>
+          </div>
         ) : null}
       </div>
 

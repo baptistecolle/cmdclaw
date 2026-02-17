@@ -89,10 +89,18 @@ export async function POST(request: Request) {
       return Response.json({ success: false });
     }
 
-    const allowedIntegrations = generationManager.getAllowedIntegrationsForConversation(
-      input.conversationId,
-    );
-    if (allowedIntegrations && !allowedIntegrations.includes(input.integration)) {
+    const gm = generationManager as unknown as {
+      getAllowedIntegrationsForGeneration?: (generationId: string) => Promise<string[] | null>;
+      getAllowedIntegrationsForConversation?: (conversationId: string) => string[] | null;
+    };
+    const allowedIntegrations =
+      typeof gm.getAllowedIntegrationsForGeneration === "function"
+        ? await gm.getAllowedIntegrationsForGeneration(genId)
+        : typeof gm.getAllowedIntegrationsForConversation === "function"
+          ? gm.getAllowedIntegrationsForConversation(input.conversationId)
+          : null;
+
+    if (Array.isArray(allowedIntegrations) && !allowedIntegrations.includes(input.integration)) {
       console.warn("[Internal] Integration not allowed for workflow:", input.integration);
       return Response.json({ success: false });
     }

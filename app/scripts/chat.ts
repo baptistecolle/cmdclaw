@@ -656,6 +656,16 @@ function createSingleMessagePrompt(): readline.Interface | null {
   return createPrompt();
 }
 
+async function printAuthenticatedUser(client: RouterClient<AppRouter>): Promise<void> {
+  try {
+    const me = await client.user.me();
+    console.log(`[auth] ${me.email} (${me.id})`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[auth] failed to resolve current user: ${message}`);
+  }
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
@@ -696,6 +706,7 @@ async function main(): Promise<void> {
   console.log(`[model] ${args.model}`);
 
   const client = createRpcClient(serverUrl, config.token);
+  await printAuthenticatedUser(client);
 
   if (args.message) {
     // Non-interactive: send a single message and exit

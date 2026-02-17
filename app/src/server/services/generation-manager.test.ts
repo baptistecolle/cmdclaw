@@ -7,6 +7,8 @@ const {
   insertValuesMock,
   generationFindFirstMock,
   conversationFindFirstMock,
+  workflowRunFindFirstMock,
+  workflowFindFirstMock,
   dbMock,
 } = vi.hoisted(() => {
   const updateWhereMock = vi.fn();
@@ -18,11 +20,15 @@ const {
   const insertMock = vi.fn(() => ({ values: insertValuesMock }));
   const generationFindFirstMock = vi.fn();
   const conversationFindFirstMock = vi.fn();
+  const workflowRunFindFirstMock = vi.fn();
+  const workflowFindFirstMock = vi.fn();
 
   const dbMock = {
     query: {
       generation: { findFirst: generationFindFirstMock },
       conversation: { findFirst: conversationFindFirstMock },
+      workflowRun: { findFirst: workflowRunFindFirstMock },
+      workflow: { findFirst: workflowFindFirstMock },
       customIntegrationCredential: { findMany: vi.fn(() => []) },
     },
     update: updateMock,
@@ -36,6 +42,8 @@ const {
     insertValuesMock,
     generationFindFirstMock,
     conversationFindFirstMock,
+    workflowRunFindFirstMock,
+    workflowFindFirstMock,
     dbMock,
   };
 });
@@ -261,6 +269,8 @@ describe("generationManager transitions", () => {
     insertReturningMock.mockResolvedValue([]);
     generationFindFirstMock.mockResolvedValue(null);
     conversationFindFirstMock.mockResolvedValue(null);
+    workflowRunFindFirstMock.mockResolvedValue(null);
+    workflowFindFirstMock.mockResolvedValue(null);
 
     const mgr = asTestManager();
     mgr.activeGenerations.clear();

@@ -289,6 +289,7 @@ function printHelp(): void {
   console.log("  create                            Create workflow (flags below)");
   console.log("  run <workflow-id>                 Trigger a workflow run");
   console.log("  logs <run-id>                     Show run events and transcript");
+  console.log("  approve <run-id> <tool-use-id> <approve|deny>  Submit pending approval");
   console.log("\nAliases:");
   console.log("  trigger <workflow-id>             Alias of run");
   console.log("  show-run <run-id>                 Alias of logs");
@@ -517,6 +518,41 @@ async function logsWorkflowRun(client: RouterClient<AppRouter>, args: ParsedArgs
   await printRunLogs(client, runId, args.watch, args.watchIntervalSeconds);
 }
 
+async function approveWorkflowRun(
+  client: RouterClient<AppRouter>,
+  args: ParsedArgs,
+): Promise<void> {
+  const runId = args.positionals[0];
+  const toolUseId = args.positionals[1];
+  const decisionRaw = args.positionals[2];
+
+  if (!runId || !toolUseId || !decisionRaw) {
+    throw new Error("Usage: bun run workflow approve <run-id> <tool-use-id> <approve|deny>");
+  }
+
+  if (decisionRaw !== "approve" && decisionRaw !== "deny") {
+    throw new Error("Decision must be 'approve' or 'deny'");
+  }
+  const decision: "approve" | "deny" = decisionRaw;
+
+  const run = await client.workflow.getRun({ id: runId });
+  if (!run.generationId) {
+    throw new Error(`Run ${runId} has no active generation for approval.`);
+  }
+
+  const result = await client.generation.submitApproval({
+    generationId: run.generationId,
+    toolUseId,
+    decision,
+  });
+
+  if (!result.success) {
+    throw new Error("Approval was not applied. Request may be stale or already resolved.");
+  }
+
+  console.log(`Submitted ${decision} for ${toolUseId} on run ${runId}.`);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -565,6 +601,9 @@ async function main(): Promise<void> {
       case "logs":
       case "show-run":
         await logsWorkflowRun(client, parsed);
+        break;
+      case "approve":
+        await approveWorkflowRun(client, parsed);
         break;
       case "runs":
         await listRuns(client, parsed);

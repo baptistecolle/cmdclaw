@@ -45,7 +45,8 @@
     "ws:dev": "bun scripts/start-ws.ts",
     "chat:auth": "bun --env-file=.env scripts/chat-auth.ts",
     "chat": "bun run chat:auth && bun scripts/chat.ts",
-    "workflow": "bun scripts/workflow.ts"
+    "workflow": "bun scripts/workflow.ts",
+    "auth:inspect": "bun scripts/auth-inspect.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

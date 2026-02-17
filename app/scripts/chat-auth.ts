@@ -10,8 +10,8 @@ type ChatConfig = {
 };
 
 const DEFAULT_SERVER_URL = "http://localhost:3000";
-const DEFAULT_CHAT_AUTH_EMAIL = "chat-cli@heybap.local";
-const DEFAULT_CHAT_AUTH_NAME = "Chat CLI";
+const DEFAULT_CHAT_AUTH_EMAIL = "baptiste@heybap.com";
+const DEFAULT_CHAT_AUTH_NAME = "Baptiste";
 const BAP_DIR = join(homedir(), ".bap");
 const CONFIG_PATH = join(BAP_DIR, "chat-config.json");
 

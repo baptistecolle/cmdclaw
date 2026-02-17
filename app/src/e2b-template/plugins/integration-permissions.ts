@@ -324,20 +324,33 @@ async function requestApproval(params: {
   operation: string;
   command: string;
   toolInput: unknown;
-}): Promise<"allow" | "deny"> {
+}): Promise<{ decision?: "allow" | "deny"; error?: string }> {
   const serverUrls = getCallbackBaseUrls();
   const serverSecret = process.env.BAP_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
   const sandboxId = process.env.SANDBOX_ID;
 
   if (serverUrls.length === 0 || !conversationId) {
-    console.error("[Plugin] Missing APP_URL or CONVERSATION_ID");
-    return "deny";
+    const reason =
+      serverUrls.length === 0
+        ? "Missing callback base URL (APP_URL/NEXT_PUBLIC_APP_URL/E2B_CALLBACK_BASE_URL)"
+        : "Missing CONVERSATION_ID";
+    console.error(`[Plugin] ${reason}`);
+    return { error: reason };
   }
 
-  const attempt = async (index: number): Promise<"allow" | "deny"> => {
+  const attempt = async (
+    index: number,
+    lastError?: string,
+  ): Promise<{ decision?: "allow" | "deny"; error?: string }> => {
     if (index >= serverUrls.length) {
-      return "deny";
+      return {
+        error:
+          lastError ??
+          `Approval callback unreachable. Tried: ${serverUrls
+            .map((url) => `${url}/api/internal/approval-request`)
+            .join(", ")}`,
+      };
     }
     const serverUrl = serverUrls[index]!;
     try {
@@ -359,17 +372,17 @@ async function requestApproval(params: {
 
       if (!response.ok) {
         const bodyPreview = (await response.text()).slice(0, 200);
-        console.error(
-          `[Plugin] Approval request failed via ${serverUrl}: ${response.status} ${bodyPreview}`,
-        );
-        return attempt(index + 1);
+        const errorMessage = `Approval request failed via ${serverUrl}: ${response.status} ${bodyPreview}`;
+        console.error(`[Plugin] ${errorMessage}`);
+        return attempt(index + 1, errorMessage);
       }
 
       const result = await response.json();
-      return result.decision || "deny";
+      return { decision: result.decision || "deny" };
     } catch (error) {
-      console.error(`[Plugin] Approval request error via ${serverUrl}:`, error);
-      return attempt(index + 1);
+      const errorMessage = `Approval request error via ${serverUrl}: ${error instanceof Error ? error.message : String(error)}`;
+      console.error(`[Plugin] ${errorMessage}`);
+      return attempt(index + 1, errorMessage);
     }
   };
 
@@ -382,20 +395,26 @@ async function requestApproval(params: {
 async function requestAuth(params: {
   integration: string;
   reason: string;
-}): Promise<{ success: boolean; tokens?: Record<string, string> }> {
+}): Promise<{ success: boolean; tokens?: Record<string, string>; error?: string }> {
   const serverUrls = getCallbackBaseUrls();
   const serverSecret = process.env.BAP_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
 
   if (serverUrls.length === 0 || !conversationId) {
-    console.error("[Plugin] Missing APP_URL or CONVERSATION_ID");
-    return { success: false };
+    const reason =
+      serverUrls.length === 0
+        ? "Missing callback base URL (APP_URL/NEXT_PUBLIC_APP_URL/E2B_CALLBACK_BASE_URL)"
+        : "Missing CONVERSATION_ID";
+    console.error(`[Plugin] ${reason}`);
+    return { success: false, error: reason };
   }
 
   const attempt = async (
     index: number,
+    lastError?: string,
   ): Promise<{ success: boolean; tokens?: Record<string, string> }> => {
     if (index >= serverUrls.length) {
+      console.error(`[Plugin] ${lastError ?? "Auth callback unreachable"}`);
       return { success: false };
     }
     const serverUrl = serverUrls[index]!;
@@ -415,10 +434,9 @@ async function requestAuth(params: {
 
       if (!response.ok) {
         const bodyPreview = (await response.text()).slice(0, 200);
-        console.error(
-          `[Plugin] Auth request failed via ${serverUrl}: ${response.status} ${bodyPreview}`,
-        );
-        return attempt(index + 1);
+        const errorMessage = `Auth request failed via ${serverUrl}: ${response.status} ${bodyPreview}`;
+        console.error(`[Plugin] ${errorMessage}`);
+        return attempt(index + 1, errorMessage);
       }
 
       const result = await response.json();
@@ -427,12 +445,21 @@ async function requestAuth(params: {
         tokens: result.tokens,
       };
     } catch (error) {
-      console.error(`[Plugin] Auth request error via ${serverUrl}:`, error);
-      return attempt(index + 1);
+      const errorMessage = `Auth request error via ${serverUrl}: ${error instanceof Error ? error.message : String(error)}`;
+      console.error(`[Plugin] ${errorMessage}`);
+      return attempt(index + 1, errorMessage);
     }
   };
-
-  return attempt(0);
+  const result = await attempt(0);
+  if (result.success) {
+    return result;
+  }
+  return {
+    ...result,
+    error: `Auth callback unreachable or denied. Tried: ${serverUrls
+      .map((url) => `${url}/api/internal/auth-request`)
+      .join(", ")}`,
+  };
 }
 
 /**
@@ -501,6 +528,10 @@ export const IntegrationPermissionsPlugin = async () => {
           reason: `${INTEGRATION_NAMES[integration] || integration} authentication required`,
         });
 
+        if (authResult.error) {
+          throw new Error(`Authentication callback failed: ${authResult.error}`);
+        }
+
         if (!authResult.success) {
           throw new Error(
             `Authentication not completed for ${INTEGRATION_NAMES[integration] || integration}`,
@@ -529,7 +560,11 @@ export const IntegrationPermissionsPlugin = async () => {
           toolInput: output.args,
         });
 
-        if (decision === "deny") {
+        if (decision.error) {
+          throw new Error(`Approval check failed: ${decision.error}`);
+        }
+
+        if (decision.decision === "deny") {
           throw new Error("User denied this action");
         }
 

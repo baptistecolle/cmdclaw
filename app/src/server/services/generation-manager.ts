@@ -27,6 +27,7 @@ import {
   generation,
   message,
   messageAttachment,
+  workflow,
   workflowRun,
   workflowRunEvent,
   type ContentPart,
@@ -968,6 +969,7 @@ class GenerationManager {
         let lastHeartbeatAt = 0;
         let lastStatus: typeof generation.$inferSelect.status = genRecord.status;
         let emittedPendingApprovalToolUseId: string | null = null;
+        let emittedPendingAuthRequestedAt: string | null = null;
 
         yield { type: "status_change", status: genRecord.status };
 
@@ -1009,6 +1011,20 @@ class GenerationManager {
                 integration: pendingApproval.integration,
                 operation: pendingApproval.operation,
                 command: pendingApproval.command,
+              };
+            }
+          }
+
+          if (latest.status === "awaiting_auth" && latest.pendingAuth) {
+            const pendingAuth = latest.pendingAuth as PendingAuth;
+            if (emittedPendingAuthRequestedAt !== pendingAuth.requestedAt) {
+              emittedPendingAuthRequestedAt = pendingAuth.requestedAt;
+              yield {
+                type: "auth_needed",
+                generationId: latest.id,
+                conversationId: latest.conversationId,
+                integrations: pendingAuth.integrations,
+                reason: pendingAuth.reason,
               };
             }
           }
@@ -1361,6 +1377,30 @@ class GenerationManager {
       return null;
     }
     return ctx.allowedIntegrations;
+  }
+
+  async getAllowedIntegrationsForGeneration(
+    generationId: string,
+  ): Promise<IntegrationType[] | null> {
+    const ctx = this.activeGenerations.get(generationId);
+    if (ctx?.allowedIntegrations) {
+      return ctx.allowedIntegrations;
+    }
+
+    const linkedRun = await db.query.workflowRun.findFirst({
+      where: eq(workflowRun.generationId, generationId),
+      columns: { workflowId: true },
+    });
+    if (!linkedRun) {
+      return null;
+    }
+
+    const wf = await db.query.workflow.findFirst({
+      where: eq(workflow.id, linkedRun.workflowId),
+      columns: { allowedIntegrations: true },
+    });
+
+    return (wf?.allowedIntegrations as IntegrationType[] | undefined) ?? null;
   }
 
   /**
@@ -3670,58 +3710,117 @@ class GenerationManager {
     userId: string,
   ): Promise<boolean> {
     const ctx = this.activeGenerations.get(generationId);
-    if (!ctx) {
+    const genRecord = await db.query.generation.findFirst({
+      where: eq(generation.id, generationId),
+      with: { conversation: true },
+    });
+
+    if (!ctx && !genRecord) {
       return false;
     }
 
-    if (ctx.userId !== userId) {
+    const recordUserId = genRecord?.conversation.userId ?? ctx?.userId;
+    if (!recordUserId || recordUserId !== userId) {
       throw new Error("Access denied");
     }
 
-    if (!ctx.pendingAuth) {
+    const pendingAuth =
+      (ctx?.pendingAuth as PendingAuth | null) ?? (genRecord?.pendingAuth as PendingAuth | null);
+    if (!pendingAuth) {
       return false;
     }
 
+    const conversationId = genRecord?.conversationId ?? ctx!.conversationId;
+    const linkedWorkflowRun = await db.query.workflowRun.findFirst({
+      where: eq(workflowRun.generationId, generationId),
+      columns: { id: true },
+    });
+
     // Clear auth timeout
-    if (ctx.authTimeoutId) {
+    if (ctx?.authTimeoutId) {
       clearTimeout(ctx.authTimeoutId);
       ctx.authTimeoutId = undefined;
     }
 
     if (!success) {
       // User cancelled - resolve promise with failure (OpenCode plugin flow)
-      if (ctx.authResolver) {
+      if (ctx?.authResolver) {
         ctx.authResolver({ success: false });
         ctx.authResolver = undefined;
       }
-      await this.finishGeneration(ctx, "cancelled");
+
+      if (ctx) {
+        await this.finishGeneration(ctx, "cancelled");
+      } else {
+        await db
+          .update(generation)
+          .set({
+            status: "cancelled",
+            pendingAuth: null,
+            completedAt: new Date(),
+          })
+          .where(eq(generation.id, generationId));
+
+        await db
+          .update(conversation)
+          .set({ generationStatus: "idle" })
+          .where(eq(conversation.id, conversationId));
+
+        if (linkedWorkflowRun?.id) {
+          await db
+            .update(workflowRun)
+            .set({ status: "cancelled", finishedAt: new Date() })
+            .where(eq(workflowRun.id, linkedWorkflowRun.id));
+        }
+      }
+
       return true;
     }
 
     // Track connected integration
-    ctx.pendingAuth.connectedIntegrations.push(integration);
-
-    const allConnected = ctx.pendingAuth.integrations.every((i) =>
-      ctx.pendingAuth!.connectedIntegrations.includes(i),
+    const connectedIntegrations = Array.from(
+      new Set([...pendingAuth.connectedIntegrations, integration]),
     );
+
+    const allConnected = pendingAuth.integrations.every((requiredIntegration) =>
+      connectedIntegrations.includes(requiredIntegration),
+    );
+
+    if (ctx?.pendingAuth) {
+      ctx.pendingAuth.connectedIntegrations = connectedIntegrations;
+    }
+
+    await db
+      .update(generation)
+      .set({
+        pendingAuth: {
+          ...pendingAuth,
+          connectedIntegrations,
+        },
+      })
+      .where(eq(generation.id, generationId));
 
     if (allConnected) {
       // Resolve the auth promise if waiting (OpenCode plugin flow)
-      if (ctx.authResolver) {
-        ctx.authResolver({ success: true, userId: ctx.userId });
+      if (ctx?.authResolver) {
+        ctx.authResolver({ success: true, userId: recordUserId });
         ctx.authResolver = undefined;
       }
 
       // Broadcast result before clearing pendingAuth
-      this.broadcast(ctx, {
-        type: "auth_result",
-        success: true,
-        integrations: ctx.pendingAuth.connectedIntegrations,
-      });
+      if (ctx) {
+        this.broadcast(ctx, {
+          type: "auth_result",
+          success: true,
+          integrations: connectedIntegrations,
+        });
+      }
 
       // Clear pending auth and resume
-      ctx.pendingAuth = null;
-      ctx.status = "running";
+      if (ctx) {
+        ctx.pendingAuth = null;
+        ctx.status = "running";
+      }
 
       // Update database
       await db
@@ -3730,28 +3829,35 @@ class GenerationManager {
           status: "running",
           pendingAuth: null,
         })
-        .where(eq(generation.id, ctx.id));
+        .where(eq(generation.id, generationId));
 
       await db
         .update(conversation)
         .set({ generationStatus: "generating" })
-        .where(eq(conversation.id, ctx.conversationId));
+        .where(eq(conversation.id, conversationId));
 
-      if (ctx.workflowRunId) {
+      if (ctx?.workflowRunId) {
         await db
           .update(workflowRun)
           .set({ status: "running" })
           .where(eq(workflowRun.id, ctx.workflowRunId));
+      } else if (linkedWorkflowRun?.id) {
+        await db
+          .update(workflowRun)
+          .set({ status: "running" })
+          .where(eq(workflowRun.id, linkedWorkflowRun.id));
       }
     } else {
       // Still waiting for more integrations - broadcast progress
-      this.broadcast(ctx, {
-        type: "auth_progress",
-        connected: integration,
-        remaining: ctx.pendingAuth.integrations.filter(
-          (i) => !ctx.pendingAuth!.connectedIntegrations.includes(i),
-        ),
-      });
+      if (ctx) {
+        this.broadcast(ctx, {
+          type: "auth_progress",
+          connected: integration,
+          remaining: pendingAuth.integrations.filter(
+            (requiredIntegration) => !connectedIntegrations.includes(requiredIntegration),
+          ),
+        });
+      }
     }
 
     return true;
@@ -3909,46 +4015,55 @@ class GenerationManager {
     },
   ): Promise<{ success: boolean; userId?: string }> {
     const ctx = this.activeGenerations.get(generationId);
-    if (!ctx) {
+    const genRecord = await db.query.generation.findFirst({
+      where: eq(generation.id, generationId),
+      with: { conversation: true },
+    });
+    if (!ctx && !genRecord) {
       return { success: false };
     }
 
+    const conversationId = genRecord?.conversationId ?? ctx!.conversationId;
+    const linkedWorkflowRun = await db.query.workflowRun.findFirst({
+      where: eq(workflowRun.generationId, generationId),
+      columns: { id: true },
+    });
+    const pendingAuth: PendingAuth = {
+      integrations: [request.integration],
+      connectedIntegrations: [],
+      requestedAt: new Date().toISOString(),
+      reason: request.reason,
+    };
+
     // Create a promise that resolves when OAuth completes
-    return new Promise((resolve) => {
+    await db
+      .update(generation)
+      .set({
+        status: "awaiting_auth",
+        pendingAuth,
+      })
+      .where(eq(generation.id, generationId));
+
+    await db
+      .update(conversation)
+      .set({ generationStatus: "awaiting_auth" })
+      .where(eq(conversation.id, conversationId));
+
+    if (ctx?.workflowRunId) {
+      await db
+        .update(workflowRun)
+        .set({ status: "awaiting_auth" })
+        .where(eq(workflowRun.id, ctx.workflowRunId));
+    } else if (linkedWorkflowRun?.id) {
+      await db
+        .update(workflowRun)
+        .set({ status: "awaiting_auth" })
+        .where(eq(workflowRun.id, linkedWorkflowRun.id));
+    }
+
+    if (ctx) {
       ctx.status = "awaiting_auth";
-      ctx.pendingAuth = {
-        integrations: [request.integration],
-        connectedIntegrations: [],
-        requestedAt: new Date().toISOString(),
-        reason: request.reason,
-      };
-      ctx.authResolver = resolve;
-
-      // Update database
-      db.update(generation)
-        .set({
-          status: "awaiting_auth",
-          pendingAuth: ctx.pendingAuth,
-        })
-        .where(eq(generation.id, ctx.id))
-        .then(() => {
-          return db
-            .update(conversation)
-            .set({ generationStatus: "awaiting_auth" })
-            .where(eq(conversation.id, ctx.conversationId));
-        })
-        .then(() => {
-          if (!ctx.workflowRunId) {
-            return;
-          }
-          return db
-            .update(workflowRun)
-            .set({ status: "awaiting_auth" })
-            .where(eq(workflowRun.id, ctx.workflowRunId));
-        })
-        .catch((err) => console.error("[GenerationManager] DB update error:", err));
-
-      // Notify subscribers
+      ctx.pendingAuth = pendingAuth;
       this.broadcast(ctx, {
         type: "auth_needed",
         generationId: ctx.id,
@@ -3956,16 +4071,73 @@ class GenerationManager {
         integrations: [request.integration],
         reason: request.reason,
       });
+    }
 
-      // Start auth timeout
-      ctx.authTimeoutId = setTimeout(() => {
-        if (ctx.authResolver) {
-          ctx.authResolver({ success: false });
-          ctx.authResolver = undefined;
-        }
-        this.handleAuthTimeout(ctx);
-      }, AUTH_TIMEOUT_MS);
-    });
+    const startedAt = Date.now();
+    const pollResult = async (): Promise<{ success: boolean; userId?: string } | null> => {
+      if (Date.now() - startedAt >= AUTH_TIMEOUT_MS) {
+        return null;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      const latest = await db.query.generation.findFirst({
+        where: eq(generation.id, generationId),
+        with: { conversation: true },
+      });
+      if (!latest) {
+        return ctx ? pollResult() : { success: false };
+      }
+
+      const latestPendingAuth = latest.pendingAuth as PendingAuth | null;
+      if (latestPendingAuth?.connectedIntegrations.includes(request.integration)) {
+        return latest.conversation.userId
+          ? { success: true, userId: latest.conversation.userId }
+          : { success: false };
+      }
+
+      if (latest.status === "cancelled" || latest.status === "error") {
+        return { success: false };
+      }
+
+      return pollResult();
+    };
+
+    const resolved = await pollResult();
+    if (resolved) {
+      return resolved;
+    }
+
+    if (ctx) {
+      if (ctx.authResolver) {
+        ctx.authResolver({ success: false });
+        ctx.authResolver = undefined;
+      }
+      await this.handleAuthTimeout(ctx);
+    } else {
+      await db
+        .update(generation)
+        .set({
+          status: "cancelled",
+          pendingAuth: null,
+          completedAt: new Date(),
+        })
+        .where(eq(generation.id, generationId));
+
+      await db
+        .update(conversation)
+        .set({ generationStatus: "idle" })
+        .where(eq(conversation.id, conversationId));
+
+      if (linkedWorkflowRun?.id) {
+        await db
+          .update(workflowRun)
+          .set({ status: "cancelled", finishedAt: new Date() })
+          .where(eq(workflowRun.id, linkedWorkflowRun.id));
+      }
+    }
+
+    return { success: false };
   }
 
   private async finishGeneration(

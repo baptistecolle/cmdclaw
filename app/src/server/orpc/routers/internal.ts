@@ -101,9 +101,7 @@ const approvalRequest = baseProcedure
       return { decision: "deny" as const };
     }
 
-    const allowedIntegrations = generationManager.getAllowedIntegrationsForConversation(
-      input.conversationId,
-    );
+    const allowedIntegrations = await generationManager.getAllowedIntegrationsForGeneration(genId);
     if (allowedIntegrations && !allowedIntegrations.includes(input.integration)) {
       console.warn("[Internal] Integration not allowed for workflow:", input.integration);
       return { decision: "deny" as const };
@@ -166,9 +164,7 @@ const authRequest = baseProcedure
       return { success: false };
     }
 
-    const allowedIntegrations = generationManager.getAllowedIntegrationsForConversation(
-      input.conversationId,
-    );
+    const allowedIntegrations = await generationManager.getAllowedIntegrationsForGeneration(genId);
     if (allowedIntegrations && !allowedIntegrations.includes(input.integration)) {
       console.warn("[Internal] Integration not allowed for workflow:", input.integration);
       return { success: false };
