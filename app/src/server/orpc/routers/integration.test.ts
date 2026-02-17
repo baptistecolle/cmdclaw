@@ -1,5 +1,6 @@
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { UNIPILE_MISSING_CREDENTIALS_MESSAGE } from "@/lib/integration-errors";
 import { mswServer } from "@/test/msw/server";
 
 function createProcedureStub() {
@@ -218,6 +219,26 @@ describe("integrationRouter", () => {
       "user-1",
       "https://app.example.com/integrations",
     );
+  });
+
+  it("returns explicit error when Unipile credentials are missing for linkedin auth", async () => {
+    const context = createContext();
+    generateLinkedInAuthUrlMock.mockRejectedValueOnce(
+      new Error(UNIPILE_MISSING_CREDENTIALS_MESSAGE),
+    );
+
+    await expect(
+      integrationRouterAny.getAuthUrl({
+        input: {
+          type: "linkedin",
+          redirectUrl: "https://app.example.com/integrations",
+        },
+        context,
+      }),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: UNIPILE_MISSING_CREDENTIALS_MESSAGE,
+    });
   });
 
   it("adds google and notion-specific auth params", async () => {

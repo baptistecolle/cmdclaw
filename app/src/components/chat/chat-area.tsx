@@ -14,6 +14,10 @@ import {
   type RuntimeActivitySegment,
   type RuntimeSnapshot,
 } from "@/lib/generation-runtime";
+import {
+  isUnipileMissingCredentialsError,
+  UNIPILE_MISSING_CREDENTIALS_MESSAGE,
+} from "@/lib/integration-errors";
 import { PREFERRED_ZEN_FREE_MODEL } from "@/lib/zen-models";
 import {
   useConversation,
@@ -1059,6 +1063,11 @@ export function ChatArea({ conversationId }: Props) {
         window.location.href = result.authUrl;
       } catch (err) {
         console.error("Failed to get auth URL:", err);
+        setStreamError(
+          isUnipileMissingCredentialsError(err)
+            ? UNIPILE_MISSING_CREDENTIALS_MESSAGE
+            : "Failed to start integration connection. Please try again.",
+        );
         if (runtimeRef.current) {
           runtimeRef.current.setAuthPending();
           syncFromRuntime(runtimeRef.current);

@@ -18,6 +18,10 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import {
+  isUnipileMissingCredentialsError,
+  UNIPILE_MISSING_CREDENTIALS_MESSAGE,
+} from "@/lib/integration-errors";
 import { getIntegrationActions } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import {
@@ -223,10 +227,12 @@ function IntegrationDisconnectButton({
 function IntegrationConnectButton({
   integrationType,
   isConnecting,
+  hasError,
   onConnect,
 }: {
   integrationType: OAuthIntegrationType;
   isConnecting: boolean;
+  hasError: boolean;
   onConnect: (type: OAuthIntegrationType) => Promise<void>;
 }) {
   const handleClick = useCallback(() => {
@@ -234,8 +240,12 @@ function IntegrationConnectButton({
   }, [integrationType, onConnect]);
 
   return (
-    <Button onClick={handleClick} disabled={isConnecting}>
-      {isConnecting ? "Connecting..." : "Connect"}
+    <Button
+      onClick={handleClick}
+      disabled={isConnecting}
+      variant={hasError ? "destructive" : "default"}
+    >
+      {isConnecting ? "Connecting..." : hasError ? "Retry" : "Connect"}
       <ExternalLink className="ml-2 h-4 w-4" />
     </Button>
   );
@@ -328,6 +338,9 @@ function IntegrationsPageContent() {
   const deleteCustom = useDeleteCustomIntegration();
   const getCustomAuthUrl = useGetCustomAuthUrl();
   const [connectingType, setConnectingType] = useState<string | null>(null);
+  const [integrationConnectErrors, setIntegrationConnectErrors] = useState<
+    Partial<Record<OAuthIntegrationType, string>>
+  >({});
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
@@ -406,6 +419,11 @@ function IntegrationsPageContent() {
   const handleConnect = useCallback(
     async (type: OAuthIntegrationType) => {
       setConnectingType(type);
+      setIntegrationConnectErrors((prev) => {
+        const next = { ...prev };
+        delete next[type];
+        return next;
+      });
       try {
         const result = await getAuthUrl.mutateAsync({
           type,
@@ -415,10 +433,12 @@ function IntegrationsPageContent() {
       } catch (error) {
         console.error("Failed to get auth URL:", error);
         setConnectingType(null);
-        setNotification({
-          type: "error",
-          message: "Failed to start connection. Please try again.",
-        });
+        setIntegrationConnectErrors((prev) => ({
+          ...prev,
+          [type]: isUnipileMissingCredentialsError(error)
+            ? UNIPILE_MISSING_CREDENTIALS_MESSAGE
+            : "Failed to start connection. Please try again.",
+        }));
       }
     },
     [getAuthUrl],
@@ -793,9 +813,18 @@ function IntegrationsPageContent() {
             const isWhatsApp = type === "whatsapp";
             const isWhatsAppConnected = isWhatsApp && whatsAppBridgeStatus === "connected";
             const actions = isWhatsApp ? [] : getIntegrationActions(type);
+            const connectError = !integration
+              ? integrationConnectErrors[type as OAuthIntegrationType]
+              : undefined;
 
             return (
               <div key={type} className="overflow-hidden rounded-lg border">
+                {connectError && (
+                  <div className="flex items-center gap-2 border-b border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
+                    <XCircle className="h-4 w-4 shrink-0" />
+                    {connectError}
+                  </div>
+                )}
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                     <div
@@ -870,6 +899,7 @@ function IntegrationsPageContent() {
                       <IntegrationConnectButton
                         integrationType={type as OAuthIntegrationType}
                         isConnecting={isConnecting}
+                        hasError={Boolean(connectError)}
                         onConnect={handleConnect}
                       />
                     )}

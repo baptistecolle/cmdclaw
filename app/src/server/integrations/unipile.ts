@@ -1,4 +1,8 @@
 import { env } from "@/env";
+import {
+  isUnipileMissingCredentialsError,
+  UNIPILE_MISSING_CREDENTIALS_MESSAGE,
+} from "@/lib/integration-errors";
 
 const getUnipileBaseUrl = () => `https://${env.UNIPILE_DSN}`;
 const getAppUrl = () => env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
@@ -53,6 +57,9 @@ export async function generateLinkedInAuthUrl(
   if (!response.ok) {
     const error = await response.text();
     console.error("Failed to generate LinkedIn auth URL:", error);
+    if (response.status === 401 && isUnipileMissingCredentialsError(error)) {
+      throw new Error(UNIPILE_MISSING_CREDENTIALS_MESSAGE);
+    }
     throw new Error("Failed to generate LinkedIn auth URL");
   }
 

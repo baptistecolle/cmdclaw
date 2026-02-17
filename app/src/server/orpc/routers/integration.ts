@@ -3,6 +3,10 @@ import { createHash, randomBytes } from "crypto";
 import { eq, and, or } from "drizzle-orm";
 import { z } from "zod";
 import {
+  isUnipileMissingCredentialsError,
+  UNIPILE_MISSING_CREDENTIALS_MESSAGE,
+} from "@/lib/integration-errors";
+import {
   integration,
   integrationToken,
   customIntegration,
@@ -71,7 +75,17 @@ const getAuthUrl = protectedProcedure
   .handler(async ({ input, context }) => {
     // LinkedIn uses Unipile hosted auth instead of standard OAuth
     if (input.type === "linkedin") {
-      const url = await generateLinkedInAuthUrl(context.user.id, input.redirectUrl);
+      let url: string;
+      try {
+        url = await generateLinkedInAuthUrl(context.user.id, input.redirectUrl);
+      } catch (error) {
+        if (isUnipileMissingCredentialsError(error)) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: UNIPILE_MISSING_CREDENTIALS_MESSAGE,
+          });
+        }
+        throw error;
+      }
       return { authUrl: url };
     }
 

@@ -1,10 +1,14 @@
 "use client";
 
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  isUnipileMissingCredentialsError,
+  UNIPILE_MISSING_CREDENTIALS_MESSAGE,
+} from "@/lib/integration-errors";
 import { cn } from "@/lib/utils";
 import {
   useIntegrationList,
@@ -145,6 +149,7 @@ function OnboardingIntegrationsContent() {
   const completeOnboarding = useCompleteOnboarding();
   const linkLinkedIn = useLinkLinkedIn();
   const [connectingType, setConnectingType] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const linkedInLinkingRef = useRef(false);
 
   useEffect(() => {
@@ -180,6 +185,7 @@ function OnboardingIntegrationsContent() {
   const handleConnect = useCallback(
     async (type: IntegrationType) => {
       setConnectingType(type);
+      setErrorMessage(null);
       try {
         const result = await getAuthUrl.mutateAsync({
           type,
@@ -188,6 +194,11 @@ function OnboardingIntegrationsContent() {
         window.location.assign(result.authUrl);
       } catch (error) {
         console.error("Failed to get auth URL:", error);
+        setErrorMessage(
+          isUnipileMissingCredentialsError(error)
+            ? UNIPILE_MISSING_CREDENTIALS_MESSAGE
+            : "Failed to start connection. Please try again.",
+        );
         setConnectingType(null);
       }
     },
@@ -221,6 +232,13 @@ function OnboardingIntegrationsContent() {
             scheduling meetings, and managing documents.
           </p>
         </div>
+
+        {errorMessage && (
+          <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-500/50 bg-red-500/10 p-4 text-red-700 dark:text-red-400">
+            <XCircle className="h-5 w-5" />
+            {errorMessage}
+          </div>
+        )}
 
         <div className="bg-card mb-6 rounded-2xl border p-6">
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
