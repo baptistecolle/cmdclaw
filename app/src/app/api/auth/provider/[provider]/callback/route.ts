@@ -48,7 +48,7 @@ export async function GET(
   }
 
   // Retrieve pending OAuth data from in-memory store (PKCE verifier stored server-side)
-  const pending = consumePending(state);
+  const pending = await consumePending(state);
   if (!pending) {
     settingsUrl.searchParams.set("provider_error", "invalid_state");
     return NextResponse.redirect(settingsUrl);

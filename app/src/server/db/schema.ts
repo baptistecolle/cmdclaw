@@ -276,6 +276,7 @@ export const generation = pgTable(
     inputTokens: integer("input_tokens").default(0).notNull(),
     outputTokens: integer("output_tokens").default(0).notNull(),
     startedAt: timestamp("started_at").defaultNow().notNull(),
+    cancelRequestedAt: timestamp("cancel_requested_at"),
     completedAt: timestamp("completed_at"),
   },
   (table) => [
@@ -1230,6 +1231,20 @@ export const whatsappAuthState = pgTable(
   (table) => [index("whatsapp_auth_state_updated_at_idx").on(table.updatedAt)],
 );
 
+export const providerOauthState = pgTable(
+  "provider_oauth_state",
+  {
+    state: text("state").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    codeVerifier: text("code_verifier").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("provider_oauth_state_created_at_idx").on(table.createdAt)],
+);
+
 export const whatsappUserLink = pgTable(
   "whatsapp_user_link",
   {
@@ -1380,6 +1395,15 @@ export const slackConversationRelations = relations(slackConversation, ({ one })
     references: [user.id],
   }),
 }));
+
+export const slackProcessedEvent = pgTable(
+  "slack_processed_event",
+  {
+    eventId: text("event_id").primaryKey(),
+    receivedAt: timestamp("received_at").defaultNow().notNull(),
+  },
+  (table) => [index("slack_processed_event_received_at_idx").on(table.receivedAt)],
+);
 
 // Aggregated schema used by better-auth's drizzle adapter.
 export const authSchema = {

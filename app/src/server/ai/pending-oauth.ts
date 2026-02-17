@@ -1,7 +1,10 @@
+import { eq, lt } from "drizzle-orm";
+import { db } from "@/server/db/client";
+import { providerOauthState } from "@/server/db/schema";
+
 /**
- * In-memory store for pending OAuth PKCE verifiers.
- * Matches OpenCode's approach — verifiers are never sent through the URL.
- * Keyed by the random `state` parameter, auto-expires after 5 minutes.
+ * Durable store for pending OAuth PKCE verifiers.
+ * Keyed by random `state`, single-use via delete+returning, with short TTL cleanup.
  */
 
 export interface PendingOAuth {
@@ -10,35 +13,46 @@ export interface PendingOAuth {
   codeVerifier: string;
 }
 
-interface StoredPendingOAuth extends PendingOAuth {
-  createdAt: number;
-}
-
 const EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
-const pending = new Map<string, StoredPendingOAuth>();
+export async function storePending(state: string, data: PendingOAuth): Promise<void> {
+  const cutoff = new Date(Date.now() - EXPIRY_MS);
+  await db.delete(providerOauthState).where(lt(providerOauthState.createdAt, cutoff));
 
-export function storePending(state: string, data: PendingOAuth) {
-  // Cleanup expired entries
-  const now = Date.now();
-  for (const [key, value] of pending) {
-    if (now - value.createdAt > EXPIRY_MS) {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
-      pending.delete(key);
-    }
-  }
-  pending.set(state, { ...data, createdAt: now });
+  await db
+    .insert(providerOauthState)
+    .values({
+      state,
+      userId: data.userId,
+      provider: data.provider,
+      codeVerifier: data.codeVerifier,
+    })
+    .onConflictDoUpdate({
+      target: providerOauthState.state,
+      set: {
+        userId: data.userId,
+        provider: data.provider,
+        codeVerifier: data.codeVerifier,
+        createdAt: new Date(),
+      },
+    });
 }
 
-export function consumePending(state: string): PendingOAuth | undefined {
-  const data = pending.get(state);
-  if (!data) {
+export async function consumePending(state: string): Promise<PendingOAuth | undefined> {
+  const [row] = await db
+    .delete(providerOauthState)
+    .where(eq(providerOauthState.state, state))
+    .returning();
+  if (!row) {
     return undefined;
   }
-  // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
-  pending.delete(state);
-  if (Date.now() - data.createdAt > EXPIRY_MS) {
+  if (Date.now() - row.createdAt.getTime() > EXPIRY_MS) {
     return undefined;
   }
-  return data;
+
+  return {
+    userId: row.userId,
+    provider: row.provider,
+    codeVerifier: row.codeVerifier,
+  };
 }

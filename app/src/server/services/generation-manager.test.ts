@@ -277,7 +277,7 @@ describe("generationManager transitions", () => {
     mgr.conversationToGeneration.clear();
   });
 
-  it("cancels generation by aborting and delegating to finishGeneration", async () => {
+  it("cancels generation by aborting active context and setting cancel_requested", async () => {
     const ctx = createCtx();
     const mgr = asTestManager();
     mgr.activeGenerations.set(ctx.id, ctx);
@@ -288,7 +288,7 @@ describe("generationManager transitions", () => {
 
     expect(result).toBe(true);
     expect(ctx.abortController.signal.aborted).toBe(true);
-    expect(finishSpy).toHaveBeenCalledWith(ctx, "cancelled");
+    expect(finishSpy).not.toHaveBeenCalled();
   });
 
   it("submits approval, persists running status, and emits approval_result", async () => {

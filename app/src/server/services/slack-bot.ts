@@ -1,28 +1,29 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, lt } from "drizzle-orm";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
-import { slackUserLink, slackConversation, conversation } from "@/server/db/schema";
+import {
+  slackUserLink,
+  slackConversation,
+  conversation,
+  slackProcessedEvent,
+} from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
 
-// ─── Event deduplication (in-memory, 5-min TTL) ─────────────
+// ─── Event deduplication (DB-backed across instances) ────────
 
-const processedEvents = new Map<string, number>();
-const DEDUP_TTL_MS = 5 * 60 * 1000;
+const DEDUP_TTL_MS = 24 * 60 * 60 * 1000;
 
-function isDuplicate(eventId: string): boolean {
-  const now = Date.now();
-  // Cleanup old entries
-  for (const [id, ts] of processedEvents) {
-    if (now - ts > DEDUP_TTL_MS) {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
-      processedEvents.delete(id);
-    }
-  }
-  if (processedEvents.has(eventId)) {
-    return true;
-  }
-  processedEvents.set(eventId, now);
-  return false;
+async function reserveEvent(eventId: string): Promise<boolean> {
+  const cutoff = new Date(Date.now() - DEDUP_TTL_MS);
+  await db.delete(slackProcessedEvent).where(lt(slackProcessedEvent.receivedAt, cutoff));
+
+  const inserted = await db
+    .insert(slackProcessedEvent)
+    .values({ eventId })
+    .onConflictDoNothing()
+    .returning({ eventId: slackProcessedEvent.eventId });
+
+  return inserted.length > 0;
 }
 
 // ─── Slack API helpers ───────────────────────────────────────
@@ -143,7 +144,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
   }
 
   // Deduplicate
-  if (isDuplicate(event_id)) {
+  if (!(await reserveEvent(event_id))) {
     return;
   }
 

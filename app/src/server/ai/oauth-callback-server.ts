@@ -68,7 +68,7 @@ export function ensureOAuthCallbackServer(): void {
       return;
     }
 
-    const pending = consumePending(state);
+    const pending = await consumePending(state);
     if (!pending) {
       settingsUrl.searchParams.set("provider_error", "invalid_state");
       res.writeHead(302, { Location: settingsUrl.toString() });

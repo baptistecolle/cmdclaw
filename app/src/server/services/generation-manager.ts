@@ -7,7 +7,7 @@ import type {
   ToolPart,
 } from "@opencode-ai/sdk/v2/client";
 import type { Sandbox } from "e2b";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 import { and } from "drizzle-orm";
 import path from "path";
 import type { LLMBackend, ChatMessage, ContentBlock } from "@/server/ai/llm-backend";
@@ -251,12 +251,15 @@ interface GenerationContext {
   agentInitStartedAt?: number;
   agentInitReadyAt?: number;
   agentInitFailedAt?: number;
+  lastCancellationCheckAt?: number;
+  isFinalizing?: boolean;
 }
 
 // Approval timeout: 5 minutes before pausing sandbox
 const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 // Auth timeout: 10 minutes for OAuth flow
 const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
+const CANCELLATION_POLL_INTERVAL_MS = 1000;
 const AGENT_PREPARING_TIMEOUT_MS = (() => {
   const seconds = Number(process.env.AGENT_PREPARING_TIMEOUT_SECONDS ?? "300");
   if (!Number.isFinite(seconds) || seconds <= 0) {
@@ -460,7 +463,7 @@ class GenerationManager {
       logContext,
     );
 
-    // Check for existing active generation on this conversation
+    // Fast local guard for this process.
     if (params.conversationId) {
       const existingGenId = this.conversationToGeneration.get(params.conversationId);
       if (existingGenId) {
@@ -468,6 +471,23 @@ class GenerationManager {
         if (existing && existing.status === "running") {
           throw new Error("Generation already in progress for this conversation");
         }
+      }
+
+      // Cross-instance guard (DB is source of truth).
+      const existing = await db.query.generation.findFirst({
+        where: and(
+          eq(generation.conversationId, params.conversationId),
+          inArray(generation.status, ["running", "awaiting_approval", "awaiting_auth", "paused"]),
+        ),
+        columns: {
+          id: true,
+          status: true,
+        },
+      });
+      if (existing) {
+        throw new Error(
+          `Generation already in progress for this conversation (${existing.id}, status=${existing.status})`,
+        );
       }
     }
     logServerEvent(
@@ -1208,18 +1228,87 @@ class GenerationManager {
    * Cancel a generation
    */
   async cancelGeneration(generationId: string, userId: string): Promise<boolean> {
-    const ctx = this.activeGenerations.get(generationId);
-    if (!ctx) {
-      return false;
+    const genRecord = await db.query.generation.findFirst({
+      where: eq(generation.id, generationId),
+      with: { conversation: true },
+      columns: {
+        id: true,
+        status: true,
+      },
+    });
+    if (!genRecord) {
+      const ctx = this.activeGenerations.get(generationId);
+      if (!ctx) {
+        return false;
+      }
+      if (ctx.userId !== userId) {
+        throw new Error("Access denied");
+      }
+      ctx.abortController.abort();
+      return true;
     }
 
-    if (ctx.userId !== userId) {
+    if (genRecord.conversation.userId !== userId) {
       throw new Error("Access denied");
     }
 
-    ctx.abortController.abort();
-    await this.finishGeneration(ctx, "cancelled");
+    if (
+      genRecord.status === "completed" ||
+      genRecord.status === "cancelled" ||
+      genRecord.status === "error"
+    ) {
+      return true;
+    }
+
+    await db
+      .update(generation)
+      .set({ cancelRequestedAt: new Date() })
+      .where(eq(generation.id, generationId));
+
+    const ctx = this.activeGenerations.get(generationId);
+    if (ctx) {
+      ctx.abortController.abort();
+    }
+
     return true;
+  }
+
+  private async refreshCancellationSignal(
+    ctx: GenerationContext,
+    options?: { force?: boolean },
+  ): Promise<boolean> {
+    if (ctx.abortController.signal.aborted) {
+      return true;
+    }
+
+    const now = Date.now();
+    if (
+      !options?.force &&
+      ctx.lastCancellationCheckAt &&
+      now - ctx.lastCancellationCheckAt < CANCELLATION_POLL_INTERVAL_MS
+    ) {
+      return false;
+    }
+    ctx.lastCancellationCheckAt = now;
+
+    const latest = await db.query.generation.findFirst({
+      where: eq(generation.id, ctx.id),
+      columns: {
+        status: true,
+        cancelRequestedAt: true,
+      },
+    });
+
+    if (!latest) {
+      return false;
+    }
+
+    if (latest.cancelRequestedAt || latest.status === "cancelled") {
+      ctx.abortController.abort();
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -1499,6 +1588,11 @@ class GenerationManager {
    */
   private async runOpenCodeGeneration(ctx: GenerationContext): Promise<void> {
     try {
+      if (await this.refreshCancellationSignal(ctx, { force: true })) {
+        await this.finishGeneration(ctx, "cancelled");
+        return;
+      }
+
       if (!env.ANTHROPIC_API_KEY) {
         throw new Error("ANTHROPIC_API_KEY is not configured");
       }
@@ -1902,7 +1996,7 @@ class GenerationManager {
       // Process SSE events
       for await (const rawEvent of eventStream) {
         const event = rawEvent as OpencodeEvent;
-        if (ctx.abortController.signal.aborted) {
+        if (await this.refreshCancellationSignal(ctx)) {
           break;
         }
 
@@ -1984,6 +2078,7 @@ class GenerationManager {
 
       // Wait for prompt to complete
       await promptPromise;
+      await this.refreshCancellationSignal(ctx, { force: true });
 
       if (ctx.e2bSandbox) {
         try {
@@ -2173,7 +2268,7 @@ class GenerationManager {
           return;
         }
 
-        if (ctx.abortController.signal.aborted) {
+        if (await this.refreshCancellationSignal(ctx)) {
           await this.finishGeneration(ctx, "cancelled");
           return;
         }
@@ -2196,7 +2291,7 @@ class GenerationManager {
         });
 
         await this.consumeAsyncStream(stream, async (event) => {
-          if (ctx.abortController.signal.aborted) {
+          if (await this.refreshCancellationSignal(ctx)) {
             return true;
           }
 
@@ -2287,7 +2382,7 @@ class GenerationManager {
           return false;
         });
 
-        if (ctx.abortController.signal.aborted) {
+        if (await this.refreshCancellationSignal(ctx, { force: true })) {
           await this.finishGeneration(ctx, "cancelled");
           return;
         }
@@ -2520,6 +2615,11 @@ class GenerationManager {
 
       if (iterationCount >= MAX_ITERATIONS) {
         console.warn("[GenerationManager] Hit max iterations in tool loop");
+      }
+
+      if (await this.refreshCancellationSignal(ctx, { force: true })) {
+        await this.finishGeneration(ctx, "cancelled");
+        return;
       }
 
       if (sandbox) {
@@ -3977,6 +4077,10 @@ class GenerationManager {
         return resolvedDecision;
       }
 
+      if (latest.cancelRequestedAt || latest.status === "cancelled" || latest.status === "error") {
+        return "deny";
+      }
+
       return pollDecision();
     };
 
@@ -4096,7 +4200,7 @@ class GenerationManager {
           : { success: false };
       }
 
-      if (latest.status === "cancelled" || latest.status === "error") {
+      if (latest.cancelRequestedAt || latest.status === "cancelled" || latest.status === "error") {
         return { success: false };
       }
 
@@ -4144,209 +4248,222 @@ class GenerationManager {
     ctx: GenerationContext,
     status: "completed" | "cancelled" | "error",
   ): Promise<void> {
-    // Clear any pending timeouts
-    if (ctx.saveDebounceId) {
-      clearTimeout(ctx.saveDebounceId);
+    if (ctx.isFinalizing) {
+      return;
     }
-    if (ctx.approvalTimeoutId) {
-      clearTimeout(ctx.approvalTimeoutId);
+    if (ctx.status === "completed" || ctx.status === "cancelled" || ctx.status === "error") {
+      return;
     }
-    if (ctx.authTimeoutId) {
-      clearTimeout(ctx.authTimeoutId);
-    }
+    ctx.isFinalizing = true;
 
-    // NOTE: We set ctx.status AFTER broadcasting to subscribers to avoid a race condition
-    // where the subscription loop sees the status change and exits before receiving the
-    // terminal event (done/cancelled/error). The status is set after broadcast below.
-
-    let messageId: string | undefined;
-
-    if (status === "completed" || status === "cancelled") {
-      // Update session ID
-      if (status === "completed" && ctx.sessionId) {
-        await db
-          .update(conversation)
-          .set({ opencodeSessionId: ctx.sessionId })
-          .where(eq(conversation.id, ctx.conversationId));
+    try {
+      // Clear any pending timeouts
+      if (ctx.saveDebounceId) {
+        clearTimeout(ctx.saveDebounceId);
+      }
+      if (ctx.approvalTimeoutId) {
+        clearTimeout(ctx.approvalTimeoutId);
+      }
+      if (ctx.authTimeoutId) {
+        clearTimeout(ctx.authTimeoutId);
       }
 
-      // Auto-collect any new files created during generation (direct mode only)
-      if (status === "completed" && ctx.sandbox && ctx.generationMarkerTime) {
-        try {
-          const excludePaths = Array.from(ctx.sentFilePaths || []);
-          const newFiles = await collectNewSandboxFiles(
-            ctx.sandbox,
-            ctx.generationMarkerTime,
-            excludePaths,
-          );
+      // NOTE: We set ctx.status AFTER broadcasting to subscribers to avoid a race condition
+      // where the subscription loop sees the status change and exits before receiving the
+      // terminal event (done/cancelled/error). The status is set after broadcast below.
 
-          await Promise.all(
-            newFiles.map(async (file) => {
-              try {
-                const fileRecord = await uploadSandboxFile({
-                  path: file.path,
-                  content: file.content,
-                  conversationId: ctx.conversationId,
-                  messageId: undefined, // Will be linked below
-                });
-                ctx.uploadedSandboxFileIds?.add(fileRecord.id);
+      let messageId: string | undefined;
 
-                // Broadcast sandbox_file event
-                this.broadcast(ctx, {
-                  type: "sandbox_file",
-                  fileId: fileRecord.id,
-                  path: file.path,
-                  filename: fileRecord.filename,
-                  mimeType: fileRecord.mimeType,
-                  sizeBytes: fileRecord.sizeBytes,
-                });
-              } catch (err) {
-                console.warn(
-                  `[GenerationManager] Failed to upload collected file ${file.path}:`,
-                  err,
-                );
-              }
-            }),
-          );
-        } catch (err) {
-          console.error("[GenerationManager] Failed to collect new sandbox files:", err);
+      if (status === "completed" || status === "cancelled") {
+        // Update session ID
+        if (status === "completed" && ctx.sessionId) {
+          await db
+            .update(conversation)
+            .set({ opencodeSessionId: ctx.sessionId })
+            .where(eq(conversation.id, ctx.conversationId));
+        }
+
+        // Auto-collect any new files created during generation (direct mode only)
+        if (status === "completed" && ctx.sandbox && ctx.generationMarkerTime) {
+          try {
+            const excludePaths = Array.from(ctx.sentFilePaths || []);
+            const newFiles = await collectNewSandboxFiles(
+              ctx.sandbox,
+              ctx.generationMarkerTime,
+              excludePaths,
+            );
+
+            await Promise.all(
+              newFiles.map(async (file) => {
+                try {
+                  const fileRecord = await uploadSandboxFile({
+                    path: file.path,
+                    content: file.content,
+                    conversationId: ctx.conversationId,
+                    messageId: undefined, // Will be linked below
+                  });
+                  ctx.uploadedSandboxFileIds?.add(fileRecord.id);
+
+                  // Broadcast sandbox_file event
+                  this.broadcast(ctx, {
+                    type: "sandbox_file",
+                    fileId: fileRecord.id,
+                    path: file.path,
+                    filename: fileRecord.filename,
+                    mimeType: fileRecord.mimeType,
+                    sizeBytes: fileRecord.sizeBytes,
+                  });
+                } catch (err) {
+                  console.warn(
+                    `[GenerationManager] Failed to upload collected file ${file.path}:`,
+                    err,
+                  );
+                }
+              }),
+            );
+          } catch (err) {
+            console.error("[GenerationManager] Failed to collect new sandbox files:", err);
+          }
+        }
+
+        const interruptionText = "Interrupted by user";
+        const cancelledParts =
+          status === "cancelled"
+            ? [
+                ...ctx.contentParts,
+                ...(ctx.contentParts.some(
+                  (part): part is ContentPart & { type: "system" } =>
+                    part.type === "system" && part.content === interruptionText,
+                )
+                  ? []
+                  : ([{ type: "system", content: interruptionText }] as ContentPart[])),
+              ]
+            : ctx.contentParts;
+
+        // Keep interruption marker in generation record snapshot too.
+        if (status === "cancelled") {
+          ctx.contentParts = cancelledParts;
+        }
+
+        // Save assistant message for completed and cancelled generations
+        const [assistantMessage] = await db
+          .insert(message)
+          .values({
+            conversationId: ctx.conversationId,
+            role: "assistant",
+            content:
+              status === "cancelled"
+                ? ctx.assistantContent || interruptionText
+                : ctx.assistantContent || "I apologize, but I couldn't generate a response.",
+            contentParts: cancelledParts.length > 0 ? cancelledParts : null,
+            inputTokens: ctx.usage.inputTokens,
+            outputTokens: ctx.usage.outputTokens,
+          })
+          .returning();
+
+        messageId = assistantMessage.id;
+
+        // Link uploaded sandbox files to the final assistant message
+        const uploadedFileIds = Array.from(ctx.uploadedSandboxFileIds || []);
+        if (status === "completed" && uploadedFileIds.length > 0) {
+          const { sandboxFile } = await import("@/server/db/schema");
+          const { inArray } = await import("drizzle-orm");
+          await db
+            .update(sandboxFile)
+            .set({ messageId })
+            .where(inArray(sandboxFile.id, uploadedFileIds));
+        }
+
+        // Generate title for new conversations
+        if (status === "completed" && ctx.isNewConversation && ctx.assistantContent) {
+          try {
+            const title = await generateConversationTitle(
+              ctx.userMessageContent,
+              ctx.assistantContent,
+            );
+            if (title) {
+              await db
+                .update(conversation)
+                .set({ title })
+                .where(eq(conversation.id, ctx.conversationId));
+            }
+          } catch (err) {
+            console.error("[GenerationManager] Failed to generate title:", err);
+          }
         }
       }
 
-      const interruptionText = "Interrupted by user";
-      const cancelledParts =
-        status === "cancelled"
-          ? [
-              ...ctx.contentParts,
-              ...(ctx.contentParts.some(
-                (part): part is ContentPart & { type: "system" } =>
-                  part.type === "system" && part.content === interruptionText,
-              )
-                ? []
-                : ([{ type: "system", content: interruptionText }] as ContentPart[])),
-            ]
-          : ctx.contentParts;
-
-      // Keep interruption marker in generation record snapshot too.
-      if (status === "cancelled") {
-        ctx.contentParts = cancelledParts;
-      }
-
-      // Save assistant message for completed and cancelled generations
-      const [assistantMessage] = await db
-        .insert(message)
-        .values({
-          conversationId: ctx.conversationId,
-          role: "assistant",
-          content:
-            status === "cancelled"
-              ? ctx.assistantContent || interruptionText
-              : ctx.assistantContent || "I apologize, but I couldn't generate a response.",
-          contentParts: cancelledParts.length > 0 ? cancelledParts : null,
+      // Update generation record
+      await db
+        .update(generation)
+        .set({
+          status,
+          messageId,
+          cancelRequestedAt: null,
+          contentParts: ctx.contentParts.length > 0 ? ctx.contentParts : null,
+          errorMessage: ctx.errorMessage,
           inputTokens: ctx.usage.inputTokens,
           outputTokens: ctx.usage.outputTokens,
+          completedAt: new Date(),
         })
-        .returning();
+        .where(eq(generation.id, ctx.id));
 
-      messageId = assistantMessage.id;
-
-      // Link uploaded sandbox files to the final assistant message
-      const uploadedFileIds = Array.from(ctx.uploadedSandboxFileIds || []);
-      if (status === "completed" && uploadedFileIds.length > 0) {
-        const { sandboxFile } = await import("@/server/db/schema");
-        const { inArray } = await import("drizzle-orm");
-        await db
-          .update(sandboxFile)
-          .set({ messageId })
-          .where(inArray(sandboxFile.id, uploadedFileIds));
-      }
-
-      // Generate title for new conversations
-      if (status === "completed" && ctx.isNewConversation && ctx.assistantContent) {
-        try {
-          const title = await generateConversationTitle(
-            ctx.userMessageContent,
-            ctx.assistantContent,
-          );
-          if (title) {
-            await db
-              .update(conversation)
-              .set({ title })
-              .where(eq(conversation.id, ctx.conversationId));
-          }
-        } catch (err) {
-          console.error("[GenerationManager] Failed to generate title:", err);
-        }
-      }
-    }
-
-    // Update generation record
-    await db
-      .update(generation)
-      .set({
-        status,
-        messageId,
-        contentParts: ctx.contentParts.length > 0 ? ctx.contentParts : null,
-        errorMessage: ctx.errorMessage,
-        inputTokens: ctx.usage.inputTokens,
-        outputTokens: ctx.usage.outputTokens,
-        completedAt: new Date(),
-      })
-      .where(eq(generation.id, ctx.id));
-
-    // Update conversation status
-    await db
-      .update(conversation)
-      .set({
-        generationStatus:
-          status === "completed" ? "complete" : status === "error" ? "error" : "idle",
-      })
-      .where(eq(conversation.id, ctx.conversationId));
-
-    if (ctx.workflowRunId) {
+      // Update conversation status
       await db
-        .update(workflowRun)
+        .update(conversation)
         .set({
-          status:
-            status === "completed" ? "completed" : status === "cancelled" ? "cancelled" : "error",
-          finishedAt: new Date(),
-          errorMessage: ctx.errorMessage,
+          generationStatus:
+            status === "completed" ? "complete" : status === "error" ? "error" : "idle",
         })
-        .where(eq(workflowRun.id, ctx.workflowRunId));
+        .where(eq(conversation.id, ctx.conversationId));
+
+      if (ctx.workflowRunId) {
+        await db
+          .update(workflowRun)
+          .set({
+            status:
+              status === "completed" ? "completed" : status === "cancelled" ? "cancelled" : "error",
+            finishedAt: new Date(),
+            errorMessage: ctx.errorMessage,
+          })
+          .where(eq(workflowRun.id, ctx.workflowRunId));
+      }
+
+      // Notify subscribers BEFORE setting status to avoid race condition
+      if (status === "completed" && messageId) {
+        this.broadcast(ctx, {
+          type: "done",
+          generationId: ctx.id,
+          conversationId: ctx.conversationId,
+          messageId,
+          usage: ctx.usage,
+        });
+      } else if (status === "cancelled") {
+        this.broadcast(ctx, {
+          type: "cancelled",
+          generationId: ctx.id,
+          conversationId: ctx.conversationId,
+          messageId,
+        });
+      } else if (status === "error") {
+        this.broadcast(ctx, {
+          type: "error",
+          message: ctx.errorMessage || "Unknown error",
+        });
+      }
+
+      // Set status AFTER broadcast so subscription loop receives the terminal event
+      // before seeing the status change
+      ctx.status = status;
+
+      // Cleanup
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
+      this.activeGenerations.delete(ctx.id);
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
+      this.conversationToGeneration.delete(ctx.conversationId);
+    } finally {
+      ctx.isFinalizing = false;
     }
-
-    // Notify subscribers BEFORE setting status to avoid race condition
-    if (status === "completed" && messageId) {
-      this.broadcast(ctx, {
-        type: "done",
-        generationId: ctx.id,
-        conversationId: ctx.conversationId,
-        messageId,
-        usage: ctx.usage,
-      });
-    } else if (status === "cancelled") {
-      this.broadcast(ctx, {
-        type: "cancelled",
-        generationId: ctx.id,
-        conversationId: ctx.conversationId,
-        messageId,
-      });
-    } else if (status === "error") {
-      this.broadcast(ctx, {
-        type: "error",
-        message: ctx.errorMessage || "Unknown error",
-      });
-    }
-
-    // Set status AFTER broadcast so subscription loop receives the terminal event
-    // before seeing the status change
-    ctx.status = status;
-
-    // Cleanup
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
-    this.activeGenerations.delete(ctx.id);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
-    this.conversationToGeneration.delete(ctx.conversationId);
   }
 
   private scheduleSave(ctx: GenerationContext): void {

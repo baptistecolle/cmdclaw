@@ -68,7 +68,7 @@ const connect = protectedProcedure
     const codeVerifier = config.usePKCE ? generateCodeVerifier() : undefined;
 
     // Store pending OAuth data in-memory (matches OpenCode's approach)
-    storePending(state, {
+    await storePending(state, {
       userId: context.user.id,
       provider: input.provider,
       codeVerifier: codeVerifier ?? "",
