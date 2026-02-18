@@ -20,10 +20,60 @@ type ModelOption = {
   providerLabel: string;
 };
 
+type SortToken = { type: "text"; value: string } | { type: "number"; value: number };
+
+function tokenizeModelName(name: string): SortToken[] {
+  return name
+    .split(/(\d+(?:\.\d+)?)/)
+    .filter((token) => token.length > 0)
+    .map((token) =>
+      /^\d+(?:\.\d+)?$/.test(token)
+        ? { type: "number", value: Number(token) }
+        : { type: "text", value: token.toLowerCase() },
+    );
+}
+
+function compareModelNames(a: string, b: string): number {
+  const aTokens = tokenizeModelName(a);
+  const bTokens = tokenizeModelName(b);
+  const maxLength = Math.max(aTokens.length, bTokens.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const aToken = aTokens[index];
+    const bToken = bTokens[index];
+
+    if (!aToken || !bToken) {
+      break;
+    }
+
+    if (aToken.type === "number" && bToken.type === "number" && aToken.value !== bToken.value) {
+      return bToken.value - aToken.value;
+    }
+
+    if (aToken.type === "text" && bToken.type === "text" && aToken.value !== bToken.value) {
+      return aToken.value.localeCompare(bToken.value);
+    }
+
+    if (aToken.type !== bToken.type) {
+      return aToken.type === "text" ? -1 : 1;
+    }
+  }
+
+  if (aTokens.length !== bTokens.length) {
+    return aTokens.length - bTokens.length;
+  }
+
+  return a.localeCompare(b);
+}
+
+function sortModels(models: ModelOption[]): ModelOption[] {
+  return models.toSorted((a, b) => compareModelNames(a.name, b.name));
+}
+
 const ANTHROPIC_MODELS: ModelOption[] = [
   {
-    id: "claude-sonnet-4-20250514",
-    name: "Claude Sonnet 4",
+    id: "claude-sonnet-4-6",
+    name: "Claude Sonnet 4.6",
     provider: "anthropic",
     providerLabel: "Anthropic",
   },
@@ -92,6 +142,11 @@ const KIMI_MODELS: ModelOption[] = [
   },
 ];
 
+const SORTED_ANTHROPIC_MODELS = sortModels(ANTHROPIC_MODELS);
+const SORTED_OPENAI_MODELS = sortModels(OPENAI_MODELS);
+const SORTED_GOOGLE_MODELS = sortModels(GOOGLE_MODELS);
+const SORTED_KIMI_MODELS = sortModels(KIMI_MODELS);
+
 type Props = {
   selectedModel: string;
   onModelChange: (modelId: string) => void;
@@ -107,12 +162,14 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
   const isGoogleConnected = "google" in connected;
   const isKimiConnected = "kimi" in connected;
 
-  const zenModels: ModelOption[] = (freeModelsData?.models ?? []).map((model) => ({
-    id: model.id,
-    name: model.name,
-    provider: "opencode",
-    providerLabel: "OpenCode Zen",
-  }));
+  const zenModels: ModelOption[] = sortModels(
+    (freeModelsData?.models ?? []).map((model) => ({
+      id: model.id,
+      name: model.name,
+      provider: "opencode",
+      providerLabel: "OpenCode Zen",
+    })),
+  );
 
   const allModels = [
     ...ANTHROPIC_MODELS,
@@ -153,7 +210,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuLabel>Anthropic</DropdownMenuLabel>
-        {ANTHROPIC_MODELS.map((model) => (
+        {SORTED_ANTHROPIC_MODELS.map((model) => (
           <DropdownMenuItem
             key={model.id}
             data-testid={`chat-model-option-${model.id}`}
@@ -189,7 +246,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
           {!isOpenAIConnected && <Lock className="text-muted-foreground h-3 w-3" />}
         </DropdownMenuLabel>
         {isOpenAIConnected ? (
-          OPENAI_MODELS.map((model) => (
+          SORTED_OPENAI_MODELS.map((model) => (
             <DropdownMenuItem
               key={model.id}
               data-testid={`chat-model-option-${model.id}`}
@@ -212,7 +269,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
           {!isGoogleConnected && <Lock className="text-muted-foreground h-3 w-3" />}
         </DropdownMenuLabel>
         {isGoogleConnected ? (
-          GOOGLE_MODELS.map((model) => (
+          SORTED_GOOGLE_MODELS.map((model) => (
             <DropdownMenuItem
               key={model.id}
               data-testid={`chat-model-option-${model.id}`}
@@ -235,7 +292,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
           {!isKimiConnected && <Lock className="text-muted-foreground h-3 w-3" />}
         </DropdownMenuLabel>
         {isKimiConnected ? (
-          KIMI_MODELS.map((model) => (
+          SORTED_KIMI_MODELS.map((model) => (
             <DropdownMenuItem
               key={model.id}
               data-testid={`chat-model-option-${model.id}`}
