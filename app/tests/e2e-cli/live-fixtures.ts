@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { spawn } from "node:child_process";
+import type { IntegrationType } from "../../src/server/oauth/config";
 import { loadConfig, createRpcClient } from "../../scripts/lib/cli-shared";
 import { closePool, db } from "../../src/server/db/client";
-import { user } from "../../src/server/db/schema";
+import { integration, integrationToken, user } from "../../src/server/db/schema";
 import { getValidTokensForUser } from "../../src/server/integrations/token-refresh";
 import { resolveLiveE2EModel } from "../e2e/live-chat-model";
 
@@ -115,6 +116,57 @@ export function assertExitOk(result: CommandResult, label: string): void {
 export async function ensureCliAuth(): Promise<void> {
   const authResult = await runBunCommand(["run", "chat:auth"], 120_000);
   assertExitOk(authResult, "bun run chat:auth");
+}
+
+export async function withIntegrationTokensTemporarilyRemoved<T>(args: {
+  email: string;
+  integrationType: IntegrationType;
+  run: () => Promise<T>;
+}): Promise<T> {
+  const dbUser = await db.query.user.findFirst({
+    where: eq(user.email, args.email),
+    columns: { id: true },
+  });
+  if (!dbUser) {
+    return args.run();
+  }
+
+  const dbIntegration = await db.query.integration.findFirst({
+    where: and(eq(integration.userId, dbUser.id), eq(integration.type, args.integrationType)),
+    columns: { id: true },
+  });
+  if (!dbIntegration) {
+    return args.run();
+  }
+
+  const previousTokens = await db.query.integrationToken.findMany({
+    where: eq(integrationToken.integrationId, dbIntegration.id),
+  });
+
+  if (previousTokens.length > 0) {
+    await db.delete(integrationToken).where(eq(integrationToken.integrationId, dbIntegration.id));
+  }
+
+  try {
+    return await args.run();
+  } finally {
+    const currentTokens = await db.query.integrationToken.findMany({
+      where: eq(integrationToken.integrationId, dbIntegration.id),
+    });
+
+    if (currentTokens.length === 0 && previousTokens.length > 0) {
+      await db.insert(integrationToken).values(
+        previousTokens.map((token) => ({
+          integrationId: dbIntegration.id,
+          accessToken: token.accessToken,
+          refreshToken: token.refreshToken,
+          tokenType: token.tokenType,
+          expiresAt: token.expiresAt,
+          idToken: token.idToken,
+        })),
+      );
+    }
+  }
 }
 
 export async function resolveLiveModel(): Promise<string> {

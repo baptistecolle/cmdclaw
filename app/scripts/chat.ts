@@ -1,4 +1,5 @@
 import type { RouterClient } from "@orpc/server";
+import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream, existsSync, readFileSync } from "node:fs";
 import { basename, resolve, extname } from "node:path";
 import readline from "node:readline";
@@ -39,6 +40,25 @@ type Args = {
 };
 
 const DEFAULT_CLIENT_ID = "bap-cli";
+const AUTH_INTEGRATION_TYPES = [
+  "gmail",
+  "google_calendar",
+  "google_docs",
+  "google_sheets",
+  "google_drive",
+  "notion",
+  "linear",
+  "github",
+  "airtable",
+  "slack",
+  "hubspot",
+  "linkedin",
+  "salesforce",
+  "reddit",
+  "twitter",
+] as const;
+
+type AuthIntegrationType = (typeof AUTH_INTEGRATION_TYPES)[number];
 
 function parseArgs(argv: string[]): Args {
   const args: Args = {
@@ -151,6 +171,32 @@ function formatToolResult(result: unknown): string {
     return JSON.stringify(result);
   } catch {
     return String(result);
+  }
+}
+
+function isAuthIntegrationType(integration: string): integration is AuthIntegrationType {
+  return (AUTH_INTEGRATION_TYPES as readonly string[]).includes(integration);
+}
+
+function openUrlInBrowser(url: string): boolean {
+  try {
+    const commandByPlatform: Record<string, { cmd: string; args: string[] }> = {
+      darwin: { cmd: "open", args: [url] },
+      linux: { cmd: "xdg-open", args: [url] },
+      win32: { cmd: "cmd", args: ["/c", "start", "", url] },
+    };
+    const command = commandByPlatform[process.platform];
+    if (!command) {
+      return false;
+    }
+    const child = spawn(command.cmd, command.args, {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -443,6 +489,9 @@ async function runGeneration(
   let outputStarted = false;
   const runtime = createGenerationRuntime();
   const streamedSandboxFileIds = new Set<string>();
+  const authHandlingInProgress = new Set<string>();
+  const resolvedServerUrl = options.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const normalizedServerUrl = resolvedServerUrl.replace(/\/$/, "");
 
   try {
     const result = await runGenerationStream({
@@ -587,9 +636,80 @@ async function runGeneration(
           runtime.handleApprovalResult(toolUseId, decision);
           process.stdout.write(`\n[approval_${decision}] ${toolUseId}\n`);
         },
-        onAuthNeeded: (auth) => {
+        onAuthNeeded: async (auth) => {
           runtime.handleAuthNeeded(auth);
           process.stdout.write(`\n[auth_needed] ${auth.integrations.join(", ")}\n`);
+          const authPrompt = createApprovalPrompt(rl);
+
+          try {
+            const handleAuthIntegration = async (index: number): Promise<void> => {
+              if (index >= auth.integrations.length) {
+                return;
+              }
+
+              const integration = auth.integrations[index]!;
+              const dedupeKey = `${auth.generationId}:${integration}`;
+              if (authHandlingInProgress.has(dedupeKey)) {
+                return handleAuthIntegration(index + 1);
+              }
+              authHandlingInProgress.add(dedupeKey);
+
+              if (!isAuthIntegrationType(integration)) {
+                process.stdout.write(
+                  `[auth_error] Unsupported integration for CLI auth flow: ${integration}\n`,
+                );
+                return handleAuthIntegration(index + 1);
+              }
+
+              const redirectUrl = `${normalizedServerUrl}/chat/${auth.conversationId}?auth_complete=${integration}&generation_id=${auth.generationId}`;
+              const { authUrl } = await client.integration.getAuthUrl({
+                type: integration,
+                redirectUrl,
+              });
+              process.stdout.write(`[auth_url] ${integration}: ${authUrl}\n`);
+
+              const opened = openUrlInBrowser(authUrl);
+              process.stdout.write(
+                opened
+                  ? "[auth_action] Browser opened. Complete auth in the browser.\n"
+                  : "[auth_action] Open the URL above and complete auth.\n",
+              );
+
+              if (authPrompt) {
+                const confirmation = (
+                  await ask(authPrompt.rl, "auth> press Enter when done (or type 'cancel'): ")
+                )
+                  .trim()
+                  .toLowerCase();
+                const allow =
+                  confirmation !== "cancel" && confirmation !== "n" && confirmation !== "no";
+                const submitted = await client.generation.submitAuthResult({
+                  generationId: auth.generationId,
+                  integration,
+                  success: allow,
+                });
+                process.stdout.write(
+                  `[auth_submit] integration=${integration} success=${submitted.success}\n`,
+                );
+              } else {
+                process.stdout.write(
+                  "[auth_action] Non-interactive mode: cannot submit auth result automatically.\n",
+                );
+              }
+              return handleAuthIntegration(index + 1);
+            };
+
+            await handleAuthIntegration(0);
+          } catch (error) {
+            process.stdout.write(
+              `[auth_error] ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+          } finally {
+            authPrompt?.close();
+            for (const integration of auth.integrations) {
+              authHandlingInProgress.delete(`${auth.generationId}:${integration}`);
+            }
+          }
         },
         onAuthProgress: (connected, remaining) => {
           runtime.handleAuthProgress(connected, remaining);

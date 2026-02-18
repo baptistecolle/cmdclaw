@@ -296,7 +296,11 @@ function isVercelHost(hostname: string): boolean {
   return hostname === "vercel.app" || hostname.endsWith(".vercel.app");
 }
 
-function getCallbackBaseUrls(): string[] {
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+export function getCallbackBaseUrls(): string[] {
   const rawCandidates = [
     process.env.E2B_CALLBACK_BASE_URL,
     process.env.APP_URL,
@@ -304,31 +308,52 @@ function getCallbackBaseUrls(): string[] {
   ].filter((value): value is string => Boolean(value && value.trim().length > 0));
 
   const normalized = rawCandidates.map((value) => value.replace(/\/$/, ""));
-  const withLocalcan = new Set<string>(normalized);
-
-  for (const url of normalized) {
+  const parsedCandidates = normalized.flatMap((url) => {
     try {
       const parsed = new URL(url);
-      if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-        withLocalcan.add("https://localcan.baptistecolle.com");
-      }
+      return [{ url, hostname: parsed.hostname }];
     } catch {
-      // ignore invalid candidate
+      return [];
+    }
+  });
+
+  const deduped = new Map<string, { hostname: string }>();
+  for (const candidate of parsedCandidates) {
+    if (!deduped.has(candidate.url)) {
+      deduped.set(candidate.url, { hostname: candidate.hostname });
     }
   }
 
-  const all = Array.from(withLocalcan);
-  const nonVercel = all.filter((url) => {
-    try {
-      return !isVercelHost(new URL(url).hostname);
-    } catch {
-      return false;
-    }
-  });
-  if (nonVercel.length > 0) {
-    return nonVercel;
+  const urls = Array.from(deduped.entries()).map(([url, meta]) => ({
+    url,
+    hostname: meta.hostname,
+  }));
+
+  const publicNonVercel = urls
+    .filter(({ hostname }) => !isLoopbackHost(hostname) && !isVercelHost(hostname))
+    .map(({ url }) => url);
+  if (publicNonVercel.length > 0) {
+    return publicNonVercel;
   }
-  return all;
+
+  const publicVercel = urls
+    .filter(({ hostname }) => !isLoopbackHost(hostname) && isVercelHost(hostname))
+    .map(({ url }) => url);
+  if (publicVercel.length > 0) {
+    return publicVercel;
+  }
+
+  const loopbackUrls = urls
+    .filter(({ hostname }) => isLoopbackHost(hostname))
+    .map(({ url }) => url);
+  if (loopbackUrls.length > 0) {
+    if (process.env.NODE_ENV !== "production") {
+      return [...loopbackUrls, "https://localcan.baptistecolle.com"];
+    }
+    return loopbackUrls;
+  }
+
+  return [];
 }
 
 /**

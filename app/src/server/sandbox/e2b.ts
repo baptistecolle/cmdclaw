@@ -25,7 +25,10 @@ function resolveSandboxAppUrl(): string {
     return "";
   }
   const parsed = new URL(configuredUrl);
-  if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+  if (
+    (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") &&
+    process.env.NODE_ENV !== "production"
+  ) {
     return "https://localcan.baptistecolle.com";
   }
   return configuredUrl;

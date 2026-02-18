@@ -6,6 +6,7 @@ import { mswServer } from "@/test/msw/server";
 const {
   getSessionMock,
   getOAuthConfigMock,
+  submitAuthResultMock,
   integrationFindFirstMock,
   updateWhereMock,
   deleteWhereMock,
@@ -15,6 +16,7 @@ const {
 } = vi.hoisted(() => {
   const getSessionMock = vi.fn();
   const getOAuthConfigMock = vi.fn();
+  const submitAuthResultMock = vi.fn();
 
   const integrationFindFirstMock = vi.fn();
 
@@ -43,6 +45,7 @@ const {
   return {
     getSessionMock,
     getOAuthConfigMock,
+    submitAuthResultMock,
     integrationFindFirstMock,
     updateWhereMock,
     deleteWhereMock,
@@ -68,6 +71,12 @@ vi.mock("@/server/oauth/config", () => ({
   getOAuthConfig: getOAuthConfigMock,
 }));
 
+vi.mock("@/server/services/generation-manager", () => ({
+  generationManager: {
+    submitAuthResult: submitAuthResultMock,
+  },
+}));
+
 import { GET } from "./route";
 
 function encodeState(state: Record<string, unknown>) {
@@ -86,6 +95,7 @@ describe("GET /api/oauth/callback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getSessionMock.mockResolvedValue({ user: { id: "user-1" } });
+    submitAuthResultMock.mockResolvedValue(true);
     integrationFindFirstMock.mockResolvedValue(null);
     insertReturningMock.mockResolvedValue([{ id: "integration-1" }]);
     deleteWhereMock.mockResolvedValue(undefined);
@@ -217,6 +227,37 @@ describe("GET /api/oauth/callback", () => {
         refreshToken: "refresh",
       }),
     );
+  });
+
+  it("preserves existing redirect query params when appending success", async () => {
+    const state = encodeState({
+      userId: "user-1",
+      type: "google_sheets",
+      redirectUrl: "/chat/conv-1?auth_complete=google_sheets&generation_id=gen-1",
+    });
+
+    mswServer.use(
+      http.post("https://oauth.example.com/token", () =>
+        HttpResponse.json({
+          access_token: "sheet-token",
+          refresh_token: "sheet-refresh",
+          expires_in: 3600,
+        }),
+      ),
+    );
+
+    const request = new NextRequest(
+      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`,
+    );
+
+    const response = await GET(request);
+    const location = getLocation(response);
+
+    expect(location).toContain("https://app.example.com/chat/conv-1?");
+    expect(location).toContain("auth_complete=google_sheets");
+    expect(location).toContain("generation_id=gen-1");
+    expect(location).toContain("success=true");
+    expect(submitAuthResultMock).toHaveBeenCalledWith("gen-1", "google_sheets", true, "user-1");
   });
 
   it("merges Salesforce instance_url into metadata", async () => {

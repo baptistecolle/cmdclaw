@@ -2,19 +2,21 @@ import { toNextJsHandler } from "better-auth/next-js";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
-const trustedOrigins = [
-  "https://localcan.baptistecolle.com",
-  "https://heybap.com",
+const trustedOrigins = new Set([
   "https://app.heybap.com",
+  "https://heybap.com",
   "https://www.heybap.com",
+  "https://localcan.baptistecolle.com",
   `http://localhost:${process.env.PORT ?? 3000}`,
   `http://127.0.0.1:${process.env.PORT ?? 3000}`,
-];
+]);
+
+const DEFAULT_ALLOWED_ORIGIN = "https://app.heybap.com";
 
 function getCorsHeaders(origin: string | null) {
-  const isAllowed = origin && trustedOrigins.includes(origin);
+  const isAllowed = origin && trustedOrigins.has(origin);
   return {
-    "Access-Control-Allow-Origin": isAllowed ? origin : trustedOrigins[0],
+    "Access-Control-Allow-Origin": isAllowed ? origin : DEFAULT_ALLOWED_ORIGIN,
     "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Credentials": "true",

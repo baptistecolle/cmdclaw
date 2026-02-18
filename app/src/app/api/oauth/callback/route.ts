@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { integration, integrationToken } from "@/server/db/schema";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
+import { generationManager } from "@/server/services/generation-manager";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -46,7 +47,24 @@ export async function GET(request: NextRequest) {
   // Helper to build redirect URL with the correct base path
   const buildRedirectUrl = (params: string) => {
     const baseUrl = stateData.redirectUrl || "/integrations";
-    return new URL(`${baseUrl}?${params}`, request.url);
+    const redirectUrl = new URL(baseUrl, request.url);
+    const extraParams = new URLSearchParams(params);
+    for (const [key, value] of extraParams.entries()) {
+      redirectUrl.searchParams.set(key, value);
+    }
+    return redirectUrl;
+  };
+
+  const resolveAuthResumeContext = (): { generationId?: string; integration?: string } => {
+    try {
+      const redirectUrl = new URL(stateData.redirectUrl, request.url);
+      return {
+        generationId: redirectUrl.searchParams.get("generation_id") ?? undefined,
+        integration: redirectUrl.searchParams.get("auth_complete") ?? undefined,
+      };
+    } catch {
+      return {};
+    }
   };
 
   // Verify user matches
@@ -180,6 +198,20 @@ export async function GET(request: NextRequest) {
       expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
       idToken: tokens.id_token,
     });
+
+    const authResume = resolveAuthResumeContext();
+    if (authResume.generationId) {
+      try {
+        await generationManager.submitAuthResult(
+          authResume.generationId,
+          authResume.integration ?? stateData.type,
+          true,
+          sessionData.user.id,
+        );
+      } catch (resumeError) {
+        console.warn("[OAuth callback] Failed to auto-submit auth result:", resumeError);
+      }
+    }
 
     return NextResponse.redirect(buildRedirectUrl("success=true"));
   } catch (error) {
