@@ -26,5 +26,20 @@ describe("google-gmail CLI", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Google Gmail CLI - Commands");
+    expect(result.stdout).toContain("latest");
+    expect(result.stdout).toContain("--scope inbox|all|strict-all");
+  });
+
+  test("fails for unsupported scope value", () => {
+    const result = runSkillCli(
+      "src/e2b-template/skills/google-gmail/src/google-gmail.ts",
+      ["list", "--scope", "archive-only"],
+      {
+        GMAIL_ACCESS_TOKEN: "test-token",
+      },
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.combined).toContain("Invalid --scope");
   });
 });

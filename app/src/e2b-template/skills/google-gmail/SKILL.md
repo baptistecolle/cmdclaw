@@ -5,7 +5,7 @@ description: Read and send Gmail emails. Use for listing emails, reading content
 
 # Google Gmail
 
-Read inbox, get email content, count unread, and send emails via Gmail API.
+Read inbox, get email content, count unread, fetch latest email, and send emails via Gmail API.
 
 ## Environment Variables
 
@@ -14,18 +14,27 @@ Read inbox, get email content, count unread, and send emails via Gmail API.
 ## Commands
 
 ```bash
-# List emails (supports Gmail search syntax)
-google-gmail list [-q "from:boss subject:urgent"] [-l limit]
+# List emails (supports Gmail search syntax, defaults to Inbox)
+google-gmail list [-q "from:boss subject:urgent"] [-l limit] [--scope inbox|all|strict-all] [--include-spam-trash]
+
+# Get latest email (defaults to Inbox)
+google-gmail latest [-q "from:boss"] [--unread] [--scope inbox|all|strict-all] [--include-spam-trash]
 
 # Get full email content
 google-gmail get <messageId>
 
-# Count unread emails
-google-gmail unread
+# Count unread emails (defaults to Inbox)
+google-gmail unread [-q "from:boss"] [--scope inbox|all|strict-all] [--include-spam-trash]
 
 # Send an email
 google-gmail send --to "user@example.com" --subject "Hello" --body "Message text" [--cc "cc@example.com"]
 ```
+
+## Scope behavior
+
+- `--scope inbox` (default): only messages in `INBOX`
+- `--scope all`: all mailbox messages except spam/trash (unless `--include-spam-trash`)
+- `--scope strict-all`: includes spam/trash by default
 
 ## Output Format
 

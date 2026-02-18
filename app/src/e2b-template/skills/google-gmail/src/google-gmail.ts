@@ -15,6 +15,9 @@ const { positionals, values } = parseArgs({
     help: { type: "boolean", short: "h" },
     query: { type: "string", short: "q" },
     limit: { type: "string", short: "l", default: "10" },
+    scope: { type: "string", default: "inbox" },
+    "include-spam-trash": { type: "boolean", default: false },
+    unread: { type: "boolean", default: false },
     to: { type: "string" },
     subject: { type: "string" },
     body: { type: "string" },
@@ -36,6 +39,7 @@ type GmailMessage = {
   snippet?: string;
   payload?: GmailPart;
 };
+type MailScope = "inbox" | "all" | "strict-all";
 
 function extractBody(part: GmailPart): string {
   if (part.body?.data) {
@@ -57,24 +61,27 @@ function extractBody(part: GmailPart): string {
   return "";
 }
 
-async function listEmails() {
-  const params = new URLSearchParams({ maxResults: values.limit || "10" });
-  if (values.query) {
-    params.set("q", values.query);
+function getScope(): MailScope {
+  const scope = values.scope;
+  if (scope === "inbox" || scope === "all" || scope === "strict-all") {
+    return scope;
   }
+  throw new Error(`Invalid --scope "${scope}". Expected one of: inbox, all, strict-all.`);
+}
 
-  const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`, {
-    headers,
-  });
-  if (!listRes.ok) {
-    throw new Error(await listRes.text());
+function buildMessageListParams(maxResults: string, query?: string) {
+  const scope = getScope();
+  const params = new URLSearchParams({ maxResults });
+  if (query) {
+    params.set("q", query);
   }
-
-  const { messages = [] } = (await listRes.json()) as { messages?: Array<{ id: string }> };
-  if (messages.length === 0) {
-    return console.log("No emails found.");
+  if (scope === "inbox") {
+    params.append("labelIds", "INBOX");
   }
+  return { params, includeSpamTrash: values["include-spam-trash"] || scope === "strict-all" };
+}
 
+async function fetchMessageDetails(messages: Array<{ id: string }>) {
   const details = await Promise.all(
     messages.slice(0, 20).map(async (msg: { id: string }) => {
       const res = await fetch(
@@ -85,7 +92,7 @@ async function listEmails() {
     }),
   );
 
-  const emails = details.filter(Boolean).map((e) => {
+  return details.filter(Boolean).map((e) => {
     const msg = e as GmailMessage;
     const getHeader = (name: string) =>
       msg.payload?.headers?.find((h) => h.name === name)?.value || "";
@@ -97,11 +104,34 @@ async function listEmails() {
       snippet: msg.snippet,
     };
   });
+}
+
+async function listEmails() {
+  const config = buildMessageListParams(values.limit || "10", values.query);
+
+  const listRes = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?${config.params}&includeSpamTrash=${String(config.includeSpamTrash)}`,
+    { headers },
+  );
+  if (!listRes.ok) {
+    throw new Error(await listRes.text());
+  }
+
+  const { messages = [] } = (await listRes.json()) as { messages?: Array<{ id: string }> };
+  if (messages.length === 0) {
+    return console.log("No emails found.");
+  }
+
+  const emails = await fetchMessageDetails(messages);
 
   console.log(JSON.stringify(emails, null, 2));
 }
 
 async function getEmail(messageId: string) {
+  if (!messageId) {
+    throw new Error("Required: google-gmail get <messageId>");
+  }
+
   const res = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
     { headers },
@@ -130,9 +160,33 @@ async function getEmail(messageId: string) {
   );
 }
 
-async function countUnread() {
+async function latestEmail() {
+  const query = values.unread
+    ? [values.query, "is:unread"].filter(Boolean).join(" ")
+    : values.query;
+  const config = buildMessageListParams("1", query);
   const res = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=1`,
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?${config.params}&includeSpamTrash=${String(config.includeSpamTrash)}`,
+    { headers },
+  );
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  const { messages = [] } = (await res.json()) as { messages?: Array<{ id: string }> };
+  if (messages.length === 0) {
+    return console.log("No emails found.");
+  }
+
+  const [email] = await fetchMessageDetails(messages);
+  console.log(JSON.stringify(email, null, 2));
+}
+
+async function countUnread() {
+  const query = [values.query, "is:unread"].filter(Boolean).join(" ");
+  const config = buildMessageListParams("1", query);
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?${config.params}&includeSpamTrash=${String(config.includeSpamTrash)}`,
     { headers },
   );
   if (!res.ok) {
@@ -175,9 +229,13 @@ async function sendEmail() {
 
 function showHelp() {
   console.log(`Google Gmail CLI - Commands:
-  list [-q query] [-l limit]  List emails
+  list [-q query] [-l limit] [--scope inbox|all|strict-all] [--include-spam-trash]
+                              List emails (default scope: inbox)
+  latest [-q query] [--unread] [--scope inbox|all|strict-all] [--include-spam-trash]
+                              Get latest email (default scope: inbox)
   get <messageId>             Get email content
-  unread                      Count unread emails
+  unread [-q query] [--scope inbox|all|strict-all] [--include-spam-trash]
+                              Count unread emails (default scope: inbox)
   send --to <email> --subject <subject> --body <body> [--cc <email>]
 
 Options:
@@ -194,6 +252,9 @@ async function main() {
     switch (command) {
       case "list":
         await listEmails();
+        break;
+      case "latest":
+        await latestEmail();
         break;
       case "get":
         await getEmail(args[0]);
