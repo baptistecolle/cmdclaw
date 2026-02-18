@@ -42,6 +42,11 @@ export type SandboxFileData = {
 };
 
 export type DoneArtifactsData = {
+  timing?: {
+    sandboxStartupDurationMs?: number;
+    sandboxStartupMode?: "created" | "reused" | "unknown";
+    generationDurationMs?: number;
+  };
   attachments: Array<{
     id: string;
     filename: string;

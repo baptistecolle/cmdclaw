@@ -77,6 +77,7 @@ const get = protectedProcedure
           role: m.role,
           content: m.content,
           contentParts: m.contentParts,
+          timing: m.timing,
           createdAt: m.createdAt,
           attachments: m.attachments?.map((a) => ({
             id: a.id,

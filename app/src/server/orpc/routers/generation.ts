@@ -78,6 +78,13 @@ const generationEventSchema = z.discriminatedUnion("type", [
     }),
     artifacts: z
       .object({
+        timing: z
+          .object({
+            sandboxStartupDurationMs: z.number().optional(),
+            sandboxStartupMode: z.enum(["created", "reused", "unknown"]).optional(),
+            generationDurationMs: z.number().optional(),
+          })
+          .optional(),
         attachments: z.array(
           z.object({
             id: z.string(),

@@ -84,6 +84,11 @@ type PersistedConversationMessage = {
     mimeType: string;
     sizeBytes: number | null;
   }>;
+  timing?: {
+    sandboxStartupDurationMs?: number;
+    sandboxStartupMode?: "created" | "reused" | "unknown";
+    generationDurationMs?: number;
+  };
 };
 
 function mapPersistedMessageToChatMessage(m: PersistedConversationMessage): Message {
@@ -151,6 +156,7 @@ function mapPersistedMessageToChatMessage(m: PersistedConversationMessage): Mess
     parts,
     attachments,
     sandboxFiles,
+    timing: m.timing,
   };
 }
 
@@ -669,6 +675,7 @@ export function ChatArea({ conversationId }: Props) {
           handleInitStatusChange(status);
         },
         onDone: async (generationId, newConversationId, messageId, _usage, artifacts) => {
+          const timing = artifacts?.timing;
           markInitSignal("done");
           runtime.handleDone({
             generationId,
@@ -690,6 +697,7 @@ export function ChatArea({ conversationId }: Props) {
             })),
             sandboxFiles:
               artifacts?.sandboxFiles ?? (assistant.sandboxFiles as SandboxFileData[] | undefined),
+            timing,
           };
           const hydratedAssistant = await hydrateAssistantMessage(
             newConversationId,
@@ -968,6 +976,7 @@ export function ChatArea({ conversationId }: Props) {
             handleInitStatusChange(status);
           },
           onDone: async (generationId, newConversationId, messageId, _usage, artifacts) => {
+            const timing = artifacts?.timing;
             markInitSignal("done");
             runtime.handleDone({
               generationId,
@@ -990,6 +999,7 @@ export function ChatArea({ conversationId }: Props) {
               sandboxFiles:
                 artifacts?.sandboxFiles ??
                 (assistant.sandboxFiles as SandboxFileData[] | undefined),
+              timing,
             };
             const hydratedAssistant = await hydrateAssistantMessage(
               newConversationId,

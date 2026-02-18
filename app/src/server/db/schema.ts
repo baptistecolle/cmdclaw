@@ -200,6 +200,12 @@ export type ContentPart =
   | { type: "thinking"; id: string; content: string }
   | { type: "system"; content: string };
 
+export type MessageTiming = {
+  sandboxStartupDurationMs?: number;
+  sandboxStartupMode?: "created" | "reused" | "unknown";
+  generationDurationMs?: number;
+};
+
 export const message = pgTable(
   "message",
   {
@@ -213,6 +219,8 @@ export const message = pgTable(
     content: text("content").notNull(),
     // Interleaved content parts (text/tool_use/tool_result)
     contentParts: jsonb("content_parts").$type<ContentPart[]>(),
+    // Optional timing metrics for assistant generations
+    timing: jsonb("timing").$type<MessageTiming>(),
     // Token usage for cost tracking
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),

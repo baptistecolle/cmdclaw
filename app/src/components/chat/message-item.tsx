@@ -1,6 +1,6 @@
 "use client";
 
-import { Paperclip, Download, FileIcon, Eye } from "lucide-react";
+import { Paperclip, Download, FileIcon, Eye, Bot, Box } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
@@ -34,6 +34,11 @@ type Props = {
   integrationsUsed?: string[];
   attachments?: AttachmentData[];
   sandboxFiles?: SandboxFileData[];
+  timing?: {
+    sandboxStartupDurationMs?: number;
+    sandboxStartupMode?: "created" | "reused" | "unknown";
+    generationDurationMs?: number;
+  };
 };
 
 const NOOP = () => {};
@@ -50,6 +55,7 @@ export function MessageItem({
   integrationsUsed,
   attachments,
   sandboxFiles,
+  timing,
 }: Props) {
   // Track expanded state for each segment
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
@@ -540,6 +546,26 @@ export function MessageItem({
         />
       )}
 
+      {timing && (timing.generationDurationMs || timing.sandboxStartupDurationMs) && (
+        <div className="text-muted-foreground flex flex-wrap gap-2 text-xs">
+          {timing.sandboxStartupDurationMs !== undefined && (
+            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
+              <Box className="h-3 w-3" />
+              <span>
+                Sandbox prep{timing.sandboxStartupMode === "reused" ? " (reused)" : ""}:{" "}
+                {formatDuration(timing.sandboxStartupDurationMs)}
+              </span>
+            </div>
+          )}
+          {timing.generationDurationMs !== undefined && (
+            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
+              <Bot className="h-3 w-3" />
+              <span>Generation: {formatDuration(timing.generationDurationMs)}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Show sandbox files as downloadable attachments */}
       {sandboxFiles && sandboxFiles.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
@@ -579,4 +605,11 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  return `${(ms / 1000).toFixed(1)}s`;
 }

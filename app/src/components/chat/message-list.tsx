@@ -51,6 +51,11 @@ export type Message = {
   integrationsUsed?: string[];
   attachments?: AttachmentData[];
   sandboxFiles?: SandboxFileData[];
+  timing?: {
+    sandboxStartupDurationMs?: number;
+    sandboxStartupMode?: "created" | "reused" | "unknown";
+    generationDurationMs?: number;
+  };
 };
 
 type Props = {
@@ -81,6 +86,7 @@ export function MessageList({ messages }: Props) {
             integrationsUsed={message.integrationsUsed}
             attachments={message.attachments}
             sandboxFiles={message.sandboxFiles}
+            timing={message.timing}
           />
         );
       })}

@@ -33,6 +33,7 @@ import {
   workflowRunEvent,
   type ContentPart,
   type GenerationExecutionPolicy,
+  type MessageTiming,
   type PendingApproval,
   type PendingAuth,
 } from "@/server/db/schema";
@@ -166,6 +167,7 @@ export type GenerationEvent =
         totalCostUsd: number;
       };
       artifacts?: {
+        timing?: MessageTiming;
         attachments: Array<{
           id: string;
           filename: string;
@@ -270,12 +272,15 @@ interface GenerationContext {
   agentInitStartedAt?: number;
   agentInitReadyAt?: number;
   agentInitFailedAt?: number;
+  agentSandboxReadyAt?: number;
+  agentSandboxMode?: "created" | "reused" | "unknown";
   lastCancellationCheckAt?: number;
   isFinalizing?: boolean;
 }
 
 async function getDoneArtifacts(messageId: string): Promise<
   | {
+      timing?: MessageTiming;
       attachments: Array<{
         id: string;
         filename: string;
@@ -305,6 +310,7 @@ async function getDoneArtifacts(messageId: string): Promise<
   }
 
   return {
+    timing: messageRecord.timing ?? undefined,
     attachments: messageRecord.attachments.map((attachment) => ({
       id: attachment.id,
       filename: attachment.filename,
@@ -2044,6 +2050,15 @@ class GenerationManager {
               },
               onLifecycle: (stage, details) => {
                 const status = `agent_init_${stage}`;
+                if (ctx.agentInitStartedAt) {
+                  if (stage === "sandbox_created") {
+                    ctx.agentSandboxReadyAt = Date.now();
+                    ctx.agentSandboxMode = "created";
+                  } else if (stage === "sandbox_reused") {
+                    ctx.agentSandboxReadyAt = Date.now();
+                    ctx.agentSandboxMode = "reused";
+                  }
+                }
                 this.broadcast(ctx, { type: "status_change", status });
                 const lifecycleEvent = status.toUpperCase();
                 logServerEvent("info", lifecycleEvent, details ?? {}, {
@@ -4739,6 +4754,17 @@ class GenerationManager {
           ctx.contentParts = cancelledParts;
         }
 
+        const messageTiming: MessageTiming = {
+          generationDurationMs: Math.max(0, Date.now() - ctx.startedAt.getTime()),
+        };
+        if (ctx.agentInitStartedAt && ctx.agentSandboxReadyAt) {
+          messageTiming.sandboxStartupDurationMs = Math.max(
+            0,
+            ctx.agentSandboxReadyAt - ctx.agentInitStartedAt,
+          );
+          messageTiming.sandboxStartupMode = ctx.agentSandboxMode ?? "unknown";
+        }
+
         // Save assistant message for completed and cancelled generations
         const [assistantMessage] = await db
           .insert(message)
@@ -4752,6 +4778,7 @@ class GenerationManager {
             contentParts: cancelledParts.length > 0 ? cancelledParts : null,
             inputTokens: ctx.usage.inputTokens,
             outputTokens: ctx.usage.outputTokens,
+            timing: messageTiming,
           })
           .returning();
 
