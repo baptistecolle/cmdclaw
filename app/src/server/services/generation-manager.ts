@@ -1570,6 +1570,20 @@ class GenerationManager {
         .set({ generationStatus: "paused" })
         .where(eq(conversation.id, genRecord.conversationId));
 
+      const linkedWorkflowRun = await db.query.workflowRun.findFirst({
+        where: eq(workflowRun.generationId, generationId),
+        columns: { id: true },
+      });
+      if (linkedWorkflowRun?.id) {
+        await db
+          .update(workflowRun)
+          .set({
+            status: "cancelled",
+            finishedAt: new Date(),
+          })
+          .where(eq(workflowRun.id, linkedWorkflowRun.id));
+      }
+
       const ctx = this.activeGenerations.get(generationId);
       if (ctx && ctx.status === "awaiting_approval") {
         ctx.status = "paused";
@@ -1943,6 +1957,7 @@ class GenerationManager {
           getOrCreateSession(
             {
               conversationId: ctx.conversationId,
+              generationId: ctx.id,
               userId: ctx.userId,
               anthropicApiKey: env.ANTHROPIC_API_KEY,
               integrationEnvs: filteredCliEnv,
@@ -3597,6 +3612,7 @@ class GenerationManager {
       const resumedSession = await getOrCreateSession(
         {
           conversationId: ctx.conversationId,
+          generationId: ctx.id,
           userId: ctx.userId,
           anthropicApiKey: env.ANTHROPIC_API_KEY || "",
           integrationEnvs: {},
@@ -3698,6 +3714,7 @@ class GenerationManager {
       const resumedSession = await getOrCreateSession(
         {
           conversationId: ctx.conversationId,
+          generationId: ctx.id,
           userId: ctx.userId,
           anthropicApiKey: env.ANTHROPIC_API_KEY || "",
           integrationEnvs: {},

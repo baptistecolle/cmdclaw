@@ -1,10 +1,8 @@
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { env } from "@/env";
-import { db } from "@/server/db/client";
-import { conversation } from "@/server/db/schema";
 import { getTokensForIntegrations } from "@/server/integrations/cli-env";
 import { generationManager } from "@/server/services/generation-manager";
+import { resolveGenerationIdForInternalCallback } from "@/server/services/internal-callback-generation";
 import { baseProcedure } from "../middleware";
 
 /**
@@ -53,7 +51,8 @@ const integrationSchema = z.enum([
 const approvalRequest = baseProcedure
   .input(
     z.object({
-      sandboxId: z.string(),
+      generationId: z.string().optional(),
+      sandboxId: z.string().optional(),
       conversationId: z.string(),
       integration: integrationSchema,
       operation: z.string(),
@@ -81,15 +80,15 @@ const approvalRequest = baseProcedure
       return { decision: "deny" as const };
     }
 
-    // Resolve generation from durable storage only.
-    const conv = await db.query.conversation.findFirst({
-      where: eq(conversation.id, input.conversationId),
-      columns: { currentGenerationId: true },
+    const genId = await resolveGenerationIdForInternalCallback({
+      conversationId: input.conversationId,
+      generationId: input.generationId,
+      sandboxId: input.sandboxId,
     });
-    const genId = conv?.currentGenerationId ?? undefined;
     console.log("[Internal] Generation lookup:", {
       conversationId: input.conversationId,
-      dbGenId: conv?.currentGenerationId ?? "NOT FOUND",
+      requestedGenerationId: input.generationId ?? "NOT PROVIDED",
+      sandboxId: input.sandboxId ?? "NOT PROVIDED",
       genId: genId ?? "NOT FOUND",
     });
     if (!genId) {
@@ -121,6 +120,8 @@ const approvalRequest = baseProcedure
 const authRequest = baseProcedure
   .input(
     z.object({
+      generationId: z.string().optional(),
+      sandboxId: z.string().optional(),
       conversationId: z.string(),
       integration: integrationSchema,
       reason: z.string().optional(),
@@ -146,12 +147,11 @@ const authRequest = baseProcedure
       reason: input.reason,
     });
 
-    // Resolve generation from durable storage only.
-    const conv = await db.query.conversation.findFirst({
-      where: eq(conversation.id, input.conversationId),
-      columns: { currentGenerationId: true },
+    const genId = await resolveGenerationIdForInternalCallback({
+      conversationId: input.conversationId,
+      generationId: input.generationId,
+      sandboxId: input.sandboxId,
     });
-    const genId = conv?.currentGenerationId ?? undefined;
     if (!genId) {
       console.error("[Internal] No active generation for conversation:", input.conversationId);
       return { success: false };

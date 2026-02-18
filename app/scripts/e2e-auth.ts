@@ -42,7 +42,7 @@ function getBaseUrl(): string {
     return fromEnv;
   }
 
-  const port = process.env.PLAYWRIGHT_PORT ?? "4173";
+  const port = process.env.PLAYWRIGHT_PORT ?? "4300";
   return `http://127.0.0.1:${port}`;
 }
 

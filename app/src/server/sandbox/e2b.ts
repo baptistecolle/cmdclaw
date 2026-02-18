@@ -24,9 +24,11 @@ function resolveSandboxAppUrl(): string {
   if (!configuredUrl) {
     return "";
   }
-  return new URL(configuredUrl).hostname === "localhost"
-    ? "https://localcan.baptistecolle.com"
-    : configuredUrl;
+  const parsed = new URL(configuredUrl);
+  if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+    return "https://localcan.baptistecolle.com";
+  }
+  return configuredUrl;
 }
 
 interface SandboxState {
@@ -60,6 +62,7 @@ function logLifecycle(
 
 export interface SandboxConfig {
   conversationId: string;
+  generationId?: string;
   userId?: string;
   anthropicApiKey: string;
   integrationEnvs?: Record<string, string>;
@@ -208,6 +211,7 @@ export async function getOrCreateSandbox(
         APP_URL: resolveSandboxAppUrl(),
         BAP_SERVER_SECRET: env.BAP_SERVER_SECRET || "",
         CONVERSATION_ID: config.conversationId,
+        GENERATION_ID: config.generationId ?? "",
         ...config.integrationEnvs,
       },
       timeoutMs: SANDBOX_TIMEOUT_MS,

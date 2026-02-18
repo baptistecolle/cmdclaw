@@ -292,11 +292,15 @@ function isWriteOperation(integration: string, operation: string): boolean {
   return false;
 }
 
+function isVercelHost(hostname: string): boolean {
+  return hostname === "vercel.app" || hostname.endsWith(".vercel.app");
+}
+
 function getCallbackBaseUrls(): string[] {
   const rawCandidates = [
+    process.env.E2B_CALLBACK_BASE_URL,
     process.env.APP_URL,
     process.env.NEXT_PUBLIC_APP_URL,
-    process.env.E2B_CALLBACK_BASE_URL,
   ].filter((value): value is string => Boolean(value && value.trim().length > 0));
 
   const normalized = rawCandidates.map((value) => value.replace(/\/$/, ""));
@@ -313,7 +317,18 @@ function getCallbackBaseUrls(): string[] {
     }
   }
 
-  return Array.from(withLocalcan);
+  const all = Array.from(withLocalcan);
+  const nonVercel = all.filter((url) => {
+    try {
+      return !isVercelHost(new URL(url).hostname);
+    } catch {
+      return false;
+    }
+  });
+  if (nonVercel.length > 0) {
+    return nonVercel;
+  }
+  return all;
 }
 
 /**
@@ -329,6 +344,7 @@ async function requestApproval(params: {
   const serverSecret = process.env.BAP_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
   const sandboxId = process.env.SANDBOX_ID;
+  const generationId = process.env.GENERATION_ID;
 
   if (serverUrls.length === 0 || !conversationId) {
     const reason =
@@ -360,6 +376,7 @@ async function requestApproval(params: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          generationId,
           sandboxId: sandboxId || "unknown",
           conversationId,
           integration: params.integration,
@@ -399,6 +416,8 @@ async function requestAuth(params: {
   const serverUrls = getCallbackBaseUrls();
   const serverSecret = process.env.BAP_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
+  const sandboxId = process.env.SANDBOX_ID;
+  const generationId = process.env.GENERATION_ID;
 
   if (serverUrls.length === 0 || !conversationId) {
     const reason =
@@ -425,6 +444,8 @@ async function requestAuth(params: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          generationId,
+          sandboxId,
           conversationId,
           integration: params.integration,
           reason: params.reason,

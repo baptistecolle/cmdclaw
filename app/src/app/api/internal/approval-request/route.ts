@@ -1,13 +1,13 @@
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { env } from "@/env";
-import { db } from "@/server/db/client";
-import { conversation } from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
+import { resolveGenerationIdForInternalCallback } from "@/server/services/internal-callback-generation";
 
 export const runtime = "nodejs";
 
 const approvalRequestSchema = z.object({
+  generationId: z.string().optional(),
+  sandboxId: z.string().optional(),
   conversationId: z.string().min(1),
   integration: z.enum([
     "gmail",
@@ -72,14 +72,15 @@ export async function POST(request: Request) {
       return Response.json({ decision: "deny" });
     }
 
-    const conv = await db.query.conversation.findFirst({
-      where: eq(conversation.id, input.conversationId),
-      columns: { currentGenerationId: true },
+    const genId = await resolveGenerationIdForInternalCallback({
+      conversationId: input.conversationId,
+      generationId: input.generationId,
+      sandboxId: input.sandboxId,
     });
-    const genId = conv?.currentGenerationId ?? undefined;
     console.log("[Internal] Generation lookup:", {
       conversationId: input.conversationId,
-      dbGenId: conv?.currentGenerationId ?? "NOT FOUND",
+      requestedGenerationId: input.generationId ?? "NOT PROVIDED",
+      sandboxId: input.sandboxId ?? "NOT PROVIDED",
       genId: genId ?? "NOT FOUND",
     });
 

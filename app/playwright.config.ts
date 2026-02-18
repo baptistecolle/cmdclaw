@@ -1,7 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
-const defaultPort = skipWebServer ? 3000 : 4173;
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER !== "0";
+const defaultPort = skipWebServer ? 3000 : 4300;
 const port = Number(process.env.PLAYWRIGHT_PORT ?? defaultPort);
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 const videoMode =
@@ -39,7 +40,7 @@ export default defineConfig({
     : {
         command: `bun run build && bun run start -- --port ${port}`,
         url: baseURL,
-        reuseExistingServer: false,
+        reuseExistingServer,
         timeout: 120_000,
       },
 });

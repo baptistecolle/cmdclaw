@@ -546,6 +546,7 @@ describe("generationManager transitions", () => {
 
   it("times out approval into paused status and emits status_change", async () => {
     const ctx = createCtx();
+    workflowRunFindFirstMock.mockResolvedValue({ id: "wf-run-1" });
     const stalePendingApproval = {
       toolUseId: "plugin-stale",
       toolName: "Bash",
@@ -600,6 +601,12 @@ describe("generationManager transitions", () => {
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "paused",
+      }),
+    );
+    expect(updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "cancelled",
+        finishedAt: expect.any(Date),
       }),
     );
   });
