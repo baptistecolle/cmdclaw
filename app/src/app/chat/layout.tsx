@@ -2,7 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   SidebarProvider,
   SidebarInset,
@@ -12,6 +12,7 @@ import { AppShell } from "@/components/app-shell";
 import { ChatCopyButton } from "@/components/chat/chat-copy-button";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useCurrentUser } from "@/orpc/hooks";
 
 const CHAT_CONVERSATION_ID_SYNC_EVENT = "chat:conversation-id-sync";
@@ -25,6 +26,15 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   );
   const router = useRouter();
   const { data: user, isLoading: userLoading } = useCurrentUser();
+  const isMobile = useIsMobile();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const handleSidebarOpenChange = useCallback(
+    (open: boolean) => {
+      setIsSidebarOpen(isMobile ? open : true);
+    },
+    [isMobile],
+  );
 
   useEffect(() => {
     setLiveConversationId(routeConversationId);
@@ -49,6 +59,12 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     }
   }, [user, userLoading, router]);
 
+  useEffect(() => {
+    if (!isMobile && !isSidebarOpen) {
+      setIsSidebarOpen(true);
+    }
+  }, [isMobile, isSidebarOpen]);
+
   // Show loading while checking onboarding status
   if (userLoading || (user && !user.onboardedAt)) {
     return (
@@ -60,7 +76,11 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <AppShell>
-      <SidebarProvider className="bg-background text-foreground">
+      <SidebarProvider
+        className="bg-background text-foreground"
+        open={isSidebarOpen}
+        onOpenChange={handleSidebarOpenChange}
+      >
         <ChatSidebar />
         <SidebarInset>
           <header className="flex h-14 items-center gap-2 border-b px-4">

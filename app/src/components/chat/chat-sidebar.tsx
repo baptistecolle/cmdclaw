@@ -75,7 +75,7 @@ export function ChatSidebar() {
   );
 
   return (
-    <Sidebar collapsible={isMobile ? "offcanvas" : "none"} className="border-r">
+    <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader>
         <Button
           variant="outline"
