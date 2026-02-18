@@ -793,8 +793,8 @@ export function useGeneration() {
                   queryKey: ["conversation", "list"],
                 });
               },
-              onDone: (generationId, conversationId, messageId, usage) => {
-                callbacks.onDone?.(generationId, conversationId, messageId, usage);
+              onDone: (generationId, conversationId, messageId, usage, artifacts) => {
+                callbacks.onDone?.(generationId, conversationId, messageId, usage, artifacts);
                 queryClient.invalidateQueries({ queryKey: ["conversation"] });
               },
               onError: (message) => {
@@ -881,8 +881,14 @@ export function useGeneration() {
             signal,
             callbacks: {
               ...callbacks,
-              onDone: (doneGenerationId, doneConversationId, messageId, usage) => {
-                callbacks.onDone?.(doneGenerationId, doneConversationId, messageId, usage);
+              onDone: (doneGenerationId, doneConversationId, messageId, usage, artifacts) => {
+                callbacks.onDone?.(
+                  doneGenerationId,
+                  doneConversationId,
+                  messageId,
+                  usage,
+                  artifacts,
+                );
                 queryClient.invalidateQueries({ queryKey: ["conversation"] });
               },
               onError: (message) => {

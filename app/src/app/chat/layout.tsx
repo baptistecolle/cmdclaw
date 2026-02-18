@@ -2,7 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   SidebarProvider,
   SidebarInset,
@@ -14,12 +14,34 @@ import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useCurrentUser } from "@/orpc/hooks";
 
+const CHAT_CONVERSATION_ID_SYNC_EVENT = "chat:conversation-id-sync";
+
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const { isAdmin } = useIsAdmin();
   const params = useParams();
-  const conversationId = params?.conversationId as string | undefined;
+  const routeConversationId = params?.conversationId as string | undefined;
+  const [liveConversationId, setLiveConversationId] = useState<string | undefined>(
+    routeConversationId,
+  );
   const router = useRouter();
   const { data: user, isLoading: userLoading } = useCurrentUser();
+
+  useEffect(() => {
+    setLiveConversationId(routeConversationId);
+  }, [routeConversationId]);
+
+  useEffect(() => {
+    const handleConversationIdSync = (event: Event) => {
+      const detail = (event as CustomEvent<{ conversationId?: string }>).detail;
+      if (detail?.conversationId) {
+        setLiveConversationId(detail.conversationId);
+      }
+    };
+
+    window.addEventListener(CHAT_CONVERSATION_ID_SYNC_EVENT, handleConversationIdSync);
+    return () =>
+      window.removeEventListener(CHAT_CONVERSATION_ID_SYNC_EVENT, handleConversationIdSync);
+  }, []);
 
   useEffect(() => {
     if (!userLoading && user && !user.onboardedAt) {
@@ -44,10 +66,12 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           <header className="flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <span className="text-sm font-medium">Chat</span>
-            {isAdmin && conversationId && (
-              <span className="text-muted-foreground font-mono text-xs">ID: {conversationId}</span>
+            {isAdmin && liveConversationId && (
+              <span className="text-muted-foreground font-mono text-xs">
+                ID: {liveConversationId}
+              </span>
             )}
-            <ChatCopyButton conversationId={conversationId} className="ml-auto" />
+            <ChatCopyButton conversationId={liveConversationId} className="ml-auto" />
           </header>
           <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">{children}</div>
         </SidebarInset>

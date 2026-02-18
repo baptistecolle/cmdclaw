@@ -165,6 +165,21 @@ export type GenerationEvent =
         outputTokens: number;
         totalCostUsd: number;
       };
+      artifacts?: {
+        attachments: Array<{
+          id: string;
+          filename: string;
+          mimeType: string;
+          sizeBytes: number;
+        }>;
+        sandboxFiles: Array<{
+          fileId: string;
+          path: string;
+          filename: string;
+          mimeType: string;
+          sizeBytes: number | null;
+        }>;
+      };
     }
   | { type: "error"; message: string }
   | {
@@ -257,6 +272,53 @@ interface GenerationContext {
   agentInitFailedAt?: number;
   lastCancellationCheckAt?: number;
   isFinalizing?: boolean;
+}
+
+async function getDoneArtifacts(messageId: string): Promise<
+  | {
+      attachments: Array<{
+        id: string;
+        filename: string;
+        mimeType: string;
+        sizeBytes: number;
+      }>;
+      sandboxFiles: Array<{
+        fileId: string;
+        path: string;
+        filename: string;
+        mimeType: string;
+        sizeBytes: number | null;
+      }>;
+    }
+  | undefined
+> {
+  const messageRecord = await db.query.message.findFirst({
+    where: eq(message.id, messageId),
+    with: {
+      attachments: true,
+      sandboxFiles: true,
+    },
+  });
+
+  if (!messageRecord) {
+    return undefined;
+  }
+
+  return {
+    attachments: messageRecord.attachments.map((attachment) => ({
+      id: attachment.id,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+    })),
+    sandboxFiles: messageRecord.sandboxFiles.map((file) => ({
+      fileId: file.id,
+      path: file.path,
+      filename: file.filename,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+    })),
+  };
 }
 
 // Approval timeout: 5 minutes before pausing sandbox
@@ -1353,6 +1415,7 @@ class GenerationManager {
       }
 
       if (latest.status === "completed" && latest.messageId) {
+        const artifacts = await getDoneArtifacts(latest.messageId);
         terminated = true;
         yield {
           type: "done",
@@ -1364,6 +1427,7 @@ class GenerationManager {
             outputTokens: latest.outputTokens,
             totalCostUsd: 0,
           },
+          artifacts,
         };
         return;
       }
@@ -4761,12 +4825,14 @@ class GenerationManager {
 
       // Notify subscribers BEFORE setting status to avoid race condition
       if (status === "completed" && messageId) {
+        const artifacts = await getDoneArtifacts(messageId);
         this.broadcast(ctx, {
           type: "done",
           generationId: ctx.id,
           conversationId: ctx.conversationId,
           messageId,
           usage: ctx.usage,
+          artifacts,
         });
       } else if (status === "cancelled") {
         this.broadcast(ctx, {

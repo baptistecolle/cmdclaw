@@ -76,6 +76,27 @@ const generationEventSchema = z.discriminatedUnion("type", [
       outputTokens: z.number(),
       totalCostUsd: z.number(),
     }),
+    artifacts: z
+      .object({
+        attachments: z.array(
+          z.object({
+            id: z.string(),
+            filename: z.string(),
+            mimeType: z.string(),
+            sizeBytes: z.number(),
+          }),
+        ),
+        sandboxFiles: z.array(
+          z.object({
+            fileId: z.string(),
+            path: z.string(),
+            filename: z.string(),
+            mimeType: z.string(),
+            sizeBytes: z.number().nullable(),
+          }),
+        ),
+      })
+      .optional(),
   }),
   z.object({
     type: z.literal("error"),

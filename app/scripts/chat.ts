@@ -442,6 +442,7 @@ async function runGeneration(
 ): Promise<{ generationId: string; conversationId: string } | null> {
   let outputStarted = false;
   const runtime = createGenerationRuntime();
+  const streamedSandboxFileIds = new Set<string>();
 
   try {
     const result = await runGenerationStream({
@@ -601,17 +602,26 @@ async function runGeneration(
           process.stdout.write(`\n[auth_result] success=${success}\n`);
         },
         onSandboxFile: (file) => {
+          streamedSandboxFileIds.add(file.fileId);
           process.stdout.write(`\n[file] ${file.filename} (${file.path})\n`);
         },
         onStatusChange: (status) => {
           process.stdout.write(`\n[status] ${status}\n`);
         },
-        onDone: async (doneGenerationId, doneConversationId, messageId) => {
+        onDone: async (doneGenerationId, doneConversationId, messageId, _usage, artifacts) => {
           runtime.handleDone({
             generationId: doneGenerationId,
             conversationId: doneConversationId,
             messageId,
           });
+          if (artifacts?.sandboxFiles?.length) {
+            for (const file of artifacts.sandboxFiles) {
+              if (streamedSandboxFileIds.has(file.fileId)) {
+                continue;
+              }
+              process.stdout.write(`\n[file] ${file.filename} (${file.path}) [from_done]\n`);
+            }
+          }
           if (outputStarted) {
             process.stdout.write("\n");
           }

@@ -19,6 +19,7 @@ import {
   UNIPILE_MISSING_CREDENTIALS_MESSAGE,
 } from "@/lib/integration-errors";
 import { PREFERRED_ZEN_FREE_MODEL } from "@/lib/zen-models";
+import { client } from "@/orpc/client";
 import {
   useConversation,
   useTranscribe,
@@ -48,6 +49,110 @@ type ActivitySegment = Omit<RuntimeActivitySegment, "items"> & {
 type Props = {
   conversationId?: string;
 };
+
+const CHAT_CONVERSATION_ID_SYNC_EVENT = "chat:conversation-id-sync";
+
+type PersistedContentPart =
+  | { type: "text"; text: string }
+  | {
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+      integration?: string;
+      operation?: string;
+    }
+  | { type: "tool_result"; tool_use_id: string; content: unknown }
+  | { type: "thinking"; id: string; content: string }
+  | { type: "system"; content: string };
+
+type PersistedConversationMessage = {
+  id: string;
+  role: string;
+  content: string;
+  contentParts?: PersistedContentPart[];
+  attachments?: Array<{
+    id: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number;
+  }>;
+  sandboxFiles?: Array<{
+    fileId: string;
+    path: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number | null;
+  }>;
+};
+
+function mapPersistedMessageToChatMessage(m: PersistedConversationMessage): Message {
+  let parts: MessagePart[] | undefined;
+  if (m.contentParts && m.contentParts.length > 0) {
+    const toolResults = new Map<string, unknown>();
+    for (const part of m.contentParts) {
+      if (part.type === "tool_result") {
+        toolResults.set(part.tool_use_id, part.content);
+      }
+    }
+    parts = m.contentParts
+      .filter((p) => p.type !== "tool_result")
+      .map((p) => {
+        if (p.type === "text") {
+          return { type: "text" as const, content: p.text };
+        }
+        if (p.type === "thinking") {
+          return {
+            type: "thinking" as const,
+            id: p.id,
+            content: p.content,
+          };
+        }
+        if (p.type === "system") {
+          return { type: "system" as const, content: p.content };
+        }
+        return {
+          type: "tool_call" as const,
+          id: p.id,
+          name: p.name,
+          input: p.input,
+          result: toolResults.get(p.id),
+          integration: p.integration,
+          operation: p.operation,
+        };
+      });
+  }
+
+  const attachments =
+    m.attachments && m.attachments.length > 0
+      ? m.attachments.map((a) => ({
+          id: a.id,
+          name: a.filename,
+          mimeType: a.mimeType,
+          dataUrl: "",
+        }))
+      : undefined;
+
+  const sandboxFiles =
+    m.sandboxFiles && m.sandboxFiles.length > 0
+      ? m.sandboxFiles.map((f) => ({
+          fileId: f.fileId,
+          path: f.path,
+          filename: f.filename,
+          mimeType: f.mimeType,
+          sizeBytes: f.sizeBytes,
+        }))
+      : undefined;
+
+  return {
+    id: m.id,
+    role: m.role as Message["role"],
+    content: m.content,
+    parts,
+    attachments,
+    sandboxFiles,
+  };
+}
 
 function getAgentInitLabel(status: string | null): string {
   switch (status) {
@@ -285,6 +390,33 @@ export function ChatArea({ conversationId }: Props) {
     setTraceStatus(snapshot.traceStatus);
   }, []);
 
+  const hydrateAssistantMessage = useCallback(
+    async (newConversationId: string, messageId: string, fallback: Message): Promise<Message> => {
+      try {
+        const conversation = await queryClient.fetchQuery({
+          queryKey: ["conversation", "get", newConversationId],
+          queryFn: () => client.conversation.get({ id: newConversationId }),
+        });
+        const persisted = conversation.messages.find((m) => m.id === messageId);
+        if (persisted) {
+          return mapPersistedMessageToChatMessage(persisted as PersistedConversationMessage);
+        }
+      } catch (error) {
+        console.error("Failed to hydrate assistant message after completion:", error);
+      }
+      return fallback;
+    },
+    [queryClient],
+  );
+
+  const notifyConversationIdSync = useCallback((id: string) => {
+    window.dispatchEvent(
+      new CustomEvent(CHAT_CONVERSATION_ID_SYNC_EVENT, {
+        detail: { conversationId: id },
+      }),
+    );
+  }, []);
+
   const persistInterruptedRuntimeMessage = useCallback(
     (runtime: GenerationRuntime, messageId?: string) => {
       runtime.handleCancelled();
@@ -325,25 +457,7 @@ export function ChatArea({ conversationId }: Props) {
       | {
           model?: string;
           autoApprove?: boolean;
-          messages?: Array<{
-            id: string;
-            role: string;
-            content: string;
-            contentParts?: Array<
-              | { type: "text"; text: string }
-              | {
-                  type: "tool_use";
-                  id: string;
-                  name: string;
-                  input: Record<string, unknown>;
-                  integration?: string;
-                  operation?: string;
-                }
-              | { type: "tool_result"; tool_use_id: string; content: unknown }
-              | { type: "thinking"; id: string; content: string }
-              | { type: "system"; content: string }
-            >;
-          }>;
+          messages?: PersistedConversationMessage[];
         }
       | null
       | undefined;
@@ -357,95 +471,7 @@ export function ChatArea({ conversationId }: Props) {
     }
 
     if (conv?.messages) {
-      setMessages(
-        conv.messages.map((m) => {
-          // Convert contentParts to frontend parts format
-          let parts: MessagePart[] | undefined;
-          if (m.contentParts && m.contentParts.length > 0) {
-            // Build a map of tool_use_id -> result for merging
-            const toolResults = new Map<string, unknown>();
-            for (const part of m.contentParts) {
-              if (part.type === "tool_result") {
-                toolResults.set(part.tool_use_id, part.content);
-              }
-            }
-            // Convert parts, merging tool_result into tool_use
-            parts = m.contentParts
-              .filter((p) => p.type !== "tool_result")
-              .map((p) => {
-                if (p.type === "text") {
-                  return { type: "text" as const, content: p.text };
-                } else if (p.type === "thinking") {
-                  return {
-                    type: "thinking" as const,
-                    id: p.id,
-                    content: p.content,
-                  };
-                } else if (p.type === "system") {
-                  return { type: "system" as const, content: p.content };
-                } else {
-                  // tool_use -> tool_call with result merged
-                  return {
-                    type: "tool_call" as const,
-                    id: p.id,
-                    name: p.name,
-                    input: p.input,
-                    result: toolResults.get(p.id),
-                    integration: p.integration,
-                    operation: p.operation,
-                  };
-                }
-              });
-          }
-          // Map persisted attachments
-          let attachments: AttachmentData[] | undefined;
-          const mAny = m as Record<string, unknown>;
-          if (Array.isArray(mAny.attachments) && (mAny.attachments as unknown[]).length > 0) {
-            attachments = (
-              mAny.attachments as Array<{
-                id: string;
-                filename: string;
-                mimeType: string;
-                sizeBytes: number;
-              }>
-            ).map((a) => ({
-              id: a.id,
-              name: a.filename,
-              mimeType: a.mimeType,
-              dataUrl: "", // No data URL for persisted attachments
-            }));
-          }
-
-          // Map persisted sandbox files
-          let sandboxFiles: SandboxFileData[] | undefined;
-          if (Array.isArray(mAny.sandboxFiles) && (mAny.sandboxFiles as unknown[]).length > 0) {
-            sandboxFiles = (
-              mAny.sandboxFiles as Array<{
-                fileId: string;
-                path: string;
-                filename: string;
-                mimeType: string;
-                sizeBytes: number | null;
-              }>
-            ).map((f) => ({
-              fileId: f.fileId,
-              path: f.path,
-              filename: f.filename,
-              mimeType: f.mimeType,
-              sizeBytes: f.sizeBytes,
-            }));
-          }
-
-          return {
-            id: m.id,
-            role: m.role as Message["role"],
-            content: m.content,
-            parts,
-            attachments,
-            sandboxFiles,
-          };
-        }),
-      );
+      setMessages(conv.messages.map((m) => mapPersistedMessageToChatMessage(m)));
     }
   }, [existingConversation, conversationId]);
 
@@ -599,7 +625,7 @@ export function ChatArea({ conversationId }: Props) {
         onStatusChange: (status) => {
           handleInitStatusChange(status);
         },
-        onDone: (generationId, newConversationId, messageId) => {
+        onDone: async (generationId, newConversationId, messageId, _usage, artifacts) => {
           markInitSignal("done");
           runtime.handleDone({
             generationId,
@@ -607,21 +633,28 @@ export function ChatArea({ conversationId }: Props) {
             messageId,
           });
           const assistant = runtime.buildAssistantMessage();
+          const fallbackAssistant: Message = {
+            id: messageId,
+            role: "assistant",
+            content: assistant.content,
+            parts: assistant.parts as MessagePart[],
+            integrationsUsed: assistant.integrationsUsed,
+            attachments: artifacts?.attachments?.map((attachment) => ({
+              id: attachment.id,
+              name: attachment.filename,
+              mimeType: attachment.mimeType,
+              dataUrl: "",
+            })),
+            sandboxFiles:
+              artifacts?.sandboxFiles ?? (assistant.sandboxFiles as SandboxFileData[] | undefined),
+          };
+          const hydratedAssistant = await hydrateAssistantMessage(
+            newConversationId,
+            messageId,
+            fallbackAssistant,
+          );
 
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: messageId,
-              role: "assistant",
-              content: assistant.content,
-              parts: assistant.parts as MessagePart[],
-              integrationsUsed: assistant.integrationsUsed,
-              sandboxFiles: assistant.sandboxFiles,
-            } as Message & {
-              integrationsUsed?: IntegrationType[];
-              sandboxFiles?: SandboxFileData[];
-            },
-          ]);
+          setMessages((prev) => [...prev, hydratedAssistant]);
           setStreamingParts([]);
           setStreamingSandboxFiles([]);
           setIsStreaming(false);
@@ -668,6 +701,7 @@ export function ChatArea({ conversationId }: Props) {
     submitApproval,
     subscribeToGeneration,
     syncFromRuntime,
+    hydrateAssistantMessage,
   ]);
 
   // Track if user is near bottom of scroll
@@ -815,6 +849,7 @@ export function ChatArea({ conversationId }: Props) {
             );
             if (!conversationId && newConversationId) {
               currentConversationIdRef.current = newConversationId;
+              notifyConversationIdSync(newConversationId);
             }
           },
           onText: (text) => {
@@ -842,6 +877,7 @@ export function ChatArea({ conversationId }: Props) {
             currentGenerationIdRef.current = data.generationId;
             if (data.conversationId) {
               currentConversationIdRef.current = data.conversationId;
+              notifyConversationIdSync(data.conversationId);
             }
             runtime.handlePendingApproval(data);
             syncFromRuntime(runtime);
@@ -866,6 +902,7 @@ export function ChatArea({ conversationId }: Props) {
             currentGenerationIdRef.current = data.generationId;
             if (data.conversationId) {
               currentConversationIdRef.current = data.conversationId;
+              notifyConversationIdSync(data.conversationId);
             }
             runtime.handleAuthNeeded(data);
             syncFromRuntime(runtime);
@@ -886,7 +923,7 @@ export function ChatArea({ conversationId }: Props) {
           onStatusChange: (status) => {
             handleInitStatusChange(status);
           },
-          onDone: (generationId, newConversationId, messageId) => {
+          onDone: async (generationId, newConversationId, messageId, _usage, artifacts) => {
             markInitSignal("done");
             runtime.handleDone({
               generationId,
@@ -894,21 +931,29 @@ export function ChatArea({ conversationId }: Props) {
               messageId,
             });
             const assistant = runtime.buildAssistantMessage();
+            const fallbackAssistant: Message = {
+              id: messageId,
+              role: "assistant",
+              content: assistant.content,
+              parts: assistant.parts as MessagePart[],
+              integrationsUsed: assistant.integrationsUsed,
+              attachments: artifacts?.attachments?.map((attachment) => ({
+                id: attachment.id,
+                name: attachment.filename,
+                mimeType: attachment.mimeType,
+                dataUrl: "",
+              })),
+              sandboxFiles:
+                artifacts?.sandboxFiles ??
+                (assistant.sandboxFiles as SandboxFileData[] | undefined),
+            };
+            const hydratedAssistant = await hydrateAssistantMessage(
+              newConversationId,
+              messageId,
+              fallbackAssistant,
+            );
 
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: messageId,
-                role: "assistant",
-                content: assistant.content,
-                parts: assistant.parts as MessagePart[],
-                integrationsUsed: assistant.integrationsUsed,
-                sandboxFiles: assistant.sandboxFiles as SandboxFileData[] | undefined,
-              } as Message & {
-                integrationsUsed?: IntegrationType[];
-                sandboxFiles?: SandboxFileData[];
-              },
-            ]);
+            setMessages((prev) => [...prev, hydratedAssistant]);
             setStreamingParts([]);
             setStreamingSandboxFiles([]);
             setIsStreaming(false);
@@ -975,6 +1020,8 @@ export function ChatArea({ conversationId }: Props) {
       startGeneration,
       submitApproval,
       syncFromRuntime,
+      notifyConversationIdSync,
+      hydrateAssistantMessage,
     ],
   );
 

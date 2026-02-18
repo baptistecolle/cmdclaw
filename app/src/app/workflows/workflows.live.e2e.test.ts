@@ -37,7 +37,19 @@ test.describe("@live workflows", () => {
     await expect(runNowButton).toBeDisabled();
 
     await promptInput.fill(workflowInstruction);
-    await page.getByRole("switch").first().click();
+    const workflowStatusLabel = page.getByText(/Workflow is (on|off)/).first();
+    await expect(workflowStatusLabel).toBeVisible();
+    const workflowSwitch = page
+      .locator("div")
+      .filter({ hasText: /Workflow is (on|off)/ })
+      .getByRole("switch")
+      .first();
+
+    if ((await workflowStatusLabel.textContent())?.includes("off")) {
+      await workflowSwitch.click();
+      await expect(workflowStatusLabel).toHaveText("Workflow is on");
+    }
+
     await expect(runNowButton).toBeEnabled({ timeout: responseTimeoutMs });
 
     await runNowButton.click();

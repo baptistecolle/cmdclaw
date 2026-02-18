@@ -41,6 +41,16 @@ export type SandboxFileData = {
   sizeBytes: number | null;
 };
 
+export type DoneArtifactsData = {
+  attachments: Array<{
+    id: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number;
+  }>;
+  sandboxFiles: SandboxFileData[];
+};
+
 export type GenerationStartInput = {
   conversationId?: string;
   content: string;
@@ -70,6 +80,7 @@ export type GenerationCallbacks = {
       outputTokens: number;
       totalCostUsd: number;
     },
+    artifacts?: DoneArtifactsData,
   ) => void | Promise<void>;
   onStarted?: (generationId: string, conversationId: string) => void | Promise<void>;
   onError?: (message: string) => void | Promise<void>;
@@ -186,6 +197,7 @@ export async function runGenerationStream(
           event.conversationId,
           event.messageId,
           event.usage,
+          event.artifacts,
         );
         break;
       case "error":
