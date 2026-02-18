@@ -1,11 +1,27 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, AlertCircle, Activity, CircleCheck } from "lucide-react";
+import {
+  MessageSquare,
+  AlertCircle,
+  Activity,
+  CircleCheck,
+  Ellipsis,
+  ListTree,
+  PenLine,
+  Trash2,
+} from "lucide-react";
 import { usePostHog } from "posthog-js/react";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import type { IntegrationType } from "@/lib/integration-icons";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import {
@@ -50,6 +66,17 @@ type Props = {
   conversationId?: string;
 };
 
+type QueuedMessage = {
+  id: string;
+  content: string;
+  attachments?: AttachmentData[];
+};
+
+type InputPrefillRequest = {
+  id: string;
+  text: string;
+};
+
 const CHAT_CONVERSATION_ID_SYNC_EVENT = "chat:conversation-id-sync";
 
 type PersistedContentPart =
@@ -88,6 +115,19 @@ type PersistedConversationMessage = {
     sandboxStartupDurationMs?: number;
     sandboxStartupMode?: "created" | "reused" | "unknown";
     generationDurationMs?: number;
+    phaseDurationsMs?: {
+      agentInitMs?: number;
+      prePromptSetupMs?: number;
+      agentReadyToPromptMs?: number;
+      waitForFirstEventMs?: number;
+      modelStreamMs?: number;
+      postProcessingMs?: number;
+    };
+    phaseTimestamps?: Array<{
+      phase: string;
+      at: string;
+      elapsedMs: number;
+    }>;
   };
 };
 
@@ -226,6 +266,12 @@ export function ChatArea({ conversationId }: Props) {
   const [localAutoApprove, setLocalAutoApprove] = useState(false);
   const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-6");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+  const [queuedMessage, setQueuedMessage] = useState<QueuedMessage | null>(null);
+  const [queueingEnabled, setQueueingEnabled] = useState(true);
+  const [inputPrefillRequest, setInputPrefillRequest] = useState<InputPrefillRequest | null>(null);
+  const [draftConversationId, setDraftConversationId] = useState<string | undefined>(
+    conversationId,
+  );
 
   // Segmented activity feed state
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
@@ -238,7 +284,66 @@ export function ChatArea({ conversationId }: Props) {
 
   // Current conversation ID (may be set during streaming for new conversations)
   const currentConversationIdRef = useRef<string | undefined>(conversationId);
+  const viewedConversationIdRef = useRef<string | undefined>(conversationId);
+  const streamScopeRef = useRef(0);
+  const queuedMessageRef = useRef<QueuedMessage | null>(null);
+  const runGenerationRef = useRef<(content: string, attachments?: AttachmentData[]) => void>(
+    () => {},
+  );
   const autoApproveEnabled = useMemo(() => localAutoApprove, [localAutoApprove]);
+
+  useEffect(() => {
+    viewedConversationIdRef.current = conversationId;
+  }, [conversationId]);
+
+  const isStreamEventForActiveScope = useCallback(
+    ({
+      scope,
+      streamGenerationId,
+      eventGenerationId,
+      eventConversationId,
+    }: {
+      scope: number;
+      streamGenerationId?: string;
+      eventGenerationId?: string;
+      eventConversationId?: string;
+    }): boolean => {
+      if (streamScopeRef.current !== scope) {
+        return false;
+      }
+
+      const activeGenerationId = currentGenerationIdRef.current;
+      const generationId = eventGenerationId ?? streamGenerationId;
+      if (activeGenerationId && generationId && activeGenerationId !== generationId) {
+        return false;
+      }
+
+      const viewedConversationId = viewedConversationIdRef.current;
+      if (
+        viewedConversationId &&
+        eventConversationId &&
+        viewedConversationId !== eventConversationId
+      ) {
+        return false;
+      }
+
+      return true;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    queuedMessageRef.current = queuedMessage;
+  }, [queuedMessage]);
+
+  const maybeSendQueuedWhenReady = useCallback(() => {
+    const queued = queuedMessageRef.current;
+    if (!queued) {
+      return;
+    }
+    setQueuedMessage(null);
+    runGenerationRef.current(queued.content, queued.attachments);
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -463,7 +568,7 @@ export function ChatArea({ conversationId }: Props) {
   }, []);
 
   const persistInterruptedRuntimeMessage = useCallback(
-    (runtime: GenerationRuntime, messageId?: string) => {
+    (runtime: GenerationRuntime, messageId?: string, timing?: Message["timing"]) => {
       runtime.handleCancelled();
       const assistant = runtime.buildAssistantMessage();
       setMessages((prev) => [
@@ -475,6 +580,7 @@ export function ChatArea({ conversationId }: Props) {
           parts: assistant.parts as MessagePart[],
           integrationsUsed: assistant.integrationsUsed,
           sandboxFiles: assistant.sandboxFiles as SandboxFileData[] | undefined,
+          timing,
         } as Message & {
           integrationsUsed?: IntegrationType[];
           sandboxFiles?: SandboxFileData[];
@@ -524,28 +630,33 @@ export function ChatArea({ conversationId }: Props) {
 
   // Reset when conversation changes
   useEffect(() => {
+    streamScopeRef.current += 1;
+    abort();
+
     // Always sync the ref with the prop
     currentConversationIdRef.current = conversationId;
+    setDraftConversationId(conversationId);
+    runtimeRef.current = null;
+    setStreamingParts([]);
+    setSegments([]);
+    setIntegrationsUsed(new Set());
+    setTraceStatus("complete");
+    setIsStreaming(false);
+    setStreamError(null);
+    setStreamingSandboxFiles([]);
+    currentGenerationIdRef.current = undefined;
+    resetInitTracking();
 
     if (!conversationId) {
-      runtimeRef.current = null;
       setMessages([]);
-      setStreamingParts([]);
-      setSegments([]);
-      setIntegrationsUsed(new Set());
-      setTraceStatus("complete");
-      setIsStreaming(false);
-      setStreamError(null);
-      setStreamingSandboxFiles([]);
       setSelectedModel(PREFERRED_ZEN_FREE_MODEL);
-      currentGenerationIdRef.current = undefined;
-      resetInitTracking();
     }
-  }, [conversationId, resetInitTracking]);
+  }, [abort, conversationId, resetInitTracking]);
 
   // Listen for "new-chat" event to reset state when user clicks New Chat
   useEffect(() => {
     const handleNewChat = () => {
+      streamScopeRef.current += 1;
       abort();
       runtimeRef.current = null;
       setMessages([]);
@@ -559,6 +670,8 @@ export function ChatArea({ conversationId }: Props) {
       setSelectedModel(PREFERRED_ZEN_FREE_MODEL);
       currentGenerationIdRef.current = undefined;
       currentConversationIdRef.current = undefined;
+      viewedConversationIdRef.current = undefined;
+      setDraftConversationId(undefined);
       resetInitTracking();
     };
     window.addEventListener("new-chat", handleNewChat);
@@ -599,29 +712,53 @@ export function ChatArea({ conversationId }: Props) {
             : "streaming",
       );
       syncFromRuntime(runtime);
+      const streamScope = streamScopeRef.current;
+      const streamGenerationId = activeGeneration.generationId;
 
       subscribeToGeneration(activeGeneration.generationId, {
         onText: (text) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           markInitSignal("text");
           runtime.handleText(text);
           syncFromRuntime(runtime);
         },
         onThinking: (data) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           markInitSignal("thinking");
           runtime.handleThinking(data);
           syncFromRuntime(runtime);
         },
         onToolUse: (data) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           markInitSignal("tool_use", { toolName: data.toolName });
           runtime.handleToolUse(data);
           syncFromRuntime(runtime);
         },
         onToolResult: (toolName, result, toolUseId) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           markInitSignal("tool_result", { toolName });
           runtime.handleToolResult(toolName, result, toolUseId);
           syncFromRuntime(runtime);
         },
         onPendingApproval: async (data) => {
+          if (
+            !isStreamEventForActiveScope({
+              scope: streamScope,
+              streamGenerationId,
+              eventGenerationId: data.generationId,
+              eventConversationId: data.conversationId,
+            })
+          ) {
+            return;
+          }
           markInitSignal("pending_approval", { toolName: data.toolName });
           console.log("[ApprovalCard] Showing approval card", {
             toolUseId: data.toolUseId,
@@ -646,35 +783,71 @@ export function ChatArea({ conversationId }: Props) {
           }
         },
         onApprovalResult: (toolUseId, decision) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           runtime.handleApprovalResult(toolUseId, decision);
           syncFromRuntime(runtime);
         },
         onAuthNeeded: (data) => {
+          if (
+            !isStreamEventForActiveScope({
+              scope: streamScope,
+              streamGenerationId,
+              eventGenerationId: data.generationId,
+              eventConversationId: data.conversationId,
+            })
+          ) {
+            return;
+          }
           markInitSignal("auth_needed", { integrations: data.integrations });
           currentGenerationIdRef.current = data.generationId;
           if (data.conversationId) {
             currentConversationIdRef.current = data.conversationId;
+            setDraftConversationId(data.conversationId);
           }
           runtime.handleAuthNeeded(data);
           syncFromRuntime(runtime);
         },
         onAuthProgress: (connected, remaining) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           runtime.handleAuthProgress(connected, remaining);
           syncFromRuntime(runtime);
         },
         onAuthResult: (success) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           runtime.handleAuthResult(success);
           syncFromRuntime(runtime);
         },
         onSandboxFile: (file) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           markInitSignal("sandbox_file", { filename: file.filename });
           runtime.handleSandboxFile(file);
           syncFromRuntime(runtime);
         },
         onStatusChange: (status) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           handleInitStatusChange(status);
         },
         onDone: async (generationId, newConversationId, messageId, _usage, artifacts) => {
+          if (
+            !isStreamEventForActiveScope({
+              scope: streamScope,
+              streamGenerationId,
+              eventGenerationId: generationId,
+              eventConversationId: newConversationId,
+            })
+          ) {
+            return;
+          }
           const timing = artifacts?.timing;
           markInitSignal("done");
           runtime.handleDone({
@@ -715,8 +888,12 @@ export function ChatArea({ conversationId }: Props) {
           currentGenerationIdRef.current = undefined;
           runtimeRef.current = null;
           resetInitTracking();
+          maybeSendQueuedWhenReady();
         },
         onError: (message) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
           runtime.handleError();
           syncFromRuntime(runtime);
           console.error("Generation error:", message);
@@ -728,6 +905,16 @@ export function ChatArea({ conversationId }: Props) {
           resetInitTracking();
         },
         onCancelled: (data) => {
+          if (
+            !isStreamEventForActiveScope({
+              scope: streamScope,
+              streamGenerationId,
+              eventGenerationId: data.generationId,
+              eventConversationId: data.conversationId,
+            })
+          ) {
+            return;
+          }
           if (runtimeRef.current === runtime) {
             persistInterruptedRuntimeMessage(runtime, data.messageId);
           }
@@ -753,6 +940,8 @@ export function ChatArea({ conversationId }: Props) {
     subscribeToGeneration,
     syncFromRuntime,
     hydrateAssistantMessage,
+    maybeSendQueuedWhenReady,
+    isStreamEventForActiveScope,
     upsertMessageById,
   ]);
 
@@ -857,7 +1046,7 @@ export function ChatArea({ conversationId }: Props) {
     return handlers;
   }, [segments, toggleSegmentExpand]);
 
-  const handleSend = useCallback(
+  const runGeneration = useCallback(
     async (content: string, attachments?: AttachmentData[]) => {
       // Reset scroll lock so auto-scroll works for the new response
       userScrolledUpRef.current = false;
@@ -882,6 +1071,8 @@ export function ChatArea({ conversationId }: Props) {
       const runtime = createGenerationRuntime();
       runtimeRef.current = runtime;
       syncFromRuntime(runtime);
+      const streamScope = streamScopeRef.current;
+      let streamGenerationId: string | undefined;
 
       const effectiveConversationId = currentConversationIdRef.current ?? conversationId;
       await startGeneration(
@@ -895,40 +1086,68 @@ export function ChatArea({ conversationId }: Props) {
         },
         {
           onStarted: (generationId, newConversationId) => {
+            if (streamScopeRef.current !== streamScope) {
+              return;
+            }
+            streamGenerationId = generationId;
             currentGenerationIdRef.current = generationId;
             console.info(
               `[AgentInit][Client] generation_started generationId=${generationId} conversationId=${newConversationId}`,
             );
             if (!conversationId && newConversationId) {
               currentConversationIdRef.current = newConversationId;
+              setDraftConversationId(newConversationId);
               notifyConversationIdSync(newConversationId);
             }
           },
           onText: (text) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             markInitSignal("text");
             runtime.handleText(text);
             syncFromRuntime(runtime);
           },
           onThinking: (data) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             markInitSignal("thinking");
             runtime.handleThinking(data);
             syncFromRuntime(runtime);
           },
           onToolUse: (data) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             markInitSignal("tool_use", { toolName: data.toolName });
             runtime.handleToolUse(data);
             syncFromRuntime(runtime);
           },
           onToolResult: (toolName, result, toolUseId) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             markInitSignal("tool_result", { toolName });
             runtime.handleToolResult(toolName, result, toolUseId);
             syncFromRuntime(runtime);
           },
           onPendingApproval: async (data) => {
+            if (
+              !isStreamEventForActiveScope({
+                scope: streamScope,
+                streamGenerationId,
+                eventGenerationId: data.generationId,
+                eventConversationId: data.conversationId,
+              })
+            ) {
+              return;
+            }
             markInitSignal("pending_approval", { toolName: data.toolName });
             currentGenerationIdRef.current = data.generationId;
             if (data.conversationId) {
               currentConversationIdRef.current = data.conversationId;
+              setDraftConversationId(data.conversationId);
               notifyConversationIdSync(data.conversationId);
             }
             runtime.handlePendingApproval(data);
@@ -946,36 +1165,72 @@ export function ChatArea({ conversationId }: Props) {
             }
           },
           onApprovalResult: (toolUseId, decision) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             runtime.handleApprovalResult(toolUseId, decision);
             syncFromRuntime(runtime);
           },
           onAuthNeeded: (data) => {
+            if (
+              !isStreamEventForActiveScope({
+                scope: streamScope,
+                streamGenerationId,
+                eventGenerationId: data.generationId,
+                eventConversationId: data.conversationId,
+              })
+            ) {
+              return;
+            }
             markInitSignal("auth_needed", { integrations: data.integrations });
             currentGenerationIdRef.current = data.generationId;
             if (data.conversationId) {
               currentConversationIdRef.current = data.conversationId;
+              setDraftConversationId(data.conversationId);
               notifyConversationIdSync(data.conversationId);
             }
             runtime.handleAuthNeeded(data);
             syncFromRuntime(runtime);
           },
           onAuthProgress: (connected, remaining) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             runtime.handleAuthProgress(connected, remaining);
             syncFromRuntime(runtime);
           },
           onAuthResult: (success) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             runtime.handleAuthResult(success);
             syncFromRuntime(runtime);
           },
           onSandboxFile: (file) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             markInitSignal("sandbox_file", { filename: file.filename });
             runtime.handleSandboxFile(file);
             syncFromRuntime(runtime);
           },
           onStatusChange: (status) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             handleInitStatusChange(status);
           },
           onDone: async (generationId, newConversationId, messageId, _usage, artifacts) => {
+            if (
+              !isStreamEventForActiveScope({
+                scope: streamScope,
+                streamGenerationId,
+                eventGenerationId: generationId,
+                eventConversationId: newConversationId,
+              })
+            ) {
+              return;
+            }
             const timing = artifacts?.timing;
             markInitSignal("done");
             runtime.handleDone({
@@ -1023,10 +1278,15 @@ export function ChatArea({ conversationId }: Props) {
 
             // Update URL for new conversations without remounting
             if (!conversationId && newConversationId) {
+              setDraftConversationId(newConversationId);
               window.history.replaceState(null, "", `/chat/${newConversationId}`);
             }
+            maybeSendQueuedWhenReady();
           },
           onError: (message) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
             runtime.handleError();
             syncFromRuntime(runtime);
             console.error("Generation error:", message);
@@ -1047,6 +1307,16 @@ export function ChatArea({ conversationId }: Props) {
             ]);
           },
           onCancelled: (data) => {
+            if (
+              !isStreamEventForActiveScope({
+                scope: streamScope,
+                streamGenerationId,
+                eventGenerationId: data.generationId,
+                eventConversationId: data.conversationId,
+              })
+            ) {
+              return;
+            }
             if (runtimeRef.current === runtime) {
               persistInterruptedRuntimeMessage(runtime, data.messageId);
             }
@@ -1076,9 +1346,66 @@ export function ChatArea({ conversationId }: Props) {
       syncFromRuntime,
       notifyConversationIdSync,
       hydrateAssistantMessage,
+      maybeSendQueuedWhenReady,
+      isStreamEventForActiveScope,
       upsertMessageById,
     ],
   );
+
+  useEffect(() => {
+    runGenerationRef.current = (content: string, attachments?: AttachmentData[]) => {
+      void runGeneration(content, attachments);
+    };
+  }, [runGeneration]);
+
+  const handleSend = useCallback(
+    (content: string, attachments?: AttachmentData[]) => {
+      if (isStreaming) {
+        if (!queueingEnabled) {
+          setStreamError("Queueing is off. Wait for the current response or stop it first.");
+          return;
+        }
+        setQueuedMessage((prev) => ({
+          id: prev?.id ?? `queued-${Date.now()}`,
+          content,
+          attachments,
+        }));
+        return;
+      }
+
+      void runGeneration(content, attachments);
+    },
+    [isStreaming, queueingEnabled, runGeneration],
+  );
+
+  const handleSendQueuedNow = useCallback(() => {
+    const queued = queuedMessageRef.current;
+    if (!queued) {
+      return;
+    }
+    setQueuedMessage(null);
+    void runGeneration(queued.content, queued.attachments);
+  }, [runGeneration]);
+
+  const handleClearQueued = useCallback(() => {
+    setQueuedMessage(null);
+  }, []);
+
+  const handleEditQueuedMessage = useCallback(() => {
+    const queued = queuedMessageRef.current;
+    if (!queued) {
+      return;
+    }
+    setQueuedMessage(null);
+    setInputPrefillRequest({
+      id: `prefill-${Date.now()}`,
+      text: queued.content,
+    });
+  }, []);
+
+  const handleToggleQueueingEnabled = useCallback(() => {
+    setQueueingEnabled((prev) => !prev);
+  }, []);
 
   // Handle approval/denial of tool use
   const handleApprove = useCallback(
@@ -1298,6 +1625,22 @@ export function ChatArea({ conversationId }: Props) {
     [handleStartRecording],
   );
 
+  useHotkeys(
+    "mod+enter",
+    () => {
+      if (queuedMessageRef.current) {
+        handleSendQueuedNow();
+      }
+    },
+    {
+      keydown: true,
+      keyup: false,
+      preventDefault: true,
+      enableOnFormTags: true,
+    },
+    [handleSendQueuedNow],
+  );
+
   // Push-to-talk: stop recording when any part of the hotkey combo is released
   // On Mac, releasing M while Cmd is held doesn't always fire keyup for M,
   // so we also stop when Meta/Ctrl is released
@@ -1504,14 +1847,69 @@ export function ChatArea({ conversationId }: Props) {
               error={voiceError}
             />
           )}
+          {queuedMessage && (
+            <div className="from-muted/75 to-background rounded-3xl border bg-gradient-to-b px-4 py-3 shadow-[0_1px_0_0_hsl(var(--background))_inset,0_12px_24px_-22px_hsl(var(--foreground)/0.5)]">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="bg-background/80 border-border/70 inline-flex size-7 items-center justify-center rounded-full border">
+                    <ListTree className="text-muted-foreground h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm leading-none font-medium">
+                      {queuedMessage.content ||
+                        `${queuedMessage.attachments?.length ?? 0} queued attachment${(queuedMessage.attachments?.length ?? 0) === 1 ? "" : "s"}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    className="h-8 rounded-full px-3"
+                    variant="secondary"
+                    onClick={handleSendQueuedNow}
+                  >
+                    Steer
+                  </Button>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={handleClearQueued}
+                    aria-label="Delete queued message"
+                    className="rounded-full"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="icon-sm" variant="ghost" className="rounded-full">
+                        <Ellipsis className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-56 rounded-2xl p-1.5">
+                      <DropdownMenuItem onClick={handleEditQueuedMessage}>
+                        <PenLine className="h-4 w-4" />
+                        Edit message
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleToggleQueueingEnabled}>
+                        <ListTree className="h-4 w-4" />
+                        {queueingEnabled ? "Turn off queueing" : "Turn on queueing"}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </div>
+          )}
           <ChatInput
             onSend={handleSend}
             onStop={handleStop}
-            disabled={isStreaming || isRecording || isProcessingVoice}
+            disabled={isRecording || isProcessingVoice}
             isStreaming={isStreaming}
             isRecording={isRecording}
             onStartRecording={handleStartRecording}
             onStopRecording={stopRecordingAndTranscribe}
+            prefillRequest={inputPrefillRequest}
+            conversationId={draftConversationId}
           />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

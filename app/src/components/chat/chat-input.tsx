@@ -1,10 +1,11 @@
 "use client";
 
-import { Send, Square, Mic, Paperclip, X } from "lucide-react";
+import { Send, Square, Mic, Paperclip, X, Clock3 } from "lucide-react";
 import Image from "next/image";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getChatDraftKey, useChatDraftStore } from "./chat-draft-store";
 
 export type AttachmentData = {
   name: string;
@@ -15,8 +16,6 @@ export type AttachmentData = {
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 5;
 
-type AttachmentItem = { file: File; preview?: string };
-
 type Props = {
   onSend: (content: string, attachments?: AttachmentData[]) => void;
   onStop?: () => void;
@@ -25,6 +24,11 @@ type Props = {
   isRecording?: boolean;
   onStartRecording?: () => void;
   onStopRecording?: () => void;
+  prefillRequest?: {
+    id: string;
+    text: string;
+  } | null;
+  conversationId?: string;
 };
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -44,12 +48,36 @@ export function ChatInput({
   isRecording,
   onStartRecording,
   onStopRecording,
+  prefillRequest,
+  conversationId,
 }: Props) {
+  const draftKey = getChatDraftKey(conversationId);
+  const readDraft = useChatDraftStore((state) => state.readDraft);
+  const upsertDraft = useChatDraftStore((state) => state.upsertDraft);
+  const isDraftStoreHydrated = useChatDraftStore((state) => state.hasHydrated);
+  const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
   const [value, setValue] = useState("");
-  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentData[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isDraftStoreHydrated) {
+      return;
+    }
+    const draft = readDraft(draftKey);
+    setValue(draft?.text ?? "");
+    setAttachments([]);
+    setLoadedDraftKey(draftKey);
+  }, [draftKey, isDraftStoreHydrated, readDraft]);
+
+  useEffect(() => {
+    if (!isDraftStoreHydrated || loadedDraftKey !== draftKey) {
+      return;
+    }
+    upsertDraft(draftKey, value);
+  }, [draftKey, isDraftStoreHydrated, loadedDraftKey, upsertDraft, value]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -60,56 +88,57 @@ export function ChatInput({
     }
   }, [value]);
 
-  const addFiles = useCallback((files: FileList | File[]) => {
-    const fileArray = Array.from(files);
-    setAttachments((prev) => {
-      const remaining = MAX_FILES - prev.length;
-      const toAdd: AttachmentItem[] = [];
-      for (const file of fileArray.slice(0, remaining)) {
-        if (file.size > MAX_FILE_SIZE) {
-          continue;
-        }
-        const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
-        toAdd.push({ file, preview });
-      }
-      return [...prev, ...toAdd];
+  useEffect(() => {
+    if (!prefillRequest) {
+      return;
+    }
+    setValue(prefillRequest.text);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(
+        prefillRequest.text.length,
+        prefillRequest.text.length,
+      );
     });
-  }, []);
+  }, [prefillRequest]);
+
+  const addFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const fileArray = Array.from(files);
+      const slotsRemaining = Math.max(0, MAX_FILES - attachments.length);
+      const filesToRead = fileArray
+        .slice(0, slotsRemaining)
+        .filter((file) => file.size <= MAX_FILE_SIZE);
+
+      const added = await Promise.all(
+        filesToRead.map(async (file) => ({
+          name: file.name,
+          mimeType: file.type,
+          dataUrl: await readFileAsDataUrl(file),
+        })),
+      );
+
+      if (added.length === 0) {
+        return;
+      }
+
+      setAttachments((prev) => [...prev, ...added]);
+    },
+    [attachments.length],
+  );
 
   const removeAttachment = useCallback((index: number) => {
-    setAttachments((prev) => {
-      const item = prev[index];
-      if (item?.preview) {
-        URL.revokeObjectURL(item.preview);
-      }
-      return prev.filter((_, i) => i !== index);
-    });
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleSubmit = useCallback(async () => {
-    if ((!value.trim() && attachments.length === 0) || disabled) {
+  const handleSubmit = useCallback(() => {
+    const trimmedValue = value.trim();
+    if ((!trimmedValue && attachments.length === 0) || disabled) {
       return;
     }
 
-    let attachmentData: AttachmentData[] | undefined;
-    if (attachments.length > 0) {
-      attachmentData = await Promise.all(
-        attachments.map(async (a) => ({
-          name: a.file.name,
-          mimeType: a.file.type,
-          dataUrl: await readFileAsDataUrl(a.file),
-        })),
-      );
-      // Clean up previews
-      for (const a of attachments) {
-        if (a.preview) {
-          URL.revokeObjectURL(a.preview);
-        }
-      }
-      setAttachments([]);
-    }
-
-    onSend(value.trim(), attachmentData);
+    onSend(trimmedValue, attachments.length > 0 ? attachments : undefined);
+    setAttachments([]);
     setValue("");
   }, [attachments, disabled, onSend, value]);
 
@@ -138,7 +167,7 @@ export function ChatInput({
       e.preventDefault();
       setIsDragging(false);
       if (e.dataTransfer.files.length > 0) {
-        addFiles(e.dataTransfer.files);
+        void addFiles(e.dataTransfer.files);
       }
     },
     [addFiles],
@@ -161,7 +190,7 @@ export function ChatInput({
   const handleFileInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files) {
-        addFiles(e.target.files);
+        void addFiles(e.target.files);
       }
       e.target.value = "";
     },
@@ -237,13 +266,13 @@ export function ChatInput({
         <div className="flex flex-wrap gap-2 px-1">
           {attachments.map((a, i) => (
             <div
-              key={`${a.file.name}-${a.file.lastModified}-${a.file.size}`}
+              key={`${a.name}-${a.mimeType}-${a.dataUrl.slice(0, 48)}`}
               className="group bg-background relative flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
             >
-              {a.preview ? (
+              {a.mimeType.startsWith("image/") ? (
                 <Image
-                  src={a.preview}
-                  alt={a.file.name}
+                  src={a.dataUrl}
+                  alt={a.name}
                   width={32}
                   height={32}
                   unoptimized
@@ -252,7 +281,7 @@ export function ChatInput({
               ) : (
                 <Paperclip className="text-muted-foreground h-3.5 w-3.5" />
               )}
-              <span className="max-w-[120px] truncate">{a.file.name}</span>
+              <span className="max-w-[120px] truncate">{a.name}</span>
               <button
                 type="button"
                 data-attachment-index={i}
@@ -273,7 +302,7 @@ export function ChatInput({
           size="icon"
           variant="ghost"
           className="h-9 w-9 shrink-0"
-          disabled={disabled || isStreaming || attachments.length >= MAX_FILES}
+          disabled={disabled || attachments.length >= MAX_FILES}
           onClick={handleOpenFilePicker}
         >
           <Paperclip className="h-4 w-4" />
@@ -323,18 +352,19 @@ export function ChatInput({
           >
             <Square className="h-4 w-4" />
           </Button>
-        ) : (
-          <Button
-            onClick={handleSubmit}
-            data-testid="chat-send"
-            aria-label="Send message"
-            disabled={disabled || (!value.trim() && attachments.length === 0)}
-            size="icon"
-            className="h-9 w-9"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        )}
+        ) : null}
+        <Button
+          onClick={handleSubmit}
+          data-testid={isStreaming ? "chat-queue" : "chat-send"}
+          aria-label={isStreaming ? "Queue message" : "Send message"}
+          title={isStreaming ? "Queue next message" : "Send message"}
+          disabled={disabled || (!value.trim() && attachments.length === 0)}
+          size="icon"
+          variant={isStreaming ? "secondary" : "default"}
+          className="h-9 w-9"
+        >
+          {isStreaming ? <Clock3 className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+        </Button>
       </div>
     </div>
   );
