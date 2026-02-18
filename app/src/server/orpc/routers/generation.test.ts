@@ -113,19 +113,12 @@ describe("generationRouter", () => {
     ).rejects.toThrow("Access denied");
   });
 
-  it("maps active generation status from manager", async () => {
+  it("returns active generation from conversation durable state", async () => {
     conversationFindFirstMock.mockResolvedValue({
       id: "conv-1",
       userId: "user-1",
-      generationStatus: "idle",
-      currentGenerationId: null,
-    });
-    generationManagerMock.getGenerationForConversation.mockReturnValue("gen-active");
-    generationManagerMock.getGenerationStatus.mockResolvedValue({
-      status: "running",
-      contentParts: [],
-      pendingApproval: null,
-      usage: { inputTokens: 0, outputTokens: 0 },
+      generationStatus: "generating",
+      currentGenerationId: "gen-db",
     });
 
     const result = await generationRouterAny.getActiveGeneration({
@@ -134,7 +127,7 @@ describe("generationRouter", () => {
     });
 
     expect(result).toEqual({
-      generationId: "gen-active",
+      generationId: "gen-db",
       status: "generating",
     });
   });

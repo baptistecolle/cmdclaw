@@ -72,17 +72,13 @@ export async function POST(request: Request) {
       return Response.json({ decision: "deny" });
     }
 
-    const inMemoryGenId = generationManager.getGenerationForConversation(input.conversationId);
-    const conv =
-      inMemoryGenId === undefined
-        ? await db.query.conversation.findFirst({
-            where: eq(conversation.id, input.conversationId),
-          })
-        : null;
-    const genId = inMemoryGenId ?? conv?.currentGenerationId ?? undefined;
+    const conv = await db.query.conversation.findFirst({
+      where: eq(conversation.id, input.conversationId),
+      columns: { currentGenerationId: true },
+    });
+    const genId = conv?.currentGenerationId ?? undefined;
     console.log("[Internal] Generation lookup:", {
       conversationId: input.conversationId,
-      inMemoryGenId: inMemoryGenId ?? "NOT FOUND",
       dbGenId: conv?.currentGenerationId ?? "NOT FOUND",
       genId: genId ?? "NOT FOUND",
     });
@@ -92,16 +88,7 @@ export async function POST(request: Request) {
       return Response.json({ decision: "deny" });
     }
 
-    const gm = generationManager as unknown as {
-      getAllowedIntegrationsForGeneration?: (generationId: string) => Promise<string[] | null>;
-      getAllowedIntegrationsForConversation?: (conversationId: string) => string[] | null;
-    };
-    const allowedIntegrations =
-      typeof gm.getAllowedIntegrationsForGeneration === "function"
-        ? await gm.getAllowedIntegrationsForGeneration(genId)
-        : typeof gm.getAllowedIntegrationsForConversation === "function"
-          ? gm.getAllowedIntegrationsForConversation(input.conversationId)
-          : null;
+    const allowedIntegrations = await generationManager.getAllowedIntegrationsForGeneration(genId);
 
     if (Array.isArray(allowedIntegrations) && !allowedIntegrations.includes(input.integration)) {
       console.warn("[Internal] Integration not allowed for workflow:", input.integration);

@@ -81,18 +81,14 @@ const approvalRequest = baseProcedure
       return { decision: "deny" as const };
     }
 
-    // Find the active generation for this conversation
-    const inMemoryGenId = generationManager.getGenerationForConversation(input.conversationId);
-    const conv =
-      inMemoryGenId === undefined
-        ? await db.query.conversation.findFirst({
-            where: eq(conversation.id, input.conversationId),
-          })
-        : null;
-    const genId = inMemoryGenId ?? conv?.currentGenerationId ?? undefined;
+    // Resolve generation from durable storage only.
+    const conv = await db.query.conversation.findFirst({
+      where: eq(conversation.id, input.conversationId),
+      columns: { currentGenerationId: true },
+    });
+    const genId = conv?.currentGenerationId ?? undefined;
     console.log("[Internal] Generation lookup:", {
       conversationId: input.conversationId,
-      inMemoryGenId: inMemoryGenId ?? "NOT FOUND",
       dbGenId: conv?.currentGenerationId ?? "NOT FOUND",
       genId: genId ?? "NOT FOUND",
     });
@@ -150,15 +146,12 @@ const authRequest = baseProcedure
       reason: input.reason,
     });
 
-    // Find the active generation for this conversation
-    const inMemoryGenId = generationManager.getGenerationForConversation(input.conversationId);
-    const conv =
-      inMemoryGenId === undefined
-        ? await db.query.conversation.findFirst({
-            where: eq(conversation.id, input.conversationId),
-          })
-        : null;
-    const genId = inMemoryGenId ?? conv?.currentGenerationId ?? undefined;
+    // Resolve generation from durable storage only.
+    const conv = await db.query.conversation.findFirst({
+      where: eq(conversation.id, input.conversationId),
+      columns: { currentGenerationId: true },
+    });
+    const genId = conv?.currentGenerationId ?? undefined;
     if (!genId) {
       console.error("[Internal] No active generation for conversation:", input.conversationId);
       return { success: false };

@@ -1,9 +1,9 @@
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk/v2/client";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, isNotNull } from "drizzle-orm";
 import { Sandbox } from "e2b";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
-import { skill, message, providerAuth } from "@/server/db/schema";
+import { skill, message, providerAuth, conversation, generation } from "@/server/db/schema";
 import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integration-skill-service";
 import {
   COMPACTION_SUMMARY_PREFIX,
@@ -29,15 +29,25 @@ function resolveSandboxAppUrl(): string {
     : configuredUrl;
 }
 
-// Cache of active sandboxes by conversation ID
 interface SandboxState {
   sandbox: Sandbox;
   client: OpencodeClient;
-  sessionId: string | null;
   serverUrl: string;
 }
 
-const activeSandboxes = new Map<string, SandboxState>();
+async function connectSandboxById(sandboxId: string): Promise<Sandbox | null> {
+  const sandboxApi = Sandbox as unknown as {
+    connect?: (id: string) => Promise<Sandbox>;
+  };
+  if (!sandboxApi.connect) {
+    return null;
+  }
+  try {
+    return await sandboxApi.connect(sandboxId);
+  } catch {
+    return null;
+  }
+}
 
 function logLifecycle(
   event: string,
@@ -121,7 +131,7 @@ export async function getOrCreateSandbox(
   config: SandboxConfig,
   onLifecycle?: SessionInitLifecycleCallback,
   telemetry?: ObservabilityContext,
-): Promise<Sandbox> {
+): Promise<SandboxState> {
   const telemetryContext: ObservabilityContext = {
     ...telemetry,
     source: "e2b",
@@ -131,53 +141,43 @@ export async function getOrCreateSandbox(
   onLifecycle?.("sandbox_checking_cache", {
     conversationId: config.conversationId,
   });
-  // Check if we have an active sandbox for this conversation
-  let state = activeSandboxes.get(config.conversationId);
 
-  if (state) {
-    // Verify sandbox and OpenCode server are alive
-    try {
-      const res = await fetch(`${state.serverUrl}/doc`, { method: "GET" });
-      if (res.ok) {
-        onLifecycle?.("sandbox_reused", {
-          conversationId: config.conversationId,
-          sandboxId: state.sandbox.sandboxId,
-        });
-        logLifecycle(
-          "VM_REUSED",
-          {
-            conversationId: config.conversationId,
-            sandboxId: state.sandbox.sandboxId,
-            serverUrl: state.serverUrl,
-          },
-          { ...telemetryContext, sandboxId: state.sandbox.sandboxId },
-        );
-        return state.sandbox;
+  const conv = await db.query.conversation.findFirst({
+    where: eq(conversation.id, config.conversationId),
+    columns: { currentGenerationId: true },
+  });
+  const persistedGeneration = conv?.currentGenerationId
+    ? await db.query.generation.findFirst({
+        where: and(
+          eq(generation.id, conv.currentGenerationId),
+          isNotNull(generation.sandboxId),
+          eq(generation.status, "running"),
+        ),
+        columns: { sandboxId: true },
+      })
+    : await db.query.generation.findFirst({
+        where: and(
+          eq(generation.conversationId, config.conversationId),
+          isNotNull(generation.sandboxId),
+          eq(generation.status, "running"),
+        ),
+        orderBy: (fields, operators) => [operators.desc(fields.startedAt)],
+        columns: { sandboxId: true },
+      });
+
+  if (persistedGeneration?.sandboxId) {
+    const connected = await connectSandboxById(persistedGeneration.sandboxId);
+    if (connected) {
+      const serverUrl = `https://${connected.getHost(OPENCODE_PORT)}`;
+      const health = await fetch(`${serverUrl}/doc`, { method: "GET" }).catch(() => null);
+      if (health?.ok) {
+        const client = createOpencodeClient({ baseUrl: serverUrl });
+        return {
+          sandbox: connected,
+          client,
+          serverUrl,
+        };
       }
-      logLifecycle(
-        "VM_CACHE_HEALTHCHECK_NOT_OK",
-        {
-          conversationId: config.conversationId,
-          sandboxId: state.sandbox.sandboxId,
-          serverUrl: state.serverUrl,
-          status: res.status,
-        },
-        { ...telemetryContext, sandboxId: state.sandbox.sandboxId },
-      );
-    } catch {
-      // Sandbox or server is dead, remove from cache and create new one
-      logLifecycle(
-        "VM_CACHE_HEALTHCHECK_FAILED",
-        {
-          conversationId: config.conversationId,
-          sandboxId: state.sandbox.sandboxId,
-          serverUrl: state.serverUrl,
-        },
-        { ...telemetryContext, sandboxId: state.sandbox.sandboxId },
-      );
-      await state.sandbox.kill().catch(() => {});
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
-      activeSandboxes.delete(config.conversationId);
     }
   }
 
@@ -350,9 +350,6 @@ export async function getOrCreateSandbox(
     baseUrl: serverUrl,
   });
 
-  state = { sandbox, client, sessionId: null, serverUrl };
-  activeSandboxes.set(config.conversationId, state);
-
   logLifecycle(
     "OPENCODE_SERVER_READY",
     {
@@ -369,29 +366,57 @@ export async function getOrCreateSandbox(
     serverUrl,
     durationMs: Date.now() - serverReadyStart,
   });
-  return sandbox;
+  return { sandbox, client, serverUrl };
 }
 
 /**
  * Get the OpenCode client for a conversation's sandbox
  */
-export function getOpencodeClient(conversationId: string): OpencodeClient | undefined {
-  const state = activeSandboxes.get(conversationId);
-  return state?.client;
-}
-
-/**
- * Get the sandbox state for a conversation
- */
-export function getSandboxState(conversationId: string): SandboxState | undefined {
-  return activeSandboxes.get(conversationId);
-}
-
-export function resetOpencodeSession(conversationId: string): void {
-  const state = activeSandboxes.get(conversationId);
-  if (state) {
-    state.sessionId = null;
+export async function getSandboxStateDurable(
+  conversationId: string,
+): Promise<SandboxState | undefined> {
+  const conv = await db.query.conversation.findFirst({
+    where: eq(conversation.id, conversationId),
+    columns: { currentGenerationId: true },
+  });
+  const gen = conv?.currentGenerationId
+    ? await db.query.generation.findFirst({
+        where: and(
+          eq(generation.id, conv.currentGenerationId),
+          isNotNull(generation.sandboxId),
+          eq(generation.status, "running"),
+        ),
+        columns: { sandboxId: true },
+      })
+    : await db.query.generation.findFirst({
+        where: and(
+          eq(generation.conversationId, conversationId),
+          isNotNull(generation.sandboxId),
+          eq(generation.status, "running"),
+        ),
+        orderBy: (fields, operators) => [operators.desc(fields.startedAt)],
+        columns: { sandboxId: true },
+      });
+  if (!gen?.sandboxId) {
+    return undefined;
   }
+
+  const connected = await connectSandboxById(gen.sandboxId);
+  if (!connected) {
+    return undefined;
+  }
+  const serverUrl = `https://${connected.getHost(OPENCODE_PORT)}`;
+  const health = await fetch(`${serverUrl}/doc`, { method: "GET" }).catch(() => null);
+  if (!health?.ok) {
+    return undefined;
+  }
+
+  const hydrated: SandboxState = {
+    sandbox: connected,
+    client: createOpencodeClient({ baseUrl: serverUrl }),
+    serverUrl,
+  };
+  return hydrated;
 }
 
 /**
@@ -423,38 +448,37 @@ export async function getOrCreateSession(
     telemetryContext,
   );
 
-  // Ensure sandbox exists
-  await getOrCreateSandbox(config, options?.onLifecycle, telemetryContext);
-  const state = activeSandboxes.get(config.conversationId);
-
-  if (!state) {
-    throw new Error("Sandbox state not found after creation");
-  }
+  const state = await getOrCreateSandbox(config, options?.onLifecycle, telemetryContext);
+  const conv = await db.query.conversation.findFirst({
+    where: eq(conversation.id, config.conversationId),
+    columns: { opencodeSessionId: true },
+  });
+  const existingSessionId = conv?.opencodeSessionId ?? null;
 
   // Reuse existing session if one already exists for this conversation
-  if (state.sessionId) {
+  if (existingSessionId) {
     options?.onLifecycle?.("session_reused", {
       conversationId: config.conversationId,
-      sessionId: state.sessionId,
+      sessionId: existingSessionId,
       sandboxId: state.sandbox.sandboxId,
     });
     logLifecycle(
       "SESSION_REUSED",
       {
         conversationId: config.conversationId,
-        sessionId: state.sessionId,
+        sessionId: existingSessionId,
         sandboxId: state.sandbox.sandboxId,
         durationMs: Date.now() - sessionInitStartedAt,
       },
       {
         ...telemetryContext,
         sandboxId: state.sandbox.sandboxId,
-        sessionId: state.sessionId,
+        sessionId: existingSessionId,
       },
     );
     return {
       client: state.client,
-      sessionId: state.sessionId,
+      sessionId: existingSessionId,
       sandbox: state.sandbox,
     };
   }
@@ -482,7 +506,6 @@ export async function getOrCreateSession(
   }
 
   const sessionId = sessionResult.data.id;
-  state.sessionId = sessionId;
   logLifecycle(
     "SESSION_CREATED",
     {
@@ -689,24 +712,36 @@ export async function injectProviderAuth(client: OpencodeClient, userId: string)
  * Kill a sandbox for a conversation
  */
 export async function killSandbox(conversationId: string): Promise<void> {
-  const state = activeSandboxes.get(conversationId);
-  if (state) {
-    try {
-      await state.sandbox.kill();
-      logLifecycle(
-        "VM_TERMINATED",
-        {
-          conversationId,
-          sandboxId: state.sandbox.sandboxId,
-          reason: "manual_kill",
-        },
-        { source: "e2b", conversationId, sandboxId: state.sandbox.sandboxId },
-      );
-    } catch (error) {
-      console.error("[E2B] Failed to kill sandbox:", error);
-    }
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
-    activeSandboxes.delete(conversationId);
+  const latestWithSandbox = await db.query.generation.findFirst({
+    where: and(eq(generation.conversationId, conversationId), isNotNull(generation.sandboxId)),
+    orderBy: (fields, operators) => [operators.desc(fields.startedAt)],
+    columns: { sandboxId: true },
+  });
+  if (!latestWithSandbox?.sandboxId) {
+    return;
+  }
+  const sandbox = await connectSandboxById(latestWithSandbox.sandboxId);
+  if (!sandbox) {
+    return;
+  }
+  const state: SandboxState = {
+    sandbox,
+    client: createOpencodeClient({ baseUrl: `https://${sandbox.getHost(OPENCODE_PORT)}` }),
+    serverUrl: `https://${sandbox.getHost(OPENCODE_PORT)}`,
+  };
+  try {
+    await state.sandbox.kill();
+    logLifecycle(
+      "VM_TERMINATED",
+      {
+        conversationId,
+        sandboxId: state.sandbox.sandboxId,
+        reason: "manual_kill",
+      },
+      { source: "e2b", conversationId, sandboxId: state.sandbox.sandboxId },
+    );
+  } catch (error) {
+    console.error("[E2B] Failed to kill sandbox:", error);
   }
 }
 
@@ -714,11 +749,25 @@ export async function killSandbox(conversationId: string): Promise<void> {
  * Cleanup all sandboxes (call on server shutdown)
  */
 export async function cleanupAllSandboxes(): Promise<void> {
-  const promises = Array.from(activeSandboxes.values()).map((state) =>
-    state.sandbox.kill().catch(console.error),
+  const knownSandboxes = await db.query.generation.findMany({
+    where: isNotNull(generation.sandboxId),
+    columns: { sandboxId: true },
+  });
+  const uniqueSandboxIds = Array.from(
+    new Set(
+      knownSandboxes
+        .map((row) => row.sandboxId)
+        .filter((sandboxId): sandboxId is string => !!sandboxId),
+    ),
   );
+  const promises = uniqueSandboxIds.map(async (sandboxId) => {
+    const sandbox = await connectSandboxById(sandboxId);
+    if (!sandbox) {
+      return;
+    }
+    await sandbox.kill().catch(console.error);
+  });
   await Promise.all(promises);
-  activeSandboxes.clear();
 }
 
 /**
@@ -904,7 +953,7 @@ export class E2BSandboxBackend implements SandboxBackend {
     if (!this.conversationId) {
       throw new Error("E2BSandboxBackend not set up");
     }
-    const state = activeSandboxes.get(this.conversationId);
+    const state = await getSandboxStateDurable(this.conversationId);
     if (!state) {
       throw new Error("No active sandbox for conversation");
     }
@@ -925,7 +974,7 @@ export class E2BSandboxBackend implements SandboxBackend {
     if (!this.conversationId) {
       throw new Error("E2BSandboxBackend not set up");
     }
-    const state = activeSandboxes.get(this.conversationId);
+    const state = await getSandboxStateDurable(this.conversationId);
     if (!state) {
       throw new Error("No active sandbox for conversation");
     }
@@ -941,7 +990,7 @@ export class E2BSandboxBackend implements SandboxBackend {
     if (!this.conversationId) {
       throw new Error("E2BSandboxBackend not set up");
     }
-    const state = activeSandboxes.get(this.conversationId);
+    const state = await getSandboxStateDurable(this.conversationId);
     if (!state) {
       throw new Error("No active sandbox for conversation");
     }

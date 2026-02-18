@@ -13,6 +13,11 @@ const redisOptions = {
 export const SCHEDULED_WORKFLOW_JOB_NAME = "workflow:scheduled-trigger";
 export const GMAIL_WORKFLOW_JOB_NAME = "workflow:gmail-trigger";
 export const X_DM_WORKFLOW_JOB_NAME = "workflow:x-dm-trigger";
+export const CHAT_GENERATION_JOB_NAME = "generation:chat-run";
+export const WORKFLOW_GENERATION_JOB_NAME = "generation:workflow-run";
+export const GENERATION_APPROVAL_TIMEOUT_JOB_NAME = "generation:approval-timeout";
+export const GENERATION_AUTH_TIMEOUT_JOB_NAME = "generation:auth-timeout";
+export const SLACK_EVENT_JOB_NAME = "slack:event-callback";
 
 type JobPayload = Record<string, unknown> & { workflowId?: string };
 type JobHandler = Processor<JobPayload, unknown, string>;
@@ -97,6 +102,50 @@ const handlers: Record<string, JobHandler> = {
       }
       throw error;
     }
+  },
+  [CHAT_GENERATION_JOB_NAME]: async (job) => {
+    const generationId = job.data?.generationId;
+    if (!generationId || typeof generationId !== "string") {
+      throw new Error(`Missing generationId in chat generation job "${job.id}"`);
+    }
+
+    const { generationManager } = await import("@/server/services/generation-manager");
+    await generationManager.runQueuedGeneration(generationId);
+  },
+  [WORKFLOW_GENERATION_JOB_NAME]: async (job) => {
+    const generationId = job.data?.generationId;
+    if (!generationId || typeof generationId !== "string") {
+      throw new Error(`Missing generationId in workflow generation job "${job.id}"`);
+    }
+
+    const { generationManager } = await import("@/server/services/generation-manager");
+    await generationManager.runQueuedGeneration(generationId);
+  },
+  [GENERATION_APPROVAL_TIMEOUT_JOB_NAME]: async (job) => {
+    const generationId = job.data?.generationId;
+    if (!generationId || typeof generationId !== "string") {
+      throw new Error(`Missing generationId in approval timeout job "${job.id}"`);
+    }
+
+    const { generationManager } = await import("@/server/services/generation-manager");
+    await generationManager.processGenerationTimeout(generationId, "approval");
+  },
+  [GENERATION_AUTH_TIMEOUT_JOB_NAME]: async (job) => {
+    const generationId = job.data?.generationId;
+    if (!generationId || typeof generationId !== "string") {
+      throw new Error(`Missing generationId in auth timeout job "${job.id}"`);
+    }
+
+    const { generationManager } = await import("@/server/services/generation-manager");
+    await generationManager.processGenerationTimeout(generationId, "auth");
+  },
+  [SLACK_EVENT_JOB_NAME]: async (job) => {
+    const payload = job.data?.payload;
+    if (!payload || typeof payload !== "object") {
+      throw new Error(`Missing payload in slack event job "${job.id}"`);
+    }
+    const { handleSlackEvent } = await import("@/server/services/slack-bot");
+    await handleSlackEvent(payload as Parameters<typeof handleSlackEvent>[0]);
   },
 };
 

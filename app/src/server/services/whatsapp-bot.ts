@@ -9,6 +9,7 @@ import createWASocket, {
   proto,
 } from "@whiskeysockets/baileys";
 import { eq, and, isNull, gt } from "drizzle-orm";
+import IORedis from "ioredis";
 import { db } from "@/server/db/client";
 import {
   conversation,
@@ -38,6 +39,70 @@ const state: WhatsAppState = {
 
 let socket: ReturnType<typeof createWASocket> | null = null;
 let isConnecting = false;
+let lockRenewTimer: ReturnType<typeof setInterval> | null = null;
+
+const WHATSAPP_LOCK_KEY = "locks:whatsapp-bot:owner";
+const WHATSAPP_LOCK_TTL_MS = 60_000;
+const whatsappInstanceId = crypto.randomUUID();
+let redisClient: IORedis | null = null;
+
+function getRedisClient(): IORedis {
+  if (!redisClient) {
+    redisClient = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    });
+  }
+  return redisClient;
+}
+
+async function acquireOwnershipLock(): Promise<boolean> {
+  const result = await getRedisClient().set(
+    WHATSAPP_LOCK_KEY,
+    whatsappInstanceId,
+    "PX",
+    WHATSAPP_LOCK_TTL_MS,
+    "NX",
+  );
+  return result === "OK";
+}
+
+function startLockRenewal(): void {
+  if (lockRenewTimer) {
+    return;
+  }
+  lockRenewTimer = setInterval(
+    async () => {
+      try {
+        const redis = getRedisClient();
+        const owner = await redis.get(WHATSAPP_LOCK_KEY);
+        if (owner !== whatsappInstanceId) {
+          return;
+        }
+        await redis.pexpire(WHATSAPP_LOCK_KEY, WHATSAPP_LOCK_TTL_MS);
+      } catch (err) {
+        console.error("[whatsapp-bot] Failed to renew ownership lock:", err);
+      }
+    },
+    Math.floor(WHATSAPP_LOCK_TTL_MS / 2),
+  );
+}
+
+async function releaseOwnershipLock(): Promise<void> {
+  if (lockRenewTimer) {
+    clearInterval(lockRenewTimer);
+    lockRenewTimer = null;
+  }
+  try {
+    const redis = getRedisClient();
+    const owner = await redis.get(WHATSAPP_LOCK_KEY);
+    if (owner === whatsappInstanceId) {
+      await redis.del(WHATSAPP_LOCK_KEY);
+    }
+  } catch (err) {
+    console.error("[whatsapp-bot] Failed to release ownership lock:", err);
+  }
+}
 
 function normalizePhoneNumber(input: string): string {
   return input.replace(/\D/g, "");
@@ -291,13 +356,27 @@ async function handleIncomingMessage(waJid: string, text: string, displayName: s
 }
 
 export async function ensureWhatsAppSocket(): Promise<void> {
+  if (process.env.VERCEL === "1") {
+    state.status = "disconnected";
+    state.lastError =
+      "WhatsApp connector must run in a dedicated stateful worker and is disabled in Vercel runtime.";
+    return;
+  }
   if (state.status === "connected" || isConnecting) {
+    return;
+  }
+
+  const ownsLock = await acquireOwnershipLock();
+  if (!ownsLock) {
+    state.status = "disconnected";
+    state.lastError = "WhatsApp connector is owned by another instance";
     return;
   }
 
   isConnecting = true;
   state.status = "connecting";
   state.lastError = null;
+  startLockRenewal();
 
   try {
     const { state: authState, saveCreds } = await createDbAuthState();
@@ -330,6 +409,7 @@ export async function ensureWhatsAppSocket(): Promise<void> {
         if (statusCode === DisconnectReason.loggedOut) {
           state.lastError = "WhatsApp logged out. Reconnect required.";
         }
+        void releaseOwnershipLock();
       }
     });
 
@@ -362,6 +442,7 @@ export async function ensureWhatsAppSocket(): Promise<void> {
   } catch (err) {
     state.lastError = err instanceof Error ? err.message : "Failed to connect WhatsApp";
     state.status = "disconnected";
+    await releaseOwnershipLock();
   } finally {
     isConnecting = false;
   }
@@ -377,4 +458,5 @@ export async function disconnectWhatsApp(): Promise<void> {
   }
   socket = null;
   state.status = "disconnected";
+  await releaseOwnershipLock();
 }

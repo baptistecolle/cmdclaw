@@ -36,10 +36,6 @@ export type ResolvedIntegrationSkill =
       createdByUserId: string | null;
     };
 
-let cachedOfficialSkills: Map<string, OfficialIntegrationSkill> | null = null;
-let cacheTimeMs = 0;
-const OFFICIAL_SKILLS_CACHE_TTL_MS = 30_000;
-
 function extractFrontmatterValue(markdown: string, key: string): string | null {
   const match = markdown.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
   if (!match?.[1]) {
@@ -181,11 +177,6 @@ export async function createCommunityIntegrationSkill(
 export async function getOfficialIntegrationSkillIndex(): Promise<
   Map<string, OfficialIntegrationSkill>
 > {
-  const now = Date.now();
-  if (cachedOfficialSkills && now - cacheTimeMs < OFFICIAL_SKILLS_CACHE_TTL_MS) {
-    return cachedOfficialSkills;
-  }
-
   const result = new Map<string, OfficialIntegrationSkill>();
   const skillsRoot = path.join(process.cwd(), "src", "e2b-template", "skills");
 
@@ -193,8 +184,6 @@ export async function getOfficialIntegrationSkillIndex(): Promise<
   try {
     entries = await fs.readdir(skillsRoot, { withFileTypes: true });
   } catch {
-    cachedOfficialSkills = result;
-    cacheTimeMs = now;
     return result;
   }
 
@@ -228,8 +217,6 @@ export async function getOfficialIntegrationSkillIndex(): Promise<
     result.set(record.slug, record);
   }
 
-  cachedOfficialSkills = result;
-  cacheTimeMs = now;
   return result;
 }
 

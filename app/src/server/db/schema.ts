@@ -234,10 +234,15 @@ export type PendingApproval = {
   toolName: string;
   toolInput: Record<string, unknown>;
   requestedAt: string;
+  expiresAt?: string;
   integration: string;
   operation: string;
   command?: string;
   decision?: "allow" | "deny";
+  questionAnswers?: string[][];
+  opencodeRequestKind?: "permission" | "question";
+  opencodeRequestId?: string;
+  opencodeDefaultAnswers?: string[][];
 };
 
 // Auth state stored in generation
@@ -245,7 +250,14 @@ export type PendingAuth = {
   integrations: string[]; // Integration types needed
   connectedIntegrations: string[]; // Already connected during this request
   requestedAt: string;
+  expiresAt?: string;
   reason?: string;
+};
+
+export type GenerationExecutionPolicy = {
+  allowedIntegrations?: string[];
+  allowedCustomIntegrations?: string[];
+  autoApprove?: boolean;
 };
 
 export const generation = pgTable(
@@ -268,6 +280,8 @@ export const generation = pgTable(
     pendingApproval: jsonb("pending_approval").$type<PendingApproval>(),
     // Auth state
     pendingAuth: jsonb("pending_auth").$type<PendingAuth>(),
+    // Execution policy snapshot for durable worker restarts
+    executionPolicy: jsonb("execution_policy").$type<GenerationExecutionPolicy>(),
     // E2B state
     sandboxId: text("sandbox_id"),
     isPaused: boolean("is_paused").default(false).notNull(),

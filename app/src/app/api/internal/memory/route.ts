@@ -3,7 +3,7 @@ import { z } from "zod";
 import { env } from "@/env";
 import { db } from "@/server/db/client";
 import { conversation } from "@/server/db/schema";
-import { getSandboxState } from "@/server/sandbox/e2b";
+import { getSandboxStateDurable } from "@/server/sandbox/e2b";
 import {
   type MemoryFileType,
   readMemoryFile,
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
         content: payload.content ?? "",
       });
 
-      const state = getSandboxState(conversationId);
+      const state = await getSandboxStateDurable(conversationId);
       if (state?.sandbox) {
         await syncMemoryToSandbox(
           userId,

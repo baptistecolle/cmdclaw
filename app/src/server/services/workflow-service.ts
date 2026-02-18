@@ -22,14 +22,9 @@ const WORKFLOW_PREPARING_TIMEOUT_MS = (() => {
   }
   return Math.floor(seconds * 1000);
 })();
-let cachedWorkflowModelPromise: Promise<string> | undefined;
 
 async function resolveWorkflowDefaultModel(): Promise<string> {
-  if (!cachedWorkflowModelPromise) {
-    cachedWorkflowModelPromise = resolveDefaultOpencodeFreeModel(process.env.BAP_CHAT_MODEL);
-  }
-
-  return cachedWorkflowModelPromise;
+  return resolveDefaultOpencodeFreeModel(process.env.BAP_CHAT_MODEL);
 }
 
 function mapGenerationStatusToWorkflowRunStatus(

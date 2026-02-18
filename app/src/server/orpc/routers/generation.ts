@@ -7,39 +7,6 @@ import { generationManager } from "@/server/services/generation-manager";
 import { logServerEvent } from "@/server/utils/observability";
 import { protectedProcedure } from "../middleware";
 
-type ActiveGenerationStatus =
-  | "idle"
-  | "generating"
-  | "awaiting_approval"
-  | "awaiting_auth"
-  | "paused"
-  | "complete"
-  | "error";
-
-function mapGenerationStatus(genStatus: string | null | undefined): ActiveGenerationStatus | null {
-  if (!genStatus) {
-    return null;
-  }
-  switch (genStatus) {
-    case "running":
-      return "generating";
-    case "completed":
-      return "complete";
-    case "cancelled":
-      return "idle";
-    case "awaiting_approval":
-      return "awaiting_approval";
-    case "awaiting_auth":
-      return "awaiting_auth";
-    case "paused":
-      return "paused";
-    case "error":
-      return "error";
-    default:
-      return null;
-  }
-}
-
 // Schema for generation events (same structure as GenerationEvent type)
 const generationEventSchema = z.discriminatedUnion("type", [
   z.object({
@@ -260,10 +227,9 @@ const resumeGeneration = protectedProcedure
     }),
   )
   .output(z.object({ success: z.boolean() }))
-  .handler(async () => {
-    // For now, resume is handled by submitApproval
-    // Future: implement sandbox resume when E2B pause/resume is stable
-    return { success: false };
+  .handler(async ({ input, context }) => {
+    const success = await generationManager.resumeGeneration(input.generationId, context.user.id);
+    return { success };
   });
 
 // Submit approval decision
@@ -399,17 +365,6 @@ const getActiveGeneration = protectedProcedure
       throw new Error("Access denied");
     }
 
-    // Check for in-memory generation first
-    const activeGenId = generationManager.getGenerationForConversation(input.conversationId);
-    if (activeGenId) {
-      const genStatus = await generationManager.getGenerationStatus(activeGenId);
-      return {
-        generationId: activeGenId,
-        status: mapGenerationStatus(genStatus?.status),
-      };
-    }
-
-    // Fall back to conversation's stored state
     return {
       generationId: conv.currentGenerationId,
       status: conv.generationStatus,

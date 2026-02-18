@@ -45,11 +45,15 @@ const pendingRequests = new Map<
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const HEARTBEAT_TIMEOUT_MS = 45_000;
 const REQUEST_TIMEOUT_MS = 120_000; // 2 minutes for command execution
+const IS_VERCEL_RUNTIME = process.env.VERCEL === "1";
 
 /**
  * Send a message to a connected device.
  */
 export function sendToDevice(deviceId: string, message: DaemonMessage): boolean {
+  if (IS_VERCEL_RUNTIME) {
+    return false;
+  }
   const conn = connections.get(deviceId);
   if (!conn) {
     return false;
@@ -71,6 +75,13 @@ export function waitForResponse(
   message: DaemonMessage & { id: string },
   timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<DaemonResponse> {
+  if (IS_VERCEL_RUNTIME) {
+    return Promise.reject(
+      new Error(
+        "Device request/response routing requires a dedicated WebSocket service and is not supported inside Vercel functions.",
+      ),
+    );
+  }
   return new Promise((resolve, reject) => {
     const sent = sendToDevice(deviceId, message);
     if (!sent) {
@@ -92,6 +103,9 @@ export function waitForResponse(
  * Check if a device is currently connected.
  */
 export function isDeviceOnline(deviceId: string): boolean {
+  if (IS_VERCEL_RUNTIME) {
+    return false;
+  }
   return connections.has(deviceId);
 }
 
@@ -99,6 +113,9 @@ export function isDeviceOnline(deviceId: string): boolean {
  * Get the WebSocket for a connected device.
  */
 export function getDeviceSocket(deviceId: string): ServerWebSocket<WebSocketData> | undefined {
+  if (IS_VERCEL_RUNTIME) {
+    return undefined;
+  }
   return connections.get(deviceId)?.ws;
 }
 
@@ -106,6 +123,9 @@ export function getDeviceSocket(deviceId: string): ServerWebSocket<WebSocketData
  * Get all connected device IDs for a user.
  */
 export function getOnlineDevicesForUser(userId: string): string[] {
+  if (IS_VERCEL_RUNTIME) {
+    return [];
+  }
   const result: string[] = [];
   for (const [deviceId, conn] of connections) {
     if (conn.userId === userId) {
@@ -229,6 +249,11 @@ function startHeartbeat(): void {
  * Start the WebSocket server.
  */
 export function startWebSocketServer(port: number = 4097): void {
+  if (IS_VERCEL_RUNTIME) {
+    throw new Error(
+      "WebSocket server must run in a dedicated stateful process and cannot be started in Vercel runtime.",
+    );
+  }
   Bun.serve<WebSocketData>({
     port,
     fetch(req, server) {

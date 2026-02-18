@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifySlackSignature } from "@/lib/slack-signature";
-import { handleSlackEvent } from "@/server/services/slack-bot";
+import { SLACK_EVENT_JOB_NAME, getQueue } from "@/server/queues";
+
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const body = await request.text();
@@ -21,10 +23,26 @@ export async function POST(request: Request) {
 
   // Acknowledge immediately (Slack requires response within 3s)
   if (payload.type === "event_callback") {
-    // Fire-and-forget async processing
-    handleSlackEvent(payload).catch((err) => {
-      console.error("[slack-events] Error processing event:", err);
-    });
+    const eventId = typeof payload.event_id === "string" ? payload.event_id : undefined;
+    if (!eventId) {
+      return NextResponse.json({ error: "Missing event_id" }, { status: 400 });
+    }
+
+    try {
+      const queue = getQueue();
+      await queue.add(
+        SLACK_EVENT_JOB_NAME,
+        { payload, eventId },
+        {
+          jobId: `${SLACK_EVENT_JOB_NAME}:${eventId}`,
+          removeOnComplete: true,
+          removeOnFail: 500,
+        },
+      );
+    } catch (err) {
+      console.error("[slack-events] Failed to enqueue event:", err);
+      return NextResponse.json({ error: "Failed to enqueue event" }, { status: 503 });
+    }
   }
 
   return NextResponse.json({ ok: true });
