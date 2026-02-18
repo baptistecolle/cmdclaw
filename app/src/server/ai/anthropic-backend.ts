@@ -19,7 +19,7 @@ export class AnthropicBackend implements LLMBackend {
   }
 
   async *chat(params: ChatParams): AsyncGenerator<StreamEvent, void, unknown> {
-    const model = params.model || "claude-sonnet-4-20250514";
+    const model = params.model || "claude-sonnet-4-6";
     const maxTokens = params.maxTokens || 16384;
 
     // Convert our message format to Anthropic format
@@ -84,7 +84,7 @@ export class AnthropicBackend implements LLMBackend {
   }
 
   async listModels(): Promise<string[]> {
-    return ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-3-5-20241022"];
+    return ["claude-sonnet-4-6", "claude-opus-4-20250514", "claude-haiku-3-5-20241022"];
   }
 
   isAvailable(): boolean {

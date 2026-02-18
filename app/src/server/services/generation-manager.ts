@@ -745,7 +745,7 @@ class GenerationManager {
           userId,
           title,
           type: "chat",
-          model: model ?? "claude-sonnet-4-20250514",
+          model: model ?? "claude-sonnet-4-6",
           autoApprove: autoApprove ?? false,
         })
         .returning();
@@ -916,7 +916,7 @@ class GenerationManager {
       startedAt: new Date(),
       lastSaveAt: new Date(),
       isNewConversation,
-      model: model ?? conv.model ?? "claude-sonnet-4-20250514",
+      model: model ?? conv.model ?? "claude-sonnet-4-6",
       userMessageContent: content,
       assistantMessageIds: new Set(),
       messageRoles: new Map(),
@@ -1183,7 +1183,7 @@ class GenerationManager {
       startedAt: genRecord.startedAt,
       lastSaveAt: new Date(),
       isNewConversation: false,
-      model: genRecord.conversation.model ?? "claude-sonnet-4-20250514",
+      model: genRecord.conversation.model ?? "claude-sonnet-4-6",
       userMessageContent: latestUserMessage?.content ?? "",
       assistantMessageIds: new Set(),
       messageRoles: new Map(),

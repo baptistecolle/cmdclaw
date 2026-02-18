@@ -218,7 +218,7 @@ export function ChatArea({ conversationId }: Props) {
   const [streamError, setStreamError] = useState<string | null>(null);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [localAutoApprove, setLocalAutoApprove] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-20250514");
+  const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-6");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
 
   // Segmented activity feed state

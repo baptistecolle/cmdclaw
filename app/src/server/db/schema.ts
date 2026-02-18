@@ -166,7 +166,7 @@ export const conversation = pgTable(
     title: text("title").default("New conversation"),
     // OpenCode session ID for resuming conversations
     opencodeSessionId: text("opencode_session_id"),
-    model: text("model").default("claude-sonnet-4-20250514"),
+    model: text("model").default("claude-sonnet-4-6"),
     // Generation tracking
     generationStatus: generationStatusEnum("generation_status").default("idle").notNull(),
     currentGenerationId: text("current_generation_id"),

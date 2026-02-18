@@ -720,7 +720,7 @@ describe("generationManager transitions", () => {
         {
           id: "conv-new",
           userId: "user-1",
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
           autoApprove: false,
           type: "chat",
         },
@@ -765,7 +765,7 @@ describe("generationManager transitions", () => {
     conversationFindFirstMock.mockResolvedValueOnce({
       id: "conv-1",
       userId: "other-user",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       autoApprove: false,
     });
 
@@ -1403,7 +1403,7 @@ describe("generationManager transitions", () => {
       id: "gen-opencode",
       conversationId: "conv-opencode",
       backendType: "opencode",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       allowedIntegrations: ["github"],
       userMessageContent: "Process these files",
       attachments: [
