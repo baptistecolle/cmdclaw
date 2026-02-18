@@ -5,6 +5,7 @@ import {
   Check,
   Loader2,
   AlertCircle,
+  ArrowRight,
   Terminal,
   FolderSearch,
   FileSearch,
@@ -15,7 +16,9 @@ import {
   StopCircle,
   type LucideIcon,
 } from "lucide-react";
+import { AnimatePresence, motion, type Transition } from "motion/react";
 import Image from "next/image";
+import { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { IntegrationType } from "@/lib/integration-icons";
 import {
@@ -73,6 +76,11 @@ type Props = {
   item: ActivityItemData;
 };
 
+const TOOL_DETAILS_INITIAL = { height: 0, opacity: 0, y: -2 };
+const TOOL_DETAILS_ANIMATE = { height: "auto", opacity: 1, y: 0 };
+const TOOL_DETAILS_EXIT = { height: 0, opacity: 0, y: -2 };
+const TOOL_DETAILS_TRANSITION: Transition = { duration: 0.2, ease: "easeInOut" };
+
 function formatValue(value: unknown): string {
   if (value === undefined || value === null) {
     return "";
@@ -104,8 +112,24 @@ function formatInput(input: unknown, toolName?: string): string {
   return formatValue(input);
 }
 
+function getInputDescription(input: unknown): string | null {
+  if (typeof input !== "object" || input === null) {
+    return null;
+  }
+  const withDescription = input as { description?: unknown };
+  if (typeof withDescription.description !== "string") {
+    return null;
+  }
+  const trimmedDescription = withDescription.description.trim();
+  return trimmedDescription.length > 0 ? trimmedDescription : null;
+}
+
 export function ActivityItem({ item }: Props) {
   const { type, content, toolName, integration, operation, status, input, result } = item;
+  const [showDetails, setShowDetails] = useState(false);
+  const handleToggleDetails = useCallback(() => {
+    setShowDetails((prev) => !prev);
+  }, []);
 
   // Get icon for tool calls only
   const getIcon = () => {
@@ -189,6 +213,11 @@ export function ActivityItem({ item }: Props) {
   // For integrations, show operation label (e.g., "Listing channels")
   // For regular tools, show tool action (e.g., "Running command")
   const displayName = (() => {
+    const inputDescription = getInputDescription(input);
+    if (inputDescription) {
+      return inputDescription;
+    }
+
     if (integration) {
       // Use operation or toolName (which may contain the operation)
       const op = operation || toolName;
@@ -199,24 +228,69 @@ export function ActivityItem({ item }: Props) {
 
   const formattedInput = formatInput(input, toolName);
   const formattedResult = formatValue(result);
+  const hasDetails = Boolean(formattedInput || formattedResult);
 
   return (
     <div className="py-0.5 text-xs">
-      <div className="flex items-center gap-1.5">
-        {getIcon()}
-        <span className="text-foreground font-mono">{displayName}</span>
-        {getStatusIcon()}
-      </div>
-      {formattedInput && (
-        <pre className="text-muted-foreground mt-0.5 ml-5 font-mono whitespace-pre-wrap">
-          {formattedInput}
-        </pre>
+      {hasDetails ? (
+        <button
+          type="button"
+          onClick={handleToggleDetails}
+          className="hover:bg-muted/30 -ml-0.5 flex w-full items-center gap-1.5 rounded px-0.5 py-0.5 text-left"
+          aria-label={showDetails ? "Hide tool details" : "Show tool details"}
+        >
+          {getIcon()}
+          <span className="text-foreground font-mono">{displayName}</span>
+          <span className="inline-flex items-center">
+            <ArrowRight
+              className={`text-muted-foreground h-3 w-3 flex-shrink-0 transition-transform duration-200 ${showDetails ? "rotate-90" : ""}`}
+            />
+          </span>
+          <div className="flex-1" />
+          {getStatusIcon()}
+        </button>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          {getIcon()}
+          <span className="text-foreground font-mono">{displayName}</span>
+          <div className="flex-1" />
+          {getStatusIcon()}
+        </div>
       )}
-      {formattedResult && (
-        <pre className="text-muted-foreground mt-0.5 ml-5 font-mono whitespace-pre-wrap">
-          {formattedResult}
-        </pre>
-      )}
+      <AnimatePresence initial={false}>
+        {showDetails && (
+          <motion.div
+            initial={TOOL_DETAILS_INITIAL}
+            animate={TOOL_DETAILS_ANIMATE}
+            exit={TOOL_DETAILS_EXIT}
+            transition={TOOL_DETAILS_TRANSITION}
+            className="mt-1 ml-5 overflow-hidden"
+          >
+            <div className="border-border/60 space-y-2 border-l pl-3">
+              {formattedInput && (
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
+                    Request
+                  </p>
+                  <pre className="text-muted-foreground rounded-sm px-2 py-1 font-mono whitespace-pre-wrap">
+                    {formattedInput}
+                  </pre>
+                </div>
+              )}
+              {formattedResult && (
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
+                    Response
+                  </p>
+                  <pre className="text-muted-foreground rounded-sm px-2 py-1 font-mono whitespace-pre-wrap">
+                    {formattedResult}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
