@@ -32,7 +32,7 @@
     "test:e2e:live:prod": "PLAYWRIGHT_SKIP_WEBSERVER=1 PLAYWRIGHT_BASE_URL=https://app.heybap.com bun run test:e2e:live",
     "test:e2e:live:prod:monitor": "bun run test:e2e:auth && E2E_LIVE=1 PLAYWRIGHT_SKIP_WEBSERVER=1 PLAYWRIGHT_BASE_URL=https://app.heybap.com PLAYWRIGHT_HTML_OPEN=never PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/monitor PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/monitor/results.json bun --env-file=.env playwright test -g @live --reporter=list,json,html",
     "test:e2e:live:record": "PLAYWRIGHT_PORT=3000 bun run test:e2e:auth && E2E_LIVE=1 PLAYWRIGHT_PORT=3000 PLAYWRIGHT_REUSE_SERVER=1 PLAYWRIGHT_VIDEO=on bun --env-file=.env playwright test",
-    "test:e2e:cli:live": "bun run chat:auth && E2E_LIVE=1 BAP_SERVER_URL=${BAP_SERVER_URL:-http://127.0.0.1:3000} bun --env-file=.env vitest run tests/e2e-cli/auth.cli.live.e2e.test.ts src/app/chat/chat.cli.live.test.ts src/app/chat/chat.question.cli.live.test.ts src/app/chat/chat.fill-pdf.cli.live.test.ts src/app/chat/chat.slack.cli.live.test.ts src/app/workflows/workflows.cli.live.test.ts",
+    "test:e2e:cli:live": "bun run chat:auth && E2E_LIVE=1 BAP_SERVER_URL=${BAP_SERVER_URL:-http://localhost:3000} bun --env-file=.env vitest run tests/e2e-cli/auth.cli.live.e2e.test.ts src/app/chat/chat.cli.live.test.ts src/app/chat/chat.question.cli.live.test.ts src/app/chat/chat.fill-pdf.cli.live.test.ts src/app/chat/chat.slack.cli.live.test.ts src/app/workflows/workflows.cli.live.test.ts",
     "monitor:playwright:kuma": "bun --env-file=.env scripts/monitoring-playwright-kuma.ts",
     "test:coverage": "vitest run --coverage",
     "test:coverage:check": "COVERAGE_CHECK=1 vitest run --coverage",

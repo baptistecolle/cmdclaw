@@ -1,4 +1,9 @@
-import { DEFAULT_SERVER_URL, createRpcClient, loadConfig } from "./lib/cli-shared";
+import {
+  DEFAULT_SERVER_URL,
+  createRpcClient,
+  getConfigPathForServerUrl,
+  loadConfig,
+} from "./lib/cli-shared";
 
 type ParsedArgs = {
   serverUrl?: string;
@@ -58,15 +63,14 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  const config = loadConfig();
-  const serverUrl =
-    args.serverUrl || config?.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const serverUrl = args.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const config = loadConfig(serverUrl);
   const token = args.token || config?.token;
 
   console.log("Auth source:");
   console.log(`  server: ${serverUrl}`);
   console.log(
-    `  token from: ${args.token ? "--token" : config?.token ? "~/.bap/chat-config.json" : "none"}`,
+    `  token from: ${args.token ? "--token" : config?.token ? getConfigPathForServerUrl(serverUrl) : "none"}`,
   );
 
   if (!token) {

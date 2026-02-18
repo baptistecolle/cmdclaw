@@ -154,6 +154,10 @@ function mapPersistedMessageToChatMessage(m: PersistedConversationMessage): Mess
   };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function getAgentInitLabel(status: string | null): string {
   switch (status) {
     case "agent_init_started":
@@ -390,21 +394,56 @@ export function ChatArea({ conversationId }: Props) {
     setTraceStatus(snapshot.traceStatus);
   }, []);
 
+  const upsertMessageById = useCallback((nextMessage: Message) => {
+    setMessages((prev) => {
+      const existingIndex = prev.findIndex((message) => message.id === nextMessage.id);
+      if (existingIndex === -1) {
+        return [...prev, nextMessage];
+      }
+      const updated = [...prev];
+      updated[existingIndex] = nextMessage;
+      return updated;
+    });
+  }, []);
+
   const hydrateAssistantMessage = useCallback(
     async (newConversationId: string, messageId: string, fallback: Message): Promise<Message> => {
-      try {
-        const conversation = await queryClient.fetchQuery({
-          queryKey: ["conversation", "get", newConversationId],
-          queryFn: () => client.conversation.get({ id: newConversationId }),
-        });
-        const persisted = conversation.messages.find((m) => m.id === messageId);
-        if (persisted) {
-          return mapPersistedMessageToChatMessage(persisted as PersistedConversationMessage);
+      const maxAttempts = 6;
+      const retryDelayMs = 300;
+      const fallbackHasFiles =
+        (fallback.attachments?.length ?? 0) > 0 || (fallback.sandboxFiles?.length ?? 0) > 0;
+
+      const attemptHydration = async (attempt: number): Promise<Message> => {
+        try {
+          const conversation = await client.conversation.get({ id: newConversationId });
+          queryClient.setQueryData(["conversation", "get", newConversationId], conversation);
+
+          const persisted = conversation.messages.find((m) => m.id === messageId);
+          if (persisted) {
+            const mapped = mapPersistedMessageToChatMessage(
+              persisted as PersistedConversationMessage,
+            );
+            const mappedHasFiles =
+              (mapped.attachments?.length ?? 0) > 0 || (mapped.sandboxFiles?.length ?? 0) > 0;
+
+            if (mappedHasFiles || fallbackHasFiles || attempt === maxAttempts - 1) {
+              return mapped;
+            }
+          }
+        } catch (error) {
+          if (attempt === maxAttempts - 1) {
+            console.error("Failed to hydrate assistant message after completion:", error);
+          }
         }
-      } catch (error) {
-        console.error("Failed to hydrate assistant message after completion:", error);
-      }
-      return fallback;
+
+        if (attempt < maxAttempts - 1) {
+          await sleep(retryDelayMs);
+          return attemptHydration(attempt + 1);
+        }
+        return fallback;
+      };
+
+      return attemptHydration(0);
     },
     [queryClient],
   );
@@ -528,6 +567,10 @@ export function ChatArea({ conversationId }: Props) {
         activeGeneration.status === "awaiting_approval" ||
         activeGeneration.status === "awaiting_auth")
     ) {
+      if (runtimeRef.current && currentGenerationIdRef.current === activeGeneration.generationId) {
+        return;
+      }
+
       // There's an active generation - reconnect to it
       currentGenerationIdRef.current = activeGeneration.generationId;
       setIsStreaming(true);
@@ -654,7 +697,7 @@ export function ChatArea({ conversationId }: Props) {
             fallbackAssistant,
           );
 
-          setMessages((prev) => [...prev, hydratedAssistant]);
+          upsertMessageById(hydratedAssistant);
           setStreamingParts([]);
           setStreamingSandboxFiles([]);
           setIsStreaming(false);
@@ -702,6 +745,7 @@ export function ChatArea({ conversationId }: Props) {
     subscribeToGeneration,
     syncFromRuntime,
     hydrateAssistantMessage,
+    upsertMessageById,
   ]);
 
   // Track if user is near bottom of scroll
@@ -953,7 +997,7 @@ export function ChatArea({ conversationId }: Props) {
               fallbackAssistant,
             );
 
-            setMessages((prev) => [...prev, hydratedAssistant]);
+            upsertMessageById(hydratedAssistant);
             setStreamingParts([]);
             setStreamingSandboxFiles([]);
             setIsStreaming(false);
@@ -1022,6 +1066,7 @@ export function ChatArea({ conversationId }: Props) {
       syncFromRuntime,
       notifyConversationIdSync,
       hydrateAssistantMessage,
+      upsertMessageById,
     ],
   );
 

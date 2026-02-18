@@ -40,6 +40,7 @@ export function CollapsedTrace({
       item.status === "interrupted" ||
       (item.type === "system" && item.content === "Interrupted by user"),
   );
+  const hasRunning = activityItems.some((item) => item.status === "running");
 
   // Handle toggle - use external handler if provided
   const handleToggle = useCallback(() => {
@@ -78,7 +79,7 @@ export function CollapsedTrace({
         ) : (
           <>
             <Check className="h-4 w-4 text-green-500" />
-            <span className="text-muted-foreground">Working...</span>
+            <span className="text-muted-foreground">{hasRunning ? "Working..." : "Done"}</span>
           </>
         )}
 

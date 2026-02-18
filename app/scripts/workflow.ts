@@ -573,14 +573,14 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const config = loadConfig();
+  const serverUrl = parsed.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const config = loadConfig(serverUrl);
   if (!config?.token) {
-    console.error("Not authenticated. Run 'bun run chat --auth' first.");
+    console.error(
+      `Not authenticated for ${serverUrl}. Run 'bun run chat -- --server ${serverUrl} --auth' first.`,
+    );
     process.exit(1);
   }
-
-  const serverUrl =
-    parsed.serverUrl || config.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
   const client = createRpcClient(serverUrl, config.token);
 
   try {

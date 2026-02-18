@@ -122,11 +122,13 @@ export async function resolveLiveModel(): Promise<string> {
 }
 
 export function getCliClient() {
-  const config = loadConfig();
+  const serverUrl = process.env.BAP_SERVER_URL || defaultServerUrl;
+  const config = loadConfig(serverUrl);
   if (!config?.token) {
-    throw new Error("Missing CLI auth token. Run bun run chat:auth first.");
+    throw new Error(
+      `Missing CLI auth token for ${serverUrl}. Run: bun run chat -- --server ${serverUrl} --auth`,
+    );
   }
-  const serverUrl = config.serverUrl || process.env.BAP_SERVER_URL || defaultServerUrl;
   return createRpcClient(serverUrl, config.token);
 }
 

@@ -1,42 +1,14 @@
 import { eq } from "drizzle-orm";
 import { randomBytes, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import {
+  DEFAULT_SERVER_URL,
+  getConfigPathForServerUrl,
+  loadConfig,
+  saveConfig,
+} from "./lib/cli-shared";
 
-type ChatConfig = {
-  serverUrl: string;
-  token: string;
-};
-
-const DEFAULT_SERVER_URL = "http://localhost:3000";
 const DEFAULT_CHAT_AUTH_EMAIL = "baptiste@heybap.com";
 const DEFAULT_CHAT_AUTH_NAME = "Baptiste";
-const BAP_DIR = join(homedir(), ".bap");
-const CONFIG_PATH = join(BAP_DIR, "chat-config.json");
-
-function ensureBapDir(): void {
-  if (!existsSync(BAP_DIR)) {
-    mkdirSync(BAP_DIR, { recursive: true });
-  }
-}
-
-function loadConfig(): ChatConfig | null {
-  try {
-    if (!existsSync(CONFIG_PATH)) {
-      return null;
-    }
-    const raw = readFileSync(CONFIG_PATH, "utf-8");
-    return JSON.parse(raw) as ChatConfig;
-  } catch {
-    return null;
-  }
-}
-
-function saveConfig(config: ChatConfig): void {
-  ensureBapDir();
-  writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
-}
 
 function isLocalServerUrl(serverUrl: string): boolean {
   try {
@@ -60,8 +32,8 @@ function formatError(err: unknown): string {
 }
 
 async function main(): Promise<void> {
-  const loaded = loadConfig();
-  const serverUrl = process.env.BAP_SERVER_URL || loaded?.serverUrl || DEFAULT_SERVER_URL;
+  const serverUrl = process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const loaded = loadConfig(serverUrl);
 
   if (!isLocalServerUrl(serverUrl)) {
     console.log(`[chat-auth] skipping bootstrap for non-local server: ${serverUrl}`);
@@ -156,7 +128,7 @@ async function main(): Promise<void> {
     saveConfig({ serverUrl, token });
     console.log(`[chat-auth] user=${email}`);
     console.log(`[chat-auth] server=${serverUrl}`);
-    console.log(`[chat-auth] config=${CONFIG_PATH}`);
+    console.log(`[chat-auth] config=${getConfigPathForServerUrl(serverUrl)}`);
     console.log(`[chat-auth] expiresAt=${expiresAt.toISOString()}`);
   } catch (err) {
     console.warn(`[chat-auth] local auth bootstrap skipped: ${formatError(err)}`);

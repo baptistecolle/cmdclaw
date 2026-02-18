@@ -678,6 +678,7 @@ async function printAuthenticatedUser(client: RouterClient<AppRouter>): Promise<
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  const requestedServerUrl = args.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
 
   if (args.listModels) {
     await printFreeModels();
@@ -685,12 +686,11 @@ async function main(): Promise<void> {
   }
 
   if (args.resetAuth) {
-    clearConfig();
+    clearConfig(requestedServerUrl);
   }
 
-  const loaded = loadConfig();
-  const serverUrl =
-    args.serverUrl || loaded?.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const loaded = loadConfig(requestedServerUrl);
+  const serverUrl = requestedServerUrl;
 
   let config = loaded;
   if (args.token) {

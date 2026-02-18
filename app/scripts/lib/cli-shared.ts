@@ -1,7 +1,7 @@
 import type { RouterClient } from "@orpc/server";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import readline from "node:readline";
@@ -13,7 +13,7 @@ export type ChatConfig = {
 };
 
 const BAP_DIR = join(homedir(), ".bap");
-const CONFIG_PATH = join(BAP_DIR, "chat-config.json");
+const PROFILES_DIR = join(BAP_DIR, "profiles");
 
 export const DEFAULT_SERVER_URL = "http://localhost:3000";
 
@@ -23,12 +23,38 @@ export function ensureBapDir(): void {
   }
 }
 
-export function loadConfig(): ChatConfig | null {
+function ensureProfilesDir(): void {
+  ensureBapDir();
+  if (!existsSync(PROFILES_DIR)) {
+    mkdirSync(PROFILES_DIR, { recursive: true });
+  }
+}
+
+function profileSlugForServerUrl(serverUrl: string): string {
   try {
-    if (!existsSync(CONFIG_PATH)) {
+    const url = new URL(serverUrl);
+    const protocol = url.protocol.replace(":", "");
+    const host = url.hostname.toLowerCase();
+    const port = url.port ? `-${url.port}` : "";
+    return `${protocol}--${host}${port}`.replace(/[^a-z0-9.-]/g, "-");
+  } catch {
+    return serverUrl.toLowerCase().replace(/[^a-z0-9.-]/g, "-");
+  }
+}
+
+export function getConfigPathForServerUrl(serverUrl: string): string {
+  return join(PROFILES_DIR, `chat-config.${profileSlugForServerUrl(serverUrl)}.json`);
+}
+
+export function loadConfig(
+  serverUrl = process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL,
+): ChatConfig | null {
+  try {
+    const configPath = getConfigPathForServerUrl(serverUrl);
+    if (!existsSync(configPath)) {
       return null;
     }
-    const raw = readFileSync(CONFIG_PATH, "utf-8");
+    const raw = readFileSync(configPath, "utf-8");
     return JSON.parse(raw) as ChatConfig;
   } catch {
     return null;
@@ -36,13 +62,15 @@ export function loadConfig(): ChatConfig | null {
 }
 
 export function saveConfig(config: ChatConfig): void {
-  ensureBapDir();
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
+  ensureProfilesDir();
+  const configPath = getConfigPathForServerUrl(config.serverUrl);
+  writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
 }
 
-export function clearConfig(): void {
-  if (existsSync(CONFIG_PATH)) {
-    writeFileSync(CONFIG_PATH, "{}", "utf-8");
+export function clearConfig(serverUrl = process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL): void {
+  const configPath = getConfigPathForServerUrl(serverUrl);
+  if (existsSync(configPath)) {
+    unlinkSync(configPath);
   }
 }
 
