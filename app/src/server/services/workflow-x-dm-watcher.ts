@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { integration, integrationToken, workflow, workflowRun } from "@/server/db/schema";
 import { getValidAccessToken } from "@/server/integrations/token-refresh";
-import { X_DM_WORKFLOW_JOB_NAME, getQueue } from "@/server/queues";
+import { buildQueueJobId, X_DM_WORKFLOW_JOB_NAME, getQueue } from "@/server/queues";
 
 const X_DM_TRIGGER_TYPE = "twitter.new_dm";
 const X_DM_EVENT_TYPE = "MessageCreate";
@@ -231,7 +231,7 @@ async function triggerWorkflowFromXDm(workflowId: string, dm: XDmSummary): Promi
       },
     },
     {
-      jobId: `workflow-x-dm-${workflowId}-${dm.id}`,
+      jobId: buildQueueJobId(["workflow-x-dm", workflowId, dm.id]),
       attempts: 20,
       backoff: {
         type: "exponential",

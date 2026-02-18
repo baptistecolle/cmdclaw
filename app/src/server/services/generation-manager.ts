@@ -44,6 +44,7 @@ import {
   getEnabledIntegrationTypes,
 } from "@/server/integrations/cli-env";
 import {
+  buildQueueJobId,
   CHAT_GENERATION_JOB_NAME,
   GENERATION_APPROVAL_TIMEOUT_JOB_NAME,
   GENERATION_AUTH_TIMEOUT_JOB_NAME,
@@ -528,7 +529,7 @@ class GenerationManager {
       jobName,
       { generationId },
       {
-        jobId: `${jobName}:${generationId}`,
+        jobId: buildQueueJobId([jobName, generationId]),
         removeOnComplete: true,
         removeOnFail: 500,
       },
@@ -546,13 +547,18 @@ class GenerationManager {
     const queue = getQueue();
     const runAt = Date.parse(expiresAtIso);
     const delay = Math.max(0, Number.isFinite(runAt) ? runAt - Date.now() : 0);
+    const timeoutKey =
+      Number.isFinite(runAt) && runAt > 0
+        ? String(runAt)
+        : expiresAtIso.replaceAll(/[^a-zA-Z0-9_-]/g, "-");
     const jobName =
       kind === "approval" ? GENERATION_APPROVAL_TIMEOUT_JOB_NAME : GENERATION_AUTH_TIMEOUT_JOB_NAME;
+    const jobId = buildQueueJobId([jobName, generationId, timeoutKey]);
     await queue.add(
       jobName,
       { generationId, kind, expiresAt: expiresAtIso },
       {
-        jobId: `${jobName}:${generationId}:${expiresAtIso}`,
+        jobId,
         delay,
         removeOnComplete: true,
         removeOnFail: 500,
@@ -1253,7 +1259,7 @@ class GenerationManager {
 
     const pollIntervalMs = 500;
     const heartbeatIntervalMs = 10_000;
-    const maxWaitMs = initial.conversation.type === "workflow" ? 10 * 60 * 1000 : 30_000;
+    const maxWaitMs = initial.conversation.type === "workflow" ? 10 * 60 * 1000 : 3 * 60 * 1000;
     const startedAt = Date.now();
     let lastHeartbeatAt = 0;
     let lastStatus: typeof generation.$inferSelect.status | null = null;
@@ -4363,12 +4369,8 @@ class GenerationManager {
       return "deny";
     }
 
-    const isSlackSendOperation =
-      request.integration === "slack" &&
-      (request.operation === "send" || /^\s*slack\s+send(?:\s|$)/.test(request.command));
-
     const autoApprove = genRecord.conversation.autoApprove;
-    if (autoApprove && !isSlackSendOperation) {
+    if (autoApprove) {
       return "allow";
     }
 

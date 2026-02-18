@@ -19,6 +19,15 @@ export const GENERATION_APPROVAL_TIMEOUT_JOB_NAME = "generation:approval-timeout
 export const GENERATION_AUTH_TIMEOUT_JOB_NAME = "generation:auth-timeout";
 export const SLACK_EVENT_JOB_NAME = "slack:event-callback";
 
+export function buildQueueJobId(parts: Array<string | number | null | undefined>): string {
+  const joined = parts
+    .map((part) => String(part ?? "").trim())
+    .filter((part) => part.length > 0)
+    .join("-");
+  const normalized = joined.replaceAll(":", "-").replaceAll(/\s+/g, "-").replaceAll(/-+/g, "-");
+  return normalized.length > 0 ? normalized : "job";
+}
+
 type JobPayload = Record<string, unknown> & { workflowId?: string };
 type JobHandler = Processor<JobPayload, unknown, string>;
 

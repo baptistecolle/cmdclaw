@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifySlackSignature } from "@/lib/slack-signature";
-import { SLACK_EVENT_JOB_NAME, getQueue } from "@/server/queues";
+import { buildQueueJobId, SLACK_EVENT_JOB_NAME, getQueue } from "@/server/queues";
 
 export const runtime = "nodejs";
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
         SLACK_EVENT_JOB_NAME,
         { payload, eventId },
         {
-          jobId: `${SLACK_EVENT_JOB_NAME}:${eventId}`,
+          jobId: buildQueueJobId([SLACK_EVENT_JOB_NAME, eventId]),
           removeOnComplete: true,
           removeOnFail: 500,
         },

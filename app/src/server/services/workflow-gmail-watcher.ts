@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { integration, integrationToken, workflow, workflowRun } from "@/server/db/schema";
 import { getValidAccessToken } from "@/server/integrations/token-refresh";
-import { GMAIL_WORKFLOW_JOB_NAME, getQueue } from "@/server/queues";
+import { buildQueueJobId, GMAIL_WORKFLOW_JOB_NAME, getQueue } from "@/server/queues";
 
 const GMAIL_TRIGGER_TYPE = "gmail.new_email";
 const DEFAULT_POLL_INTERVAL_MS = 2 * 60 * 1000;
@@ -234,7 +234,7 @@ async function triggerWorkflowFromGmailMessage(
       },
     },
     {
-      jobId: `workflow-gmail-${workflowId}-${message.id}`,
+      jobId: buildQueueJobId(["workflow-gmail", workflowId, message.id]),
       attempts: 20,
       backoff: {
         type: "exponential",
