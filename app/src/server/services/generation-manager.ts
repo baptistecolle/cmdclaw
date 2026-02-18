@@ -991,10 +991,6 @@ class GenerationManager {
     autoApprove: boolean;
     allowedIntegrations: IntegrationType[];
     allowedCustomIntegrations?: string[];
-    workflowPrompt: string;
-    workflowPromptDo?: string | null;
-    workflowPromptDont?: string | null;
-    triggerPayload: unknown;
   }): Promise<{ generationId: string; conversationId: string }> {
     const { content, userId, model } = params;
     const resolvedModel = await resolveWorkflowModel(model);
@@ -1087,10 +1083,10 @@ class GenerationManager {
       allowedIntegrations: params.allowedIntegrations,
       autoApprove: params.autoApprove,
       allowedCustomIntegrations: params.allowedCustomIntegrations,
-      workflowPrompt: params.workflowPrompt,
-      workflowPromptDo: params.workflowPromptDo ?? undefined,
-      workflowPromptDont: params.workflowPromptDont ?? undefined,
-      triggerPayload: params.triggerPayload,
+      workflowPrompt: undefined,
+      workflowPromptDo: undefined,
+      workflowPromptDont: undefined,
+      triggerPayload: undefined,
       userStagedFilePaths: new Set(),
       uploadedSandboxFileIds: new Set(),
       agentInitStartedAt: undefined,
@@ -1208,10 +1204,10 @@ class GenerationManager {
         executionPolicy.allowedCustomIntegrations ??
         linkedWorkflow?.allowedCustomIntegrations ??
         undefined,
-      workflowPrompt: linkedWorkflow?.prompt ?? undefined,
-      workflowPromptDo: linkedWorkflow?.promptDo ?? undefined,
-      workflowPromptDont: linkedWorkflow?.promptDont ?? undefined,
-      triggerPayload: linkedWorkflowRun?.triggerPayload,
+      workflowPrompt: undefined,
+      workflowPromptDo: undefined,
+      workflowPromptDont: undefined,
+      triggerPayload: undefined,
       userStagedFilePaths: new Set(),
       uploadedSandboxFileIds: new Set(),
       agentInitStartedAt: undefined,

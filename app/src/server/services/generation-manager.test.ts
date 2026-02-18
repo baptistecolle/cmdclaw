@@ -801,10 +801,6 @@ describe("generationManager transitions", () => {
       autoApprove: true,
       allowedIntegrations: ["github"],
       allowedCustomIntegrations: ["custom-slug"],
-      workflowPrompt: "Follow the workflow",
-      workflowPromptDo: "Do summarize results",
-      workflowPromptDont: "Do not send emails",
-      triggerPayload: { source: "cron" },
       model: "gpt-4.1-mini",
     });
 
@@ -817,10 +813,10 @@ describe("generationManager transitions", () => {
       workflowRunId: "wf-run-1",
       allowedIntegrations: ["github"],
       allowedCustomIntegrations: ["custom-slug"],
-      workflowPrompt: "Follow the workflow",
-      workflowPromptDo: "Do summarize results",
-      workflowPromptDont: "Do not send emails",
-      triggerPayload: { source: "cron" },
+      workflowPrompt: undefined,
+      workflowPromptDo: undefined,
+      workflowPromptDont: undefined,
+      triggerPayload: undefined,
     });
   });
 

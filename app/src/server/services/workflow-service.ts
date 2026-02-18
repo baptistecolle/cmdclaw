@@ -205,7 +205,13 @@ export async function triggerWorkflowRun(params: {
   });
 
   const payloadText = JSON.stringify(params.triggerPayload ?? {}, null, 2);
-  const userContent = `Workflow trigger received.\n\n<trigger_payload>\n${payloadText}\n</trigger_payload>`;
+  const workflowSections = [
+    wf.prompt?.trim() ? `## Workflow Instructions\n${wf.prompt}` : null,
+    wf.promptDo?.trim() ? `## Do\n${wf.promptDo}` : null,
+    wf.promptDont?.trim() ? `## Don't\n${wf.promptDont}` : null,
+    `## Trigger Payload\n${payloadText}`,
+  ].filter(Boolean);
+  const userContent = workflowSections.join("\n\n");
 
   const allowedIntegrations = (wf.allowedIntegrations ?? []) as IntegrationType[];
   const allowedCustomIntegrations = Array.isArray(wf.allowedCustomIntegrations)
@@ -224,10 +230,6 @@ export async function triggerWorkflowRun(params: {
       autoApprove: wf.autoApprove,
       allowedIntegrations,
       allowedCustomIntegrations,
-      workflowPrompt: wf.prompt,
-      workflowPromptDo: wf.promptDo,
-      workflowPromptDont: wf.promptDont,
-      triggerPayload: params.triggerPayload,
     });
 
     generationId = startResult.generationId;
