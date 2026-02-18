@@ -64,7 +64,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
         <ChatSidebar />
         <SidebarInset>
           <header className="flex h-14 items-center gap-2 border-b px-4">
-            <SidebarTrigger />
+            <SidebarTrigger className="md:hidden" />
             <span className="text-sm font-medium">Chat</span>
             {isAdmin && liveConversationId && (
               <span className="text-muted-foreground font-mono text-xs">

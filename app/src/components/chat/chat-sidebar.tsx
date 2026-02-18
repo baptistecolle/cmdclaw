@@ -25,6 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useConversationList, useDeleteConversation } from "@/orpc/hooks";
 
 type ConversationListData = {
@@ -38,6 +39,7 @@ type ConversationListData = {
 };
 
 export function ChatSidebar() {
+  const isMobile = useIsMobile();
   const pathname = usePathname();
   const router = useRouter();
   const { data: rawData, isLoading } = useConversationList();
@@ -73,7 +75,7 @@ export function ChatSidebar() {
   );
 
   return (
-    <Sidebar collapsible="icon" className="border-r">
+    <Sidebar collapsible={isMobile ? "offcanvas" : "none"} className="border-r">
       <SidebarHeader>
         <Button
           variant="outline"
@@ -144,7 +146,7 @@ export function ChatSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarRail />
+      {isMobile ? <SidebarRail /> : null}
     </Sidebar>
   );
 }
