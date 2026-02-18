@@ -757,6 +757,7 @@ export function useGeneration() {
       },
       callbacks: GenerationCallbacks,
     ): Promise<{ generationId: string; conversationId: string } | null> => {
+      abortControllerRef.current?.abort();
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
       let currentGenerationId: string | undefined;
@@ -863,6 +864,7 @@ export function useGeneration() {
 
   const subscribeToGeneration = useCallback(
     async (generationId: string, callbacks: GenerationCallbacks) => {
+      abortControllerRef.current?.abort();
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
       const currentGenerationId: string | undefined = generationId;
