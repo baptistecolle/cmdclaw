@@ -50,10 +50,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  buildWorkflowForwardingAddress,
-  EMAIL_FORWARDED_TRIGGER_TYPE,
-} from "@/lib/email-forwarding";
+import { EMAIL_FORWARDED_TRIGGER_TYPE } from "@/lib/email-forwarding";
 import {
   INTEGRATION_DISPLAY_NAMES,
   INTEGRATION_LOGOS,
@@ -64,8 +61,11 @@ import {
 import { cn } from "@/lib/utils";
 import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
 import {
-  useUserForwardingSettings,
+  useCreateWorkflowForwardingAlias,
+  useDisableWorkflowForwardingAlias,
+  useRotateWorkflowForwardingAlias,
   useWorkflow,
+  useWorkflowForwardingAlias,
   useUpdateWorkflow,
   useWorkflowRuns,
   useWorkflowRun,
@@ -198,10 +198,13 @@ function IntegrationToggleSwitch({
 export default function WorkflowEditorPage() {
   const params = useParams<{ id: string }>();
   const workflowId = params?.id;
-  const { data: forwardingSettings } = useUserForwardingSettings();
   const { data: workflow, isLoading } = useWorkflow(workflowId);
+  const { data: workflowForwardingAlias } = useWorkflowForwardingAlias(workflowId);
   const { data: runs, refetch: refetchRuns } = useWorkflowRuns(workflowId);
   const updateWorkflow = useUpdateWorkflow();
+  const createForwardingAlias = useCreateWorkflowForwardingAlias();
+  const disableForwardingAlias = useDisableWorkflowForwardingAlias();
+  const rotateForwardingAlias = useRotateWorkflowForwardingAlias();
   const triggerWorkflow = useTriggerWorkflow();
   const cancelGeneration = useCancelGeneration();
   const submitApproval = useSubmitApproval();
@@ -247,13 +250,9 @@ export default function WorkflowEditorPage() {
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     [],
   );
-  const workflowForwardingAddress = useMemo(() => {
-    if (!workflowId || !forwardingSettings?.receivingDomain) {
-      return null;
-    }
-
-    return buildWorkflowForwardingAddress(workflowId, forwardingSettings.receivingDomain);
-  }, [forwardingSettings?.receivingDomain, workflowId]);
+  const workflowForwardingAddress = workflowForwardingAlias?.forwardingAddress ?? null;
+  const hasActiveForwardingAlias = Boolean(workflowForwardingAlias?.activeAlias);
+  const isEmailTriggerPersisted = workflow?.triggerType === EMAIL_FORWARDED_TRIGGER_TYPE;
   const integrationEntries = useMemo(
     () =>
       WORKFLOW_AVAILABLE_INTEGRATION_TYPES.map((key) => ({
@@ -569,6 +568,48 @@ export default function WorkflowEditorPage() {
     }
     void handleCopyForwardingAddress(workflowForwardingAddress, "workflowAlias");
   }, [handleCopyForwardingAddress, workflowForwardingAddress]);
+
+  const handleCreateWorkflowAlias = useCallback(async () => {
+    if (!workflowId) {
+      return;
+    }
+
+    try {
+      await createForwardingAlias.mutateAsync(workflowId);
+      setNotification({ type: "success", message: "Forwarding address created." });
+    } catch (error) {
+      console.error("Failed to create forwarding alias:", error);
+      setNotification({ type: "error", message: "Failed to create forwarding address." });
+    }
+  }, [createForwardingAlias, workflowId]);
+
+  const handleRotateWorkflowAlias = useCallback(async () => {
+    if (!workflowId) {
+      return;
+    }
+
+    try {
+      await rotateForwardingAlias.mutateAsync(workflowId);
+      setNotification({ type: "success", message: "Forwarding address rotated." });
+    } catch (error) {
+      console.error("Failed to rotate forwarding alias:", error);
+      setNotification({ type: "error", message: "Failed to rotate forwarding address." });
+    }
+  }, [rotateForwardingAlias, workflowId]);
+
+  const handleDisableWorkflowAlias = useCallback(async () => {
+    if (!workflowId) {
+      return;
+    }
+
+    try {
+      await disableForwardingAlias.mutateAsync(workflowId);
+      setNotification({ type: "success", message: "Forwarding address disabled." });
+    } catch (error) {
+      console.error("Failed to disable forwarding alias:", error);
+      setNotification({ type: "error", message: "Failed to disable forwarding address." });
+    }
+  }, [disableForwardingAlias, workflowId]);
 
   const cancelTargetRunId = activeRun?.id ?? testRunId ?? null;
   const { data: cancelTargetRun } = useWorkflowRun(cancelTargetRunId ?? undefined);
@@ -1202,23 +1243,65 @@ export default function WorkflowEditorPage() {
                     <div className="bg-muted/20 mt-4 space-y-4 rounded-lg border p-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Workflow forwarding address</label>
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <Input
-                            type="text"
-                            value={workflowForwardingAddress ?? ""}
-                            disabled
-                            className="bg-background/60 font-mono text-xs"
-                            placeholder="Set RESEND_RECEIVING_DOMAIN to enable forwarding aliases"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleCopyWorkflowAlias}
-                            disabled={!workflowForwardingAddress}
-                          >
-                            {copiedForwardingField === "workflowAlias" ? "Copied" : "Copy"}
-                          </Button>
-                        </div>
+                        {hasActiveForwardingAlias ? (
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Input
+                              type="text"
+                              value={workflowForwardingAddress ?? ""}
+                              disabled
+                              className="bg-background/60 font-mono text-xs"
+                              placeholder="Set RESEND_RECEIVING_DOMAIN to enable forwarding aliases"
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleCopyWorkflowAlias}
+                                disabled={!workflowForwardingAddress}
+                              >
+                                {copiedForwardingField === "workflowAlias" ? "Copied" : "Copy"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleRotateWorkflowAlias}
+                                disabled={rotateForwardingAlias.isPending}
+                              >
+                                Rotate
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleDisableWorkflowAlias}
+                                disabled={disableForwardingAlias.isPending}
+                              >
+                                Disable
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Input
+                              type="text"
+                              value=""
+                              disabled
+                              className="bg-background/60 font-mono text-xs"
+                              placeholder="No forwarding address yet"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleCreateWorkflowAlias}
+                              disabled={
+                                createForwardingAlias.isPending ||
+                                !workflowForwardingAlias?.receivingDomain ||
+                                !isEmailTriggerPersisted
+                              }
+                            >
+                              Create email
+                            </Button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Personal forwarding alias intentionally hidden for now. */}

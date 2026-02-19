@@ -1,7 +1,19 @@
 import { ORPCError } from "@orpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { generation, user, workflow, workflowRun, workflowRunEvent } from "@/server/db/schema";
+import {
+  buildWorkflowForwardingAddress,
+  EMAIL_FORWARDED_TRIGGER_TYPE,
+  generateWorkflowAliasLocalPart,
+} from "@/lib/email-forwarding";
+import {
+  generation,
+  user,
+  workflow,
+  workflowEmailAlias,
+  workflowRun,
+  workflowRunEvent,
+} from "@/server/db/schema";
 import {
   removeWorkflowScheduleJob,
   syncWorkflowScheduleJob,
@@ -30,6 +42,12 @@ const integrationTypeSchema = z.enum([
 const ALL_INTEGRATION_TYPES = [...integrationTypeSchema.options];
 
 const triggerTypeSchema = z.string().min(1).max(128);
+const WORKFLOW_ALIAS_GENERATION_MAX_ATTEMPTS = 32;
+
+function getReceivingDomain(): string | null {
+  const value = process.env.RESEND_RECEIVING_DOMAIN?.trim().toLowerCase();
+  return value && value.length > 0 ? value : null;
+}
 
 function buildFallbackWorkflowName(agentDescription: string): string {
   const firstSentence = agentDescription
@@ -469,6 +487,303 @@ const listRuns = protectedProcedure
     }));
   });
 
+const getForwardingAlias = protectedProcedure
+  .input(z.object({ id: z.string() }))
+  .handler(async ({ input, context }) => {
+    const wf = await context.db.query.workflow.findFirst({
+      where: and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)),
+      columns: { id: true, triggerType: true },
+    });
+
+    if (!wf) {
+      throw new ORPCError("NOT_FOUND", { message: "Workflow not found" });
+    }
+
+    const receivingDomain = getReceivingDomain();
+    if (!receivingDomain || wf.triggerType !== EMAIL_FORWARDED_TRIGGER_TYPE) {
+      return {
+        receivingDomain,
+        activeAlias: null,
+        forwardingAddress: null,
+      };
+    }
+
+    const activeAlias = await context.db.query.workflowEmailAlias.findFirst({
+      where: and(
+        eq(workflowEmailAlias.workflowId, wf.id),
+        eq(workflowEmailAlias.domain, receivingDomain),
+        eq(workflowEmailAlias.status, "active"),
+      ),
+      columns: {
+        id: true,
+        localPart: true,
+        domain: true,
+        status: true,
+        createdAt: true,
+      },
+      orderBy: (row, { desc }) => [desc(row.createdAt)],
+    });
+
+    return {
+      receivingDomain,
+      activeAlias,
+      forwardingAddress: activeAlias
+        ? buildWorkflowForwardingAddress(activeAlias.localPart, receivingDomain)
+        : null,
+    };
+  });
+
+const createForwardingAlias = protectedProcedure
+  .input(z.object({ id: z.string() }))
+  .handler(async ({ input, context }) => {
+    const receivingDomain = getReceivingDomain();
+    if (!receivingDomain) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "RESEND_RECEIVING_DOMAIN is not configured",
+      });
+    }
+
+    const wf = await context.db.query.workflow.findFirst({
+      where: and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)),
+      columns: { id: true, triggerType: true },
+    });
+
+    if (!wf) {
+      throw new ORPCError("NOT_FOUND", { message: "Workflow not found" });
+    }
+
+    if (wf.triggerType !== EMAIL_FORWARDED_TRIGGER_TYPE) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Workflow trigger must be email.forwarded to create an email alias",
+      });
+    }
+
+    const existing = await context.db.query.workflowEmailAlias.findFirst({
+      where: and(
+        eq(workflowEmailAlias.workflowId, wf.id),
+        eq(workflowEmailAlias.domain, receivingDomain),
+        eq(workflowEmailAlias.status, "active"),
+      ),
+      columns: {
+        id: true,
+        localPart: true,
+        domain: true,
+        status: true,
+        createdAt: true,
+      },
+      orderBy: (row, { desc }) => [desc(row.createdAt)],
+    });
+
+    if (existing) {
+      return {
+        alias: existing,
+        forwardingAddress: buildWorkflowForwardingAddress(existing.localPart, receivingDomain),
+      };
+    }
+
+    const insertAlias = async (
+      attempt = 0,
+    ): Promise<{
+      id: string;
+      localPart: string;
+      domain: string;
+      status: "active" | "disabled" | "rotated" | "deleted";
+      createdAt: Date;
+    } | null> => {
+      if (attempt >= WORKFLOW_ALIAS_GENERATION_MAX_ATTEMPTS) {
+        return null;
+      }
+
+      const localPart =
+        attempt < WORKFLOW_ALIAS_GENERATION_MAX_ATTEMPTS / 2
+          ? generateWorkflowAliasLocalPart()
+          : `${generateWorkflowAliasLocalPart()}-${crypto.randomUUID().slice(0, 6)}`;
+      const created = await context.db
+        .insert(workflowEmailAlias)
+        .values({
+          workflowId: wf.id,
+          localPart,
+          domain: receivingDomain,
+          status: "active" as const,
+        })
+        .onConflictDoNothing({
+          target: [workflowEmailAlias.localPart, workflowEmailAlias.domain],
+        })
+        .returning({
+          id: workflowEmailAlias.id,
+          localPart: workflowEmailAlias.localPart,
+          domain: workflowEmailAlias.domain,
+          status: workflowEmailAlias.status,
+          createdAt: workflowEmailAlias.createdAt,
+        });
+
+      if (created[0]) {
+        return created[0];
+      }
+
+      return insertAlias(attempt + 1);
+    };
+
+    const created = await insertAlias();
+
+    if (created) {
+      return {
+        alias: created,
+        forwardingAddress: buildWorkflowForwardingAddress(created.localPart, receivingDomain),
+      };
+    }
+
+    throw new ORPCError("INTERNAL_SERVER_ERROR", {
+      message: "Failed to create unique forwarding alias",
+    });
+  });
+
+const disableForwardingAlias = protectedProcedure
+  .input(z.object({ id: z.string() }))
+  .handler(async ({ input, context }) => {
+    const wf = await context.db.query.workflow.findFirst({
+      where: and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)),
+      columns: { id: true },
+    });
+
+    if (!wf) {
+      throw new ORPCError("NOT_FOUND", { message: "Workflow not found" });
+    }
+
+    const activeAlias = await context.db.query.workflowEmailAlias.findFirst({
+      where: and(eq(workflowEmailAlias.workflowId, wf.id), eq(workflowEmailAlias.status, "active")),
+      columns: { id: true },
+      orderBy: (row, { desc }) => [desc(row.createdAt)],
+    });
+
+    if (!activeAlias) {
+      return { success: true, disabled: false };
+    }
+
+    await context.db
+      .update(workflowEmailAlias)
+      .set({
+        status: "disabled",
+        disabledAt: new Date(),
+        disabledReason: "manual_disable",
+      })
+      .where(eq(workflowEmailAlias.id, activeAlias.id));
+
+    return { success: true, disabled: true };
+  });
+
+const rotateForwardingAlias = protectedProcedure
+  .input(z.object({ id: z.string() }))
+  .handler(async ({ input, context }) => {
+    const receivingDomain = getReceivingDomain();
+    if (!receivingDomain) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "RESEND_RECEIVING_DOMAIN is not configured",
+      });
+    }
+
+    const wf = await context.db.query.workflow.findFirst({
+      where: and(eq(workflow.id, input.id), eq(workflow.ownerId, context.user.id)),
+      columns: { id: true, triggerType: true },
+    });
+
+    if (!wf) {
+      throw new ORPCError("NOT_FOUND", { message: "Workflow not found" });
+    }
+
+    if (wf.triggerType !== EMAIL_FORWARDED_TRIGGER_TYPE) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Workflow trigger must be email.forwarded to rotate an email alias",
+      });
+    }
+
+    const result = await context.db.transaction(async (tx) => {
+      const currentActive = await tx.query.workflowEmailAlias.findFirst({
+        where: and(
+          eq(workflowEmailAlias.workflowId, wf.id),
+          eq(workflowEmailAlias.domain, receivingDomain),
+          eq(workflowEmailAlias.status, "active"),
+        ),
+        columns: { id: true, localPart: true },
+        orderBy: (row, { desc }) => [desc(row.createdAt)],
+      });
+
+      const insertAlias = async (
+        attempt = 0,
+      ): Promise<{
+        id: string;
+        localPart: string;
+        domain: string;
+        status: "active" | "disabled" | "rotated" | "deleted";
+        createdAt: Date;
+      } | null> => {
+        if (attempt >= WORKFLOW_ALIAS_GENERATION_MAX_ATTEMPTS) {
+          return null;
+        }
+
+        const localPart =
+          attempt < WORKFLOW_ALIAS_GENERATION_MAX_ATTEMPTS / 2
+            ? generateWorkflowAliasLocalPart()
+            : `${generateWorkflowAliasLocalPart()}-${crypto.randomUUID().slice(0, 6)}`;
+        const created = await tx
+          .insert(workflowEmailAlias)
+          .values({
+            workflowId: wf.id,
+            localPart,
+            domain: receivingDomain,
+            status: "active" as const,
+          })
+          .onConflictDoNothing({
+            target: [workflowEmailAlias.localPart, workflowEmailAlias.domain],
+          })
+          .returning({
+            id: workflowEmailAlias.id,
+            localPart: workflowEmailAlias.localPart,
+            domain: workflowEmailAlias.domain,
+            status: workflowEmailAlias.status,
+            createdAt: workflowEmailAlias.createdAt,
+          });
+
+        if (created[0]) {
+          return created[0];
+        }
+
+        return insertAlias(attempt + 1);
+      };
+
+      const created = await insertAlias();
+
+      if (!created) {
+        return null;
+      }
+
+      if (currentActive) {
+        await tx
+          .update(workflowEmailAlias)
+          .set({
+            status: "rotated",
+            disabledAt: new Date(),
+            disabledReason: "rotated",
+            replacedByAliasId: created.id,
+          })
+          .where(eq(workflowEmailAlias.id, currentActive.id));
+      }
+
+      return created;
+    });
+
+    if (!result) {
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Failed to rotate forwarding alias",
+      });
+    }
+
+    return {
+      alias: result,
+      forwardingAddress: buildWorkflowForwardingAddress(result.localPart, receivingDomain),
+    };
+  });
+
 export const workflowRouter = {
   list,
   get,
@@ -478,4 +793,8 @@ export const workflowRouter = {
   trigger,
   getRun,
   listRuns,
+  getForwardingAlias,
+  createForwardingAlias,
+  disableForwardingAlias,
+  rotateForwardingAlias,
 };

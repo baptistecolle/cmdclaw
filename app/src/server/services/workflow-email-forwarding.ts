@@ -7,7 +7,7 @@ import {
   parseForwardingTargetFromEmail,
 } from "@/lib/email-forwarding";
 import { db } from "@/server/db/client";
-import { user, workflow, workflowRun } from "@/server/db/schema";
+import { user, workflow, workflowEmailAlias, workflowRun } from "@/server/db/schema";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
 const RESEND_EMAIL_RECEIVED_EVENT = "email.received";
@@ -112,7 +112,7 @@ async function resolveTargetWorkflow(params: {
   recipients: string[];
   receivingDomain: string;
 }): Promise<{ workflowId: string; routingMode: "workflow_alias" | "user_alias" } | null> {
-  const workflowTargets = new Set<string>();
+  const aliasTargets = new Set<string>();
   const userTargets = new Set<string>();
 
   for (const recipient of params.recipients) {
@@ -121,30 +121,36 @@ async function resolveTargetWorkflow(params: {
       continue;
     }
 
-    if (target.kind === "workflow") {
-      workflowTargets.add(target.id);
+    if (target.kind === "workflow_alias") {
+      aliasTargets.add(target.localPart);
       continue;
     }
 
     userTargets.add(target.id);
   }
 
-  const workflowMatches = await Promise.all(
-    [...workflowTargets].map(async (workflowId) => {
-      const row = await db.query.workflow.findFirst({
-        where: and(
-          eq(workflow.id, workflowId),
-          eq(workflow.status, "on"),
-          eq(workflow.triggerType, EMAIL_FORWARDED_TRIGGER_TYPE),
-        ),
-        columns: { id: true },
-      });
+  const aliasMatches = await Promise.all(
+    [...aliasTargets].map(async (localPart) => {
+      const row = await db
+        .select({ workflowId: workflowEmailAlias.workflowId })
+        .from(workflowEmailAlias)
+        .innerJoin(workflow, eq(workflow.id, workflowEmailAlias.workflowId))
+        .where(
+          and(
+            eq(workflowEmailAlias.localPart, localPart),
+            eq(workflowEmailAlias.domain, params.receivingDomain),
+            eq(workflowEmailAlias.status, "active"),
+            eq(workflow.status, "on"),
+            eq(workflow.triggerType, EMAIL_FORWARDED_TRIGGER_TYPE),
+          ),
+        )
+        .limit(1);
 
-      return row?.id ?? null;
+      return row[0]?.workflowId ?? null;
     }),
   );
 
-  const resolvedWorkflow = workflowMatches.find((id): id is string => typeof id === "string");
+  const resolvedWorkflow = aliasMatches.find((id): id is string => typeof id === "string");
   if (resolvedWorkflow) {
     return { workflowId: resolvedWorkflow, routingMode: "workflow_alias" };
   }

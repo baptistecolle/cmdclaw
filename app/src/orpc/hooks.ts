@@ -611,6 +611,47 @@ export function useWorkflowRuns(workflowId: string | undefined, limit = 20) {
   });
 }
 
+export function useWorkflowForwardingAlias(workflowId: string | undefined) {
+  return useQuery({
+    queryKey: ["workflow", "forwarding-alias", workflowId],
+    queryFn: () => client.workflow.getForwardingAlias({ id: workflowId! }),
+    enabled: !!workflowId,
+  });
+}
+
+export function useCreateWorkflowForwardingAlias() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (workflowId: string) => client.workflow.createForwardingAlias({ id: workflowId }),
+    onSuccess: (_, workflowId) => {
+      queryClient.invalidateQueries({ queryKey: ["workflow", "forwarding-alias", workflowId] });
+    },
+  });
+}
+
+export function useDisableWorkflowForwardingAlias() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (workflowId: string) => client.workflow.disableForwardingAlias({ id: workflowId }),
+    onSuccess: (_, workflowId) => {
+      queryClient.invalidateQueries({ queryKey: ["workflow", "forwarding-alias", workflowId] });
+    },
+  });
+}
+
+export function useRotateWorkflowForwardingAlias() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (workflowId: string) => client.workflow.rotateForwardingAlias({ id: workflowId }),
+    onSuccess: (_, workflowId) => {
+      queryClient.invalidateQueries({ queryKey: ["workflow", "forwarding-alias", workflowId] });
+    },
+  });
+}
+
 // Hook for deleting a file
 export function useDeleteSkillFile() {
   const queryClient = useQueryClient();

@@ -1,10 +1,68 @@
 export const EMAIL_FORWARDED_TRIGGER_TYPE = "email.forwarded";
 
-const WORKFLOW_ALIAS_PREFIX = "wf_";
 const USER_ALIAS_PREFIX = "u_";
 const DEFAULT_LOCAL_PART = "bot";
 
-export type ForwardingTarget = { kind: "workflow"; id: string } | { kind: "user"; id: string };
+const ANIMALS = [
+  "beaver",
+  "falcon",
+  "otter",
+  "lynx",
+  "panda",
+  "badger",
+  "heron",
+  "fox",
+  "wolf",
+  "tiger",
+  "koala",
+  "raven",
+  "walrus",
+  "bison",
+  "yak",
+  "zebra",
+] as const;
+
+const ADJECTIVES = [
+  "brisk",
+  "bold",
+  "bright",
+  "clever",
+  "steady",
+  "swift",
+  "calm",
+  "strong",
+  "sturdy",
+  "quiet",
+  "sharp",
+  "solar",
+  "lunar",
+  "crisp",
+  "noble",
+  "eager",
+] as const;
+
+const COLORS = [
+  "orange",
+  "blue",
+  "green",
+  "red",
+  "gold",
+  "teal",
+  "amber",
+  "gray",
+  "black",
+  "white",
+  "silver",
+  "navy",
+  "coral",
+  "indigo",
+  "olive",
+  "scarlet",
+] as const;
+
+export type ForwardingTarget =
+  | { kind: "workflow_alias"; localPart: string }
+  | { kind: "user"; id: string };
 
 function normalizeDomain(domain: string): string {
   return domain.trim().toLowerCase();
@@ -34,12 +92,12 @@ export function extractEmailAddress(value: string | null | undefined): string | 
 }
 
 export function buildWorkflowForwardingAddress(
-  workflowId: string,
+  aliasLocalPart: string,
   domain: string,
   localPart = DEFAULT_LOCAL_PART,
 ): string {
   const normalizedDomain = normalizeDomain(domain);
-  return `${localPart}+${WORKFLOW_ALIAS_PREFIX}${workflowId}@${normalizedDomain}`;
+  return `${localPart}+${aliasLocalPart}@${normalizedDomain}`;
 }
 
 export function buildUserForwardingAddress(
@@ -67,22 +125,33 @@ export function parseForwardingTargetFromEmail(
   }
 
   const localPart = email.slice(0, atIndex);
-  const token = localPart.includes("+") ? (localPart.split("+").pop() ?? "") : localPart;
+  const hasPlus = localPart.includes("+");
+  const token = hasPlus ? (localPart.split("+").pop() ?? "") : localPart;
+  const normalizedToken = token.trim().toLowerCase();
 
-  if (token.startsWith(WORKFLOW_ALIAS_PREFIX)) {
-    const id = token.slice(WORKFLOW_ALIAS_PREFIX.length).trim();
+  if (!hasPlus && normalizedToken === DEFAULT_LOCAL_PART) {
+    return null;
+  }
+
+  if (normalizedToken.startsWith(USER_ALIAS_PREFIX)) {
+    const id = normalizedToken.slice(USER_ALIAS_PREFIX.length).trim();
     if (id.length > 0) {
-      return { kind: "workflow", id };
+      return { kind: "user", id };
     }
     return null;
   }
 
-  if (token.startsWith(USER_ALIAS_PREFIX)) {
-    const id = token.slice(USER_ALIAS_PREFIX.length).trim();
-    if (id.length > 0) {
-      return { kind: "user", id };
-    }
+  if (normalizedToken.length > 0) {
+    return { kind: "workflow_alias", localPart: normalizedToken };
   }
 
   return null;
+}
+
+function pickWord<T extends readonly string[]>(list: T): string {
+  return list[Math.floor(Math.random() * list.length)] ?? "token";
+}
+
+export function generateWorkflowAliasLocalPart(): string {
+  return `${pickWord(ANIMALS)}-${pickWord(ADJECTIVES)}-${pickWord(COLORS)}`;
 }
