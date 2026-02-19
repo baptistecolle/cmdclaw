@@ -16,6 +16,7 @@ export const slackPollIntervalMs = Number(process.env.E2E_SLACK_POLL_INTERVAL_MS
 export const slackPostVerifyTimeoutMs = Number(
   process.env.E2E_SLACK_POST_VERIFY_TIMEOUT_MS ?? "30000",
 );
+export const gmailPollIntervalMs = Number(process.env.E2E_GMAIL_POLL_INTERVAL_MS ?? "2500");
 
 export const expectedUserEmail = "baptiste@heybap.com";
 export const sourceChannelName = "bap-experiments";
@@ -48,6 +49,27 @@ type SlackApiResponse = {
   channels?: Array<{ id?: string; name?: string }>;
   messages?: SlackMessage[];
   response_metadata?: { next_cursor?: string };
+};
+
+type GmailMessageRef = {
+  id?: string;
+};
+
+type GmailHeader = {
+  name?: string;
+  value?: string;
+};
+
+type GmailListResponse = {
+  messages?: GmailMessageRef[];
+};
+
+type GmailMessageResponse = {
+  id?: string;
+  internalDate?: string;
+  payload?: {
+    headers?: GmailHeader[];
+  };
 };
 
 export function runBunCommand(
@@ -455,6 +477,106 @@ export async function getSlackAccessTokenForExpectedUser(): Promise<string> {
   }
 
   return slackToken;
+}
+
+async function gmailApi<T>(
+  token: string,
+  path: string,
+  params: Record<string, string | number | boolean> = {},
+): Promise<T> {
+  const query = new URLSearchParams(
+    Object.entries(params).map(([key, value]) => [key, String(value)]),
+  ).toString();
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/${path}${query ? `?${query}` : ""}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gmail API ${path} failed with HTTP ${response.status}`);
+  }
+
+  return (await response.json()) as T;
+}
+
+function parseGmailInternalDate(value: string | undefined): number {
+  if (!value) {
+    return 0;
+  }
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return 0;
+  }
+  return numeric;
+}
+
+function readHeader(headers: GmailHeader[] | undefined, name: string): string {
+  if (!headers) {
+    return "";
+  }
+  const match = headers.find((header) => header.name?.toLowerCase() === name.toLowerCase());
+  return match?.value?.trim() ?? "";
+}
+
+export async function getGmailAccessTokenForExpectedUser(): Promise<string> {
+  const dbUser = await db.query.user.findFirst({
+    where: eq(user.email, expectedUserEmail),
+  });
+
+  if (!dbUser) {
+    throw new Error(`Live e2e user not found: ${expectedUserEmail}`);
+  }
+
+  const tokens = await getValidTokensForUser(dbUser.id);
+  const gmailToken = tokens.get("gmail");
+
+  if (!gmailToken) {
+    throw new Error(
+      `Gmail is not connected for ${expectedUserEmail}. Connect Gmail in app integrations before running this test.`,
+    );
+  }
+
+  return gmailToken;
+}
+
+export async function readLatestInboxMessage(args: {
+  token: string;
+}): Promise<{ id: string; subject: string; internalDateMs: number }> {
+  const list = await gmailApi<GmailListResponse>(args.token, "messages", {
+    maxResults: 10,
+    labelIds: "INBOX",
+    q: "in:inbox",
+  });
+
+  const messages = (list.messages ?? []).filter((message): message is { id: string } =>
+    Boolean(message.id),
+  );
+  const detailsList = await Promise.all(
+    messages.map(async (message) => ({
+      id: message.id,
+      details: await gmailApi<GmailMessageResponse>(args.token, `messages/${message.id}`, {
+        format: "metadata",
+        metadataHeaders: "Subject",
+      }),
+    })),
+  );
+
+  for (const entry of detailsList) {
+    const subject = readHeader(entry.details.payload?.headers, "Subject");
+    if (!subject) {
+      continue;
+    }
+    return {
+      id: entry.id,
+      subject: subject.replace(/\s+/g, " ").trim(),
+      internalDateMs: parseGmailInternalDate(entry.details.internalDate),
+    };
+  }
+
+  throw new Error("Could not find a readable latest message in Gmail inbox.");
 }
 
 export function parseSlackTimestamp(value: string): number {
