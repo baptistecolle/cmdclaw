@@ -19,6 +19,7 @@ import {
   whatsappUserLink,
   user,
 } from "@/server/db/schema";
+import { buildRedisOptions } from "@/server/redis/connection-options";
 import { generationManager } from "@/server/services/generation-manager";
 
 type WhatsAppStatus = "disconnected" | "connecting" | "connected";
@@ -48,10 +49,12 @@ let redisClient: IORedis | null = null;
 
 function getRedisClient(): IORedis {
   if (!redisClient) {
-    redisClient = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-    });
+    redisClient = new IORedis(
+      buildRedisOptions(process.env.REDIS_URL ?? "redis://localhost:6379", {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      }),
+    );
   }
   return redisClient;
 }

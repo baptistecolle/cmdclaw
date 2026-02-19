@@ -1,6 +1,7 @@
 import { Queue, QueueEvents, Worker, type ConnectionOptions, type Processor } from "bullmq";
 import IORedis from "ioredis";
 import { EMAIL_FORWARDED_TRIGGER_TYPE } from "@/lib/email-forwarding";
+import { buildRedisOptions } from "@/server/redis/connection-options";
 import { processForwardedEmailEvent } from "@/server/services/workflow-email-forwarding";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
@@ -200,7 +201,7 @@ let queue: Queue<JobPayload, unknown, string> | null = null;
 let queueConnection: IORedis | null = null;
 
 function createRedisConnection(): IORedis {
-  return new IORedis(redisUrl, redisOptions);
+  return new IORedis(buildRedisOptions(redisUrl, redisOptions));
 }
 
 export const getQueue = (): Queue<JobPayload, unknown, string> => {

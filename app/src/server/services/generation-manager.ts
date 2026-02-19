@@ -54,6 +54,7 @@ import {
   WORKFLOW_GENERATION_JOB_NAME,
   getQueue,
 } from "@/server/queues";
+import { buildRedisOptions } from "@/server/redis/connection-options";
 import {
   getOrCreateSession,
   writeSkillsToSandbox,
@@ -595,11 +596,10 @@ class GenerationManager {
     const globalForLocks = globalThis as typeof globalThis & { __bapGenerationLockRedis?: IORedis };
     if (!globalForLocks.__bapGenerationLockRedis) {
       globalForLocks.__bapGenerationLockRedis = new IORedis(
-        process.env.REDIS_URL ?? "redis://localhost:6379",
-        {
+        buildRedisOptions(process.env.REDIS_URL ?? "redis://localhost:6379", {
           maxRetriesPerRequest: null,
           enableReadyCheck: false,
-        },
+        }),
       );
     }
     return globalForLocks.__bapGenerationLockRedis;
