@@ -1,6 +1,5 @@
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { ensureOAuthCallbackServer } from "@/server/ai/oauth-callback-server";
 import { listOpencodeFreeModels } from "@/server/ai/opencode-models";
 import { storePending } from "@/server/ai/pending-oauth";
 import {
@@ -54,11 +53,6 @@ const connect = protectedProcedure
     const config = SUBSCRIPTION_PROVIDERS[input.provider];
     if (!isOAuthProviderConfig(config)) {
       throw new Error(`Provider "${input.provider}" does not support OAuth`);
-    }
-
-    // Start the OAuth callback server for providers that use localhost:1455
-    if (input.provider === "openai") {
-      ensureOAuthCallbackServer();
     }
 
     // Generate random state for CSRF protection

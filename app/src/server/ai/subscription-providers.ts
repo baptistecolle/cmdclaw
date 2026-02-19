@@ -42,12 +42,11 @@ export const SUBSCRIPTION_PROVIDERS: Record<SubscriptionProviderID, Subscription
     authType: "oauth",
     name: "ChatGPT",
     description: "Use your ChatGPT Plus/Pro/Max subscription",
-    // OpenAI Codex public PKCE client — no secret needed
+    // OpenAI PKCE client — no secret needed
     clientId: "app_EMoamEEZ73f0CkXaXp7hrann",
     authUrl: "https://auth.openai.com/oauth/authorize",
     tokenUrl: "https://auth.openai.com/oauth/token",
-    // Must match OpenCode's registered redirect URI for this client
-    redirectUri: "http://localhost:1455/auth/callback",
+    redirectUri: `${getAppUrl()}/api/auth/provider/openai/callback`,
     scopes: ["openid", "profile", "email", "offline_access"],
     usePKCE: true,
     models: [
