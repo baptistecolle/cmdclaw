@@ -606,6 +606,17 @@ function SkillEditorPageContent() {
     }
   }, []);
 
+  const handlePromptDownloadDocument = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      const docId = event.currentTarget.dataset.docId;
+      if (docId) {
+        void handleDownloadDocument(docId);
+      }
+    },
+    [handleDownloadDocument],
+  );
+
   const handleShowAddFile = useCallback(() => {
     setShowAddFile(true);
   }, []);
@@ -877,6 +888,14 @@ function SkillEditorPageContent() {
                 {doc.filename}
                 <button
                   data-doc-id={doc.id}
+                  onClick={handlePromptDownloadDocument}
+                  className="hover:bg-muted ml-0.5 rounded p-0.5 opacity-0 group-hover:opacity-100"
+                  title="Download document"
+                >
+                  <Download className="h-2.5 w-2.5" />
+                </button>
+                <button
+                  data-doc-id={doc.id}
                   data-doc-filename={doc.filename}
                   onClick={handlePromptDeleteDocument}
                   className="hover:bg-muted ml-0.5 rounded p-0.5 opacity-0 group-hover:opacity-100"
@@ -1021,12 +1040,23 @@ Add your skill instructions here..."
               if (isViewable && documentUrl) {
                 if (selectedDoc.mimeType === "application/pdf") {
                   return (
-                    <iframe
-                      src={documentUrl}
-                      sandbox="allow-same-origin allow-downloads"
+                    <object
+                      data={documentUrl}
+                      type="application/pdf"
                       className="h-full w-full rounded-lg border"
-                      title={selectedDoc.filename}
-                    />
+                      aria-label={selectedDoc.filename}
+                    >
+                      <div className="bg-muted/30 flex h-full flex-col items-center justify-center gap-4 rounded-lg border">
+                        <FileText className="text-muted-foreground h-16 w-16" />
+                        <p className="text-muted-foreground text-sm">
+                          Preview unavailable in this browser.
+                        </p>
+                        <Button onClick={handleDownloadSelectedDocument}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </Button>
+                      </div>
+                    </object>
                   );
                 }
                 if (selectedDoc.mimeType.startsWith("image/")) {
