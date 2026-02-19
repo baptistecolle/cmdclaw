@@ -40,6 +40,37 @@ export type IntegrationType =
   | "reddit"
   | "twitter";
 
+export const ALL_INTEGRATION_TYPES: IntegrationType[] = [
+  "gmail",
+  "google_calendar",
+  "google_docs",
+  "google_sheets",
+  "google_drive",
+  "notion",
+  "linear",
+  "github",
+  "airtable",
+  "slack",
+  "hubspot",
+  "linkedin",
+  "salesforce",
+  "reddit",
+  "twitter",
+];
+
+export const COMING_SOON_INTEGRATIONS: ReadonlySet<IntegrationType> = new Set([
+  "reddit",
+  "twitter",
+]);
+
+export function isComingSoonIntegration(integration: IntegrationType): boolean {
+  return COMING_SOON_INTEGRATIONS.has(integration);
+}
+
+export const WORKFLOW_AVAILABLE_INTEGRATION_TYPES: IntegrationType[] = ALL_INTEGRATION_TYPES.filter(
+  (integration) => !isComingSoonIntegration(integration),
+);
+
 export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   gmail: Mail,
   google_calendar: Calendar,

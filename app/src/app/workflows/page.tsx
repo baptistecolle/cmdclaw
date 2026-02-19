@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { INTEGRATION_DISPLAY_NAMES, type IntegrationType } from "@/lib/integration-icons";
+import { WORKFLOW_AVAILABLE_INTEGRATION_TYPES } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
 import {
@@ -162,7 +162,7 @@ export default function WorkflowsPage() {
         name: "",
         triggerType: "manual",
         prompt: "",
-        allowedIntegrations: Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[],
+        allowedIntegrations: WORKFLOW_AVAILABLE_INTEGRATION_TYPES,
       });
       window.location.href = `/workflows/${result.id}`;
     } catch (error) {

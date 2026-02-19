@@ -57,6 +57,8 @@ import {
 import {
   INTEGRATION_DISPLAY_NAMES,
   INTEGRATION_LOGOS,
+  WORKFLOW_AVAILABLE_INTEGRATION_TYPES,
+  isComingSoonIntegration,
   type IntegrationType,
 } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
@@ -78,7 +80,9 @@ const TRIGGERS = [
   { value: "schedule", label: "Run on a schedule" },
   { value: EMAIL_FORWARDED_TRIGGER_TYPE, label: "Email forwarded to Bap" },
   { value: "gmail.new_email", label: "New Gmail email" },
-  { value: "twitter.new_dm", label: "New X (Twitter) DM" },
+  ...(isComingSoonIntegration("twitter")
+    ? []
+    : ([{ value: "twitter.new_dm", label: "New X (Twitter) DM" }] as const)),
 ];
 
 const scheduleMotionInitial = { opacity: 0, y: -8, height: 0 } as const;
@@ -254,7 +258,7 @@ export default function WorkflowEditorPage() {
   }, [forwardingSettings?.receivingDomain, workflowId]);
   const integrationEntries = useMemo(
     () =>
-      (Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[]).map((key) => ({
+      WORKFLOW_AVAILABLE_INTEGRATION_TYPES.map((key) => ({
         key,
         name: INTEGRATION_DISPLAY_NAMES[key],
         logo: INTEGRATION_LOGOS[key],
@@ -398,8 +402,10 @@ export default function WorkflowEditorPage() {
       return;
     }
 
-    const availableIntegrationTypes = Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[];
-    const workflowAllowedIntegrations = (workflow.allowedIntegrations ?? []) as IntegrationType[];
+    const availableIntegrationTypes = WORKFLOW_AVAILABLE_INTEGRATION_TYPES;
+    const workflowAllowedIntegrations = (
+      (workflow.allowedIntegrations ?? []) as IntegrationType[]
+    ).filter((type): type is IntegrationType => availableIntegrationTypes.includes(type));
     const hasRestriction =
       workflowAllowedIntegrations.length > 0 &&
       workflowAllowedIntegrations.length < availableIntegrationTypes.length;

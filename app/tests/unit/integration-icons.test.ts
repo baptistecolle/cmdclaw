@@ -1,13 +1,16 @@
 import { describe, expect, test } from "vitest";
 import {
+  COMING_SOON_INTEGRATIONS,
   INTEGRATION_DISPLAY_NAMES,
   INTEGRATION_OPERATION_LABELS,
+  WORKFLOW_AVAILABLE_INTEGRATION_TYPES,
   getCustomIntegrationDisplayInfo,
   getIntegrationActions,
   getIntegrationColor,
   getIntegrationDisplayName,
   getIntegrationIcon,
   getIntegrationLogo,
+  isComingSoonIntegration,
   getOperationLabel,
 } from "@/lib/integration-icons";
 
@@ -75,5 +78,15 @@ describe("integration-icons", () => {
       color: "text-indigo-500",
       iconUrl: null,
     });
+  });
+
+  test("exposes workflow-safe integrations from coming-soon flags", () => {
+    for (const integration of WORKFLOW_AVAILABLE_INTEGRATION_TYPES) {
+      expect(isComingSoonIntegration(integration)).toBe(false);
+    }
+
+    for (const integration of COMING_SOON_INTEGRATIONS) {
+      expect(WORKFLOW_AVAILABLE_INTEGRATION_TYPES).not.toContain(integration);
+    }
   });
 });

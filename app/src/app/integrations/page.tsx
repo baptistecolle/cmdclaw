@@ -23,7 +23,7 @@ import {
   isUnipileMissingCredentialsError,
   UNIPILE_MISSING_CREDENTIALS_MESSAGE,
 } from "@/lib/integration-errors";
-import { getIntegrationActions } from "@/lib/integration-icons";
+import { getIntegrationActions, isComingSoonIntegration } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import {
   useIntegrationList,
@@ -156,7 +156,11 @@ const defaultCustomForm: CustomFormState = {
 
 type IntegrationType = keyof typeof integrationConfig;
 type OAuthIntegrationType = Exclude<IntegrationType, "whatsapp">;
-const adminPreviewOnlyIntegrations = new Set<IntegrationType>(["reddit", "twitter", "whatsapp"]);
+const adminPreviewOnlyIntegrations = new Set<IntegrationType>(
+  (Object.keys(integrationConfig) as IntegrationType[]).filter(
+    (type) => type === "whatsapp" || isComingSoonIntegration(type as OAuthIntegrationType),
+  ),
+);
 type CustomAuthType = "oauth2" | "api_key" | "bearer_token";
 type CustomFormState = {
   slug: string;
