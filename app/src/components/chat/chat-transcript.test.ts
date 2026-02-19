@@ -69,6 +69,30 @@ describe("formatChatTranscript", () => {
     expect(transcript).toContain("Working on it...");
   });
 
+  it("includes performance metrics only when enabled", () => {
+    const messages: Message[] = [
+      {
+        id: "m1",
+        role: "assistant",
+        content: "done",
+        timing: {
+          generationDurationMs: 1250,
+          phaseDurationsMs: {
+            waitForFirstEventMs: 320,
+          },
+        },
+      },
+    ];
+
+    const withoutMetrics = formatChatTranscript(messages);
+    expect(withoutMetrics).not.toContain("performance metrics:");
+
+    const withMetrics = formatChatTranscript(messages, [], { includeTimingMetrics: true });
+    expect(withMetrics).toContain("performance metrics:");
+    expect(withMetrics).toContain("- Generation: 1.3s");
+    expect(withMetrics).toContain("- First event wait: 320ms");
+  });
+
   it("formats persisted conversation messages", () => {
     const transcript = formatPersistedChatTranscript([
       {
@@ -98,5 +122,24 @@ describe("formatChatTranscript", () => {
     expect(transcript).toContain("Done.");
     expect(transcript).toContain("[tool_call] web.search");
     expect(transcript).toContain('result: {\n  "ok": true\n}');
+  });
+
+  it("includes persisted performance metrics when enabled", () => {
+    const transcript = formatPersistedChatTranscript(
+      [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "Ready",
+          timing: {
+            sandboxStartupDurationMs: 800,
+          },
+        },
+      ],
+      { includeTimingMetrics: true },
+    );
+
+    expect(transcript).toContain("performance metrics:");
+    expect(transcript).toContain("- Sandbox prep: 800ms");
   });
 });

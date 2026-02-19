@@ -1,4 +1,5 @@
 import type { Message, MessagePart } from "./message-list";
+import { getTimingMetrics, type MessageTiming } from "./chat-performance-metrics";
 
 function formatValue(value: unknown): string {
   if (value === undefined) {
@@ -68,8 +69,12 @@ function formatRole(role: Message["role"]): string {
 export function formatChatTranscript(
   messages: Message[],
   streamingParts: MessagePart[] = [],
+  options?: {
+    includeTimingMetrics?: boolean;
+  },
 ): string {
   const lines: string[] = [];
+  const includeTimingMetrics = options?.includeTimingMetrics ?? false;
 
   messages.forEach((message, index) => {
     lines.push(`## ${index + 1}. ${formatRole(message.role)}`);
@@ -90,6 +95,16 @@ export function formatChatTranscript(
       lines.push("sandbox files:");
       for (const file of message.sandboxFiles) {
         lines.push(`- ${file.path}`);
+      }
+    }
+
+    if (includeTimingMetrics && message.timing) {
+      const metrics = getTimingMetrics(message.timing);
+      if (metrics.length > 0) {
+        lines.push("performance metrics:");
+        for (const metric of metrics) {
+          lines.push(`- ${metric.label}: ${metric.value}`);
+        }
       }
     }
 
@@ -124,11 +139,17 @@ type PersistedMessage = {
   role: string;
   content: string;
   contentParts?: PersistedContentPart[];
+  timing?: MessageTiming;
   attachments?: Array<{ filename: string; mimeType: string }>;
   sandboxFiles?: Array<{ path: string; filename: string; mimeType: string; fileId: string }>;
 };
 
-export function formatPersistedChatTranscript(messages: PersistedMessage[]): string {
+export function formatPersistedChatTranscript(
+  messages: PersistedMessage[],
+  options?: {
+    includeTimingMetrics?: boolean;
+  },
+): string {
   const normalizedMessages: Message[] = messages.map((message) => {
     let parts: MessagePart[] | undefined;
     if (message.contentParts && message.contentParts.length > 0) {
@@ -169,6 +190,7 @@ export function formatPersistedChatTranscript(messages: PersistedMessage[]): str
       role: (message.role as Message["role"]) ?? "assistant",
       content: message.content,
       parts,
+      timing: message.timing,
       attachments: message.attachments?.map((attachment) => ({
         name: attachment.filename,
         mimeType: attachment.mimeType,
@@ -184,5 +206,5 @@ export function formatPersistedChatTranscript(messages: PersistedMessage[]): str
     };
   });
 
-  return formatChatTranscript(normalizedMessages);
+  return formatChatTranscript(normalizedMessages, [], options);
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import type { MessageTiming } from "./chat-performance-metrics";
 import { MessageItem } from "./message-item";
 
 export type MessagePart =
@@ -51,24 +52,7 @@ export type Message = {
   integrationsUsed?: string[];
   attachments?: AttachmentData[];
   sandboxFiles?: SandboxFileData[];
-  timing?: {
-    sandboxStartupDurationMs?: number;
-    sandboxStartupMode?: "created" | "reused" | "unknown";
-    generationDurationMs?: number;
-    phaseDurationsMs?: {
-      agentInitMs?: number;
-      prePromptSetupMs?: number;
-      agentReadyToPromptMs?: number;
-      waitForFirstEventMs?: number;
-      modelStreamMs?: number;
-      postProcessingMs?: number;
-    };
-    phaseTimestamps?: Array<{
-      phase: string;
-      at: string;
-      elapsedMs: number;
-    }>;
-  };
+  timing?: MessageTiming;
 };
 
 type Props = {

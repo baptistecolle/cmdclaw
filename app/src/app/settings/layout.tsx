@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 const settingsTabs = [
   { label: "General", href: "/settings" },
+  { label: "Advanced", href: "/settings/advanced" },
   { label: "Subscriptions", href: "/settings/subscriptions" },
   // { label: "Billing", href: "/settings/billing" },
   // { label: "Devices", href: "/settings/devices" },

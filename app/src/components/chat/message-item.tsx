@@ -7,6 +7,8 @@ import type { IntegrationType } from "@/lib/integration-icons";
 import { useDownloadAttachment, useDownloadSandboxFile } from "@/orpc/hooks";
 import type { ActivityItemData } from "./activity-item";
 import type { MessagePart, AttachmentData, SandboxFileData } from "./message-list";
+import { useChatAdvancedSettingsStore } from "./chat-advanced-settings-store";
+import { getTimingMetrics, type MessageTiming } from "./chat-performance-metrics";
 import { CollapsedTrace } from "./collapsed-trace";
 import { MessageBubble } from "./message-bubble";
 import { ToolApprovalCard } from "./tool-approval-card";
@@ -34,24 +36,7 @@ type Props = {
   integrationsUsed?: string[];
   attachments?: AttachmentData[];
   sandboxFiles?: SandboxFileData[];
-  timing?: {
-    sandboxStartupDurationMs?: number;
-    sandboxStartupMode?: "created" | "reused" | "unknown";
-    generationDurationMs?: number;
-    phaseDurationsMs?: {
-      agentInitMs?: number;
-      prePromptSetupMs?: number;
-      agentReadyToPromptMs?: number;
-      waitForFirstEventMs?: number;
-      modelStreamMs?: number;
-      postProcessingMs?: number;
-    };
-    phaseTimestamps?: Array<{
-      phase: string;
-      at: string;
-      elapsedMs: number;
-    }>;
-  };
+  timing?: MessageTiming;
 };
 
 const NOOP = () => {};
@@ -74,6 +59,9 @@ export function MessageItem({
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
   const { mutateAsync: downloadAttachment } = useDownloadAttachment();
   const { mutateAsync: downloadSandboxFile } = useDownloadSandboxFile();
+  const displayAdvancedMetrics = useChatAdvancedSettingsStore(
+    (state) => state.displayAdvancedMetrics,
+  );
 
   const getAttachmentUrl = useCallback(
     async (attachment: AttachmentData): Promise<string | null> => {
@@ -349,6 +337,7 @@ export function MessageItem({
 
   // Check if we have segments with approvals (need segmented display)
   const hasApprovals = segments.some((seg) => seg.approval !== null);
+  const timingMetrics = useMemo(() => getTimingMetrics(timing), [timing]);
 
   // For user messages, show simple bubble + attachments
   if (role === "user") {
@@ -559,52 +548,20 @@ export function MessageItem({
         />
       )}
 
-      {timing && (timing.generationDurationMs || timing.sandboxStartupDurationMs) && (
+      {displayAdvancedMetrics && timingMetrics.length > 0 && (
         <div className="text-muted-foreground flex flex-wrap gap-2 text-xs">
-          {timing.sandboxStartupDurationMs !== undefined && (
-            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
-              <Box className="h-3 w-3" />
+          {timingMetrics.map((metric) => (
+            <div
+              key={metric.key}
+              className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1"
+            >
+              {metric.key === "sandbox_prep" && <Box className="h-3 w-3" />}
+              {metric.key === "generation" && <Bot className="h-3 w-3" />}
               <span>
-                Sandbox prep{timing.sandboxStartupMode === "reused" ? " (reused)" : ""}:{" "}
-                {formatDuration(timing.sandboxStartupDurationMs)}
+                {metric.label}: {metric.value}
               </span>
             </div>
-          )}
-          {timing.generationDurationMs !== undefined && (
-            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
-              <Bot className="h-3 w-3" />
-              <span>Generation: {formatDuration(timing.generationDurationMs)}</span>
-            </div>
-          )}
-          {timing.phaseDurationsMs?.agentInitMs !== undefined && (
-            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
-              <span>Agent init: {formatDuration(timing.phaseDurationsMs.agentInitMs)}</span>
-            </div>
-          )}
-          {timing.phaseDurationsMs?.prePromptSetupMs !== undefined && (
-            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
-              <span>Pre-prompt: {formatDuration(timing.phaseDurationsMs.prePromptSetupMs)}</span>
-            </div>
-          )}
-          {timing.phaseDurationsMs?.waitForFirstEventMs !== undefined && (
-            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
-              <span>
-                First event wait: {formatDuration(timing.phaseDurationsMs.waitForFirstEventMs)}
-              </span>
-            </div>
-          )}
-          {timing.phaseDurationsMs?.modelStreamMs !== undefined && (
-            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
-              <span>Model stream: {formatDuration(timing.phaseDurationsMs.modelStreamMs)}</span>
-            </div>
-          )}
-          {timing.phaseDurationsMs?.postProcessingMs !== undefined && (
-            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
-              <span>
-                Post-processing: {formatDuration(timing.phaseDurationsMs.postProcessingMs)}
-              </span>
-            </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -647,11 +604,4 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) {
-    return `${ms}ms`;
-  }
-  return `${(ms / 1000).toFixed(1)}s`;
 }
