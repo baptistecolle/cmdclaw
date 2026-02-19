@@ -60,6 +60,8 @@ export const env = createEnv({
     APPLE_APP_BUNDLE_IDENTIFIER: z.string().optional(),
     // Fal.ai
     FAL_KEY: z.string().optional(),
+    // Deepgram
+    DEEPGRAM_API_KEY: z.string().optional(),
     // Gemini (title generation)
     GEMINI_API_KEY: z.string().optional(),
     // Encryption key for provider OAuth tokens (32-byte hex string)
@@ -156,6 +158,7 @@ export const env = createEnv({
     APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
     APPLE_APP_BUNDLE_IDENTIFIER: process.env.APPLE_APP_BUNDLE_IDENTIFIER,
     FAL_KEY: process.env.FAL_KEY,
+    DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
     BAP_SERVER_SECRET: process.env.BAP_SERVER_SECRET,
