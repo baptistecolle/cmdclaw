@@ -51,6 +51,10 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
+  buildWorkflowForwardingAddress,
+  EMAIL_FORWARDED_TRIGGER_TYPE,
+} from "@/lib/email-forwarding";
+import {
   INTEGRATION_DISPLAY_NAMES,
   INTEGRATION_LOGOS,
   type IntegrationType,
@@ -58,6 +62,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getWorkflowRunStatusLabel } from "@/lib/workflow-status";
 import {
+  useUserForwardingSettings,
   useWorkflow,
   useUpdateWorkflow,
   useWorkflowRuns,
@@ -71,6 +76,7 @@ import {
 const TRIGGERS = [
   { value: "manual", label: "Manual only" },
   { value: "schedule", label: "Run on a schedule" },
+  { value: EMAIL_FORWARDED_TRIGGER_TYPE, label: "Email forwarded to Bap" },
   { value: "gmail.new_email", label: "New Gmail email" },
   { value: "twitter.new_dm", label: "New X (Twitter) DM" },
 ];
@@ -188,6 +194,7 @@ function IntegrationToggleSwitch({
 export default function WorkflowEditorPage() {
   const params = useParams<{ id: string }>();
   const workflowId = params?.id;
+  const { data: forwardingSettings } = useUserForwardingSettings();
   const { data: workflow, isLoading } = useWorkflow(workflowId);
   const { data: runs, refetch: refetchRuns } = useWorkflowRuns(workflowId);
   const updateWorkflow = useUpdateWorkflow();
@@ -213,6 +220,9 @@ export default function WorkflowEditorPage() {
   const [testRunId, setTestRunId] = useState<string | null>(null);
   const [isTestPanelExpanded, setIsTestPanelExpanded] = useState(false);
   const [isRunSelectorOpen, setIsRunSelectorOpen] = useState(false);
+  const [copiedForwardingField, setCopiedForwardingField] = useState<
+    "workflowAlias" | "userAlias" | null
+  >(null);
   const {
     data: selectedRun,
     isLoading: isSelectedRunLoading,
@@ -235,6 +245,13 @@ export default function WorkflowEditorPage() {
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     [],
   );
+  const workflowForwardingAddress = useMemo(() => {
+    if (!workflowId || !forwardingSettings?.receivingDomain) {
+      return null;
+    }
+
+    return buildWorkflowForwardingAddress(workflowId, forwardingSettings.receivingDomain);
+  }, [forwardingSettings?.receivingDomain, workflowId]);
   const integrationEntries = useMemo(
     () =>
       (Object.keys(INTEGRATION_DISPLAY_NAMES) as IntegrationType[]).map((key) => ({
@@ -532,6 +549,32 @@ export default function WorkflowEditorPage() {
   const handleToggleTestPanel = useCallback(() => {
     setIsTestPanelExpanded((prev) => !prev);
   }, []);
+
+  const handleCopyForwardingAddress = useCallback(
+    async (value: string, field: "workflowAlias" | "userAlias") => {
+      try {
+        await navigator.clipboard.writeText(value);
+        setCopiedForwardingField(field);
+        setTimeout(() => setCopiedForwardingField(null), 1500);
+      } catch (error) {
+        console.error("Failed to copy forwarding address:", error);
+      }
+    },
+    [],
+  );
+  const handleCopyWorkflowAlias = useCallback(() => {
+    if (!workflowForwardingAddress) {
+      return;
+    }
+    void handleCopyForwardingAddress(workflowForwardingAddress, "workflowAlias");
+  }, [handleCopyForwardingAddress, workflowForwardingAddress]);
+  const handleCopyUserAlias = useCallback(() => {
+    const userAlias = forwardingSettings?.userForwardingAddress;
+    if (!userAlias) {
+      return;
+    }
+    void handleCopyForwardingAddress(userAlias, "userAlias");
+  }, [forwardingSettings?.userForwardingAddress, handleCopyForwardingAddress]);
 
   const cancelTargetRunId = activeRun?.id ?? testRunId ?? null;
   const { data: cancelTargetRun } = useWorkflowRun(cancelTargetRunId ?? undefined);
@@ -1160,6 +1203,61 @@ export default function WorkflowEditorPage() {
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  {triggerType === EMAIL_FORWARDED_TRIGGER_TYPE && (
+                    <div className="bg-muted/20 mt-4 space-y-4 rounded-lg border p-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Workflow forwarding address</label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Input
+                            type="text"
+                            value={workflowForwardingAddress ?? ""}
+                            disabled
+                            className="bg-background/60 font-mono text-xs"
+                            placeholder="Set RESEND_RECEIVING_DOMAIN to enable forwarding aliases"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleCopyWorkflowAlias}
+                            disabled={!workflowForwardingAddress}
+                          >
+                            {copiedForwardingField === "workflowAlias" ? "Copied" : "Copy"}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                          Your personal forwarding alias
+                        </label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Input
+                            type="text"
+                            value={forwardingSettings?.userForwardingAddress ?? ""}
+                            disabled
+                            className="bg-background/60 font-mono text-xs"
+                            placeholder="Configure in Settings"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleCopyUserAlias}
+                            disabled={!forwardingSettings?.userForwardingAddress}
+                          >
+                            {copiedForwardingField === "userAlias" ? "Copied" : "Copy"}
+                          </Button>
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                          Personal alias routes by your default forwarded-email workflow in{" "}
+                          <Link href="/settings" className="underline">
+                            Settings
+                          </Link>
+                          .
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">

@@ -94,6 +94,19 @@ export function useUpdateConversationTitle() {
   });
 }
 
+// Hook for updating conversation pin state
+export function useUpdateConversationPinned() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, isPinned }: { id: string; isPinned: boolean }) =>
+      client.conversation.updatePinned({ id, isPinned }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversation"] });
+    },
+  });
+}
+
 // Hook for updating conversation auto-approve setting
 export function useUpdateAutoApprove() {
   const queryClient = useQueryClient();
@@ -684,6 +697,25 @@ export function useCompleteOnboarding() {
   });
 }
 
+export function useUserForwardingSettings() {
+  return useQuery({
+    queryKey: ["user", "forwarding"],
+    queryFn: () => client.user.forwarding(),
+  });
+}
+
+export function useSetDefaultForwardedWorkflow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (workflowId: string | null) =>
+      client.user.setDefaultForwardedWorkflow({ workflowId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user", "forwarding"] });
+    },
+  });
+}
+
 // ========== PROVIDER AUTH HOOKS ==========
 
 type SubscriptionProvider = "openai" | "google" | "kimi";
@@ -753,6 +785,7 @@ export function useGeneration() {
         model?: string;
         autoApprove?: boolean;
         deviceId?: string;
+        selectedPlatformSkillSlugs?: string[];
         attachments?: { name: string; mimeType: string; dataUrl: string }[];
       },
       callbacks: GenerationCallbacks,
@@ -938,6 +971,21 @@ export function useGeneration() {
   }, []);
 
   return { startGeneration, subscribeToGeneration, abort };
+}
+
+export function usePlatformSkillList() {
+  return useQuery({
+    queryKey: ["generation", "platformSkills"],
+    queryFn: () => client.generation.listPlatformSkills(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useDetectUserMessageLanguage() {
+  return useMutation({
+    mutationFn: ({ text }: { text: string }) =>
+      client.generation.detectUserMessageLanguage({ text }),
+  });
 }
 
 // Hook for canceling a generation

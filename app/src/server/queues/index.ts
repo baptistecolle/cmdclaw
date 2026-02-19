@@ -1,5 +1,7 @@
 import { Queue, QueueEvents, Worker, type ConnectionOptions, type Processor } from "bullmq";
 import IORedis from "ioredis";
+import { EMAIL_FORWARDED_TRIGGER_TYPE } from "@/lib/email-forwarding";
+import { processForwardedEmailEvent } from "@/server/services/workflow-email-forwarding";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
 const rawQueueName = process.env.BULLMQ_QUEUE_NAME ?? "bap-default";
@@ -13,6 +15,7 @@ const redisOptions = {
 export const SCHEDULED_WORKFLOW_JOB_NAME = "workflow:scheduled-trigger";
 export const GMAIL_WORKFLOW_JOB_NAME = "workflow:gmail-trigger";
 export const X_DM_WORKFLOW_JOB_NAME = "workflow:x-dm-trigger";
+export const EMAIL_FORWARDED_WORKFLOW_JOB_NAME = "workflow:email-forwarded-trigger";
 export const CHAT_GENERATION_JOB_NAME = "generation:chat-run";
 export const WORKFLOW_GENERATION_JOB_NAME = "generation:workflow-run";
 export const GENERATION_APPROVAL_TIMEOUT_JOB_NAME = "generation:approval-timeout";
@@ -106,6 +109,21 @@ const handlers: Record<string, JobHandler> = {
       if (isActiveWorkflowRunConflict(error)) {
         console.warn(
           `[worker] skipped x dm workflow trigger because run is already active for workflow ${workflowId}`,
+        );
+        return;
+      }
+      throw error;
+    }
+  },
+  [EMAIL_FORWARDED_WORKFLOW_JOB_NAME]: async (job) => {
+    try {
+      await processForwardedEmailEvent(
+        job.data as Parameters<typeof processForwardedEmailEvent>[0],
+      );
+    } catch (error) {
+      if (isActiveWorkflowRunConflict(error)) {
+        console.warn(
+          `[worker] skipped forwarded email trigger because run is already active (source: ${EMAIL_FORWARDED_TRIGGER_TYPE})`,
         );
         return;
       }

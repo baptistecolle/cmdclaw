@@ -21,6 +21,7 @@ export const user = pgTable("user", {
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
   phoneNumber: text("phone_number"),
+  defaultForwardedWorkflowId: text("default_forwarded_workflow_id"),
   role: text("role").default("user"),
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
@@ -166,12 +167,15 @@ export const conversation = pgTable(
     title: text("title").default("New conversation"),
     // OpenCode session ID for resuming conversations
     opencodeSessionId: text("opencode_session_id"),
+    // OpenCode sandbox ID bound to this conversation
+    opencodeSandboxId: text("opencode_sandbox_id"),
     model: text("model").default("claude-sonnet-4-6"),
     // Generation tracking
     generationStatus: generationStatusEnum("generation_status").default("idle").notNull(),
     currentGenerationId: text("current_generation_id"),
     // Auto-approve sensitive operations without user confirmation
     autoApprove: boolean("auto_approve").default(false).notNull(),
+    isPinned: boolean("is_pinned").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -204,6 +208,19 @@ export type MessageTiming = {
   sandboxStartupDurationMs?: number;
   sandboxStartupMode?: "created" | "reused" | "unknown";
   generationDurationMs?: number;
+  phaseDurationsMs?: {
+    agentInitMs?: number;
+    prePromptSetupMs?: number;
+    agentReadyToPromptMs?: number;
+    waitForFirstEventMs?: number;
+    modelStreamMs?: number;
+    postProcessingMs?: number;
+  };
+  phaseTimestamps?: Array<{
+    phase: string;
+    at: string;
+    elapsedMs: number;
+  }>;
 };
 
 export const message = pgTable(
@@ -266,6 +283,7 @@ export type GenerationExecutionPolicy = {
   allowedIntegrations?: string[];
   allowedCustomIntegrations?: string[];
   autoApprove?: boolean;
+  selectedPlatformSkillSlugs?: string[];
 };
 
 export const generation = pgTable(

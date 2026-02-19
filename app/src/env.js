@@ -12,6 +12,9 @@ export const env = createEnv({
     DATABASE_URL: z.string().url(),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     RESEND_API_KEY: process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
+    RESEND_WEBHOOK_SECRET:
+      process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
+    RESEND_RECEIVING_DOMAIN: z.string().optional(),
     EMAIL_FROM:
       process.env.NODE_ENV === "production" ? z.string().email() : z.string().email().optional(),
     REDIS_URL: z.string().url().optional(),
@@ -113,6 +116,8 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
+    RESEND_RECEIVING_DOMAIN: process.env.RESEND_RECEIVING_DOMAIN,
     EMAIL_FROM: process.env.EMAIL_FROM,
     REDIS_URL: process.env.REDIS_URL,
     REDIS_HOST: process.env.REDIS_HOST,
