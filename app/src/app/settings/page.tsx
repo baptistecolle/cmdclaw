@@ -5,16 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
-import { useSetDefaultForwardedWorkflow, useUserForwardingSettings } from "@/orpc/hooks";
 
 type SessionData = Awaited<ReturnType<typeof authClient.getSession>>["data"];
 
@@ -41,9 +33,6 @@ export default function SettingsPage() {
     type: "success" | "error";
     message: string;
   } | null>(null);
-  const { data: forwardingSettings } = useUserForwardingSettings();
-  const setDefaultForwardedWorkflow = useSetDefaultForwardedWorkflow();
-  const [copiedField, setCopiedField] = useState<"userAlias" | null>(null);
 
   useEffect(() => {
     authClient
@@ -137,44 +126,6 @@ export default function SettingsPage() {
   const handlePhoneNumberChange = useCallback((value?: string) => {
     setPhoneNumber(value ?? "");
   }, []);
-
-  const handleCopyUserAlias = useCallback(async () => {
-    if (!forwardingSettings?.userForwardingAddress) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(forwardingSettings.userForwardingAddress);
-      setCopiedField("userAlias");
-      setTimeout(() => setCopiedField(null), 1500);
-    } catch (error) {
-      console.error("Failed to copy forwarding address:", error);
-    }
-  }, [forwardingSettings?.userForwardingAddress]);
-
-  const handleDefaultWorkflowChange = useCallback(
-    async (value: string) => {
-      const workflowId = value === "__none__" ? null : value;
-
-      try {
-        await setDefaultForwardedWorkflow.mutateAsync(workflowId);
-        setNotification({ type: "success", message: "Default forwarded-email workflow updated." });
-      } catch (error) {
-        console.error("Failed to update default forwarded-email workflow:", error);
-        setNotification({
-          type: "error",
-          message: "Failed to update default forwarded-email workflow.",
-        });
-      }
-    },
-    [setDefaultForwardedWorkflow],
-  );
-  const handleDefaultWorkflowValueChange = useCallback(
-    (value: string) => {
-      void handleDefaultWorkflowChange(value);
-    },
-    [handleDefaultWorkflowChange],
-  );
 
   const user = sessionData?.user;
 
@@ -276,70 +227,7 @@ export default function SettingsPage() {
             ) : null}
           </div>
 
-          <div className="rounded-lg border p-4">
-            <h3 className="text-sm font-semibold">Email Forwarding</h3>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Forward emails to your personal alias to trigger your forwarded-email workflows.
-            </p>
-
-            <div className="mt-4 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium">Your forwarding address</label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    type="text"
-                    value={forwardingSettings?.userForwardingAddress ?? ""}
-                    disabled
-                    className="bg-muted/50 font-mono text-xs"
-                    placeholder={
-                      forwardingSettings?.receivingDomain
-                        ? ""
-                        : "Set RESEND_RECEIVING_DOMAIN to enable forwarding aliases"
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCopyUserAlias}
-                    disabled={!forwardingSettings?.userForwardingAddress}
-                  >
-                    {copiedField === "userAlias" ? "Copied" : "Copy"}
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Default workflow for your alias
-                </label>
-                <Select
-                  value={forwardingSettings?.defaultForwardedWorkflowId ?? "__none__"}
-                  onValueChange={handleDefaultWorkflowValueChange}
-                  disabled={
-                    setDefaultForwardedWorkflow.isPending ||
-                    !forwardingSettings?.workflows ||
-                    forwardingSettings.workflows.length === 0
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="No default workflow" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None</SelectItem>
-                    {(forwardingSettings?.workflows ?? []).map((wf) => (
-                      <SelectItem key={wf.id} value={wf.id}>
-                        {wf.name.trim().length > 0 ? wf.name : wf.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  If unset, Bap only auto-routes your alias when exactly one forwarded-email
-                  workflow is active.
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* Email forwarding settings intentionally hidden for now. */}
         </div>
 
         <Button type="submit" disabled={saving}>

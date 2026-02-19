@@ -224,9 +224,7 @@ export default function WorkflowEditorPage() {
   const [testRunId, setTestRunId] = useState<string | null>(null);
   const [isTestPanelExpanded, setIsTestPanelExpanded] = useState(false);
   const [isRunSelectorOpen, setIsRunSelectorOpen] = useState(false);
-  const [copiedForwardingField, setCopiedForwardingField] = useState<
-    "workflowAlias" | "userAlias" | null
-  >(null);
+  const [copiedForwardingField, setCopiedForwardingField] = useState<"workflowAlias" | null>(null);
   const {
     data: selectedRun,
     isLoading: isSelectedRunLoading,
@@ -556,31 +554,21 @@ export default function WorkflowEditorPage() {
     setIsTestPanelExpanded((prev) => !prev);
   }, []);
 
-  const handleCopyForwardingAddress = useCallback(
-    async (value: string, field: "workflowAlias" | "userAlias") => {
-      try {
-        await navigator.clipboard.writeText(value);
-        setCopiedForwardingField(field);
-        setTimeout(() => setCopiedForwardingField(null), 1500);
-      } catch (error) {
-        console.error("Failed to copy forwarding address:", error);
-      }
-    },
-    [],
-  );
+  const handleCopyForwardingAddress = useCallback(async (value: string, field: "workflowAlias") => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedForwardingField(field);
+      setTimeout(() => setCopiedForwardingField(null), 1500);
+    } catch (error) {
+      console.error("Failed to copy forwarding address:", error);
+    }
+  }, []);
   const handleCopyWorkflowAlias = useCallback(() => {
     if (!workflowForwardingAddress) {
       return;
     }
     void handleCopyForwardingAddress(workflowForwardingAddress, "workflowAlias");
   }, [handleCopyForwardingAddress, workflowForwardingAddress]);
-  const handleCopyUserAlias = useCallback(() => {
-    const userAlias = forwardingSettings?.userForwardingAddress;
-    if (!userAlias) {
-      return;
-    }
-    void handleCopyForwardingAddress(userAlias, "userAlias");
-  }, [forwardingSettings?.userForwardingAddress, handleCopyForwardingAddress]);
 
   const cancelTargetRunId = activeRun?.id ?? testRunId ?? null;
   const { data: cancelTargetRun } = useWorkflowRun(cancelTargetRunId ?? undefined);
@@ -1233,35 +1221,7 @@ export default function WorkflowEditorPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">
-                          Your personal forwarding alias
-                        </label>
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <Input
-                            type="text"
-                            value={forwardingSettings?.userForwardingAddress ?? ""}
-                            disabled
-                            className="bg-background/60 font-mono text-xs"
-                            placeholder="Configure in Settings"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleCopyUserAlias}
-                            disabled={!forwardingSettings?.userForwardingAddress}
-                          >
-                            {copiedForwardingField === "userAlias" ? "Copied" : "Copy"}
-                          </Button>
-                        </div>
-                        <p className="text-muted-foreground text-xs">
-                          Personal alias routes by your default forwarded-email workflow in{" "}
-                          <Link href="/settings" className="underline">
-                            Settings
-                          </Link>
-                          .
-                        </p>
-                      </div>
+                      {/* Personal forwarding alias intentionally hidden for now. */}
                     </div>
                   )}
                 </div>
