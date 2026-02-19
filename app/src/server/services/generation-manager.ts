@@ -470,7 +470,7 @@ function shouldAutoApproveOpenCodePermission(
       permissionType === "external_directory" &&
       (normalized.startsWith("/tmp") ||
         normalized.startsWith("/app") ||
-        normalized.startsWith("/home/user"))
+        normalized.startsWith("/home"))
     ) {
       return true;
     }
