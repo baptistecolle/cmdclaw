@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import { eq, desc, and, isNull, asc } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { conversation, message, messageAttachment, sandboxFile } from "@/server/db/schema";
 import { writeSessionTranscriptFromConversation } from "@/server/services/memory-service";
@@ -37,6 +38,8 @@ const list = protectedProcedure
         id: c.id,
         title: c.title,
         isPinned: c.isPinned,
+        isShared: c.isShared,
+        generationStatus: c.generationStatus,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
         messageCount: c.messages.length,
@@ -70,6 +73,8 @@ const get = protectedProcedure
       id: conv.id,
       title: conv.title,
       isPinned: conv.isPinned,
+      isShared: conv.isShared,
+      shareToken: conv.shareToken,
       model: conv.model,
       autoApprove: conv.autoApprove,
       messages: conv.messages
@@ -188,6 +193,48 @@ const updateAutoApprove = protectedProcedure
     }
 
     return { success: true, autoApprove: result[0].autoApprove };
+  });
+
+// Share conversation via public link
+const share = protectedProcedure
+  .input(z.object({ id: z.string() }))
+  .handler(async ({ input, context }) => {
+    const result = await context.db
+      .update(conversation)
+      .set({
+        isShared: true,
+        shareToken: randomUUID(),
+        sharedAt: new Date(),
+      })
+      .where(and(eq(conversation.id, input.id), eq(conversation.userId, context.user.id)))
+      .returning({ shareToken: conversation.shareToken });
+
+    if (result.length === 0 || !result[0].shareToken) {
+      throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }
+
+    return { success: true, shareToken: result[0].shareToken };
+  });
+
+// Unshare conversation and invalidate existing link
+const unshare = protectedProcedure
+  .input(z.object({ id: z.string() }))
+  .handler(async ({ input, context }) => {
+    const result = await context.db
+      .update(conversation)
+      .set({
+        isShared: false,
+        shareToken: null,
+        sharedAt: null,
+      })
+      .where(and(eq(conversation.id, input.id), eq(conversation.userId, context.user.id)))
+      .returning({ id: conversation.id });
+
+    if (result.length === 0) {
+      throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }
+
+    return { success: true };
   });
 
 // Archive conversation
@@ -359,6 +406,8 @@ export const conversationRouter = {
   updateTitle,
   updatePinned,
   updateAutoApprove,
+  share,
+  unshare,
   archive,
   delete: del,
   downloadAttachment,

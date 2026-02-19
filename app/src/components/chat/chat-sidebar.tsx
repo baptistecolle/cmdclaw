@@ -1,10 +1,10 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { MoreHorizontal, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -48,11 +48,27 @@ type ConversationListData = {
     id: string;
     title: string | null;
     isPinned: boolean;
+    generationStatus:
+      | "idle"
+      | "generating"
+      | "awaiting_approval"
+      | "awaiting_auth"
+      | "paused"
+      | "complete"
+      | "error";
     updatedAt: Date;
     messageCount: number;
   }>;
   nextCursor?: string;
 };
+
+const RUNNING_CONVERSATION_STATUSES = new Set([
+  "generating",
+  "awaiting_approval",
+  "awaiting_auth",
+  "paused",
+]);
+const SIDEBAR_SEEN_COUNTS_STORAGE_KEY = "chat-sidebar-seen-message-counts-v1";
 
 export function ChatSidebar() {
   const isMobile = useIsMobile();
@@ -66,6 +82,35 @@ export function ChatSidebar() {
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [renameConversationId, setRenameConversationId] = useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
+  const [seenMessageCountsByConversation, setSeenMessageCountsByConversation] = useState<
+    Record<string, number>
+  >({});
+
+  const persistSeenMessageCounts = useCallback((counts: Record<string, number>) => {
+    try {
+      localStorage.setItem(SIDEBAR_SEEN_COUNTS_STORAGE_KEY, JSON.stringify(counts));
+    } catch {
+      // Ignore localStorage failures and keep in-memory state as fallback.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(SIDEBAR_SEEN_COUNTS_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        setSeenMessageCountsByConversation(parsed as Record<string, number>);
+      }
+    } catch {
+      // Ignore malformed storage payload.
+    }
+  }, []);
 
   const renameTitleTrimmed = useMemo(() => renameTitle.trim(), [renameTitle]);
   const isRenameDisabled =
@@ -161,6 +206,35 @@ export function ChatSidebar() {
     [handleRenameSubmit],
   );
 
+  const markConversationAsSeen = useCallback(
+    (conversationId: string, messageCount: number) => {
+      setSeenMessageCountsByConversation((prev) => {
+        const previousCount = prev[conversationId] ?? 0;
+        if (messageCount <= previousCount) {
+          return prev;
+        }
+        const next = { ...prev, [conversationId]: messageCount };
+        persistSeenMessageCounts(next);
+        return next;
+      });
+    },
+    [persistSeenMessageCounts],
+  );
+
+  useEffect(() => {
+    const activeConversationId = pathname.startsWith("/chat/")
+      ? pathname.slice("/chat/".length)
+      : "";
+    if (!activeConversationId || !data?.conversations) {
+      return;
+    }
+    const activeConversation = data.conversations.find((conv) => conv.id === activeConversationId);
+    if (!activeConversation) {
+      return;
+    }
+    markConversationAsSeen(activeConversation.id, activeConversation.messageCount);
+  }, [data?.conversations, markConversationAsSeen, pathname]);
+
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader>
@@ -184,74 +258,94 @@ export function ChatSidebar() {
               ) : data?.conversations.length === 0 ? (
                 <div className="text-muted-foreground px-2 py-4 text-sm">No conversations yet</div>
               ) : (
-                data?.conversations.map((conv) => (
-                  <SidebarMenuItem key={conv.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === `/chat/${conv.id}`}
-                      tooltip={conv.title || "Untitled"}
-                      highlightValue={conv.id}
-                      className="h-auto py-2"
-                    >
-                      <Link
-                        href={`/chat/${conv.id}`}
-                        className="flex min-w-0 flex-1 flex-col items-start gap-0.5"
+                data?.conversations.map((conv) => {
+                  const isActiveConversation = pathname === `/chat/${conv.id}`;
+                  const isConversationRunning = RUNNING_CONVERSATION_STATUSES.has(
+                    conv.generationStatus,
+                  );
+                  const seenMessageCount = seenMessageCountsByConversation[conv.id] ?? 0;
+                  const hasUnreadResults =
+                    !isConversationRunning &&
+                    !isActiveConversation &&
+                    conv.messageCount > seenMessageCount;
+
+                  return (
+                    <SidebarMenuItem key={conv.id}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActiveConversation}
+                        tooltip={conv.title || "Untitled"}
+                        highlightValue={conv.id}
+                        className="h-auto py-2"
                       >
-                        <span className="flex w-full min-w-0 items-center gap-1.5">
-                          {conv.isPinned ? (
-                            <Pin className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                          ) : null}
-                          <span className="truncate">{conv.title || "Untitled"}</span>
-                        </span>
-                        <span className="text-muted-foreground w-full truncate text-xs">
-                          {formatDistanceToNow(new Date(conv.updatedAt), {
-                            addSuffix: true,
-                          })}
-                        </span>
-                      </Link>
-                    </SidebarMenuButton>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <SidebarMenuAction
-                          showOnHover
-                          className="border-0 focus:ring-0 focus:outline-none focus-visible:ring-0 data-[state=open]:bg-transparent"
+                        <Link
+                          href={`/chat/${conv.id}`}
+                          className="flex min-w-0 flex-1 flex-col items-start gap-0.5"
                         >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </SidebarMenuAction>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" side="right">
-                        <DropdownMenuItem
-                          data-conversation-id={conv.id}
-                          data-conversation-pinned={conv.isPinned ? "true" : "false"}
-                          onClick={handlePinMenuClick}
-                        >
-                          {conv.isPinned ? (
-                            <PinOff className="h-4 w-4" />
-                          ) : (
-                            <Pin className="h-4 w-4" />
-                          )}
-                          <span>{conv.isPinned ? "Unpin" : "Pin"}</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          data-conversation-id={conv.id}
-                          data-conversation-title={conv.title ?? ""}
-                          onClick={handleRenameMenuClick}
-                        >
-                          <Pencil className="h-4 w-4" />
-                          <span>Rename</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          data-conversation-id={conv.id}
-                          onClick={handleDeleteMenuClick}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span>Delete</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </SidebarMenuItem>
-                ))
+                          <span className="flex w-full min-w-0 items-center gap-1.5">
+                            {isConversationRunning ? (
+                              <LoaderCircle className="text-muted-foreground h-3.5 w-3.5 shrink-0 animate-spin" />
+                            ) : hasUnreadResults ? (
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500"
+                                aria-label="New unread results"
+                              />
+                            ) : null}
+                            {conv.isPinned ? (
+                              <Pin className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                            ) : null}
+                            <span className="truncate">{conv.title || "Untitled"}</span>
+                          </span>
+                          <span className="text-muted-foreground w-full truncate text-xs">
+                            {formatDistanceToNow(new Date(conv.updatedAt), {
+                              addSuffix: true,
+                            })}
+                          </span>
+                        </Link>
+                      </SidebarMenuButton>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <SidebarMenuAction
+                            showOnHover
+                            className="border-0 focus:ring-0 focus:outline-none focus-visible:ring-0 data-[state=open]:bg-transparent"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </SidebarMenuAction>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" side="right">
+                          <DropdownMenuItem
+                            data-conversation-id={conv.id}
+                            data-conversation-pinned={conv.isPinned ? "true" : "false"}
+                            onClick={handlePinMenuClick}
+                          >
+                            {conv.isPinned ? (
+                              <PinOff className="h-4 w-4" />
+                            ) : (
+                              <Pin className="h-4 w-4" />
+                            )}
+                            <span>{conv.isPinned ? "Unpin" : "Pin"}</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            data-conversation-id={conv.id}
+                            data-conversation-title={conv.title ?? ""}
+                            onClick={handleRenameMenuClick}
+                          >
+                            <Pencil className="h-4 w-4" />
+                            <span>Rename</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            data-conversation-id={conv.id}
+                            onClick={handleDeleteMenuClick}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>Delete</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </SidebarMenuItem>
+                  );
+                })
               )}
             </SidebarMenu>
           </SidebarGroupContent>
