@@ -457,6 +457,7 @@ export function MessageItem({
                         integrationsUsed={nextSegmentIntegrations}
                         hasError={hasError && index + 1 === segments.length - 1}
                         activityItems={nextSegment.items}
+                        timing={timing}
                         defaultExpanded={isNextExpanded}
                         onToggleExpand={segmentToggleHandlers.get(nextSegment.id) ?? NOOP}
                       />
@@ -495,6 +496,7 @@ export function MessageItem({
                         integrationsUsed={segmentIntegrations}
                         hasError={hasError && index === segments.length - 1}
                         activityItems={segment.items}
+                        timing={timing}
                         defaultExpanded={isExpanded}
                         onToggleExpand={segmentToggleHandlers.get(segment.id) ?? NOOP}
                       />
@@ -540,6 +542,7 @@ export function MessageItem({
             }
             hasError={hasError}
             activityItems={segments.flatMap((seg) => seg.items)}
+            timing={timing}
           />
         ))}
 

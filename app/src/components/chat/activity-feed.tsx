@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Activity } from "lucide-react";
+import { ChevronDown, ChevronUp, Activity, Timer } from "lucide-react";
 import { motion, AnimatePresence, type Transition } from "motion/react";
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
 import { ActivityItem, type ActivityItemData } from "./activity-item";
+import { formatDuration } from "./chat-performance-metrics";
 import { IntegrationBadges } from "./integration-badges";
 
 export type { ActivityItemData };
@@ -16,6 +17,7 @@ type Props = {
   isExpanded: boolean;
   onToggleExpand: () => void;
   integrationsUsed: IntegrationType[];
+  elapsedMs?: number;
 };
 
 // Line height is ~18px (text-xs with line-height), 5 lines = ~90px + padding
@@ -33,6 +35,7 @@ export function ActivityFeed({
   isExpanded,
   onToggleExpand,
   integrationsUsed,
+  elapsedMs,
 }: Props) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
@@ -40,6 +43,10 @@ export function ActivityFeed({
   const contentHeight = isExpanded ? MAX_EXPANDED_HEIGHT : COLLAPSED_HEIGHT;
   const contentAnimate = useMemo(() => ({ height: contentHeight }), [contentHeight]);
   const contentStyle = useMemo(() => ({ height: contentHeight }), [contentHeight]);
+  const elapsedLabel = useMemo(
+    () => (elapsedMs === undefined ? null : formatDuration(Math.max(0, elapsedMs))),
+    [elapsedMs],
+  );
 
   // Auto-scroll to bottom when new items arrive (unless user has scrolled up)
   useEffect(() => {
@@ -101,6 +108,12 @@ export function ActivityFeed({
           </div>
         )}
         <div className="flex-1" />
+        {elapsedLabel && (
+          <div className="text-muted-foreground/70 inline-flex items-center gap-1 text-xs">
+            <Timer className="h-3 w-3" />
+            <span>{elapsedLabel}</span>
+          </div>
+        )}
         <span className="text-muted-foreground/60 text-xs">{items.length} items</span>
         {isExpanded ? (
           <ChevronUp className="text-muted-foreground h-4 w-4" />

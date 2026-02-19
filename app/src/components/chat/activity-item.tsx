@@ -70,6 +70,7 @@ export type ActivityItemData = {
   status?: "running" | "complete" | "error" | "interrupted";
   input?: unknown;
   result?: unknown;
+  elapsedMs?: number;
 };
 
 type Props = {

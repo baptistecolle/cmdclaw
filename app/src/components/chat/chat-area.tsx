@@ -42,7 +42,6 @@ import {
   isUnipileMissingCredentialsError,
   UNIPILE_MISSING_CREDENTIALS_MESSAGE,
 } from "@/lib/integration-errors";
-import { PREFERRED_ZEN_FREE_MODEL } from "@/lib/zen-models";
 import { client } from "@/orpc/client";
 import {
   useConversation,
@@ -62,6 +61,7 @@ import {
 import { ActivityFeed, type ActivityItemData } from "./activity-feed";
 import { AuthRequestCard } from "./auth-request-card";
 import { ChatInput } from "./chat-input";
+import { useChatModelStore } from "./chat-model-store";
 import { formatDuration } from "./chat-performance-metrics";
 import { useChatSkillStore } from "./chat-skill-store";
 import { DeviceSelector } from "./device-selector";
@@ -340,7 +340,8 @@ export function ChatArea({ conversationId }: Props) {
   const [streamError, setStreamError] = useState<string | null>(null);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [localAutoApprove, setLocalAutoApprove] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(PREFERRED_ZEN_FREE_MODEL);
+  const selectedModel = useChatModelStore((state) => state.selectedModel);
+  const setSelectedModel = useChatModelStore((state) => state.setSelectedModel);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
   const [queuedMessage, setQueuedMessage] = useState<QueuedMessage | null>(null);
   const [queueingEnabled, setQueueingEnabled] = useState(true);
@@ -365,7 +366,7 @@ export function ChatArea({ conversationId }: Props) {
   const [, setIntegrationsUsed] = useState<Set<IntegrationType>>(new Set());
   const [, setTraceStatus] = useState<TraceStatus>("complete");
   const [agentInitStatus, setAgentInitStatus] = useState<string | null>(null);
-  const [initPhaseNow, setInitPhaseNow] = useState(() => Date.now());
+  const [streamClockNow, setStreamClockNow] = useState(() => Date.now());
 
   // Sandbox files collected during streaming
   const [, setStreamingSandboxFiles] = useState<SandboxFileData[]>([]);
@@ -379,20 +380,30 @@ export function ChatArea({ conversationId }: Props) {
     () => {},
   );
   const autoApproveEnabled = useMemo(() => localAutoApprove, [localAutoApprove]);
+  const conversationModel = (
+    existingConversation as
+      | {
+          model?: string;
+        }
+      | null
+      | undefined
+  )?.model;
+  const showModelSwitchWarning = Boolean(
+    conversationId && conversationModel && selectedModel !== conversationModel,
+  );
 
   useEffect(() => {
     viewedConversationIdRef.current = conversationId;
   }, [conversationId]);
 
   useEffect(() => {
-    const shouldShowInitTimer =
-      isStreaming && segments.length === 0 && initTrackingStartedAtRef.current !== null;
-    if (!shouldShowInitTimer) {
+    const shouldRunStreamTimer = isStreaming && initTrackingStartedAtRef.current !== null;
+    if (!shouldRunStreamTimer) {
       return;
     }
-    const interval = window.setInterval(() => setInitPhaseNow(Date.now()), 250);
+    const interval = window.setInterval(() => setStreamClockNow(Date.now()), 250);
     return () => window.clearInterval(interval);
-  }, [isStreaming, segments.length]);
+  }, [isStreaming]);
 
   const isStreamEventForActiveScope = useCallback(
     ({
@@ -467,8 +478,8 @@ export function ChatArea({ conversationId }: Props) {
   }, []);
 
   const beginInitTracking = useCallback(
-    (source: "new_generation" | "reconnect") => {
-      const startedAt = Date.now();
+    (source: "new_generation" | "reconnect", startedAtMs?: number) => {
+      const startedAt = startedAtMs ?? Date.now();
       resetInitTracking();
       initTrackingStartedAtRef.current = startedAt;
       setAgentInitStatus("agent_init_started");
@@ -560,12 +571,19 @@ export function ChatArea({ conversationId }: Props) {
     [posthog, selectedModel],
   );
 
-  const initElapsedLabel = useMemo(() => {
-    if (!isStreaming || segments.length > 0 || !initTrackingStartedAtRef.current) {
+  const streamElapsedMs = useMemo(() => {
+    if (!initTrackingStartedAtRef.current) {
       return null;
     }
-    return formatDuration(Math.max(0, initPhaseNow - initTrackingStartedAtRef.current));
-  }, [initPhaseNow, isStreaming, segments.length]);
+    return Math.max(0, streamClockNow - initTrackingStartedAtRef.current);
+  }, [streamClockNow]);
+
+  const initElapsedLabel = useMemo(() => {
+    if (!isStreaming || segments.length > 0 || streamElapsedMs === null) {
+      return null;
+    }
+    return formatDuration(streamElapsedMs);
+  }, [isStreaming, segments.length, streamElapsedMs]);
 
   const handleInitStatusChange = useCallback(
     (status: string) => {
@@ -729,7 +747,7 @@ export function ChatArea({ conversationId }: Props) {
     if (conv?.messages) {
       setMessages(conv.messages.map((m) => mapPersistedMessageToChatMessage(m)));
     }
-  }, [existingConversation, conversationId]);
+  }, [existingConversation, conversationId, setSelectedModel]);
 
   useEffect(() => () => resetInitTracking(), [resetInitTracking]);
 
@@ -754,7 +772,6 @@ export function ChatArea({ conversationId }: Props) {
 
     if (!conversationId) {
       setMessages([]);
-      setSelectedModel(PREFERRED_ZEN_FREE_MODEL);
     }
   }, [abort, conversationId, resetInitTracking]);
 
@@ -772,7 +789,6 @@ export function ChatArea({ conversationId }: Props) {
       setIsStreaming(false);
       setStreamError(null);
       setStreamingSandboxFiles([]);
-      setSelectedModel(PREFERRED_ZEN_FREE_MODEL);
       currentGenerationIdRef.current = undefined;
       currentConversationIdRef.current = undefined;
       viewedConversationIdRef.current = undefined;
@@ -798,7 +814,13 @@ export function ChatArea({ conversationId }: Props) {
       // There's an active generation - reconnect to it
       currentGenerationIdRef.current = activeGeneration.generationId;
       setIsStreaming(true);
-      beginInitTracking("reconnect");
+      const reconnectStartedAtMs = activeGeneration.startedAt
+        ? Date.parse(activeGeneration.startedAt)
+        : NaN;
+      beginInitTracking(
+        "reconnect",
+        Number.isFinite(reconnectStartedAtMs) ? reconnectStartedAtMs : undefined,
+      );
       setTraceStatus(
         activeGeneration.status === "awaiting_approval"
           ? "waiting_approval"
@@ -977,13 +999,6 @@ export function ChatArea({ conversationId }: Props) {
               artifacts?.sandboxFiles ?? (assistant.sandboxFiles as SandboxFileData[] | undefined),
             timing,
           };
-          const hydratedAssistant = await hydrateAssistantMessage(
-            newConversationId,
-            messageId,
-            fallbackAssistant,
-          );
-
-          upsertMessageById(hydratedAssistant);
           setStreamingParts([]);
           setStreamingSandboxFiles([]);
           setIsStreaming(false);
@@ -993,6 +1008,22 @@ export function ChatArea({ conversationId }: Props) {
           currentGenerationIdRef.current = undefined;
           runtimeRef.current = null;
           resetInitTracking();
+          const hydratedAssistant = await hydrateAssistantMessage(
+            newConversationId,
+            messageId,
+            fallbackAssistant,
+          );
+          if (
+            !isStreamEventForActiveScope({
+              scope: streamScope,
+              streamGenerationId,
+              eventGenerationId: generationId,
+              eventConversationId: newConversationId,
+            })
+          ) {
+            return;
+          }
+          upsertMessageById(hydratedAssistant);
           maybeSendQueuedWhenReady();
         },
         onError: (message) => {
@@ -1033,6 +1064,7 @@ export function ChatArea({ conversationId }: Props) {
     }
   }, [
     activeGeneration?.generationId,
+    activeGeneration?.startedAt,
     activeGeneration?.status,
     autoApproveEnabled,
     beginInitTracking,
@@ -1375,13 +1407,6 @@ export function ChatArea({ conversationId }: Props) {
                 (assistant.sandboxFiles as SandboxFileData[] | undefined),
               timing,
             };
-            const hydratedAssistant = await hydrateAssistantMessage(
-              newConversationId,
-              messageId,
-              fallbackAssistant,
-            );
-
-            upsertMessageById(hydratedAssistant);
             setStreamingParts([]);
             setStreamingSandboxFiles([]);
             setIsStreaming(false);
@@ -1391,6 +1416,22 @@ export function ChatArea({ conversationId }: Props) {
             currentGenerationIdRef.current = undefined;
             runtimeRef.current = null;
             resetInitTracking();
+            const hydratedAssistant = await hydrateAssistantMessage(
+              newConversationId,
+              messageId,
+              fallbackAssistant,
+            );
+            if (
+              !isStreamEventForActiveScope({
+                scope: streamScope,
+                streamGenerationId,
+                eventGenerationId: generationId,
+                eventConversationId: newConversationId,
+              })
+            ) {
+              return;
+            }
+            upsertMessageById(hydratedAssistant);
 
             // Invalidate conversation queries to refresh sidebar
             queryClient.invalidateQueries({ queryKey: ["conversation"] });
@@ -1928,6 +1969,12 @@ export function ChatArea({ conversationId }: Props) {
         className="min-h-0 flex-1 overflow-y-auto p-4"
       >
         <div className="mx-auto max-w-3xl">
+          {showModelSwitchWarning && (
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Changing model mid-conversation can degrade performance.</span>
+            </div>
+          )}
           {streamError && (
             <div className="border-destructive/30 bg-destructive/10 text-destructive mb-4 flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
               <AlertCircle className="mt-0.5 h-4 w-4" />
@@ -1959,13 +2006,14 @@ export function ChatArea({ conversationId }: Props) {
                         <span className="text-muted-foreground text-sm">
                           {getAgentInitLabel(agentInitStatus)}
                         </span>
+                        <div className="flex-1" />
                         {initElapsedLabel && (
                           <div className="text-muted-foreground/70 inline-flex items-center gap-1 text-xs">
                             <Timer className="h-3 w-3" />
                             <span>{initElapsedLabel}</span>
                           </div>
                         )}
-                        <div className="ml-auto flex gap-1">
+                        <div className="flex gap-1">
                           <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
                           <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
                           <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full" />
@@ -2005,6 +2053,7 @@ export function ChatArea({ conversationId }: Props) {
                               isExpanded={nextSegment.isExpanded}
                               onToggleExpand={segmentToggleHandlers.get(nextSegment.id)!}
                               integrationsUsed={nextSegmentIntegrations}
+                              elapsedMs={streamElapsedMs ?? undefined}
                             />
                             <ToolApprovalCard
                               toolUseId={deferredApproval.toolUseId}
@@ -2046,6 +2095,7 @@ export function ChatArea({ conversationId }: Props) {
                               isExpanded={segment.isExpanded}
                               onToggleExpand={segmentToggleHandlers.get(segment.id)!}
                               integrationsUsed={segmentIntegrations}
+                              elapsedMs={streamElapsedMs ?? undefined}
                             />
                           )}
 

@@ -53,4 +53,29 @@ describe("GenerationRuntime tool result matching", () => {
     );
     expect(toolCall).toMatchObject({ id: "tool-search-1", result: { ok: true } });
   });
+
+  it("tracks elapsed time per tool call and aggregates activity stats", () => {
+    const runtime = createGenerationRuntime();
+
+    runtime.handleToolUse({
+      toolName: "search",
+      toolInput: { query: "activity timer" },
+      toolUseId: "tool-search-1",
+    });
+    runtime.handleToolResult("search", { ok: true }, "tool-search-1");
+
+    const snapshot = runtime.snapshot;
+    const toolItem = snapshot.segments
+      .flatMap((segment) => segment.items)
+      .find((item) => item.type === "tool_call" && item.toolUseId === "tool-search-1");
+
+    expect(toolItem?.elapsedMs).toBeTypeOf("number");
+    expect(toolItem?.elapsedMs).toBeGreaterThanOrEqual(0);
+
+    const stats = runtime.getActivityStats();
+    expect(stats.totalToolCalls).toBe(1);
+    expect(stats.completedToolCalls).toBe(1);
+    expect(stats.totalToolDurationMs).toBeGreaterThanOrEqual(0);
+    expect(stats.perToolUseIdMs["tool-search-1"]).toBeGreaterThanOrEqual(0);
+  });
 });

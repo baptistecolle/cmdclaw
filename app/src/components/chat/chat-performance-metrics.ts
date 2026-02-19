@@ -19,6 +19,13 @@ export type MessageTiming = {
     at: string;
     elapsedMs: number;
   }>;
+  activityDurationsMs?: {
+    totalToolCalls?: number;
+    completedToolCalls?: number;
+    totalToolDurationMs?: number;
+    maxToolDurationMs?: number;
+    perToolUseIdMs?: Record<string, number>;
+  };
 };
 
 export type TimingMetric = {
@@ -32,7 +39,9 @@ export type TimingMetric = {
     | "pre_prompt"
     | "first_event_wait"
     | "model_stream"
-    | "post_processing";
+    | "post_processing"
+    | "tool_calls_total"
+    | "tool_calls_max";
   label: string;
   value: string;
 };
@@ -130,6 +139,22 @@ export function getTimingMetrics(timing?: MessageTiming): TimingMetric[] {
       key: "post_processing",
       label: "Post-processing",
       value: formatDuration(timing.phaseDurationsMs.postProcessingMs),
+    });
+  }
+
+  if (timing.activityDurationsMs?.totalToolDurationMs !== undefined) {
+    metrics.push({
+      key: "tool_calls_total",
+      label: "Tool calls total",
+      value: formatDuration(timing.activityDurationsMs.totalToolDurationMs),
+    });
+  }
+
+  if (timing.activityDurationsMs?.maxToolDurationMs !== undefined) {
+    metrics.push({
+      key: "tool_calls_max",
+      label: "Longest tool call",
+      value: formatDuration(timing.activityDurationsMs.maxToolDurationMs),
     });
   }
 

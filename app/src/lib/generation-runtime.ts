@@ -37,6 +37,7 @@ export type RuntimeActivityItem = {
   status?: "running" | "complete" | "error" | "interrupted";
   input?: unknown;
   result?: unknown;
+  elapsedMs?: number;
 };
 
 export type RuntimeSegmentApproval = {
@@ -178,6 +179,14 @@ export type RuntimeSnapshot = {
   traceStatus: TraceStatus;
 };
 
+export type RuntimeActivityStats = {
+  totalToolCalls: number;
+  completedToolCalls: number;
+  totalToolDurationMs: number;
+  maxToolDurationMs: number;
+  perToolUseIdMs: Record<string, number>;
+};
+
 export type RuntimeAssistantMessage = {
   content: string;
   parts: RuntimeMessagePart[];
@@ -194,6 +203,13 @@ export class GenerationRuntime {
   private toolCallCounter = 0;
   private activityCounter = 0;
   private segmentCounter = 0;
+  private activityStats: RuntimeActivityStats = {
+    totalToolCalls: 0,
+    completedToolCalls: 0,
+    totalToolDurationMs: 0,
+    maxToolDurationMs: 0,
+    perToolUseIdMs: {},
+  };
 
   private currentGenerationId?: string;
   private currentConversationId?: string;
@@ -228,6 +244,13 @@ export class GenerationRuntime {
     return {
       generationId: this.currentGenerationId,
       conversationId: this.currentConversationId,
+    };
+  }
+
+  getActivityStats(): RuntimeActivityStats {
+    return {
+      ...this.activityStats,
+      perToolUseIdMs: { ...this.activityStats.perToolUseIdMs },
     };
   }
 
@@ -270,6 +293,7 @@ export class GenerationRuntime {
   handleToolUse(data: RuntimeToolUseData): void {
     const toolId = data.toolUseId || `tc-${this.toolCallCounter++}`;
     const now = Date.now();
+    this.activityStats.totalToolCalls += 1;
 
     this.parts.push({
       type: "tool_call",
@@ -330,8 +354,7 @@ export class GenerationRuntime {
               item.status === "running",
           );
         if (toolItem) {
-          toolItem.status = "complete";
-          toolItem.result = result;
+          this.completeToolItem(toolItem, "complete", result);
           break;
         }
       }
@@ -345,8 +368,7 @@ export class GenerationRuntime {
               item.type === "tool_call" && item.content === toolName && item.status === "running",
           );
         if (toolItem) {
-          toolItem.status = "complete";
-          toolItem.result = result;
+          this.completeToolItem(toolItem, "complete", result);
           break;
         }
       }
@@ -385,7 +407,7 @@ export class GenerationRuntime {
           (item) => item.type === "tool_call" && item.status === "running",
         );
         if (toolItem) {
-          toolItem.status = status === "approved" ? "complete" : "error";
+          this.completeToolItem(toolItem, status === "approved" ? "complete" : "error");
         }
         break;
       }
@@ -497,7 +519,7 @@ export class GenerationRuntime {
     for (const segment of this.segments) {
       for (const item of segment.items) {
         if (item.status === "running") {
-          item.status = "interrupted";
+          this.completeToolItem(item, "interrupted");
         }
       }
     }
@@ -639,8 +661,40 @@ export class GenerationRuntime {
     this.toolCallCounter = 0;
     this.activityCounter = 0;
     this.segmentCounter = 0;
+    this.activityStats = {
+      totalToolCalls: 0,
+      completedToolCalls: 0,
+      totalToolDurationMs: 0,
+      maxToolDurationMs: 0,
+      perToolUseIdMs: {},
+    };
     this.currentGenerationId = undefined;
     this.currentConversationId = undefined;
+  }
+
+  private completeToolItem(
+    item: RuntimeActivityItem,
+    status: NonNullable<RuntimeActivityItem["status"]>,
+    result?: unknown,
+  ): void {
+    item.status = status;
+    if (result !== undefined) {
+      item.result = result;
+    }
+    if (item.elapsedMs !== undefined) {
+      return;
+    }
+    const elapsedMs = Math.max(0, Date.now() - item.timestamp);
+    item.elapsedMs = elapsedMs;
+    this.activityStats.completedToolCalls += 1;
+    this.activityStats.totalToolDurationMs += elapsedMs;
+    this.activityStats.maxToolDurationMs = Math.max(
+      this.activityStats.maxToolDurationMs,
+      elapsedMs,
+    );
+    if (item.toolUseId) {
+      this.activityStats.perToolUseIdMs[item.toolUseId] = elapsedMs;
+    }
   }
 
   private getCurrentSegment(): RuntimeActivitySegment {

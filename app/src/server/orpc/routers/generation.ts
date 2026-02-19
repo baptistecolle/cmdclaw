@@ -435,6 +435,7 @@ const getActiveGeneration = protectedProcedure
   .output(
     z.object({
       generationId: z.string().nullable(),
+      startedAt: z.string().nullable(),
       status: z
         .enum([
           "idle",
@@ -462,8 +463,20 @@ const getActiveGeneration = protectedProcedure
       throw new Error("Access denied");
     }
 
+    let startedAt: string | null = null;
+    if (conv.currentGenerationId) {
+      const currentGeneration = await db.query.generation.findFirst({
+        where: eq(generation.id, conv.currentGenerationId),
+        columns: {
+          startedAt: true,
+        },
+      });
+      startedAt = currentGeneration?.startedAt?.toISOString() ?? null;
+    }
+
     return {
       generationId: conv.currentGenerationId,
+      startedAt,
       status: conv.generationStatus,
     };
   });

@@ -1,11 +1,13 @@
 "use client";
 
-import { Check, AlertCircle, ChevronRight, Eye, StopCircle } from "lucide-react";
+import { Check, AlertCircle, ChevronRight, Eye, StopCircle, Timer } from "lucide-react";
 import { motion, AnimatePresence, type Transition } from "motion/react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
 import { cn } from "@/lib/utils";
+import type { MessageTiming } from "./chat-performance-metrics";
 import { ActivityItem, type ActivityItemData } from "./activity-item";
+import { formatDuration } from "./chat-performance-metrics";
 import { IntegrationBadges } from "./integration-badges";
 
 const COLLAPSED_TRACE_EXPANDED_INITIAL = { height: 0, opacity: 0 };
@@ -21,6 +23,7 @@ type Props = {
   integrationsUsed: IntegrationType[];
   hasError: boolean;
   activityItems?: ActivityItemData[];
+  timing?: MessageTiming;
   className?: string;
   defaultExpanded?: boolean;
   onToggleExpand?: () => void;
@@ -30,6 +33,7 @@ export function CollapsedTrace({
   integrationsUsed,
   hasError,
   activityItems = [],
+  timing,
   className,
   defaultExpanded = false,
   onToggleExpand,
@@ -41,6 +45,46 @@ export function CollapsedTrace({
       (item.type === "system" && item.content === "Interrupted by user"),
   );
   const hasRunning = activityItems.some((item) => item.status === "running");
+  const summaryDuration = useMemo(() => {
+    if (timing?.endToEndDurationMs !== undefined) {
+      return formatDuration(timing.endToEndDurationMs);
+    }
+    if (timing?.generationDurationMs !== undefined) {
+      return formatDuration(timing.generationDurationMs);
+    }
+    if (timing?.phaseDurationsMs) {
+      const phaseTotalMs = Object.values(timing.phaseDurationsMs).reduce((sum, value) => {
+        if (typeof value !== "number") {
+          return sum;
+        }
+        return sum + value;
+      }, 0);
+      if (phaseTotalMs > 0) {
+        return formatDuration(phaseTotalMs);
+      }
+    }
+
+    const toolElapsedTotal = activityItems.reduce((sum, item) => {
+      if (item.type !== "tool_call") {
+        return sum;
+      }
+      return sum + (item.elapsedMs ?? 0);
+    }, 0);
+
+    if (toolElapsedTotal > 0) {
+      return formatDuration(toolElapsedTotal);
+    }
+
+    if (activityItems.length >= 2) {
+      const firstTs = activityItems[0]?.timestamp;
+      const lastTs = activityItems[activityItems.length - 1]?.timestamp;
+      if (typeof firstTs === "number" && typeof lastTs === "number" && lastTs >= firstTs) {
+        return formatDuration(lastTs - firstTs);
+      }
+    }
+
+    return null;
+  }, [activityItems, timing]);
 
   // Handle toggle - use external handler if provided
   const handleToggle = useCallback(() => {
@@ -86,6 +130,13 @@ export function CollapsedTrace({
         <div className="flex-1" />
 
         <IntegrationBadges integrations={integrationsUsed} size="sm" />
+
+        {summaryDuration && (
+          <div className="text-muted-foreground/70 ml-2 inline-flex items-center gap-1 text-xs">
+            <Timer className="h-3 w-3" />
+            <span>{summaryDuration}</span>
+          </div>
+        )}
 
         <div className="text-muted-foreground/60 ml-2 flex items-center gap-1 text-xs">
           <Eye className="h-3 w-3" />
