@@ -1,7 +1,12 @@
 import { env } from "@/env";
 
 const getAppUrl = () =>
-  env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+  process.env.NEXT_PUBLIC_APP_URL ?? env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+
+function getOpenAIRedirectUri(): string {
+  const appUrl = getAppUrl();
+  return `${appUrl}/api/auth/provider/openai/callback`;
+}
 
 export type SubscriptionProviderID = "openai" | "kimi";
 
@@ -46,7 +51,7 @@ export const SUBSCRIPTION_PROVIDERS: Record<SubscriptionProviderID, Subscription
     clientId: "app_EMoamEEZ73f0CkXaXp7hrann",
     authUrl: "https://auth.openai.com/oauth/authorize",
     tokenUrl: "https://auth.openai.com/oauth/token",
-    redirectUri: `${getAppUrl()}/api/auth/provider/openai/callback`,
+    redirectUri: getOpenAIRedirectUri(),
     scopes: ["openid", "profile", "email", "offline_access"],
     usePKCE: true,
     models: [

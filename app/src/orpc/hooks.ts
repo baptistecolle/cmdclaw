@@ -810,6 +810,13 @@ export function useConnectProvider() {
   });
 }
 
+export function usePollProviderConnection() {
+  return useMutation({
+    mutationFn: ({ provider, flowId }: { provider: "openai"; flowId: string }) =>
+      client.providerAuth.poll({ provider, flowId }),
+  });
+}
+
 // Hook for disconnecting a subscription provider
 export function useDisconnectProvider() {
   const queryClient = useQueryClient();

@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { listOpencodeFreeModels } from "@/server/ai/opencode-models";
-import { storePending } from "@/server/ai/pending-oauth";
+import { deletePending, getPending, storePending } from "@/server/ai/pending-oauth";
 import {
   SUBSCRIPTION_PROVIDERS,
   isOAuthProviderConfig,
@@ -13,26 +13,10 @@ import { protectedProcedure } from "../middleware";
 
 const oauthProviderSchema = z.enum(["openai", "google"]);
 const providerSchema = z.enum(["openai", "google", "kimi"]);
-
-// PKCE helpers — matches OpenCode's codex.ts implementation
-function generateCodeVerifier(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-  const bytes = new Uint8Array(43);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => chars[b % chars.length])
-    .join("");
-}
-
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  const data = new TextEncoder().encode(verifier);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  const bytes = new Uint8Array(hash);
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
+const pollProviderSchema = z.object({
+  provider: z.literal("openai"),
+  flowId: z.string().min(1),
+});
 
 function generateState(): string {
   return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
@@ -41,10 +25,69 @@ function generateState(): string {
     .replace(/=+$/, "");
 }
 
+const openAIDeviceCodeResponseSchema = z.object({
+  device_auth_id: z.string(),
+  user_code: z.string(),
+  expires_in: z.coerce.number().optional(),
+  expires_at: z.string().optional(),
+  interval: z.coerce.number().optional(),
+});
+
+const openAIDeviceTokenResponseSchema = z.object({
+  authorization_code: z.string(),
+  code_verifier: z.string(),
+});
+
+const openAITokenResponseSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string().optional(),
+  expires_in: z.coerce.number().optional(),
+});
+
+const openAIDeviceFlowStateSchema = z.object({
+  deviceAuthId: z.string(),
+  userCode: z.string(),
+  interval: z.number(),
+});
+
+async function requestOpenAIDeviceCode(config: {
+  clientId: string;
+  authUrl: string;
+}): Promise<z.infer<typeof openAIDeviceCodeResponseSchema>> {
+  const issuer = new URL(config.authUrl).origin;
+  const deviceCodeUrl = new URL("/api/accounts/deviceauth/usercode", issuer).toString();
+
+  const response = await fetch(deviceCodeUrl, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": "opencode/bap",
+    },
+    body: JSON.stringify({ client_id: config.clientId }),
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `OpenAI device-code request failed (${response.status}): ${text.slice(0, 180)}`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("OpenAI device-code response was not JSON");
+  }
+
+  return openAIDeviceCodeResponseSchema.parse(parsed);
+}
+
 /**
  * GET /provider-auth/connect/:provider
- * Generate authorization URL for the given subscription provider.
- * For OpenAI (PKCE), generates code verifier/challenge.
+ * Start provider auth flow.
+ * OpenAI uses a device-code flow (no browser redirect callback).
  */
 const connect = protectedProcedure
   .input(z.object({ provider: oauthProviderSchema }))
@@ -58,47 +101,141 @@ const connect = protectedProcedure
       throw new Error(`Provider "${input.provider}" does not support OAuth`);
     }
 
-    // Generate random state for CSRF protection
-    const state = generateState();
+    const flowId = generateState();
+    const device = await requestOpenAIDeviceCode({
+      clientId: config.clientId,
+      authUrl: config.authUrl,
+    });
+    const interval = Math.max(device.interval ?? 5, 1);
+    const flowState = openAIDeviceFlowStateSchema.parse({
+      deviceAuthId: device.device_auth_id,
+      userCode: device.user_code,
+      interval,
+    });
 
-    // Generate PKCE verifier — stored server-side, never in the URL
-    const codeVerifier = config.usePKCE ? generateCodeVerifier() : undefined;
-
-    // Store pending OAuth data in-memory (matches OpenCode's approach)
-    await storePending(state, {
+    await storePending(flowId, {
       userId: context.user.id,
       provider: input.provider,
-      codeVerifier: codeVerifier ?? "",
+      // Reuse durable pending state storage for device-flow state.
+      codeVerifier: JSON.stringify(flowState),
     });
-
-    const params = new URLSearchParams({
-      response_type: "code",
-      client_id: config.clientId,
-      redirect_uri: config.redirectUri,
-      state,
-    });
-
-    if (config.scopes?.length) {
-      params.set("scope", config.scopes.join(" "));
-    }
-
-    // PKCE challenge for OpenAI
-    if (codeVerifier) {
-      params.set("code_challenge", await generateCodeChallenge(codeVerifier));
-      params.set("code_challenge_method", "S256");
-    }
-
-    // OpenAI-specific params (matches OpenCode's codex.ts)
-    if (input.provider === "openai") {
-      params.set("id_token_add_organizations", "true");
-      params.set("codex_cli_simplified_flow", "true");
-      params.set("originator", "opencode");
-    }
 
     return {
-      authUrl: `${config.authUrl}?${params}`,
+      mode: "device" as const,
+      flowId,
+      userCode: device.user_code,
+      verificationUri: `${new URL(config.authUrl).origin}/codex/device`,
+      verificationUriComplete: `${new URL(config.authUrl).origin}/codex/device`,
+      interval,
+      expiresIn: device.expires_at
+        ? Math.max(Math.floor((new Date(device.expires_at).getTime() - Date.now()) / 1000), 30)
+        : (device.expires_in ?? 900),
     };
   });
+
+/**
+ * Poll OpenAI device flow and finalize token storage once approved.
+ */
+const poll = protectedProcedure.input(pollProviderSchema).handler(async ({ input, context }) => {
+  const pending = await getPending(input.flowId);
+  if (!pending || pending.userId !== context.user.id || pending.provider !== input.provider) {
+    return {
+      status: "failed" as const,
+      error: "invalid_state",
+    };
+  }
+
+  const config = SUBSCRIPTION_PROVIDERS[input.provider];
+  if (!isOAuthProviderConfig(config)) {
+    return {
+      status: "failed" as const,
+      error: "invalid_provider",
+    };
+  }
+
+  const issuer = new URL(config.authUrl).origin;
+
+  let flowState: z.infer<typeof openAIDeviceFlowStateSchema>;
+  try {
+    flowState = openAIDeviceFlowStateSchema.parse(JSON.parse(pending.codeVerifier));
+  } catch {
+    await deletePending(input.flowId);
+    return { status: "failed" as const, error: "invalid_state_payload" };
+  }
+
+  const deviceTokenResponse = await fetch(`${issuer}/api/accounts/deviceauth/token`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": "opencode/bap",
+    },
+    body: JSON.stringify({
+      device_auth_id: flowState.deviceAuthId,
+      user_code: flowState.userCode,
+    }),
+  });
+
+  if (deviceTokenResponse.status === 403 || deviceTokenResponse.status === 404) {
+    return { status: "pending" as const, interval: flowState.interval + 3 };
+  }
+  if (!deviceTokenResponse.ok) {
+    await deletePending(input.flowId);
+    return {
+      status: "failed" as const,
+      error: `device_token_failed_${deviceTokenResponse.status}`,
+    };
+  }
+
+  let deviceTokenData: z.infer<typeof openAIDeviceTokenResponseSchema>;
+  try {
+    deviceTokenData = openAIDeviceTokenResponseSchema.parse(await deviceTokenResponse.json());
+  } catch {
+    await deletePending(input.flowId);
+    return { status: "failed" as const, error: "invalid_device_token_response" };
+  }
+
+  const oauthTokenBody = new URLSearchParams({
+    grant_type: "authorization_code",
+    code: deviceTokenData.authorization_code,
+    redirect_uri: `${issuer}/deviceauth/callback`,
+    client_id: config.clientId,
+    code_verifier: deviceTokenData.code_verifier,
+  });
+
+  const tokenResponse = await fetch(config.tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: oauthTokenBody,
+  });
+
+  const text = await tokenResponse.text();
+  if (!tokenResponse.ok) {
+    await deletePending(input.flowId);
+    return { status: "failed" as const, error: `oauth_token_failed_${tokenResponse.status}` };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { status: "failed" as const, error: "invalid_token_response" };
+  }
+
+  const tokens = openAITokenResponseSchema.parse(parsed);
+  const expiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000);
+
+  await storeProviderTokens({
+    userId: context.user.id,
+    provider: input.provider,
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token ?? "",
+    expiresAt,
+  });
+  await deletePending(input.flowId);
+
+  return { status: "connected" as const };
+});
 
 /**
  * GET /provider-auth/status
@@ -218,6 +355,7 @@ export async function storeProviderTokens(params: {
 
 export const providerAuthRouter = {
   connect,
+  poll,
   status,
   disconnect,
   setApiKey,

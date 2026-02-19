@@ -56,3 +56,25 @@ export async function consumePending(state: string): Promise<PendingOAuth | unde
     codeVerifier: row.codeVerifier,
   };
 }
+
+export async function getPending(state: string): Promise<PendingOAuth | undefined> {
+  const row = await db.query.providerOauthState.findFirst({
+    where: eq(providerOauthState.state, state),
+  });
+  if (!row) {
+    return undefined;
+  }
+  if (Date.now() - row.createdAt.getTime() > EXPIRY_MS) {
+    return undefined;
+  }
+
+  return {
+    userId: row.userId,
+    provider: row.provider,
+    codeVerifier: row.codeVerifier,
+  };
+}
+
+export async function deletePending(state: string): Promise<void> {
+  await db.delete(providerOauthState).where(eq(providerOauthState.state, state));
+}

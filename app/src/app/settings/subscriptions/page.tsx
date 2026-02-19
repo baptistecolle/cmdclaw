@@ -7,10 +7,24 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useProviderAuthStatus, useConnectProvider, useDisconnectProvider } from "@/orpc/hooks";
+import {
+  useProviderAuthStatus,
+  useConnectProvider,
+  useDisconnectProvider,
+  usePollProviderConnection,
+} from "@/orpc/hooks";
 
 type ProviderID = "openai";
 type ProviderAuthType = "oauth";
+type DeviceFlowState = {
+  provider: "openai";
+  flowId: string;
+  userCode: string;
+  verificationUri: string;
+  verificationUriComplete: string;
+  interval: number;
+  expiresAt: number;
+};
 
 const PROVIDER_LABELS: Record<ProviderID, string> = {
   openai: "ChatGPT",
@@ -128,10 +142,12 @@ function ProviderConnectButton({
 }
 
 export default function SubscriptionsPage() {
-  const { data, isLoading } = useProviderAuthStatus();
+  const { data, isLoading, refetch } = useProviderAuthStatus();
   const connectProvider = useConnectProvider();
+  const pollProvider = usePollProviderConnection();
   const disconnectProvider = useDisconnectProvider();
   const [connectingProvider, setConnectingProvider] = useState<ProviderID | null>(null);
+  const [deviceFlow, setDeviceFlow] = useState<DeviceFlowState | null>(null);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
@@ -152,14 +168,81 @@ export default function SubscriptionsPage() {
     }
   }, [notification]);
 
+  useEffect(() => {
+    if (!deviceFlow) {
+      return;
+    }
+
+    if (Date.now() >= deviceFlow.expiresAt) {
+      setNotification({
+        type: "error",
+        message: "Device code expired. Please reconnect to generate a new code.",
+      });
+      setDeviceFlow(null);
+      setConnectingProvider(null);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      void (async () => {
+        try {
+          const result = await pollProvider.mutateAsync({
+            provider: deviceFlow.provider,
+            flowId: deviceFlow.flowId,
+          });
+
+          if (result.status === "connected") {
+            await refetch();
+            setNotification({
+              type: "success",
+              message: `${getProviderLabel(deviceFlow.provider)} connected successfully!`,
+            });
+            setDeviceFlow(null);
+            setConnectingProvider(null);
+            return;
+          }
+
+          if (result.status === "failed") {
+            setNotification({
+              type: "error",
+              message: `Connection failed: ${result.error.replace(/_/g, " ")}`,
+            });
+            setDeviceFlow(null);
+            setConnectingProvider(null);
+            return;
+          }
+
+          if (result.status === "pending" && result.interval) {
+            setDeviceFlow((prev) => (prev ? { ...prev, interval: result.interval } : prev));
+          }
+        } catch (error) {
+          console.error("Failed polling provider auth:", error);
+        }
+      })();
+    }, deviceFlow.interval * 1000);
+
+    return () => clearTimeout(timeout);
+  }, [deviceFlow, pollProvider, refetch]);
+
   const handleConnect = useCallback(
     async (provider: ProviderID) => {
       setConnectingProvider(provider);
 
       try {
         const result = await connectProvider.mutateAsync(provider);
-        // Open the OAuth URL in the same window
-        window.location.href = result.authUrl;
+
+        if (result.mode === "device") {
+          setDeviceFlow({
+            provider,
+            flowId: result.flowId,
+            userCode: result.userCode,
+            verificationUri: result.verificationUri,
+            verificationUriComplete: result.verificationUriComplete,
+            interval: result.interval,
+            expiresAt: Date.now() + result.expiresIn * 1000,
+          });
+          return;
+        }
       } catch (error) {
         console.error("Failed to start OAuth flow:", error);
         setNotification({
@@ -190,6 +273,18 @@ export default function SubscriptionsPage() {
     },
     [disconnectProvider],
   );
+
+  const handleCopyDeviceCode = useCallback(() => {
+    if (!deviceFlow) {
+      return;
+    }
+    void navigator.clipboard.writeText(deviceFlow.userCode);
+  }, [deviceFlow]);
+
+  const handleCancelDeviceFlow = useCallback(() => {
+    setDeviceFlow(null);
+    setConnectingProvider(null);
+  }, []);
 
   if (isLoading) {
     return (
@@ -228,6 +323,31 @@ export default function SubscriptionsPage() {
             <XCircle className="h-4 w-4 shrink-0" />
           )}
           {notification.message}
+        </div>
+      )}
+
+      {deviceFlow && (
+        <div className="mb-6 rounded-lg border p-4">
+          <p className="text-sm font-medium">ChatGPT Pro/Plus (Device Code)</p>
+          <p className="text-muted-foreground mt-2 text-sm">
+            Open the verification page and enter the code below.
+          </p>
+          <p className="mt-2 text-sm">Go to this link: {deviceFlow.verificationUri}</p>
+          <div className="bg-muted mt-3 rounded-md px-3 py-2 font-mono text-lg tracking-wider">
+            {deviceFlow.userCode}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleCopyDeviceCode}>
+              Copy code
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleCancelDeviceFlow}>
+              Cancel
+            </Button>
+            <div className="text-muted-foreground ml-auto flex items-center text-xs">
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+              Waiting for authorization...
+            </div>
+          </div>
         </div>
       )}
 
