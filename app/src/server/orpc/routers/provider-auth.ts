@@ -45,11 +45,14 @@ function generateState(): string {
  * GET /provider-auth/connect/:provider
  * Generate authorization URL for the given subscription provider.
  * For OpenAI (PKCE), generates code verifier/challenge.
- * For Google, uses standard OAuth with client secret.
  */
 const connect = protectedProcedure
   .input(z.object({ provider: oauthProviderSchema }))
   .handler(async ({ input, context }) => {
+    if (input.provider === "google") {
+      throw new Error("Google subscription is not supported yet");
+    }
+
     const config = SUBSCRIPTION_PROVIDERS[input.provider];
     if (!isOAuthProviderConfig(config)) {
       throw new Error(`Provider "${input.provider}" does not support OAuth`);
@@ -90,12 +93,6 @@ const connect = protectedProcedure
       params.set("id_token_add_organizations", "true");
       params.set("codex_cli_simplified_flow", "true");
       params.set("originator", "opencode");
-    }
-
-    // Google-specific params
-    if (input.provider === "google") {
-      params.set("access_type", "offline");
-      params.set("prompt", "consent");
     }
 
     return {

@@ -9,12 +9,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useProviderAuthStatus, useConnectProvider, useDisconnectProvider } from "@/orpc/hooks";
 
-type ProviderID = "openai" | "google";
+type ProviderID = "openai";
 type ProviderAuthType = "oauth";
 
 const PROVIDER_LABELS: Record<ProviderID, string> = {
   openai: "ChatGPT",
-  google: "Gemini",
 };
 
 const getProviderLabel = (provider: ProviderID | string) =>
@@ -45,15 +44,6 @@ const PROVIDERS: {
       "GPT-5.2 Codex",
       "GPT-5.1 Codex",
     ],
-  },
-  {
-    id: "google",
-    authType: "oauth",
-    name: "Gemini",
-    description: "Use your Google AI Pro/Ultra subscription",
-    logoUrl: "/integrations/gemini.svg",
-    logoAlt: "Google Gemini logo",
-    models: ["Gemini 2.5 Pro", "Gemini 2.5 Flash"],
   },
 ];
 

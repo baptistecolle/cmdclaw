@@ -74,7 +74,7 @@ export async function GET(
       tokenBody.set("code_verifier", pending.codeVerifier);
     }
 
-    // Add client secret for Google (non-PKCE flow)
+    // Add client secret when a provider uses non-PKCE OAuth.
     if (!providerConfig.usePKCE && providerConfig.clientSecret) {
       tokenBody.set("client_secret", providerConfig.clientSecret);
     }

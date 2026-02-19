@@ -112,21 +112,6 @@ const OPENAI_MODELS: ModelOption[] = [
   },
 ];
 
-const GOOGLE_MODELS: ModelOption[] = [
-  {
-    id: "gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
-    provider: "google",
-    providerLabel: "Gemini",
-  },
-  {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    provider: "google",
-    providerLabel: "Gemini",
-  },
-];
-
 const KIMI_MODELS: ModelOption[] = [
   {
     id: "k2p5",
@@ -144,7 +129,6 @@ const KIMI_MODELS: ModelOption[] = [
 
 const SORTED_ANTHROPIC_MODELS = sortModels(ANTHROPIC_MODELS);
 const SORTED_OPENAI_MODELS = sortModels(OPENAI_MODELS);
-const SORTED_GOOGLE_MODELS = sortModels(GOOGLE_MODELS);
 const SORTED_KIMI_MODELS = sortModels(KIMI_MODELS);
 
 type Props = {
@@ -159,7 +143,6 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
   const connected = authStatus?.connected ?? {};
 
   const isOpenAIConnected = "openai" in connected;
-  const isGoogleConnected = "google" in connected;
   const isKimiConnected = "kimi" in connected;
 
   const zenModels: ModelOption[] = sortModels(
@@ -171,13 +154,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
     })),
   );
 
-  const allModels = [
-    ...ANTHROPIC_MODELS,
-    ...OPENAI_MODELS,
-    ...GOOGLE_MODELS,
-    ...KIMI_MODELS,
-    ...zenModels,
-  ];
+  const allModels = [...ANTHROPIC_MODELS, ...OPENAI_MODELS, ...KIMI_MODELS, ...zenModels];
 
   const currentModel = allModels.find((m) => m.id === selectedModel);
   const displayName = currentModel?.name ?? selectedModel;
@@ -247,29 +224,6 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         </DropdownMenuLabel>
         {isOpenAIConnected ? (
           SORTED_OPENAI_MODELS.map((model) => (
-            <DropdownMenuItem
-              key={model.id}
-              data-testid={`chat-model-option-${model.id}`}
-              data-model-id={model.id}
-              onClick={handleModelSelect}
-            >
-              <span className="flex-1">{model.name}</span>
-              {selectedModel === model.id && <Check className="text-foreground h-3.5 w-3.5" />}
-            </DropdownMenuItem>
-          ))
-        ) : (
-          <DropdownMenuItem className="text-muted-foreground text-xs" onClick={openSubscriptions}>
-            Connect in Settings to unlock
-          </DropdownMenuItem>
-        )}
-
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="flex items-center gap-1.5">
-          Gemini
-          {!isGoogleConnected && <Lock className="text-muted-foreground h-3 w-3" />}
-        </DropdownMenuLabel>
-        {isGoogleConnected ? (
-          SORTED_GOOGLE_MODELS.map((model) => (
             <DropdownMenuItem
               key={model.id}
               data-testid={`chat-model-option-${model.id}`}
