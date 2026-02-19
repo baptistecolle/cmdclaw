@@ -72,6 +72,21 @@ type GmailMessageResponse = {
   };
 };
 
+type GoogleCalendarEventDateTime = {
+  dateTime?: string;
+  date?: string;
+};
+
+type GoogleCalendarEvent = {
+  id?: string;
+  summary?: string;
+  start?: GoogleCalendarEventDateTime;
+};
+
+type GoogleCalendarEventsResponse = {
+  items?: GoogleCalendarEvent[];
+};
+
 type UnipileUserResponse = {
   provider_id?: string;
   display_name?: string;
@@ -547,6 +562,91 @@ export async function getGmailAccessTokenForExpectedUser(): Promise<string> {
   }
 
   return gmailToken;
+}
+
+async function googleCalendarApi<T>(
+  token: string,
+  path: string,
+  params: Record<string, string | number | boolean> = {},
+): Promise<T> {
+  const query = new URLSearchParams(
+    Object.entries(params).map(([key, value]) => [key, String(value)]),
+  ).toString();
+  const url = `https://www.googleapis.com/calendar/v3/${path}${query ? `?${query}` : ""}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Google Calendar API ${path} failed with HTTP ${response.status}`);
+  }
+
+  return (await response.json()) as T;
+}
+
+function normalizeCalendarStart(start: GoogleCalendarEventDateTime | undefined): string {
+  if (!start) {
+    return "";
+  }
+  return (start.dateTime ?? start.date ?? "").trim();
+}
+
+export async function getGoogleCalendarAccessTokenForExpectedUser(): Promise<string> {
+  const dbUser = await db.query.user.findFirst({
+    where: eq(user.email, expectedUserEmail),
+  });
+
+  if (!dbUser) {
+    throw new Error(`Live e2e user not found: ${expectedUserEmail}`);
+  }
+
+  const tokens = await getValidTokensForUser(dbUser.id);
+  const googleCalendarToken = tokens.get("google_calendar");
+
+  if (!googleCalendarToken) {
+    throw new Error(
+      `Google Calendar is not connected for ${expectedUserEmail}. Connect Google Calendar in app integrations before running this test.`,
+    );
+  }
+
+  return googleCalendarToken;
+}
+
+export async function readUpcomingGoogleCalendarEvent(args: {
+  token: string;
+  calendarId?: string;
+}): Promise<{ id: string; summary: string; start: string }> {
+  const encodedCalendarId = encodeURIComponent(args.calendarId ?? "primary");
+  const events = await googleCalendarApi<GoogleCalendarEventsResponse>(
+    args.token,
+    `calendars/${encodedCalendarId}/events`,
+    {
+      maxResults: 5,
+      singleEvents: true,
+      orderBy: "startTime",
+      timeMin: new Date().toISOString(),
+    },
+  );
+
+  const readableEvent = (events.items ?? []).find((event) => {
+    const id = event.id?.trim() ?? "";
+    const summary = event.summary?.replace(/\s+/g, " ").trim() ?? "";
+    const start = normalizeCalendarStart(event.start);
+    return Boolean(id && summary && start);
+  });
+
+  if (!readableEvent?.id) {
+    throw new Error("Could not find a readable upcoming event in Google Calendar.");
+  }
+
+  return {
+    id: readableEvent.id,
+    summary: readableEvent.summary!.replace(/\s+/g, " ").trim(),
+    start: normalizeCalendarStart(readableEvent.start),
+  };
 }
 
 export async function getLinkedInAccountIdForExpectedUser(): Promise<string> {
