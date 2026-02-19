@@ -46,6 +46,19 @@ export type DoneArtifactsData = {
     sandboxStartupDurationMs?: number;
     sandboxStartupMode?: "created" | "reused" | "unknown";
     generationDurationMs?: number;
+    phaseDurationsMs?: {
+      agentInitMs?: number;
+      prePromptSetupMs?: number;
+      agentReadyToPromptMs?: number;
+      waitForFirstEventMs?: number;
+      modelStreamMs?: number;
+      postProcessingMs?: number;
+    };
+    phaseTimestamps?: Array<{
+      phase: string;
+      at: string;
+      elapsedMs: number;
+    }>;
   };
   attachments: Array<{
     id: string;
@@ -62,6 +75,7 @@ export type GenerationStartInput = {
   model?: string;
   autoApprove?: boolean;
   deviceId?: string;
+  selectedPlatformSkillSlugs?: string[];
   attachments?: { name: string; mimeType: string; dataUrl: string }[];
 };
 

@@ -25,6 +25,12 @@ export const template = Template()
   .copy("opencode.json", "/app/opencode.json")
   .runCmd("mkdir -p /app/.opencode/plugins")
   .copy("plugins", "/app/.opencode/plugins")
+  // Prewarm OpenCode runtime/plugin deps to avoid 3-5s lazy install on first health request
+  .runCmd("mkdir -p $HOME/.config/opencode /app/.opencode $HOME/.cache/opencode")
+  .runCmd("cp /app/opencode.json /app/.opencode/opencode.json")
+  .runCmd(
+    'bash -lc \'set -euo pipefail; opencode serve --hostname 127.0.0.1 --port 4096 > /tmp/opencode-prewarm.log 2>&1 & pid=$!; ok=0; for i in $(seq 1 120); do if curl -fsS http://127.0.0.1:4096/health >/dev/null 2>&1; then ok=1; break; fi; sleep 0.25; done; kill $pid || true; wait $pid || true; test "$ok" = "1"\'',
+  )
   // Copy skills into .claude/skills
   .runCmd("mkdir -p /app/.claude")
   .copy("skills", "/app/.claude/skills")

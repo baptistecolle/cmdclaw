@@ -147,7 +147,7 @@ export function ActivityItem({ item }: Props) {
             alt={getIntegrationDisplayName(integration)}
             width={14}
             height={14}
-            className="h-3.5 w-3.5 flex-shrink-0"
+            className="h-3.5 w-auto flex-shrink-0"
           />
         );
       }

@@ -55,6 +55,19 @@ export type Message = {
     sandboxStartupDurationMs?: number;
     sandboxStartupMode?: "created" | "reused" | "unknown";
     generationDurationMs?: number;
+    phaseDurationsMs?: {
+      agentInitMs?: number;
+      prePromptSetupMs?: number;
+      agentReadyToPromptMs?: number;
+      waitForFirstEventMs?: number;
+      modelStreamMs?: number;
+      postProcessingMs?: number;
+    };
+    phaseTimestamps?: Array<{
+      phase: string;
+      at: string;
+      elapsedMs: number;
+    }>;
   };
 };
 

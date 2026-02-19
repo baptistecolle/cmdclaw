@@ -4,6 +4,8 @@ import { z } from "zod";
 import { db } from "@/server/db/client";
 import { generation, conversation } from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
+import { listSelectablePlatformSkills } from "@/server/services/platform-skill-service";
+import { detectMessageLanguage } from "@/server/utils/detect-message-language";
 import { logServerEvent } from "@/server/utils/observability";
 import { protectedProcedure } from "../middleware";
 
@@ -83,6 +85,25 @@ const generationEventSchema = z.discriminatedUnion("type", [
             sandboxStartupDurationMs: z.number().optional(),
             sandboxStartupMode: z.enum(["created", "reused", "unknown"]).optional(),
             generationDurationMs: z.number().optional(),
+            phaseDurationsMs: z
+              .object({
+                agentInitMs: z.number().optional(),
+                prePromptSetupMs: z.number().optional(),
+                agentReadyToPromptMs: z.number().optional(),
+                waitForFirstEventMs: z.number().optional(),
+                modelStreamMs: z.number().optional(),
+                postProcessingMs: z.number().optional(),
+              })
+              .optional(),
+            phaseTimestamps: z
+              .array(
+                z.object({
+                  phase: z.string(),
+                  at: z.string(),
+                  elapsedMs: z.number(),
+                }),
+              )
+              .optional(),
           })
           .optional(),
         attachments: z.array(
@@ -138,6 +159,7 @@ const startGeneration = protectedProcedure
       model: z.string().optional(),
       autoApprove: z.boolean().optional(),
       deviceId: z.string().optional(),
+      selectedPlatformSkillSlugs: z.array(z.string().max(128)).max(50).optional(),
       attachments: z
         .array(
           z.object({
@@ -172,6 +194,7 @@ const startGeneration = protectedProcedure
         userId: context.user.id,
         autoApprove: input.autoApprove,
         deviceId: input.deviceId,
+        selectedPlatformSkillSlugs: input.selectedPlatformSkillSlugs,
         attachments: input.attachments,
       });
 
@@ -203,6 +226,36 @@ const startGeneration = protectedProcedure
       );
       throw error;
     }
+  });
+
+const listPlatformSkills = protectedProcedure
+  .output(
+    z.array(
+      z.object({
+        slug: z.string(),
+        title: z.string(),
+        description: z.string(),
+      }),
+    ),
+  )
+  .handler(async () => {
+    return await listSelectablePlatformSkills();
+  });
+
+const detectUserMessageLanguage = protectedProcedure
+  .input(
+    z.object({
+      text: z.string().min(1).max(10000),
+    }),
+  )
+  .output(
+    z.object({
+      language: z.enum(["french", "other"]),
+    }),
+  )
+  .handler(async ({ input }) => {
+    const language = await detectMessageLanguage(input.text);
+    return { language };
   });
 
 // Subscribe to generation stream (can be called multiple times, from multiple clients)
@@ -406,6 +459,8 @@ export const generationRouter = {
   resumeGeneration,
   submitApproval,
   submitAuthResult,
+  listPlatformSkills,
+  detectUserMessageLanguage,
   getGenerationStatus,
   getActiveGeneration,
 };

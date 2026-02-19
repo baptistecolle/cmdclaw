@@ -64,5 +64,7 @@ If not set, defaults to `bap-agent-dev`.
 When you modify CLI tools in `src/cli/`, rebuild the template:
 
 ```bash
-npx tsx build.dev.ts
+tsx build.dev.ts
 ```
+
+When you change OpenCode/runtime setup in `src/e2b-template/template.ts`, rebuild the template too so runtime sandboxes pick up the prewarmed OpenCode cache and plugins.

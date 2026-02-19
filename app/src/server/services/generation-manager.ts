@@ -73,6 +73,7 @@ import {
   writeMemoryEntry,
   writeSessionTranscriptFromConversation,
 } from "@/server/services/memory-service";
+import { resolveSelectedPlatformSkillSlugs } from "@/server/services/platform-skill-service";
 import {
   uploadSandboxFile,
   collectNewSandboxFiles,
@@ -262,6 +263,7 @@ interface GenerationContext {
   workflowPromptDo?: string;
   workflowPromptDont?: string;
   triggerPayload?: unknown;
+  selectedPlatformSkillSlugs?: string[];
   // Sandbox file collection
   generationMarkerTime?: number;
   sandbox?: SandboxBackend;
@@ -274,6 +276,12 @@ interface GenerationContext {
   agentInitFailedAt?: number;
   agentSandboxReadyAt?: number;
   agentSandboxMode?: "created" | "reused" | "unknown";
+  phaseMarks?: Record<string, number>;
+  phaseTimeline?: Array<{
+    phase: string;
+    atMs: number;
+    elapsedMs: number;
+  }>;
   lastCancellationCheckAt?: number;
   isFinalizing?: boolean;
 }
@@ -339,6 +347,13 @@ const AGENT_PREPARING_TIMEOUT_MS = (() => {
   }
   return Math.floor(seconds * 1000);
 })();
+const OPENCODE_PROMPT_TIMEOUT_MS = (() => {
+  const seconds = Number(process.env.OPENCODE_PROMPT_TIMEOUT_SECONDS ?? "180");
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return 3 * 60 * 1000;
+  }
+  return Math.floor(seconds * 1000);
+})();
 // Save debounce interval for text chunks
 const SAVE_DEBOUNCE_MS = 2000;
 // Compaction + memory flush defaults
@@ -368,12 +383,33 @@ function buildExecutionPolicy(params: {
   allowedIntegrations?: IntegrationType[];
   allowedCustomIntegrations?: string[];
   autoApprove: boolean;
+  selectedPlatformSkillSlugs?: string[];
 }): GenerationExecutionPolicy {
   return {
     allowedIntegrations: params.allowedIntegrations,
     allowedCustomIntegrations: params.allowedCustomIntegrations,
     autoApprove: params.autoApprove,
+    selectedPlatformSkillSlugs: params.selectedPlatformSkillSlugs,
   };
+}
+
+function getSelectedPlatformSkillPrompt(selectedPlatformSkillSlugs: string[] | undefined): string {
+  if (!selectedPlatformSkillSlugs || selectedPlatformSkillSlugs.length === 0) {
+    return "";
+  }
+
+  const list = selectedPlatformSkillSlugs.map((slug) => `- ${slug}`).join("\n");
+  const paths = selectedPlatformSkillSlugs
+    .map((slug) => `- /app/.claude/skills/${slug}/SKILL.md`)
+    .join("\n");
+  return [
+    "# Selected Platform Skills",
+    "The user selected these platform skills for this generation:",
+    list,
+    "Prioritize these selected skills before using other platform skills.",
+    "Read and follow these SKILL.md files first:",
+    paths,
+  ].join("\n");
 }
 
 function computeExpiryIso(timeoutMs: number): string {
@@ -641,6 +677,7 @@ class GenerationManager {
     allowedIntegrations?: IntegrationType[];
     allowedCustomIntegrations?: string[];
     autoApprove?: boolean;
+    selectedPlatformSkillSlugs?: string[];
   } {
     const policy =
       (genRecord.executionPolicy as GenerationExecutionPolicy | null | undefined) ?? undefined;
@@ -653,7 +690,97 @@ class GenerationManager {
       allowedIntegrations,
       allowedCustomIntegrations: policy?.allowedCustomIntegrations,
       autoApprove: policy?.autoApprove ?? fallbackAutoApprove,
+      selectedPlatformSkillSlugs: Array.isArray(policy?.selectedPlatformSkillSlugs)
+        ? policy.selectedPlatformSkillSlugs.filter(
+            (entry): entry is string => typeof entry === "string",
+          )
+        : undefined,
     };
+  }
+
+  private markPhase(ctx: GenerationContext, phase: string): void {
+    const now = Date.now();
+    const startedAtMs = ctx.startedAt.getTime();
+    if (!ctx.phaseMarks) {
+      ctx.phaseMarks = {};
+    }
+    if (!ctx.phaseTimeline) {
+      ctx.phaseTimeline = [];
+    }
+    if (ctx.phaseMarks[phase] === undefined) {
+      ctx.phaseMarks[phase] = now;
+    }
+    ctx.phaseTimeline.push({
+      phase,
+      atMs: now,
+      elapsedMs: Math.max(0, now - startedAtMs),
+    });
+  }
+
+  private buildMessageTiming(ctx: GenerationContext): MessageTiming {
+    const generationCompletedAt = Date.now();
+    const generationStartedAt = ctx.startedAt.getTime();
+    const phaseMarks = ctx.phaseMarks ?? {};
+    const phaseTimeline = ctx.phaseTimeline ?? [];
+    const messageTiming: MessageTiming = {
+      generationDurationMs: Math.max(0, generationCompletedAt - generationStartedAt),
+    };
+    if (ctx.agentInitStartedAt && ctx.agentSandboxReadyAt) {
+      messageTiming.sandboxStartupDurationMs = Math.max(
+        0,
+        ctx.agentSandboxReadyAt - ctx.agentInitStartedAt,
+      );
+      messageTiming.sandboxStartupMode = ctx.agentSandboxMode ?? "unknown";
+    }
+
+    const agentInitMs =
+      phaseMarks.agent_init_started !== undefined && phaseMarks.agent_init_ready !== undefined
+        ? Math.max(0, phaseMarks.agent_init_ready - phaseMarks.agent_init_started)
+        : undefined;
+    const prePromptSetupMs =
+      phaseMarks.pre_prompt_setup_started !== undefined && phaseMarks.prompt_sent !== undefined
+        ? Math.max(0, phaseMarks.prompt_sent - phaseMarks.pre_prompt_setup_started)
+        : undefined;
+    const agentReadyToPromptMs =
+      phaseMarks.agent_init_ready !== undefined && phaseMarks.prompt_sent !== undefined
+        ? Math.max(0, phaseMarks.prompt_sent - phaseMarks.agent_init_ready)
+        : undefined;
+    const waitForFirstEventMs =
+      phaseMarks.prompt_sent !== undefined && phaseMarks.first_event_received !== undefined
+        ? Math.max(0, phaseMarks.first_event_received - phaseMarks.prompt_sent)
+        : undefined;
+    const streamFinishedAt = phaseMarks.session_idle ?? phaseMarks.prompt_completed;
+    const modelStreamMs =
+      phaseMarks.first_event_received !== undefined && streamFinishedAt !== undefined
+        ? Math.max(0, streamFinishedAt - phaseMarks.first_event_received)
+        : undefined;
+    const postProcessingMs =
+      phaseMarks.post_processing_started !== undefined &&
+      phaseMarks.post_processing_completed !== undefined
+        ? Math.max(0, phaseMarks.post_processing_completed - phaseMarks.post_processing_started)
+        : undefined;
+
+    const phaseDurationsMs = {
+      agentInitMs,
+      prePromptSetupMs,
+      agentReadyToPromptMs,
+      waitForFirstEventMs,
+      modelStreamMs,
+      postProcessingMs,
+    };
+    if (Object.values(phaseDurationsMs).some((value) => value !== undefined)) {
+      messageTiming.phaseDurationsMs = phaseDurationsMs;
+    }
+
+    if (phaseTimeline.length > 0) {
+      messageTiming.phaseTimestamps = phaseTimeline.map((entry) => ({
+        phase: entry.phase,
+        at: new Date(entry.atMs).toISOString(),
+        elapsedMs: entry.elapsedMs,
+      }));
+    }
+
+    return messageTiming;
   }
 
   /**
@@ -668,6 +795,7 @@ class GenerationManager {
     allowedIntegrations?: IntegrationType[];
     deviceId?: string;
     attachments?: { name: string; mimeType: string; dataUrl: string }[];
+    selectedPlatformSkillSlugs?: string[];
   }): Promise<{ generationId: string; conversationId: string }> {
     const { content, userId, model, autoApprove } = params;
     const traceId = createTraceId();
@@ -686,6 +814,7 @@ class GenerationManager {
         hasDeviceId: Boolean(params.deviceId),
         hasAllowedIntegrations: params.allowedIntegrations !== undefined,
         attachmentsCount: params.attachments?.length ?? 0,
+        selectedPlatformSkillCount: params.selectedPlatformSkillSlugs?.length ?? 0,
       },
       logContext,
     );
@@ -769,6 +898,10 @@ class GenerationManager {
       { ...logContext, conversationId: conv.id },
     );
 
+    const selectedPlatformSkillSlugs = await resolveSelectedPlatformSkillSlugs(
+      params.selectedPlatformSkillSlugs,
+    );
+
     // Save user message
     const [userMsg] = await db
       .insert(message)
@@ -842,6 +975,7 @@ class GenerationManager {
         executionPolicy: buildExecutionPolicy({
           allowedIntegrations: params.allowedIntegrations,
           autoApprove: conv.autoApprove,
+          selectedPlatformSkillSlugs,
         }),
         contentParts: [],
         inputTokens: 0,
@@ -932,14 +1066,18 @@ class GenerationManager {
       allowedIntegrations: params.allowedIntegrations,
       autoApprove: conv.autoApprove,
       attachments: params.attachments,
+      selectedPlatformSkillSlugs,
       userStagedFilePaths: new Set(),
       uploadedSandboxFileIds: new Set(),
       agentInitStartedAt: undefined,
       agentInitReadyAt: undefined,
       agentInitFailedAt: undefined,
+      phaseMarks: {},
+      phaseTimeline: [],
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
+    this.markPhase(ctx, "generation_started");
 
     logServerEvent(
       "info",
@@ -1022,6 +1160,7 @@ class GenerationManager {
           allowedIntegrations: params.allowedIntegrations,
           allowedCustomIntegrations: params.allowedCustomIntegrations,
           autoApprove: params.autoApprove,
+          selectedPlatformSkillSlugs: undefined,
         }),
         contentParts: [],
         inputTokens: 0,
@@ -1087,14 +1226,18 @@ class GenerationManager {
       workflowPromptDo: undefined,
       workflowPromptDont: undefined,
       triggerPayload: undefined,
+      selectedPlatformSkillSlugs: undefined,
       userStagedFilePaths: new Set(),
       uploadedSandboxFileIds: new Set(),
       agentInitStartedAt: undefined,
       agentInitReadyAt: undefined,
       agentInitFailedAt: undefined,
+      phaseMarks: {},
+      phaseTimeline: [],
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
+    this.markPhase(ctx, "generation_started");
 
     logServerEvent(
       "info",
@@ -1208,14 +1351,18 @@ class GenerationManager {
       workflowPromptDo: undefined,
       workflowPromptDont: undefined,
       triggerPayload: undefined,
+      selectedPlatformSkillSlugs: executionPolicy.selectedPlatformSkillSlugs,
       userStagedFilePaths: new Set(),
       uploadedSandboxFileIds: new Set(),
       agentInitStartedAt: undefined,
       agentInitReadyAt: undefined,
       agentInitFailedAt: undefined,
+      phaseMarks: {},
+      phaseTimeline: [],
     };
 
     this.activeGenerations.set(genRecord.id, ctx);
+    this.markPhase(ctx, "generation_started");
     if (ctx.status === "awaiting_approval" && ctx.pendingApproval?.expiresAt) {
       await this.enqueueGenerationTimeout(ctx.id, "approval", ctx.pendingApproval.expiresAt);
     }
@@ -1925,6 +2072,8 @@ class GenerationManager {
    * Original E2B/OpenCode generation flow. Delegates everything to OpenCode inside E2B sandbox.
    */
   private async runOpenCodeGeneration(ctx: GenerationContext): Promise<void> {
+    let promptTimeoutTriggered = false;
+    let clearPromptTimeout: (() => void) | undefined;
     try {
       if (await this.refreshCancellationSignal(ctx, { force: true })) {
         await this.finishGeneration(ctx, "cancelled");
@@ -1981,7 +2130,7 @@ class GenerationManager {
       });
 
       // Determine if we need to replay history (existing conversation)
-      const hasExistingMessages = !!conv?.opencodeSessionId;
+      const hasExistingMessages = !ctx.isNewConversation;
 
       // Get or create sandbox with OpenCode session
       const agentInitStartedAt = Date.now();
@@ -1989,6 +2138,7 @@ class GenerationManager {
       ctx.agentInitStartedAt = agentInitStartedAt;
       ctx.agentInitReadyAt = undefined;
       ctx.agentInitFailedAt = undefined;
+      this.markPhase(ctx, "agent_init_started");
       this.broadcast(ctx, {
         type: "status_change",
         status: "agent_init_started",
@@ -2046,6 +2196,7 @@ class GenerationManager {
               },
               onLifecycle: (stage, details) => {
                 const status = `agent_init_${stage}`;
+                this.markPhase(ctx, status);
                 if (ctx.agentInitStartedAt) {
                   if (stage === "sandbox_created") {
                     ctx.agentSandboxReadyAt = Date.now();
@@ -2074,6 +2225,7 @@ class GenerationManager {
         sessionId = session.sessionId;
         sandbox = session.sandbox;
         ctx.agentInitReadyAt = Date.now();
+        this.markPhase(ctx, "agent_init_ready");
         this.broadcast(ctx, {
           type: "status_change",
           status: "agent_init_ready",
@@ -2095,6 +2247,7 @@ class GenerationManager {
         );
       } catch (error) {
         ctx.agentInitFailedAt = Date.now();
+        this.markPhase(ctx, "agent_init_failed");
         this.broadcast(ctx, {
           type: "status_change",
           status: "agent_init_failed",
@@ -2134,6 +2287,7 @@ class GenerationManager {
       ctx.e2bSandbox = sandbox;
       ctx.sentFilePaths = new Set();
       ctx.userStagedFilePaths = new Set();
+      this.markPhase(ctx, "pre_prompt_setup_started");
 
       // Write skills to sandbox
       const writtenSkills = await writeSkillsToSandbox(sandbox, ctx.userId);
@@ -2223,11 +2377,15 @@ class GenerationManager {
       ].join("");
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
       const integrationSkillDraftInstructions = this.getIntegrationSkillDraftInstructions();
+      const selectedPlatformSkillInstructions = getSelectedPlatformSkillPrompt(
+        ctx.selectedPlatformSkillSlugs,
+      );
       const systemPromptParts = [
         baseSystemPrompt,
         fileShareInstructions,
         cliInstructions,
         skillsInstructions,
+        selectedPlatformSkillInstructions,
         integrationSkillsInstructions,
         integrationSkillDraftInstructions,
         memoryInstructions,
@@ -2246,7 +2404,11 @@ class GenerationManager {
       let stagedUploadFailureCount = 0;
 
       // Subscribe to SSE events BEFORE sending the prompt
-      const eventResult = await client.event.subscribe();
+      const promptTimeoutController = new AbortController();
+      const eventResult = await client.event.subscribe(
+        {},
+        { signal: promptTimeoutController.signal },
+      );
       const eventStream = eventResult.stream;
 
       // Resolve provider from model ID
@@ -2336,6 +2498,31 @@ class GenerationManager {
           sessionId,
         },
       );
+      this.markPhase(ctx, "prompt_sent");
+      const promptTimeoutId = setTimeout(() => {
+        promptTimeoutTriggered = true;
+        promptTimeoutController.abort();
+        logServerEvent(
+          "error",
+          "OPENCODE_PROMPT_TIMEOUT",
+          { timeoutMs: OPENCODE_PROMPT_TIMEOUT_MS },
+          {
+            source: "generation-manager",
+            traceId: ctx.traceId,
+            generationId: ctx.id,
+            conversationId: ctx.conversationId,
+            userId: ctx.userId,
+            sessionId,
+          },
+        );
+        void client.session.abort({ sessionID: sessionId }).catch((err) => {
+          console.error("[GenerationManager] Failed to abort timed out OpenCode session:", err);
+        });
+      }, OPENCODE_PROMPT_TIMEOUT_MS);
+      clearPromptTimeout = () => {
+        clearTimeout(promptTimeoutId);
+        clearPromptTimeout = undefined;
+      };
       const promptPromise = client.session.prompt({
         sessionID: sessionId,
         parts: promptParts,
@@ -2345,6 +2532,9 @@ class GenerationManager {
 
       // Process SSE events
       for await (const rawEvent of eventStream) {
+        if (!ctx.phaseMarks?.first_event_received) {
+          this.markPhase(ctx, "first_event_received");
+        }
         const event = rawEvent as OpencodeEvent;
         if (await this.refreshCancellationSignal(ctx)) {
           break;
@@ -2397,6 +2587,7 @@ class GenerationManager {
 
         // Check for session idle (generation complete)
         if (event.type === "session.idle") {
+          this.markPhase(ctx, "session_idle");
           console.log("[GenerationManager] Session idle - generation complete");
           break;
         }
@@ -2428,7 +2619,10 @@ class GenerationManager {
 
       // Wait for prompt to complete
       await promptPromise;
+      clearPromptTimeout?.();
+      this.markPhase(ctx, "prompt_completed");
       await this.refreshCancellationSignal(ctx, { force: true });
+      this.markPhase(ctx, "post_processing_started");
 
       if (ctx.e2bSandbox) {
         try {
@@ -2486,6 +2680,7 @@ class GenerationManager {
           console.error("[GenerationManager] Failed to collect sandbox files:", err);
         }
       }
+      this.markPhase(ctx, "post_processing_completed");
 
       // Check if aborted
       if (ctx.abortController.signal.aborted) {
@@ -2502,8 +2697,14 @@ class GenerationManager {
       );
       await this.finishGeneration(ctx, "completed");
     } catch (error) {
+      clearPromptTimeout?.();
+      if (promptTimeoutTriggered && error instanceof Error && error.name === "AbortError") {
+        ctx.errorMessage = "OpenCode prompt timed out";
+      }
       console.error("[GenerationManager] Error:", error);
-      ctx.errorMessage = error instanceof Error ? error.message : "Unknown error";
+      if (!ctx.errorMessage) {
+        ctx.errorMessage = error instanceof Error ? error.message : "Unknown error";
+      }
       console.info(
         `[GenerationManager][SUMMARY] status=error generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} error=${JSON.stringify(ctx.errorMessage)}`,
       );
@@ -2589,9 +2790,13 @@ class GenerationManager {
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
       const memoryPrompt = buildMemorySystemPrompt();
       const integrationSkillDraftInstructions = this.getIntegrationSkillDraftInstructions();
+      const selectedPlatformSkillInstructions = getSelectedPlatformSkillPrompt(
+        ctx.selectedPlatformSkillSlugs,
+      );
       const systemPromptParts = [
         baseSystemPrompt,
         cliInstructions,
+        selectedPlatformSkillInstructions,
         integrationSkillsPrompt,
         integrationSkillDraftInstructions,
         memoryPrompt,
@@ -4683,7 +4888,10 @@ class GenerationManager {
         if (status === "completed" && ctx.sessionId) {
           await db
             .update(conversation)
-            .set({ opencodeSessionId: ctx.sessionId })
+            .set({
+              opencodeSessionId: ctx.sessionId,
+              opencodeSandboxId: ctx.sandboxId ?? null,
+            })
             .where(eq(conversation.id, ctx.conversationId));
         }
 
@@ -4750,16 +4958,8 @@ class GenerationManager {
           ctx.contentParts = cancelledParts;
         }
 
-        const messageTiming: MessageTiming = {
-          generationDurationMs: Math.max(0, Date.now() - ctx.startedAt.getTime()),
-        };
-        if (ctx.agentInitStartedAt && ctx.agentSandboxReadyAt) {
-          messageTiming.sandboxStartupDurationMs = Math.max(
-            0,
-            ctx.agentSandboxReadyAt - ctx.agentInitStartedAt,
-          );
-          messageTiming.sandboxStartupMode = ctx.agentSandboxMode ?? "unknown";
-        }
+        this.markPhase(ctx, "generation_completed");
+        const messageTiming: MessageTiming = this.buildMessageTiming(ctx);
 
         // Save assistant message for completed and cancelled generations
         const [assistantMessage] = await db

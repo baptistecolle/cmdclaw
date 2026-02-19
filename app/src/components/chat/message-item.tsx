@@ -38,6 +38,19 @@ type Props = {
     sandboxStartupDurationMs?: number;
     sandboxStartupMode?: "created" | "reused" | "unknown";
     generationDurationMs?: number;
+    phaseDurationsMs?: {
+      agentInitMs?: number;
+      prePromptSetupMs?: number;
+      agentReadyToPromptMs?: number;
+      waitForFirstEventMs?: number;
+      modelStreamMs?: number;
+      postProcessingMs?: number;
+    };
+    phaseTimestamps?: Array<{
+      phase: string;
+      at: string;
+      elapsedMs: number;
+    }>;
   };
 };
 
@@ -561,6 +574,35 @@ export function MessageItem({
             <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
               <Bot className="h-3 w-3" />
               <span>Generation: {formatDuration(timing.generationDurationMs)}</span>
+            </div>
+          )}
+          {timing.phaseDurationsMs?.agentInitMs !== undefined && (
+            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
+              <span>Agent init: {formatDuration(timing.phaseDurationsMs.agentInitMs)}</span>
+            </div>
+          )}
+          {timing.phaseDurationsMs?.prePromptSetupMs !== undefined && (
+            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
+              <span>Pre-prompt: {formatDuration(timing.phaseDurationsMs.prePromptSetupMs)}</span>
+            </div>
+          )}
+          {timing.phaseDurationsMs?.waitForFirstEventMs !== undefined && (
+            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
+              <span>
+                First event wait: {formatDuration(timing.phaseDurationsMs.waitForFirstEventMs)}
+              </span>
+            </div>
+          )}
+          {timing.phaseDurationsMs?.modelStreamMs !== undefined && (
+            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
+              <span>Model stream: {formatDuration(timing.phaseDurationsMs.modelStreamMs)}</span>
+            </div>
+          )}
+          {timing.phaseDurationsMs?.postProcessingMs !== undefined && (
+            <div className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1">
+              <span>
+                Post-processing: {formatDuration(timing.phaseDurationsMs.postProcessingMs)}
+              </span>
             </div>
           )}
         </div>

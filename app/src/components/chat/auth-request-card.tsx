@@ -84,7 +84,7 @@ export function AuthRequestCard({
                 alt={getIntegrationDisplayName(integration)}
                 width={20}
                 height={20}
-                className="h-5 w-5 object-contain"
+                className="h-5 w-auto object-contain"
               />
             ) : null;
           })}
@@ -138,7 +138,7 @@ export function AuthRequestCard({
                         alt={displayName}
                         width={24}
                         height={24}
-                        className="h-6 w-6 object-contain"
+                        className="h-6 w-auto object-contain"
                       />
                     )}
                     <span className="text-sm">

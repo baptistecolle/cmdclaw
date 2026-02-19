@@ -174,6 +174,18 @@ function formatToolResult(result: unknown): string {
   }
 }
 
+function formatDurationMs(ms: number): string {
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`;
+  }
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function formatClockTime(ms: number): string {
+  const date = new Date(ms);
+  return date.toISOString().replace("T", " ").replace("Z", " UTC");
+}
+
 function isAuthIntegrationType(integration: string): integration is AuthIntegrationType {
   return (AUTH_INTEGRATION_TYPES as readonly string[]).includes(integration);
 }
@@ -487,6 +499,8 @@ async function runGeneration(
   attachments?: { name: string; mimeType: string; dataUrl: string }[],
 ): Promise<{ generationId: string; conversationId: string } | null> {
   let outputStarted = false;
+  const generationStartedAtMs = Date.now();
+  const statusTimeline: Array<{ status: string; atMs: number; elapsedMs: number }> = [];
   const runtime = createGenerationRuntime();
   const streamedSandboxFileIds = new Set<string>();
   const authHandlingInProgress = new Set<string>();
@@ -726,7 +740,12 @@ async function runGeneration(
           process.stdout.write(`\n[file] ${file.filename} (${file.path})\n`);
         },
         onStatusChange: (status) => {
-          process.stdout.write(`\n[status] ${status}\n`);
+          const now = Date.now();
+          const elapsedMs = Math.max(0, now - generationStartedAtMs);
+          statusTimeline.push({ status, atMs: now, elapsedMs });
+          process.stdout.write(
+            `\n[status] ${status} @ ${formatClockTime(now)} (+${formatDurationMs(elapsedMs)})\n`,
+          );
         },
         onDone: async (doneGenerationId, doneConversationId, messageId, _usage, artifacts) => {
           runtime.handleDone({
@@ -740,6 +759,55 @@ async function runGeneration(
                 continue;
               }
               process.stdout.write(`\n[file] ${file.filename} (${file.path}) [from_done]\n`);
+            }
+          }
+          if (artifacts?.timing) {
+            const timing = artifacts.timing;
+            process.stdout.write("\n[timing] Summary\n");
+            if (timing.generationDurationMs !== undefined) {
+              process.stdout.write(
+                `  generation: ${formatDurationMs(timing.generationDurationMs)}\n`,
+              );
+            }
+            if (timing.sandboxStartupDurationMs !== undefined) {
+              process.stdout.write(
+                `  sandbox_prep${
+                  timing.sandboxStartupMode ? ` (${timing.sandboxStartupMode})` : ""
+                }: ${formatDurationMs(timing.sandboxStartupDurationMs)}\n`,
+              );
+            }
+            const phaseDurations = timing.phaseDurationsMs;
+            if (phaseDurations) {
+              const rows: Array<[string, number | undefined]> = [
+                ["agent_init", phaseDurations.agentInitMs],
+                ["pre_prompt_setup", phaseDurations.prePromptSetupMs],
+                ["agent_ready_to_prompt", phaseDurations.agentReadyToPromptMs],
+                ["wait_for_first_event", phaseDurations.waitForFirstEventMs],
+                ["model_stream", phaseDurations.modelStreamMs],
+                ["post_processing", phaseDurations.postProcessingMs],
+              ];
+              for (const [label, value] of rows) {
+                if (value === undefined) {
+                  continue;
+                }
+                process.stdout.write(`  ${label}: ${formatDurationMs(value)}\n`);
+              }
+            }
+            if (timing.phaseTimestamps?.length) {
+              process.stdout.write("[timing] Phase timestamps\n");
+              for (const entry of timing.phaseTimestamps) {
+                process.stdout.write(
+                  `  - ${entry.phase}: ${entry.at} (+${formatDurationMs(entry.elapsedMs)})\n`,
+                );
+              }
+            }
+          }
+          if (statusTimeline.length > 0) {
+            process.stdout.write("[timing] Status timeline\n");
+            for (const entry of statusTimeline) {
+              process.stdout.write(
+                `  - ${entry.status}: ${formatClockTime(entry.atMs)} (+${formatDurationMs(entry.elapsedMs)})\n`,
+              );
             }
           }
           if (outputStarted) {

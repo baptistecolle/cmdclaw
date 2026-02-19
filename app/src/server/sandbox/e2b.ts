@@ -38,6 +38,7 @@ interface SandboxState {
   sandbox: Sandbox;
   client: OpencodeClient;
   serverUrl: string;
+  reused: boolean;
 }
 
 async function connectSandboxById(sandboxId: string): Promise<Sandbox | null> {
@@ -150,8 +151,35 @@ export async function getOrCreateSandbox(
 
   const conv = await db.query.conversation.findFirst({
     where: eq(conversation.id, config.conversationId),
-    columns: { currentGenerationId: true },
+    columns: { currentGenerationId: true, opencodeSandboxId: true },
   });
+
+  if (conv?.opencodeSandboxId) {
+    const connected = await connectSandboxById(conv.opencodeSandboxId);
+    if (connected) {
+      const serverUrl = `https://${connected.getHost(OPENCODE_PORT)}`;
+      const health = await fetch(`${serverUrl}/doc`, { method: "GET" }).catch(() => null);
+      if (health?.ok) {
+        onLifecycle?.("sandbox_reused", {
+          conversationId: config.conversationId,
+          sandboxId: connected.sandboxId,
+        });
+        const client = createOpencodeClient({ baseUrl: serverUrl });
+        return {
+          sandbox: connected,
+          client,
+          serverUrl,
+          reused: true,
+        };
+      }
+    }
+
+    await db
+      .update(conversation)
+      .set({ opencodeSandboxId: null, opencodeSessionId: null })
+      .where(eq(conversation.id, config.conversationId));
+  }
+
   const persistedGeneration = conv?.currentGenerationId
     ? await db.query.generation.findFirst({
         where: and(
@@ -177,11 +205,16 @@ export async function getOrCreateSandbox(
       const serverUrl = `https://${connected.getHost(OPENCODE_PORT)}`;
       const health = await fetch(`${serverUrl}/doc`, { method: "GET" }).catch(() => null);
       if (health?.ok) {
+        onLifecycle?.("sandbox_reused", {
+          conversationId: config.conversationId,
+          sandboxId: connected.sandboxId,
+        });
         const client = createOpencodeClient({ baseUrl: serverUrl });
         return {
           sandbox: connected,
           client,
           serverUrl,
+          reused: true,
         };
       }
     }
@@ -373,7 +406,7 @@ export async function getOrCreateSandbox(
     serverUrl,
     durationMs: Date.now() - serverReadyStart,
   });
-  return { sandbox, client, serverUrl };
+  return { sandbox, client, serverUrl, reused: false };
 }
 
 /**
@@ -384,8 +417,29 @@ export async function getSandboxStateDurable(
 ): Promise<SandboxState | undefined> {
   const conv = await db.query.conversation.findFirst({
     where: eq(conversation.id, conversationId),
-    columns: { currentGenerationId: true },
+    columns: { currentGenerationId: true, opencodeSandboxId: true },
   });
+  if (conv?.opencodeSandboxId) {
+    const connectedByConversation = await connectSandboxById(conv.opencodeSandboxId);
+    if (connectedByConversation) {
+      const serverUrl = `https://${connectedByConversation.getHost(OPENCODE_PORT)}`;
+      const health = await fetch(`${serverUrl}/doc`, { method: "GET" }).catch(() => null);
+      if (health?.ok) {
+        return {
+          sandbox: connectedByConversation,
+          client: createOpencodeClient({ baseUrl: serverUrl }),
+          serverUrl,
+          reused: true,
+        };
+      }
+    }
+
+    await db
+      .update(conversation)
+      .set({ opencodeSandboxId: null, opencodeSessionId: null })
+      .where(eq(conversation.id, conversationId));
+  }
+
   const gen = conv?.currentGenerationId
     ? await db.query.generation.findFirst({
         where: and(
@@ -422,6 +476,7 @@ export async function getSandboxStateDurable(
     sandbox: connected,
     client: createOpencodeClient({ baseUrl: serverUrl }),
     serverUrl,
+    reused: true,
   };
   return hydrated;
 }
@@ -462,20 +517,43 @@ export async function getOrCreateSession(
   });
   const existingSessionId = conv?.opencodeSessionId ?? null;
 
-  // Reuse existing session if one already exists for this conversation
-  if (existingSessionId) {
-    options?.onLifecycle?.("session_reused", {
-      conversationId: config.conversationId,
-      sessionId: existingSessionId,
-      sandboxId: state.sandbox.sandboxId,
-    });
+  // Reuse existing session only if we also reused the sandbox that owns it,
+  // and the session ID is still valid on that sandbox's OpenCode server.
+  if (existingSessionId && state.reused) {
+    const existingSession = await state.client.session.get({ sessionID: existingSessionId });
+    if (!existingSession.error && existingSession.data) {
+      options?.onLifecycle?.("session_reused", {
+        conversationId: config.conversationId,
+        sessionId: existingSessionId,
+        sandboxId: state.sandbox.sandboxId,
+      });
+      logLifecycle(
+        "SESSION_REUSED",
+        {
+          conversationId: config.conversationId,
+          sessionId: existingSessionId,
+          sandboxId: state.sandbox.sandboxId,
+          durationMs: Date.now() - sessionInitStartedAt,
+        },
+        {
+          ...telemetryContext,
+          sandboxId: state.sandbox.sandboxId,
+          sessionId: existingSessionId,
+        },
+      );
+      return {
+        client: state.client,
+        sessionId: existingSessionId,
+        sandbox: state.sandbox,
+      };
+    }
+
     logLifecycle(
-      "SESSION_REUSED",
+      "SESSION_REUSE_INVALID",
       {
         conversationId: config.conversationId,
         sessionId: existingSessionId,
         sandboxId: state.sandbox.sandboxId,
-        durationMs: Date.now() - sessionInitStartedAt,
       },
       {
         ...telemetryContext,
@@ -483,11 +561,28 @@ export async function getOrCreateSession(
         sessionId: existingSessionId,
       },
     );
-    return {
-      client: state.client,
-      sessionId: existingSessionId,
-      sandbox: state.sandbox,
-    };
+    await db
+      .update(conversation)
+      .set({ opencodeSessionId: null })
+      .where(eq(conversation.id, config.conversationId));
+  } else if (existingSessionId && !state.reused) {
+    logLifecycle(
+      "SESSION_REUSE_SKIPPED_SANDBOX_REPLACED",
+      {
+        conversationId: config.conversationId,
+        sessionId: existingSessionId,
+        sandboxId: state.sandbox.sandboxId,
+      },
+      {
+        ...telemetryContext,
+        sandboxId: state.sandbox.sandboxId,
+        sessionId: existingSessionId,
+      },
+    );
+    await db
+      .update(conversation)
+      .set({ opencodeSessionId: null })
+      .where(eq(conversation.id, config.conversationId));
   }
 
   // Create a new session
@@ -735,9 +830,14 @@ export async function killSandbox(conversationId: string): Promise<void> {
     sandbox,
     client: createOpencodeClient({ baseUrl: `https://${sandbox.getHost(OPENCODE_PORT)}` }),
     serverUrl: `https://${sandbox.getHost(OPENCODE_PORT)}`,
+    reused: true,
   };
   try {
     await state.sandbox.kill();
+    await db
+      .update(conversation)
+      .set({ opencodeSandboxId: null, opencodeSessionId: null })
+      .where(eq(conversation.id, conversationId));
     logLifecycle(
       "VM_TERMINATED",
       {

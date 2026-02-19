@@ -38,6 +38,7 @@
     "test:coverage:check": "COVERAGE_CHECK=1 vitest run --coverage",
     "test:all": "bun run test:unit && bun run test:e2e",
     "worker": "bun --env-file=.env scripts/bullmq-worker.ts",
+    "worker:dev": "bun --watch --env-file=.env scripts/bullmq-worker.ts",
     "auth:generate": "bun x @better-auth/cli@latest generate --output src/server/db/auth-schema.ts -y",
     "docker-up:local": "docker compose up",
     "e2b:build:dev": "bun src/e2b-template/build.dev.ts",

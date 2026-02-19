@@ -20,7 +20,7 @@ const list = protectedProcedure
         eq(conversation.type, "chat"),
         isNull(conversation.archivedAt),
       ),
-      orderBy: desc(conversation.updatedAt),
+      orderBy: [desc(conversation.isPinned), desc(conversation.updatedAt)],
       limit: input.limit + 1,
       with: {
         messages: {
@@ -36,6 +36,7 @@ const list = protectedProcedure
       conversations: items.map((c) => ({
         id: c.id,
         title: c.title,
+        isPinned: c.isPinned,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
         messageCount: c.messages.length,
@@ -68,6 +69,7 @@ const get = protectedProcedure
     return {
       id: conv.id,
       title: conv.title,
+      isPinned: conv.isPinned,
       model: conv.model,
       autoApprove: conv.autoApprove,
       messages: conv.messages
@@ -124,6 +126,37 @@ const updateTitle = protectedProcedure
     }
 
     return { success: true };
+  });
+
+// Update conversation pinned setting
+const updatePinned = protectedProcedure
+  .input(
+    z.object({
+      id: z.string(),
+      isPinned: z.boolean(),
+    }),
+  )
+  .handler(async ({ input, context }) => {
+    const result = await context.db
+      .update(conversation)
+      .set({ isPinned: input.isPinned })
+      .where(
+        and(
+          eq(conversation.id, input.id),
+          eq(conversation.userId, context.user.id),
+          eq(conversation.type, "chat"),
+        ),
+      )
+      .returning({
+        id: conversation.id,
+        isPinned: conversation.isPinned,
+      });
+
+    if (result.length === 0) {
+      throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }
+
+    return { success: true, isPinned: result[0].isPinned };
   });
 
 // Update conversation auto-approve setting
@@ -324,6 +357,7 @@ export const conversationRouter = {
   list,
   get,
   updateTitle,
+  updatePinned,
   updateAutoApprove,
   archive,
   delete: del,

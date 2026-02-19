@@ -53,15 +53,27 @@ const transcribe = protectedProcedure
     const audioUrl = await fal.storage.upload(audioFile);
 
     // Call Wizper API
-    const result = await fal.subscribe("fal-ai/wizper", {
-      input: {
+    const response = await fetch("https://fal.run/fal-ai/wizper", {
+      method: "POST",
+      headers: {
+        Authorization: `Key ${env.FAL_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
         audio_url: audioUrl,
         task: "transcribe",
-      },
+        language: null,
+      }),
     });
 
+    if (!response.ok) {
+      throw new Error(`Wizper request failed with status ${response.status}`);
+    }
+
+    const result = await response.json();
+
     return {
-      text: (result.data as WizperResult).text,
+      text: (result as WizperResult).text,
     };
   });
 

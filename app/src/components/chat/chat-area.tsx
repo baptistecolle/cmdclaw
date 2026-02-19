@@ -5,10 +5,13 @@ import {
   MessageSquare,
   AlertCircle,
   Activity,
+  Check,
   CircleCheck,
   Ellipsis,
   ListTree,
   PenLine,
+  Search,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
@@ -19,9 +22,12 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import {
@@ -45,12 +51,15 @@ import {
   useGetAuthUrl,
   useActiveGeneration,
   useCancelGeneration,
+  useDetectUserMessageLanguage,
+  usePlatformSkillList,
   useUpdateAutoApprove,
   type SandboxFileData,
 } from "@/orpc/hooks";
 import { ActivityFeed, type ActivityItemData } from "./activity-feed";
 import { AuthRequestCard } from "./auth-request-card";
 import { ChatInput } from "./chat-input";
+import { useChatSkillStore } from "./chat-skill-store";
 import { DeviceSelector } from "./device-selector";
 import { MessageList, type Message, type MessagePart, type AttachmentData } from "./message-list";
 import { ModelSelector } from "./model-selector";
@@ -70,6 +79,7 @@ type QueuedMessage = {
   id: string;
   content: string;
   attachments?: AttachmentData[];
+  selectedSkillSlugs?: string[];
 };
 
 type InputPrefillRequest = {
@@ -78,6 +88,7 @@ type InputPrefillRequest = {
 };
 
 const CHAT_CONVERSATION_ID_SYNC_EVENT = "chat:conversation-id-sync";
+const EMPTY_SELECTED_SKILLS: string[] = [];
 
 type PersistedContentPart =
   | { type: "text"; text: string }
@@ -204,6 +215,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function buildSkillInstructionBlock(skillSlugs: string[], isFrench: boolean): string {
+  const heading = isFrench
+    ? "Utilise les skills suivants pour résoudre la tâche:"
+    : "use the following skills to solve the task:";
+  const skillsList = skillSlugs.map((skillSlug) => `- "${skillSlug}"`).join("\n");
+  return `${heading}\n${skillsList}`;
+}
+
 function getAgentInitLabel(status: string | null): string {
   switch (status) {
     case "agent_init_started":
@@ -246,12 +265,14 @@ function getAgentInitLabel(status: string | null): string {
 export function ChatArea({ conversationId }: Props) {
   const queryClient = useQueryClient();
   const posthog = usePostHog();
+  const { data: platformSkills, isLoading: isPlatformSkillsLoading } = usePlatformSkillList();
   const { data: existingConversation, isLoading } = useConversation(conversationId);
   const { startGeneration, subscribeToGeneration, abort } = useGeneration();
   const { mutateAsync: submitApproval, isPending: isApproving } = useSubmitApproval();
   const { mutateAsync: submitAuthResult, isPending: isSubmittingAuth } = useSubmitAuthResult();
   const { mutateAsync: getAuthUrl } = useGetAuthUrl();
   const { mutateAsync: cancelGeneration } = useCancelGeneration();
+  const { mutateAsync: detectUserMessageLanguage } = useDetectUserMessageLanguage();
   const { data: activeGeneration } = useActiveGeneration(conversationId);
 
   // Track current generation ID
@@ -268,10 +289,21 @@ export function ChatArea({ conversationId }: Props) {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
   const [queuedMessage, setQueuedMessage] = useState<QueuedMessage | null>(null);
   const [queueingEnabled, setQueueingEnabled] = useState(true);
+  const [skillsMenuOpen, setSkillsMenuOpen] = useState(false);
+  const [skillSearchQuery, setSkillSearchQuery] = useState("");
   const [inputPrefillRequest, setInputPrefillRequest] = useState<InputPrefillRequest | null>(null);
   const [draftConversationId, setDraftConversationId] = useState<string | undefined>(
     conversationId,
   );
+  const skillSelectionScopeKey = useMemo(
+    () => draftConversationId ?? conversationId ?? "new-chat",
+    [conversationId, draftConversationId],
+  );
+  const selectedSkillSlugsByScope = useChatSkillStore((state) => state.selectedSkillSlugsByScope);
+  const selectedPlatformSkillSlugs =
+    selectedSkillSlugsByScope[skillSelectionScopeKey] ?? EMPTY_SELECTED_SKILLS;
+  const toggleSelectedSkillSlug = useChatSkillStore((state) => state.toggleSelectedSkillSlug);
+  const clearSelectedSkillSlugs = useChatSkillStore((state) => state.clearSelectedSkillSlugs);
 
   // Segmented activity feed state
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
@@ -1047,7 +1079,11 @@ export function ChatArea({ conversationId }: Props) {
   }, [segments, toggleSegmentExpand]);
 
   const runGeneration = useCallback(
-    async (content: string, attachments?: AttachmentData[]) => {
+    async (
+      content: string,
+      attachments?: AttachmentData[],
+      selectedSkillSlugsOverride?: string[],
+    ) => {
       // Reset scroll lock so auto-scroll works for the new response
       userScrolledUpRef.current = false;
       setStreamError(null);
@@ -1082,6 +1118,7 @@ export function ChatArea({ conversationId }: Props) {
           model: selectedModel,
           autoApprove: autoApproveEnabled,
           deviceId: selectedDeviceId,
+          selectedPlatformSkillSlugs: selectedSkillSlugsOverride ?? selectedPlatformSkillSlugs,
           attachments,
         },
         {
@@ -1340,6 +1377,7 @@ export function ChatArea({ conversationId }: Props) {
       queryClient,
       resetInitTracking,
       selectedDeviceId,
+      selectedPlatformSkillSlugs,
       selectedModel,
       startGeneration,
       submitApproval,
@@ -1358,24 +1396,62 @@ export function ChatArea({ conversationId }: Props) {
     };
   }, [runGeneration]);
 
-  const handleSend = useCallback(
-    (content: string, attachments?: AttachmentData[]) => {
-      if (isStreaming) {
-        if (!queueingEnabled) {
-          setStreamError("Queueing is off. Wait for the current response or stop it first.");
-          return;
-        }
-        setQueuedMessage((prev) => ({
-          id: prev?.id ?? `queued-${Date.now()}`,
-          content,
-          attachments,
-        }));
-        return;
+  const buildOutgoingContent = useCallback(
+    async (content: string, selectedSkillSlugs: string[]): Promise<string> => {
+      if (selectedSkillSlugs.length === 0) {
+        return content;
       }
 
-      void runGeneration(content, attachments);
+      let isFrench = false;
+      try {
+        const result = await detectUserMessageLanguage({ text: content });
+        isFrench = result.language === "french";
+      } catch (error) {
+        console.error("Failed to detect user message language:", error);
+      }
+
+      const instructions = buildSkillInstructionBlock(selectedSkillSlugs, isFrench);
+      return `${content}\n\n${instructions}`;
     },
-    [isStreaming, queueingEnabled, runGeneration],
+    [detectUserMessageLanguage],
+  );
+
+  const handleSend = useCallback(
+    (content: string, attachments?: AttachmentData[]) => {
+      const send = async () => {
+        const selectedSkillSlugsSnapshot = [...selectedPlatformSkillSlugs];
+        const outgoingContent = await buildOutgoingContent(content, selectedSkillSlugsSnapshot);
+
+        if (isStreaming) {
+          if (!queueingEnabled) {
+            setStreamError("Queueing is off. Wait for the current response or stop it first.");
+            return;
+          }
+          setQueuedMessage((prev) => ({
+            id: prev?.id ?? `queued-${Date.now()}`,
+            content: outgoingContent,
+            attachments,
+            selectedSkillSlugs: selectedSkillSlugsSnapshot,
+          }));
+          clearSelectedSkillSlugs(skillSelectionScopeKey);
+          return;
+        }
+
+        clearSelectedSkillSlugs(skillSelectionScopeKey);
+        await runGeneration(outgoingContent, attachments, selectedSkillSlugsSnapshot);
+      };
+
+      void send();
+    },
+    [
+      buildOutgoingContent,
+      clearSelectedSkillSlugs,
+      isStreaming,
+      queueingEnabled,
+      runGeneration,
+      selectedPlatformSkillSlugs,
+      skillSelectionScopeKey,
+    ],
   );
 
   const handleSendQueuedNow = useCallback(() => {
@@ -1384,7 +1460,7 @@ export function ChatArea({ conversationId }: Props) {
       return;
     }
     setQueuedMessage(null);
-    void runGeneration(queued.content, queued.attachments);
+    void runGeneration(queued.content, queued.attachments, queued.selectedSkillSlugs);
   }, [runGeneration]);
 
   const handleClearQueued = useCallback(() => {
@@ -1573,6 +1649,61 @@ export function ChatArea({ conversationId }: Props) {
     },
     [conversationId, updateAutoApprove],
   );
+
+  const selectedSkillLabel = useMemo(() => {
+    if (selectedPlatformSkillSlugs.length === 0) {
+      return "Skills";
+    }
+    if (selectedPlatformSkillSlugs.length === 1) {
+      const only = platformSkills?.find((skill) => skill.slug === selectedPlatformSkillSlugs[0]);
+      return only?.title ?? selectedPlatformSkillSlugs[0] ?? "1 skill";
+    }
+    return `${selectedPlatformSkillSlugs.length} skills`;
+  }, [platformSkills, selectedPlatformSkillSlugs]);
+
+  const filteredPlatformSkills = useMemo(() => {
+    const query = skillSearchQuery.trim().toLowerCase();
+    if (!query) {
+      return platformSkills ?? [];
+    }
+    return (platformSkills ?? []).filter((skill) => {
+      const title = skill.title.toLowerCase();
+      const slug = skill.slug.toLowerCase();
+      return title.includes(query) || slug.includes(query);
+    });
+  }, [platformSkills, skillSearchQuery]);
+
+  const handleSkillDropdownSelect = useCallback(
+    (event: Event) => {
+      event.preventDefault();
+      const target = event.currentTarget as HTMLElement | null;
+      const slug = target?.dataset.skillSlug;
+      if (!slug) {
+        return;
+      }
+      toggleSelectedSkillSlug(skillSelectionScopeKey, slug);
+    },
+    [skillSelectionScopeKey, toggleSelectedSkillSlug],
+  );
+
+  const handleSkillSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSkillSearchQuery(event.target.value);
+  }, []);
+
+  const handleCloseSkillsMenu = useCallback(() => {
+    setSkillsMenuOpen(false);
+  }, []);
+
+  const handleClearSelectedSkills = useCallback(() => {
+    clearSelectedSkillSlugs(skillSelectionScopeKey);
+  }, [clearSelectedSkillSlugs, skillSelectionScopeKey]);
+
+  const handleOpenSkillsChange = useCallback((open: boolean) => {
+    setSkillsMenuOpen(open);
+    if (!open) {
+      setSkillSearchQuery("");
+    }
+  }, []);
 
   // Voice recording: stop and transcribe
   const stopRecordingAndTranscribe = useCallback(async () => {
@@ -1839,7 +1970,7 @@ export function ChatArea({ conversationId }: Props) {
       </div>
 
       <div className="bg-background border-t p-4">
-        <div className="mx-auto max-w-4xl space-y-2">
+        <div className="mx-auto w-full space-y-2">
           {(isRecording || isProcessingVoice || voiceError) && (
             <VoiceIndicator
               isRecording={isRecording}
@@ -1900,40 +2031,137 @@ export function ChatArea({ conversationId }: Props) {
               </div>
             </div>
           )}
-          <ChatInput
-            onSend={handleSend}
-            onStop={handleStop}
-            disabled={isRecording || isProcessingVoice}
-            isStreaming={isStreaming}
-            isRecording={isRecording}
-            onStartRecording={handleStartRecording}
-            onStopRecording={stopRecordingAndTranscribe}
-            prefillRequest={inputPrefillRequest}
-            conversationId={draftConversationId}
-          />
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ModelSelector
-                selectedModel={selectedModel}
-                onModelChange={setSelectedModel}
-                disabled={isStreaming}
-              />
-              <DeviceSelector selectedDeviceId={selectedDeviceId} onSelect={setSelectedDeviceId} />
+          <div className="mx-auto w-full max-w-[1276px]">
+            <div className="grid grid-cols-1 items-end gap-2 md:grid-cols-[52px_minmax(0,896px)_52px] md:justify-center">
+              <div className="min-w-0 md:col-start-1">
+                <div className="bg-muted/50 border-input flex h-[52px] items-center justify-center rounded-lg border p-2">
+                  <DropdownMenu open={skillsMenuOpen} onOpenChange={handleOpenSkillsChange}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        aria-label={selectedSkillLabel}
+                        className="relative h-9 w-9 px-0"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        {selectedPlatformSkillSlugs.length > 0 ? (
+                          <span className="bg-foreground text-background absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-4 font-medium">
+                            {selectedPlatformSkillSlugs.length}
+                          </span>
+                        ) : null}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      side="top"
+                      align="center"
+                      sideOffset={16}
+                      className="border-border/80 bg-background/95 flex h-[360px] w-[320px] flex-col rounded-xl p-0 shadow-xl backdrop-blur-sm"
+                    >
+                      <DropdownMenuLabel className="px-3 py-2.5">
+                        <div className="relative">
+                          <Search className="text-muted-foreground absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
+                          <Input
+                            value={skillSearchQuery}
+                            onChange={handleSkillSearchChange}
+                            placeholder="Search skills..."
+                            className="h-9 pl-8"
+                          />
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <div className="min-h-0 flex-1 overflow-y-auto p-1">
+                        {isPlatformSkillsLoading ? (
+                          <DropdownMenuItem disabled>Loading...</DropdownMenuItem>
+                        ) : filteredPlatformSkills.length === 0 ? (
+                          <DropdownMenuItem disabled>No skills found</DropdownMenuItem>
+                        ) : (
+                          filteredPlatformSkills.map((skill) => {
+                            const isSelected = selectedPlatformSkillSlugs.includes(skill.slug);
+                            return (
+                              <DropdownMenuItem
+                                key={skill.slug}
+                                data-skill-slug={skill.slug}
+                                onSelect={handleSkillDropdownSelect}
+                              >
+                                <Check
+                                  className={
+                                    isSelected ? "h-4 w-4 opacity-100" : "h-4 w-4 opacity-0"
+                                  }
+                                />
+                                <span className="truncate">{skill.title}</span>
+                              </DropdownMenuItem>
+                            );
+                          })
+                        )}
+                      </div>
+                      <DropdownMenuSeparator />
+                      <div className="grid grid-cols-2 items-center gap-0 p-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={handleClearSelectedSkills}
+                          disabled={selectedPlatformSkillSlugs.length === 0}
+                          className="h-10 rounded-md"
+                        >
+                          Clear
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={handleCloseSkillsMenu}
+                          className="h-10 rounded-md"
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+              <div className="min-w-0 md:col-start-2">
+                <ChatInput
+                  onSend={handleSend}
+                  onStop={handleStop}
+                  disabled={isRecording || isProcessingVoice}
+                  isStreaming={isStreaming}
+                  isRecording={isRecording}
+                  onStartRecording={handleStartRecording}
+                  onStopRecording={stopRecordingAndTranscribe}
+                  prefillRequest={inputPrefillRequest}
+                  conversationId={draftConversationId}
+                />
+              </div>
+              <div className="hidden md:col-start-3 md:block" aria-hidden="true" />
             </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="auto-approve"
-                checked={autoApproveEnabled}
-                onCheckedChange={handleAutoApproveChange}
-              />
-              <label
-                htmlFor="auto-approve"
-                className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs select-none"
-              >
-                <CircleCheck className="h-3.5 w-3.5" />
-                <span>Auto-approve</span>
-              </label>
-              <VoiceHint />
+          </div>
+          <div className="mx-auto w-full max-w-4xl">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  disabled={isStreaming}
+                />
+                <DeviceSelector
+                  selectedDeviceId={selectedDeviceId}
+                  onSelect={setSelectedDeviceId}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="auto-approve"
+                  checked={autoApproveEnabled}
+                  onCheckedChange={handleAutoApproveChange}
+                />
+                <label
+                  htmlFor="auto-approve"
+                  className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs select-none"
+                >
+                  <CircleCheck className="h-3.5 w-3.5" />
+                  <span>Auto-approve</span>
+                </label>
+                <VoiceHint />
+              </div>
             </div>
           </div>
         </div>
