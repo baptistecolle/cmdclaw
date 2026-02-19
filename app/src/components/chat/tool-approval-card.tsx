@@ -1,19 +1,6 @@
 "use client";
 
-import {
-  ChevronDown,
-  ChevronRight,
-  Check,
-  X,
-  Loader2,
-  Code,
-  CircleHelp,
-  SquareTerminal,
-  Code2,
-  Search,
-  Wrench,
-  Bot,
-} from "lucide-react";
+import { Check, X, Loader2, Wrench } from "lucide-react";
 import Image from "next/image";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -165,45 +152,12 @@ export function ToolApprovalCard({
   status,
   isLoading,
 }: ToolApprovalCardProps) {
-  const [showRawCommand, setShowRawCommand] = useState(false);
-
   const logo = getIntegrationLogo(integration);
   const IntegrationIcon = getIntegrationIcon(integration);
   const displayName = getIntegrationDisplayName(integration);
   const isQuestionRequest =
     (operation === "question" || toolName.toLowerCase() === "question") &&
     integration.toLowerCase() === "bap";
-  const FallbackIcon = useMemo(() => {
-    if (isQuestionRequest) {
-      return CircleHelp;
-    }
-
-    const descriptor = `${toolName} ${operation}`.toLowerCase();
-    if (
-      descriptor.includes("bash") ||
-      descriptor.includes("command") ||
-      descriptor.includes("shell") ||
-      descriptor.includes("terminal")
-    ) {
-      return SquareTerminal;
-    }
-    if (descriptor.includes("code")) {
-      return Code2;
-    }
-    if (descriptor.includes("search")) {
-      return Search;
-    }
-    if (
-      descriptor.includes("write") ||
-      descriptor.includes("edit") ||
-      descriptor.includes("update") ||
-      descriptor.includes("create") ||
-      descriptor.includes("delete")
-    ) {
-      return Wrench;
-    }
-    return Bot;
-  }, [isQuestionRequest, operation, toolName]);
   const questionPayload = useMemo(
     () => (isQuestionRequest ? parseQuestionRequestPayload(toolInput) : null),
     [isQuestionRequest, toolInput],
@@ -292,10 +246,6 @@ export function ToolApprovalCard({
       command: parsedCommand.rawCommand,
     };
   }, [parsedCommand]);
-  const handleToggleRawCommand = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    setShowRawCommand((prev) => !prev);
-  }, []);
   const handleDenyClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
@@ -518,7 +468,7 @@ export function ToolApprovalCard({
         ) : IntegrationIcon ? (
           <IntegrationIcon className="text-muted-foreground h-4 w-4" />
         ) : (
-          <FallbackIcon className="text-muted-foreground h-4 w-4" />
+          <Wrench className="text-muted-foreground h-4 w-4" />
         )}
         {isQuestionRequest ? (
           <span className="font-medium">Bap wants to ask a question</span>
@@ -556,27 +506,10 @@ export function ToolApprovalCard({
         {/* Formatted Preview */}
         {previewProps && <div className="mb-3">{renderPreview(integration, previewProps)}</div>}
 
-        {/* Collapsible Raw Command Section */}
+        {/* Raw Command Section */}
         {command && (
           <div className="mb-3">
-            <button
-              onClick={handleToggleRawCommand}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors"
-            >
-              <Code className="h-3 w-3" />
-              {showRawCommand ? "Hide" : "Show"} raw command
-              {showRawCommand ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-
-            {showRawCommand && (
-              <pre className="bg-muted mt-2 overflow-x-auto rounded p-2 font-mono text-xs">
-                {command}
-              </pre>
-            )}
+            <pre className="bg-muted overflow-x-auto rounded p-2 font-mono text-xs">{command}</pre>
           </div>
         )}
 

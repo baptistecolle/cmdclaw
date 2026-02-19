@@ -465,13 +465,12 @@ function shouldAutoApproveOpenCodePermission(
   return patterns.every((pattern) => {
     const normalized = normalizePermissionPattern(pattern);
 
-    // Always allow access to staged uploads directory.
-    if (normalized.startsWith("/home/user/uploads")) {
-      return true;
-    }
-
-    // OpenCode may ask external_directory for user files directly in /home/user.
-    if (permissionType === "external_directory" && normalized.startsWith("/home/user")) {
+    // Allow common sandbox working directories without interactive approval.
+    if (
+      (permissionType === "external_directory" &&
+        (normalized.startsWith("/tmp") || normalized.startsWith("/app"))) ||
+      normalized.startsWith("/home/user")
+    ) {
       return true;
     }
 

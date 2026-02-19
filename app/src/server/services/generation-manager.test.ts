@@ -574,6 +574,40 @@ describe("generationManager transitions", () => {
     expect(ctx.status).toBe("running");
   });
 
+  it("auto-approves allowlisted external directories (/tmp and /app)", async () => {
+    const permissionReplyMock = vi.fn().mockResolvedValue({ data: true, error: undefined });
+    const ctx = createCtx({
+      autoApprove: false,
+      opencodeClient: {
+        permission: {
+          reply: permissionReplyMock,
+        },
+      },
+    });
+    const mgr = asTestManager();
+
+    await mgr.handleOpenCodePermissionAsked(
+      ctx,
+      {
+        permission: {
+          reply: permissionReplyMock,
+        },
+      },
+      {
+        id: "permission-request-allowlisted-paths",
+        permission: "external_directory",
+        patterns: ["/tmp/hello.txt", "/app/output/report.txt"],
+      },
+    );
+
+    expect(permissionReplyMock).toHaveBeenCalledWith({
+      requestID: "permission-request-allowlisted-paths",
+      reply: "always",
+    });
+    expect(ctx.pendingApproval).toBeNull();
+    expect(ctx.status).toBe("running");
+  });
+
   it("times out approval into paused status and emits status_change", async () => {
     const ctx = createCtx();
     workflowRunFindFirstMock.mockResolvedValue({ id: "wf-run-1" });
