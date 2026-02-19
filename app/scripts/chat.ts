@@ -530,6 +530,12 @@ async function runGeneration(
         onToolUse: (toolUse) => {
           runtime.handleToolUse(toolUse);
           process.stdout.write(`\n[tool_use] ${toolUse.toolName}\n`);
+          if (toolUse.integration) {
+            process.stdout.write(`[tool_integration] ${toolUse.integration}\n`);
+          }
+          if (typeof toolUse.isWrite === "boolean") {
+            process.stdout.write(`[tool_is_write] ${toolUse.isWrite}\n`);
+          }
           process.stdout.write(`[tool_input] ${JSON.stringify(toolUse.toolInput)}\n`);
         },
         onToolResult: (toolName, result, toolUseId) => {
@@ -766,12 +772,12 @@ async function runGeneration(
             process.stdout.write("\n[timing] Summary\n");
             if (timing.generationDurationMs !== undefined) {
               process.stdout.write(
-                `  generation: ${formatDurationMs(timing.generationDurationMs)}\n`,
+                `  end_to_end_total: ${formatDurationMs(timing.generationDurationMs)}\n`,
               );
             }
             if (timing.sandboxStartupDurationMs !== undefined) {
               process.stdout.write(
-                `  sandbox_prep${
+                `  sandbox_connect_or_create${
                   timing.sandboxStartupMode ? ` (${timing.sandboxStartupMode})` : ""
                 }: ${formatDurationMs(timing.sandboxStartupDurationMs)}\n`,
               );
@@ -779,6 +785,9 @@ async function runGeneration(
             const phaseDurations = timing.phaseDurationsMs;
             if (phaseDurations) {
               const rows: Array<[string, number | undefined]> = [
+                ["sandbox_connect_or_create", phaseDurations.sandboxConnectOrCreateMs],
+                ["opencode_ready", phaseDurations.opencodeReadyMs],
+                ["session_ready", phaseDurations.sessionReadyMs],
                 ["agent_init", phaseDurations.agentInitMs],
                 ["pre_prompt_setup", phaseDurations.prePromptSetupMs],
                 ["agent_ready_to_prompt", phaseDurations.agentReadyToPromptMs],

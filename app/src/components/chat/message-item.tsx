@@ -1,6 +1,6 @@
 "use client";
 
-import { Paperclip, Download, FileIcon, Eye, Bot, Box } from "lucide-react";
+import { Paperclip, Download, FileIcon, Eye } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
 import type { IntegrationType } from "@/lib/integration-icons";
@@ -555,8 +555,6 @@ export function MessageItem({
               key={metric.key}
               className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2 py-1"
             >
-              {metric.key === "sandbox_prep" && <Box className="h-3 w-3" />}
-              {metric.key === "generation" && <Bot className="h-3 w-3" />}
               <span>
                 {metric.label}: {metric.value}
               </span>

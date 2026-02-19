@@ -27,7 +27,7 @@ export default function AdvancedSettingsPage() {
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
               <label htmlFor="display-advanced-metrics" className="text-sm font-medium">
-                Display advanced metrics
+                Nerd mode
               </label>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -46,8 +46,7 @@ export default function AdvancedSettingsPage() {
               </Tooltip>
             </div>
             <p className="text-muted-foreground text-sm">
-              Off by default. Enable to show performance timings like generation and first-event
-              wait.
+              Enable to show performance timings like generation and first-event wait.
             </p>
           </div>
           <Switch

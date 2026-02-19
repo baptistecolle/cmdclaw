@@ -28,6 +28,7 @@ import {
   generation,
   message,
   messageAttachment,
+  skill,
   workflow,
   workflowRun,
   workflowRunEvent,
@@ -49,6 +50,7 @@ import {
   CHAT_GENERATION_JOB_NAME,
   GENERATION_APPROVAL_TIMEOUT_JOB_NAME,
   GENERATION_AUTH_TIMEOUT_JOB_NAME,
+  GENERATION_PREPARING_STUCK_CHECK_JOB_NAME,
   WORKFLOW_GENERATION_JOB_NAME,
   getQueue,
 } from "@/server/queues";
@@ -285,6 +287,22 @@ interface GenerationContext {
   lastCancellationCheckAt?: number;
   isFinalizing?: boolean;
 }
+
+type ToolUseMetadata = {
+  integration?: string;
+  operation?: string;
+  isWrite?: boolean;
+};
+
+type PrePromptCacheRecord = {
+  version: 1;
+  cacheKey: string;
+  writtenSkills: string[];
+  writtenIntegrationSkills: string[];
+  updatedAt: string;
+};
+
+const PRE_PROMPT_CACHE_PATH = "/app/.opencode/pre-prompt-cache.json";
 
 async function getDoneArtifacts(messageId: string): Promise<
   | {
@@ -670,6 +688,33 @@ class GenerationManager {
     );
   }
 
+  private async enqueuePreparingStuckCheck(generationId: string): Promise<void> {
+    try {
+      const queue = getQueue();
+      const jobName = GENERATION_PREPARING_STUCK_CHECK_JOB_NAME;
+      await queue.add(
+        jobName,
+        { generationId },
+        {
+          jobId: buildQueueJobId([jobName, generationId]),
+          delay: AGENT_PREPARING_TIMEOUT_MS,
+          removeOnComplete: true,
+          removeOnFail: 500,
+        },
+      );
+    } catch (error) {
+      logServerEvent(
+        "warn",
+        "GENERATION_PREPARING_STUCK_CHECK_ENQUEUE_FAILED",
+        {
+          generationId,
+          error: formatErrorMessage(error),
+        },
+        { source: "generation-manager" },
+      );
+    }
+  }
+
   private getExecutionPolicyFromRecord(
     genRecord: typeof generation.$inferSelect,
     fallbackAutoApprove: boolean,
@@ -725,11 +770,39 @@ class GenerationManager {
     const messageTiming: MessageTiming = {
       generationDurationMs: Math.max(0, generationCompletedAt - generationStartedAt),
     };
-    if (ctx.agentInitStartedAt && ctx.agentSandboxReadyAt) {
-      messageTiming.sandboxStartupDurationMs = Math.max(
-        0,
-        ctx.agentSandboxReadyAt - ctx.agentInitStartedAt,
-      );
+    const sandboxConnectStartMs =
+      phaseMarks.agent_init_sandbox_checking_cache ?? phaseMarks.agent_init_started;
+    const sandboxConnectEndMs =
+      phaseMarks.agent_init_sandbox_reused ?? phaseMarks.agent_init_sandbox_created;
+    const sandboxConnectOrCreateMs =
+      sandboxConnectStartMs !== undefined && sandboxConnectEndMs !== undefined
+        ? Math.max(0, sandboxConnectEndMs - sandboxConnectStartMs)
+        : undefined;
+    const opencodeReadyMs =
+      phaseMarks.agent_init_opencode_starting !== undefined &&
+      phaseMarks.agent_init_opencode_ready !== undefined
+        ? Math.max(
+            0,
+            phaseMarks.agent_init_opencode_ready - phaseMarks.agent_init_opencode_starting,
+          )
+        : undefined;
+    const sessionReadyMs =
+      phaseMarks.agent_init_session_reused !== undefined && sandboxConnectEndMs !== undefined
+        ? Math.max(0, phaseMarks.agent_init_session_reused - sandboxConnectEndMs)
+        : phaseMarks.agent_init_session_creating !== undefined &&
+            phaseMarks.agent_init_session_init_completed !== undefined
+          ? Math.max(
+              0,
+              phaseMarks.agent_init_session_init_completed - phaseMarks.agent_init_session_creating,
+            )
+          : undefined;
+    const legacySandboxStartupMs =
+      ctx.agentInitStartedAt && ctx.agentSandboxReadyAt
+        ? Math.max(0, ctx.agentSandboxReadyAt - ctx.agentInitStartedAt)
+        : undefined;
+    const resolvedSandboxStartupMs = sandboxConnectOrCreateMs ?? legacySandboxStartupMs;
+    if (resolvedSandboxStartupMs !== undefined) {
+      messageTiming.sandboxStartupDurationMs = resolvedSandboxStartupMs;
       messageTiming.sandboxStartupMode = ctx.agentSandboxMode ?? "unknown";
     }
 
@@ -761,6 +834,9 @@ class GenerationManager {
         : undefined;
 
     const phaseDurationsMs = {
+      sandboxConnectOrCreateMs,
+      opencodeReadyMs,
+      sessionReadyMs,
       agentInitMs,
       prePromptSetupMs,
       agentReadyToPromptMs,
@@ -1001,6 +1077,7 @@ class GenerationManager {
         currentGenerationId: genRecord.id,
       })
       .where(eq(conversation.id, conv.id));
+    await this.enqueuePreparingStuckCheck(genRecord.id);
     logServerEvent(
       "info",
       "START_GENERATION_PHASE_DONE",
@@ -1419,18 +1496,36 @@ class GenerationManager {
     generationId: string,
     userId: string,
   ): AsyncGenerator<GenerationEvent, void, unknown> {
+    const getReplayToolUseMetadata = (
+      part: Extract<ContentPart, { type: "tool_use" }>,
+    ): ToolUseMetadata => {
+      if (part.integration || part.operation) {
+        return {
+          integration: part.integration,
+          operation: part.operation,
+        };
+      }
+      const parsed = this.getToolUseMetadata(part.name, part.input);
+      if (!parsed.integration && !parsed.operation) {
+        return {};
+      }
+      return parsed;
+    };
+
     const emitPartEvent = (part: ContentPart, allParts: ContentPart[]): GenerationEvent | null => {
       if (part.type === "text") {
         return { type: "text", content: part.text };
       }
       if (part.type === "tool_use") {
+        const metadata = getReplayToolUseMetadata(part);
         return {
           type: "tool_use",
           toolName: part.name,
           toolInput: part.input,
           toolUseId: part.id,
-          integration: part.integration,
-          operation: part.operation,
+          integration: metadata.integration,
+          operation: metadata.operation,
+          isWrite: metadata.isWrite,
         };
       }
       if (part.type === "tool_result") {
@@ -1861,6 +1956,93 @@ class GenerationManager {
     }
   }
 
+  async processPreparingStuckCheck(generationId: string): Promise<void> {
+    const genRecord = await db.query.generation.findFirst({
+      where: eq(generation.id, generationId),
+      with: {
+        conversation: {
+          columns: {
+            id: true,
+            userId: true,
+            type: true,
+          },
+        },
+      },
+    });
+    if (!genRecord) {
+      return;
+    }
+    if (!genRecord.conversation || genRecord.conversation.type !== "chat") {
+      return;
+    }
+    if (genRecord.status !== "running" || genRecord.sandboxId || genRecord.completedAt) {
+      return;
+    }
+
+    const elapsedMs = Date.now() - genRecord.startedAt.getTime();
+    if (elapsedMs < AGENT_PREPARING_TIMEOUT_MS) {
+      return;
+    }
+
+    const userId = genRecord.conversation.userId ?? undefined;
+    const details = {
+      generationId: genRecord.id,
+      conversationId: genRecord.conversation.id,
+      userId,
+      elapsedMs,
+      thresholdMs: AGENT_PREPARING_TIMEOUT_MS,
+      status: genRecord.status,
+    };
+
+    logServerEvent("warn", "GENERATION_PREPARING_STUCK_DETECTED", details, {
+      source: "generation-manager",
+      generationId: genRecord.id,
+      conversationId: genRecord.conversation.id,
+      userId,
+    });
+
+    const pushUrl = process.env.KUMA_PUSH_URL?.trim();
+    if (!pushUrl) {
+      return;
+    }
+
+    const monitorUrl = new URL(pushUrl);
+    monitorUrl.searchParams.set("status", "down");
+    monitorUrl.searchParams.set(
+      "msg",
+      `preparing agent timeout generation=${genRecord.id} conversation=${genRecord.conversation.id} user=${userId ?? "unknown"} elapsedMs=${elapsedMs}`,
+    );
+    monitorUrl.searchParams.set("ping", String(Math.max(1, Math.round(elapsedMs))));
+
+    try {
+      const response = await fetch(monitorUrl.toString(), { method: "GET" });
+      if (!response.ok) {
+        throw new Error(`Kuma push failed (${response.status})`);
+      }
+      logServerEvent("warn", "GENERATION_PREPARING_STUCK_KUMA_PUSHED", details, {
+        source: "generation-manager",
+        generationId: genRecord.id,
+        conversationId: genRecord.conversation.id,
+        userId,
+      });
+    } catch (error) {
+      logServerEvent(
+        "error",
+        "GENERATION_PREPARING_STUCK_KUMA_PUSH_FAILED",
+        {
+          ...details,
+          error: formatErrorMessage(error),
+        },
+        {
+          source: "generation-manager",
+          generationId: genRecord.id,
+          conversationId: genRecord.conversation.id,
+          userId,
+        },
+      );
+    }
+  }
+
   private async refreshCancellationSignal(
     ctx: GenerationContext,
     options?: { force?: boolean },
@@ -2282,17 +2464,22 @@ class GenerationManager {
         .set({ sandboxId: sandbox.sandboxId })
         .where(eq(generation.id, ctx.id));
 
+      // Persist reusable IDs immediately so follow-up turns can reuse session/sandbox
+      // even if the current turn is interrupted before completion.
+      await db
+        .update(conversation)
+        .set({
+          opencodeSessionId: ctx.sessionId,
+          opencodeSandboxId: ctx.sandboxId ?? null,
+        })
+        .where(eq(conversation.id, ctx.conversationId));
+
       // Record marker time for file collection and store sandbox reference
       ctx.generationMarkerTime = Date.now();
       ctx.e2bSandbox = sandbox;
       ctx.sentFilePaths = new Set();
       ctx.userStagedFilePaths = new Set();
       this.markPhase(ctx, "pre_prompt_setup_started");
-
-      // Write skills to sandbox
-      const writtenSkills = await writeSkillsToSandbox(sandbox, ctx.userId);
-      const skillsInstructions = getSkillsSystemPrompt(writtenSkills);
-      let integrationSkillsInstructions = "";
 
       // Write memory files to sandbox
       let memoryInstructions = buildMemorySystemPrompt();
@@ -2311,61 +2498,151 @@ class GenerationManager {
         memoryInstructions = buildMemorySystemPrompt();
       }
 
-      // Write custom integration CLI code to sandbox
-      try {
-        const customCreds = await db.query.customIntegrationCredential.findMany({
-          where: and(
-            eq(customIntegrationCredential.userId, ctx.userId),
-            eq(customIntegrationCredential.enabled, true),
-          ),
-          with: { customIntegration: true },
-        });
+      const enabledSkillRows = await db.query.skill.findMany({
+        where: and(eq(skill.userId, ctx.userId), eq(skill.enabled, true)),
+        columns: {
+          name: true,
+          updatedAt: true,
+        },
+      });
 
-        const eligibleCustomCreds = customCreds.filter((cred) => {
-          if (!ctx.allowedCustomIntegrations) {
-            return true;
-          }
-          return ctx.allowedCustomIntegrations.includes(cred.customIntegration.slug);
-        });
+      const customCreds = await db.query.customIntegrationCredential.findMany({
+        where: and(
+          eq(customIntegrationCredential.userId, ctx.userId),
+          eq(customIntegrationCredential.enabled, true),
+        ),
+        with: { customIntegration: true },
+      });
 
-        await Promise.all(
-          eligibleCustomCreds.map(async (cred) => {
-            const integ = cred.customIntegration;
-            const cliPath = `/app/cli/custom-${integ.slug}.ts`;
-            await sandbox.files.write(cliPath, integ.cliCode);
-          }),
-        );
-
-        const customPerms: Record<string, { read: string[]; write: string[] }> = {};
-        for (const cred of eligibleCustomCreds) {
-          const integ = cred.customIntegration;
-          customPerms[`custom-${integ.slug}`] = {
-            read: integ.permissions.readOps,
-            write: integ.permissions.writeOps,
-          };
+      const eligibleCustomCreds = customCreds.filter((cred) => {
+        if (!ctx.allowedCustomIntegrations) {
+          return true;
         }
+        return ctx.allowedCustomIntegrations.includes(cred.customIntegration.slug);
+      });
 
-        if (Object.keys(customPerms).length > 0) {
-          // Set the permissions env var on the sandbox
-          await sandbox.commands.run(
-            `echo 'export CUSTOM_INTEGRATION_PERMISSIONS=${JSON.stringify(JSON.stringify(customPerms)).slice(1, -1)}' >> ~/.bashrc`,
+      const prePromptCacheKey = JSON.stringify({
+        userId: ctx.userId,
+        allowedIntegrations: [...allowedIntegrations].toSorted(),
+        allowedCustomIntegrations: [...(ctx.allowedCustomIntegrations ?? [])].toSorted(),
+        selectedPlatformSkillSlugs: [...(ctx.selectedPlatformSkillSlugs ?? [])].toSorted(),
+        skills: enabledSkillRows
+          .map((entry) => `${entry.name}:${entry.updatedAt.toISOString()}`)
+          .toSorted(),
+        customIntegrations: eligibleCustomCreds
+          .map(
+            (cred) =>
+              `${cred.customIntegration.slug}:${cred.updatedAt.toISOString()}:${cred.customIntegration.updatedAt.toISOString()}`,
+          )
+          .toSorted(),
+      });
+
+      let writtenSkills: string[] = [];
+      let writtenIntegrationSkills: string[] = [];
+      let prePromptCacheHit = false;
+
+      if (ctx.agentSandboxMode === "reused") {
+        try {
+          const rawCache = await sandbox.files.read(PRE_PROMPT_CACHE_PATH);
+          const parsed = JSON.parse(String(rawCache)) as Partial<PrePromptCacheRecord>;
+          if (parsed.cacheKey === prePromptCacheKey) {
+            prePromptCacheHit = true;
+            if (Array.isArray(parsed.writtenSkills)) {
+              writtenSkills = parsed.writtenSkills.filter(
+                (value): value is string => typeof value === "string",
+              );
+            }
+            if (Array.isArray(parsed.writtenIntegrationSkills)) {
+              writtenIntegrationSkills = parsed.writtenIntegrationSkills.filter(
+                (value): value is string => typeof value === "string",
+              );
+            }
+            logServerEvent(
+              "info",
+              "PRE_PROMPT_CACHE_HIT",
+              {
+                skillsCount: writtenSkills.length,
+                integrationSkillCount: writtenIntegrationSkills.length,
+              },
+              {
+                source: "generation-manager",
+                traceId: ctx.traceId,
+                generationId: ctx.id,
+                conversationId: ctx.conversationId,
+                userId: ctx.userId,
+                sandboxId: sandbox.sandboxId,
+                sessionId: ctx.sessionId,
+              },
+            );
+          }
+        } catch {
+          // Cache file absent or invalid; fall back to full prep.
+        }
+      }
+
+      // Write custom skills/integration assets only when cache is stale.
+      try {
+        if (!prePromptCacheHit) {
+          writtenSkills = await writeSkillsToSandbox(sandbox, ctx.userId);
+
+          await Promise.all(
+            eligibleCustomCreds.map(async (cred) => {
+              const integ = cred.customIntegration;
+              const cliPath = `/app/cli/custom-${integ.slug}.ts`;
+              await sandbox.files.write(cliPath, integ.cliCode);
+            }),
+          );
+
+          const customPerms: Record<string, { read: string[]; write: string[] }> = {};
+          for (const cred of eligibleCustomCreds) {
+            const integ = cred.customIntegration;
+            customPerms[`custom-${integ.slug}`] = {
+              read: integ.permissions.readOps,
+              write: integ.permissions.writeOps,
+            };
+          }
+
+          if (Object.keys(customPerms).length > 0) {
+            // Set the permissions env var on the sandbox
+            await sandbox.commands.run(
+              `echo 'export CUSTOM_INTEGRATION_PERMISSIONS=${JSON.stringify(JSON.stringify(customPerms)).slice(1, -1)}' >> ~/.bashrc`,
+            );
+          }
+
+          const allowedSkillSlugs = new Set<string>(allowedIntegrations);
+          for (const cred of eligibleCustomCreds) {
+            allowedSkillSlugs.add(cred.customIntegration.slug);
+          }
+
+          writtenIntegrationSkills = await writeResolvedIntegrationSkillsToSandbox(
+            sandbox,
+            ctx.userId,
+            Array.from(allowedSkillSlugs),
+          );
+
+          await sandbox.commands.run(`mkdir -p "${path.dirname(PRE_PROMPT_CACHE_PATH)}"`);
+          const nextCacheRecord: PrePromptCacheRecord = {
+            version: 1,
+            cacheKey: prePromptCacheKey,
+            writtenSkills,
+            writtenIntegrationSkills,
+            updatedAt: new Date().toISOString(),
+          };
+          await sandbox.files.write(
+            PRE_PROMPT_CACHE_PATH,
+            JSON.stringify(nextCacheRecord, null, 2),
           );
         }
-
-        const allowedSkillSlugs = new Set<string>(allowedIntegrations);
-        for (const cred of eligibleCustomCreds) {
-          allowedSkillSlugs.add(cred.customIntegration.slug);
-        }
-
-        const writtenIntegrationSkills = await writeResolvedIntegrationSkillsToSandbox(
-          sandbox,
-          ctx.userId,
-          Array.from(allowedSkillSlugs),
-        );
-        integrationSkillsInstructions = getIntegrationSkillsSystemPrompt(writtenIntegrationSkills);
       } catch (e) {
         console.error("[Generation] Failed to write custom integration CLI code:", e);
       }
+
+      if (writtenSkills.length === 0) {
+        writtenSkills = enabledSkillRows.map((entry) => entry.name);
+      }
+      const skillsInstructions = getSkillsSystemPrompt(writtenSkills);
+      const integrationSkillsInstructions =
+        getIntegrationSkillsSystemPrompt(writtenIntegrationSkills);
 
       // Build system prompt
       const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
@@ -2890,6 +3167,7 @@ class GenerationManager {
               } catch {
                 toolInput = { raw: currentToolJson };
               }
+              const metadata = this.getToolUseMetadata(currentToolName, toolInput);
 
               const toolBlock: ContentBlock = {
                 type: "tool_use",
@@ -2904,6 +3182,9 @@ class GenerationManager {
                 toolName: currentToolName,
                 toolInput,
                 toolUseId: currentToolUseId,
+                integration: metadata.integration,
+                operation: metadata.operation,
+                isWrite: metadata.isWrite,
               });
 
               ctx.contentParts.push({
@@ -2911,6 +3192,8 @@ class GenerationManager {
                 id: currentToolUseId,
                 name: currentToolName,
                 input: toolInput,
+                integration: metadata.integration,
+                operation: metadata.operation,
               });
 
               await this.saveProgress(ctx);
@@ -4234,7 +4517,8 @@ class GenerationManager {
       setCurrentTextPart(null, null);
       const toolUseId = part.callID;
       const toolName = part.tool;
-      const toolInput = "input" in part.state ? part.state.input : {};
+      const toolInput = "input" in part.state ? (part.state.input as Record<string, unknown>) : {};
+      const metadata = this.getToolUseMetadata(toolName, toolInput);
 
       const existingToolUse = ctx.contentParts.find(
         (p): p is ContentPart & { type: "tool_use" } => p.type === "tool_use" && p.id === toolUseId,
@@ -4253,6 +4537,9 @@ class GenerationManager {
             toolName,
             toolInput,
             toolUseId,
+            integration: metadata.integration,
+            operation: metadata.operation,
+            isWrite: metadata.isWrite,
           });
 
           ctx.contentParts.push({
@@ -4260,6 +4547,8 @@ class GenerationManager {
             id: toolUseId,
             name: toolName,
             input: toolInput,
+            integration: metadata.integration,
+            operation: metadata.operation,
           });
           await this.saveProgress(ctx);
           return;
@@ -4450,6 +4739,31 @@ class GenerationManager {
     createdCount = creationResults.reduce<number>((sum, value) => sum + value, 0);
 
     return createdCount;
+  }
+
+  private getToolUseMetadata(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+  ): ToolUseMetadata {
+    if (toolName.toLowerCase() !== "bash") {
+      return {};
+    }
+
+    const command = toolInput.command;
+    if (typeof command !== "string" || command.trim().length === 0) {
+      return {};
+    }
+
+    const parsed = parseBashCommand(command);
+    if (!parsed) {
+      return {};
+    }
+
+    return {
+      integration: parsed.integration,
+      operation: parsed.operation,
+      isWrite: parsed.isWrite,
+    };
   }
 
   private async forEachSequential<T>(

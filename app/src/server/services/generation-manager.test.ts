@@ -10,6 +10,7 @@ const {
   conversationFindFirstMock,
   workflowRunFindFirstMock,
   workflowFindFirstMock,
+  queueAddMock,
   dbMock,
 } = vi.hoisted(() => {
   const updateWhereMock = vi.fn();
@@ -24,6 +25,7 @@ const {
   const conversationFindFirstMock = vi.fn();
   const workflowRunFindFirstMock = vi.fn();
   const workflowFindFirstMock = vi.fn();
+  const queueAddMock = vi.fn();
 
   const dbMock = {
     query: {
@@ -32,6 +34,7 @@ const {
       conversation: { findFirst: conversationFindFirstMock },
       workflowRun: { findFirst: workflowRunFindFirstMock },
       workflow: { findFirst: workflowFindFirstMock },
+      skill: { findMany: vi.fn(() => []) },
       customIntegrationCredential: { findMany: vi.fn(() => []) },
     },
     update: updateMock,
@@ -48,6 +51,7 @@ const {
     conversationFindFirstMock,
     workflowRunFindFirstMock,
     workflowFindFirstMock,
+    queueAddMock,
     dbMock,
   };
 });
@@ -136,6 +140,22 @@ vi.mock("@/server/utils/observability", () => ({
   logServerEvent: vi.fn(),
 }));
 
+vi.mock("@/server/queues", () => ({
+  buildQueueJobId: (parts: Array<string | number | null | undefined>) =>
+    parts
+      .map((part) => String(part ?? "").trim())
+      .filter(Boolean)
+      .join("-"),
+  CHAT_GENERATION_JOB_NAME: "generation:chat-run",
+  WORKFLOW_GENERATION_JOB_NAME: "generation:workflow-run",
+  GENERATION_APPROVAL_TIMEOUT_JOB_NAME: "generation:approval-timeout",
+  GENERATION_AUTH_TIMEOUT_JOB_NAME: "generation:auth-timeout",
+  GENERATION_PREPARING_STUCK_CHECK_JOB_NAME: "generation:preparing-stuck-check",
+  getQueue: () => ({
+    add: queueAddMock,
+  }),
+}));
+
 import { env } from "@/env";
 import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
 import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
@@ -159,6 +179,7 @@ import {
   collectNewE2BFiles,
   readSandboxFileAsBuffer,
 } from "@/server/services/sandbox-file-service";
+import { logServerEvent } from "@/server/utils/observability";
 import { generationManager } from "./generation-manager";
 
 type GenerationCtx = {
@@ -262,6 +283,7 @@ async function* asAsyncIterable<T>(items: T[]) {
 
 describe("generationManager transitions", () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     vi.useFakeTimers();
     vi.restoreAllMocks();
     vi.clearAllMocks();
@@ -275,6 +297,9 @@ describe("generationManager transitions", () => {
     conversationFindFirstMock.mockResolvedValue(null);
     workflowRunFindFirstMock.mockResolvedValue(null);
     workflowFindFirstMock.mockResolvedValue(null);
+    queueAddMock.mockReset();
+    delete process.env.VERCEL;
+    delete process.env.KUMA_PUSH_URL;
 
     const mgr = asTestManager();
     mgr.activeGenerations.clear();
@@ -744,6 +769,84 @@ describe("generationManager transitions", () => {
       backendType: "opencode",
       userId: "user-1",
     });
+  });
+
+  it("enqueues run and preparing-stuck check jobs when deferred to worker", async () => {
+    process.env.VERCEL = "1";
+    const mgr = asTestManager();
+    const runSpy = vi.spyOn(mgr, "runGeneration").mockResolvedValue(undefined);
+
+    insertReturningMock
+      .mockResolvedValueOnce([
+        {
+          id: "conv-new",
+          userId: "user-1",
+          model: "claude-sonnet-4-6",
+          autoApprove: false,
+          type: "chat",
+        },
+      ])
+      .mockResolvedValueOnce([{ id: "msg-user" }])
+      .mockResolvedValueOnce([{ id: "gen-new" }]);
+
+    await generationManager.startGeneration({
+      content: "hi",
+      userId: "user-1",
+    });
+
+    expect(runSpy).not.toHaveBeenCalled();
+    expect(queueAddMock).toHaveBeenCalledTimes(2);
+    expect(queueAddMock).toHaveBeenNthCalledWith(
+      1,
+      "generation:preparing-stuck-check",
+      { generationId: "gen-new" },
+      expect.objectContaining({
+        delay: 5 * 60 * 1000,
+      }),
+    );
+    expect(queueAddMock).toHaveBeenNthCalledWith(
+      2,
+      "generation:chat-run",
+      { generationId: "gen-new" },
+      expect.any(Object),
+    );
+  });
+
+  it("reports stuck preparing generations and pushes to kuma", async () => {
+    process.env.KUMA_PUSH_URL = "https://kuma.example/push/abc";
+    generationFindFirstMock.mockResolvedValueOnce({
+      id: "gen-stuck",
+      status: "running",
+      sandboxId: null,
+      completedAt: null,
+      startedAt: new Date(Date.now() - 6 * 60 * 1000),
+      conversation: {
+        id: "conv-stuck",
+        userId: "user-1",
+        type: "chat",
+      },
+    });
+
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generationManager.processPreparingStuckCheck("gen-stuck");
+
+    expect(logServerEvent).toHaveBeenCalledWith(
+      "warn",
+      "GENERATION_PREPARING_STUCK_DETECTED",
+      expect.objectContaining({
+        generationId: "gen-stuck",
+        conversationId: "conv-stuck",
+        userId: "user-1",
+      }),
+      expect.any(Object),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [calledUrl] = fetchMock.mock.calls[0] as [string];
+    expect(calledUrl).toContain("status=down");
+    expect(calledUrl).toContain("conversation%3Dconv-stuck");
+    expect(calledUrl).toContain("user%3Duser-1");
   });
 
   it("rejects startGeneration when an active generation already exists in DB", async () => {
@@ -1483,6 +1586,17 @@ describe("generationManager transitions", () => {
         needsAuth: false,
       };
     });
+    vi.mocked(parseBashCommand).mockImplementation((command) => {
+      if (command === "google-gmail list -l 1") {
+        return {
+          integration: "gmail",
+          operation: "list",
+          integrationName: "Gmail",
+          isWrite: false,
+        };
+      }
+      return null;
+    });
     vi.mocked(readSandboxFileAsBuffer).mockResolvedValue(Buffer.from("file-content"));
     vi.mocked(uploadSandboxFile).mockResolvedValue({
       id: "uploaded-send-file-1",
@@ -1526,7 +1640,7 @@ describe("generationManager transitions", () => {
       { type: "tool_use_delta", jsonDelta: '{"content":"note"}' },
       { type: "tool_use_end" },
       { type: "tool_use_start", toolUseId: "b1", toolName: "bash" },
-      { type: "tool_use_delta", jsonDelta: '{"command":"slack forbidden"}' },
+      { type: "tool_use_delta", jsonDelta: '{"command":"google-gmail list -l 1"}' },
       { type: "tool_use_end" },
       { type: "tool_use_start", toolUseId: "a1", toolName: "auth_tool" },
       { type: "tool_use_delta", jsonDelta: "{}" },
@@ -1583,5 +1697,16 @@ describe("generationManager transitions", () => {
     expect(vi.mocked(uploadSandboxFile)).toHaveBeenCalled();
     expect(ctx.uploadedSandboxFileIds?.has("uploaded-send-file-1")).toBe(true);
     expect(ctx.assistantContent).toContain("Hello done");
+    expect(ctx.contentParts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "tool_use",
+          id: "b1",
+          name: "bash",
+          integration: "gmail",
+          operation: "list",
+        }),
+      ]),
+    );
   });
 });

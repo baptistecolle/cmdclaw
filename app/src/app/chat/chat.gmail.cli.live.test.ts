@@ -60,6 +60,7 @@ describe.runIf(liveEnabled)("@live CLI chat gmail", () => {
       expect(result.stdout).not.toContain("[error]");
       expect(result.stdout).not.toContain("[auth_needed]");
       expect(result.stdout).not.toContain("User denied this action");
+      expect(result.stdout).toContain("[tool_integration] gmail");
       expect(result.stdout).toContain(`READ_SUBJECT=[${marker}]`);
       expect(result.stdout).toContain(latestInboxBeforePrompt.subject);
     },

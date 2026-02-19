@@ -1,8 +1,12 @@
 export type MessageTiming = {
+  endToEndDurationMs?: number;
   sandboxStartupDurationMs?: number;
   sandboxStartupMode?: "created" | "reused" | "unknown";
   generationDurationMs?: number;
   phaseDurationsMs?: {
+    sandboxConnectOrCreateMs?: number;
+    opencodeReadyMs?: number;
+    sessionReadyMs?: number;
     agentInitMs?: number;
     prePromptSetupMs?: number;
     agentReadyToPromptMs?: number;
@@ -19,7 +23,10 @@ export type MessageTiming = {
 
 export type TimingMetric = {
   key:
-    | "sandbox_prep"
+    | "end_to_end"
+    | "sandbox_connect_or_create"
+    | "opencode_ready"
+    | "session_ready"
     | "generation"
     | "agent_init"
     | "pre_prompt"
@@ -44,11 +51,37 @@ export function getTimingMetrics(timing?: MessageTiming): TimingMetric[] {
 
   const metrics: TimingMetric[] = [];
 
-  if (timing.sandboxStartupDurationMs !== undefined) {
+  if (timing.endToEndDurationMs !== undefined) {
     metrics.push({
-      key: "sandbox_prep",
-      label: `Sandbox prep${timing.sandboxStartupMode === "reused" ? " (reused)" : ""}`,
-      value: formatDuration(timing.sandboxStartupDurationMs),
+      key: "end_to_end",
+      label: "End-to-end",
+      value: formatDuration(timing.endToEndDurationMs),
+    });
+  }
+
+  const sandboxConnectOrCreateMs =
+    timing.phaseDurationsMs?.sandboxConnectOrCreateMs ?? timing.sandboxStartupDurationMs;
+  if (sandboxConnectOrCreateMs !== undefined) {
+    metrics.push({
+      key: "sandbox_connect_or_create",
+      label: `Sandbox connect/create${timing.sandboxStartupMode === "reused" ? " (reused)" : ""}`,
+      value: formatDuration(sandboxConnectOrCreateMs),
+    });
+  }
+
+  if (timing.phaseDurationsMs?.opencodeReadyMs !== undefined) {
+    metrics.push({
+      key: "opencode_ready",
+      label: "OpenCode ready",
+      value: formatDuration(timing.phaseDurationsMs.opencodeReadyMs),
+    });
+  }
+
+  if (timing.phaseDurationsMs?.sessionReadyMs !== undefined) {
+    metrics.push({
+      key: "session_ready",
+      label: "Session ready",
+      value: formatDuration(timing.phaseDurationsMs.sessionReadyMs),
     });
   }
 

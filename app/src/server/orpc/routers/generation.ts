@@ -87,6 +87,9 @@ const generationEventSchema = z.discriminatedUnion("type", [
             generationDurationMs: z.number().optional(),
             phaseDurationsMs: z
               .object({
+                sandboxConnectOrCreateMs: z.number().optional(),
+                opencodeReadyMs: z.number().optional(),
+                sessionReadyMs: z.number().optional(),
                 agentInitMs: z.number().optional(),
                 prePromptSetupMs: z.number().optional(),
                 agentReadyToPromptMs: z.number().optional(),

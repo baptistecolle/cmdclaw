@@ -140,6 +140,6 @@ describe("formatChatTranscript", () => {
     );
 
     expect(transcript).toContain("performance metrics:");
-    expect(transcript).toContain("- Sandbox prep: 800ms");
+    expect(transcript).toContain("- Sandbox connect/create: 800ms");
   });
 });

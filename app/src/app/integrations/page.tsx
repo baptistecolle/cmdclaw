@@ -331,6 +331,7 @@ function CustomIntegrationDeleteButton({
 }
 
 function IntegrationsPageContent() {
+  const showCustomIntegrations = false;
   const { isAdmin } = useIsAdmin();
   const searchParams = useSearchParams();
   const { data: integrations, isLoading, refetch } = useIntegrationList();
@@ -963,243 +964,248 @@ function IntegrationsPageContent() {
         </div>
       )}
 
-      {/* Custom Integrations Section */}
-      <div className="mt-10">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold">Custom Integrations</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Add your own API integrations with custom credentials.
-            </p>
-          </div>
-          <Button onClick={handleShowAddCustom}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Custom
-          </Button>
-        </div>
+      {/* Custom integrations are intentionally hidden until the feature is ready. */}
+      {showCustomIntegrations && (
+        <>
+          {/* Custom Integrations Section */}
+          <div className="mt-10">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Custom Integrations</h2>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Add your own API integrations with custom credentials.
+                </p>
+              </div>
+              <Button onClick={handleShowAddCustom}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Custom
+              </Button>
+            </div>
 
-        {customIntegrations && customIntegrations.length > 0 ? (
-          <div className="space-y-4">
-            {customIntegrations.map((ci) => (
-              <div key={ci.id} className="overflow-hidden rounded-lg border">
-                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                  <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                    <div className="flex shrink-0 items-center justify-center rounded-lg border bg-white p-2 shadow-sm dark:bg-gray-800">
-                      {ci.iconUrl ? (
-                        <Image src={ci.iconUrl} alt={ci.name} width={24} height={24} />
-                      ) : (
-                        <Puzzle className="h-6 w-6 text-indigo-500" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-medium">{ci.name}</h3>
-                      <p className="text-muted-foreground text-sm">
+            {customIntegrations && customIntegrations.length > 0 ? (
+              <div className="space-y-4">
+                {customIntegrations.map((ci) => (
+                  <div key={ci.id} className="overflow-hidden rounded-lg border">
+                    <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                      <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                        <div className="flex shrink-0 items-center justify-center rounded-lg border bg-white p-2 shadow-sm dark:bg-gray-800">
+                          {ci.iconUrl ? (
+                            <Image src={ci.iconUrl} alt={ci.name} width={24} height={24} />
+                          ) : (
+                            <Puzzle className="h-6 w-6 text-indigo-500" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-medium">{ci.name}</h3>
+                          <p className="text-muted-foreground text-sm">
+                            {ci.connected ? (
+                              <>
+                                Connected
+                                {ci.displayName ? ` as ${ci.displayName}` : ""}
+                              </>
+                            ) : (
+                              ci.description
+                            )}
+                          </p>
+                          {ci.communityStatus && (
+                            <span
+                              className={cn(
+                                "mt-1 inline-block rounded-full px-2 py-0.5 text-xs",
+                                ci.communityStatus === "approved"
+                                  ? "bg-green-100 text-green-700"
+                                  : ci.communityStatus === "pending"
+                                    ? "bg-yellow-100 text-yellow-700"
+                                    : "bg-red-100 text-red-700",
+                              )}
+                            >
+                              Community: {ci.communityStatus}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                         {ci.connected ? (
                           <>
-                            Connected
-                            {ci.displayName ? ` as ${ci.displayName}` : ""}
+                            <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap">
+                              <CustomIntegrationEnabledSwitch
+                                checked={ci.enabled}
+                                customIntegrationId={ci.id}
+                                onToggle={handleToggleCustom}
+                              />
+                              <span className="inline-block w-8 text-sm">
+                                {ci.enabled ? "On" : "Off"}
+                              </span>
+                            </label>
+                            <CustomIntegrationDisconnectButton
+                              customIntegrationId={ci.id}
+                              onDisconnect={handleDisconnectCustom}
+                            />
                           </>
+                        ) : ci.authType === "oauth2" ? (
+                          <CustomIntegrationOAuthConnectButton
+                            slug={ci.slug}
+                            onConnect={handleConnectCustomOAuth}
+                          />
                         ) : (
-                          ci.description
+                          <span className="text-muted-foreground text-xs">Credentials saved</span>
                         )}
-                      </p>
-                      {ci.communityStatus && (
-                        <span
-                          className={cn(
-                            "mt-1 inline-block rounded-full px-2 py-0.5 text-xs",
-                            ci.communityStatus === "approved"
-                              ? "bg-green-100 text-green-700"
-                              : ci.communityStatus === "pending"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-red-100 text-red-700",
-                          )}
-                        >
-                          Community: {ci.communityStatus}
-                        </span>
-                      )}
+                        {!ci.isBuiltIn && (
+                          <CustomIntegrationDeleteButton
+                            customIntegrationId={ci.id}
+                            onDelete={handleDeleteCustom}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-                    {ci.connected ? (
-                      <>
-                        <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap">
-                          <CustomIntegrationEnabledSwitch
-                            checked={ci.enabled}
-                            customIntegrationId={ci.id}
-                            onToggle={handleToggleCustom}
-                          />
-                          <span className="inline-block w-8 text-sm">
-                            {ci.enabled ? "On" : "Off"}
-                          </span>
-                        </label>
-                        <CustomIntegrationDisconnectButton
-                          customIntegrationId={ci.id}
-                          onDisconnect={handleDisconnectCustom}
-                        />
-                      </>
-                    ) : ci.authType === "oauth2" ? (
-                      <CustomIntegrationOAuthConnectButton
-                        slug={ci.slug}
-                        onConnect={handleConnectCustomOAuth}
-                      />
-                    ) : (
-                      <span className="text-muted-foreground text-xs">Credentials saved</span>
-                    )}
-                    {!ci.isBuiltIn && (
-                      <CustomIntegrationDeleteButton
-                        customIntegrationId={ci.id}
-                        onDelete={handleDeleteCustom}
-                      />
-                    )}
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="text-muted-foreground py-8 text-center text-sm">
+                No custom integrations yet. Click &quot;Add Custom&quot; to create one.
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="text-muted-foreground py-8 text-center text-sm">
-            No custom integrations yet. Click &quot;Add Custom&quot; to create one.
-          </div>
-        )}
-      </div>
 
-      {/* Add Custom Integration Dialog */}
-      {showAddCustom && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={handleHideAddCustom}
-        >
-          <div
-            className="bg-background w-full max-w-lg rounded-lg p-6 shadow-xl"
-            onClick={handleDialogContentClick}
-          >
-            <h3 className="mb-4 text-lg font-semibold">Add Custom Integration</h3>
-            <div className="max-h-[60vh] space-y-3 overflow-y-auto">
-              <div>
-                <label className="text-sm font-medium">Slug</label>
-                <Input
-                  placeholder="e.g. trello"
-                  value={customForm.slug}
-                  onChange={handleCustomSlugChange}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Name</label>
-                <Input
-                  placeholder="e.g. Trello"
-                  value={customForm.name}
-                  onChange={handleCustomNameChange}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Description</label>
-                <Input
-                  placeholder="What does this integration do?"
-                  value={customForm.description}
-                  onChange={handleCustomDescriptionChange}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Base URL</label>
-                <Input
-                  placeholder="https://api.example.com"
-                  value={customForm.baseUrl}
-                  onChange={handleCustomBaseUrlChange}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Auth Type</label>
-                <select
-                  className="bg-background w-full rounded-md border px-3 py-2 text-sm"
-                  value={customForm.authType}
-                  onChange={handleCustomAuthTypeChange}
-                >
-                  <option value="api_key">API Key</option>
-                  <option value="bearer_token">Bearer Token</option>
-                  <option value="oauth2">OAuth 2.0</option>
-                </select>
-              </div>
-
-              {customForm.authType === "api_key" && (
-                <div>
-                  <label className="text-sm font-medium">API Key</label>
-                  <Input
-                    type="password"
-                    placeholder="Your API key"
-                    value={customForm.apiKey}
-                    onChange={handleCustomApiKeyChange}
-                  />
-                </div>
-              )}
-
-              {customForm.authType === "bearer_token" && (
-                <div>
-                  <label className="text-sm font-medium">Bearer Token</label>
-                  <Input
-                    type="password"
-                    placeholder="Your bearer token"
-                    value={customForm.apiKey}
-                    onChange={handleCustomApiKeyChange}
-                  />
-                </div>
-              )}
-
-              {customForm.authType === "oauth2" && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium">Client ID</label>
-                    <Input value={customForm.clientId} onChange={handleCustomClientIdChange} />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Client Secret</label>
-                    <Input
-                      type="password"
-                      value={customForm.clientSecret}
-                      onChange={handleCustomClientSecretChange}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Auth URL</label>
-                    <Input
-                      placeholder="https://example.com/oauth/authorize"
-                      value={customForm.authUrl}
-                      onChange={handleCustomAuthUrlChange}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Token URL</label>
-                    <Input
-                      placeholder="https://example.com/oauth/token"
-                      value={customForm.tokenUrl}
-                      onChange={handleCustomTokenUrlChange}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Scopes (comma-separated)</label>
-                    <Input
-                      placeholder="read,write"
-                      value={customForm.scopes}
-                      onChange={handleCustomScopesChange}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={handleHideAddCustom}>
-                Cancel
-              </Button>
-              <Button
-                disabled={!customForm.slug || !customForm.name || !customForm.baseUrl}
-                onClick={handleCreateCustomIntegration}
+          {/* Add Custom Integration Dialog */}
+          {showAddCustom && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              onClick={handleHideAddCustom}
+            >
+              <div
+                className="bg-background w-full max-w-lg rounded-lg p-6 shadow-xl"
+                onClick={handleDialogContentClick}
               >
-                Create
-              </Button>
+                <h3 className="mb-4 text-lg font-semibold">Add Custom Integration</h3>
+                <div className="max-h-[60vh] space-y-3 overflow-y-auto">
+                  <div>
+                    <label className="text-sm font-medium">Slug</label>
+                    <Input
+                      placeholder="e.g. trello"
+                      value={customForm.slug}
+                      onChange={handleCustomSlugChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Name</label>
+                    <Input
+                      placeholder="e.g. Trello"
+                      value={customForm.name}
+                      onChange={handleCustomNameChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Description</label>
+                    <Input
+                      placeholder="What does this integration do?"
+                      value={customForm.description}
+                      onChange={handleCustomDescriptionChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Base URL</label>
+                    <Input
+                      placeholder="https://api.example.com"
+                      value={customForm.baseUrl}
+                      onChange={handleCustomBaseUrlChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Auth Type</label>
+                    <select
+                      className="bg-background w-full rounded-md border px-3 py-2 text-sm"
+                      value={customForm.authType}
+                      onChange={handleCustomAuthTypeChange}
+                    >
+                      <option value="api_key">API Key</option>
+                      <option value="bearer_token">Bearer Token</option>
+                      <option value="oauth2">OAuth 2.0</option>
+                    </select>
+                  </div>
+
+                  {customForm.authType === "api_key" && (
+                    <div>
+                      <label className="text-sm font-medium">API Key</label>
+                      <Input
+                        type="password"
+                        placeholder="Your API key"
+                        value={customForm.apiKey}
+                        onChange={handleCustomApiKeyChange}
+                      />
+                    </div>
+                  )}
+
+                  {customForm.authType === "bearer_token" && (
+                    <div>
+                      <label className="text-sm font-medium">Bearer Token</label>
+                      <Input
+                        type="password"
+                        placeholder="Your bearer token"
+                        value={customForm.apiKey}
+                        onChange={handleCustomApiKeyChange}
+                      />
+                    </div>
+                  )}
+
+                  {customForm.authType === "oauth2" && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium">Client ID</label>
+                        <Input value={customForm.clientId} onChange={handleCustomClientIdChange} />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Client Secret</label>
+                        <Input
+                          type="password"
+                          value={customForm.clientSecret}
+                          onChange={handleCustomClientSecretChange}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Auth URL</label>
+                        <Input
+                          placeholder="https://example.com/oauth/authorize"
+                          value={customForm.authUrl}
+                          onChange={handleCustomAuthUrlChange}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Token URL</label>
+                        <Input
+                          placeholder="https://example.com/oauth/token"
+                          value={customForm.tokenUrl}
+                          onChange={handleCustomTokenUrlChange}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Scopes (comma-separated)</label>
+                        <Input
+                          placeholder="read,write"
+                          value={customForm.scopes}
+                          onChange={handleCustomScopesChange}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button variant="ghost" onClick={handleHideAddCustom}>
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={!customForm.slug || !customForm.name || !customForm.baseUrl}
+                    onClick={handleCreateCustomIntegration}
+                  >
+                    Create
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );

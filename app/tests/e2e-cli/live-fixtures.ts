@@ -87,6 +87,18 @@ type GoogleCalendarEventsResponse = {
   items?: GoogleCalendarEvent[];
 };
 
+type GoogleDriveFile = {
+  id?: string;
+  name?: string;
+  mimeType?: string;
+  modifiedTime?: string;
+  trashed?: boolean;
+};
+
+type GoogleDriveFilesResponse = {
+  files?: GoogleDriveFile[];
+};
+
 type UnipileUserResponse = {
   provider_id?: string;
   display_name?: string;
@@ -587,6 +599,29 @@ async function googleCalendarApi<T>(
   return (await response.json()) as T;
 }
 
+async function googleDriveApi<T>(
+  token: string,
+  path: string,
+  params: Record<string, string | number | boolean> = {},
+): Promise<T> {
+  const query = new URLSearchParams(
+    Object.entries(params).map(([key, value]) => [key, String(value)]),
+  ).toString();
+  const url = `https://www.googleapis.com/drive/v3/${path}${query ? `?${query}` : ""}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Google Drive API ${path} failed with HTTP ${response.status}`);
+  }
+
+  return (await response.json()) as T;
+}
+
 function normalizeCalendarStart(start: GoogleCalendarEventDateTime | undefined): string {
   if (!start) {
     return "";
@@ -646,6 +681,53 @@ export async function readUpcomingGoogleCalendarEvent(args: {
     id: readableEvent.id,
     summary: readableEvent.summary!.replace(/\s+/g, " ").trim(),
     start: normalizeCalendarStart(readableEvent.start),
+  };
+}
+
+export async function getGoogleDriveAccessTokenForExpectedUser(): Promise<string> {
+  const dbUser = await db.query.user.findFirst({
+    where: eq(user.email, expectedUserEmail),
+  });
+
+  if (!dbUser) {
+    throw new Error(`Live e2e user not found: ${expectedUserEmail}`);
+  }
+
+  const tokens = await getValidTokensForUser(dbUser.id);
+  const googleDriveToken = tokens.get("google_drive");
+
+  if (!googleDriveToken) {
+    throw new Error(
+      `Google Drive is not connected for ${expectedUserEmail}. Connect Google Drive in app integrations before running this test.`,
+    );
+  }
+
+  return googleDriveToken;
+}
+
+export async function readLatestGoogleDriveFile(args: {
+  token: string;
+}): Promise<{ id: string; name: string }> {
+  const files = await googleDriveApi<GoogleDriveFilesResponse>(args.token, "files", {
+    pageSize: 10,
+    orderBy: "modifiedTime desc",
+    q: "trashed=false",
+    fields: "files(id,name,mimeType,modifiedTime,trashed)",
+  });
+
+  const readableFile = (files.files ?? []).find((file) => {
+    const id = file.id?.trim() ?? "";
+    const name = file.name?.replace(/\s+/g, " ").trim() ?? "";
+    return Boolean(id && name && !file.trashed);
+  });
+
+  if (!readableFile?.id) {
+    throw new Error("Could not find a readable file in Google Drive.");
+  }
+
+  return {
+    id: readableFile.id,
+    name: readableFile.name!.replace(/\s+/g, " ").trim(),
   };
 }
 

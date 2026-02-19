@@ -20,6 +20,7 @@ export const CHAT_GENERATION_JOB_NAME = "generation:chat-run";
 export const WORKFLOW_GENERATION_JOB_NAME = "generation:workflow-run";
 export const GENERATION_APPROVAL_TIMEOUT_JOB_NAME = "generation:approval-timeout";
 export const GENERATION_AUTH_TIMEOUT_JOB_NAME = "generation:auth-timeout";
+export const GENERATION_PREPARING_STUCK_CHECK_JOB_NAME = "generation:preparing-stuck-check";
 export const SLACK_EVENT_JOB_NAME = "slack:event-callback";
 
 export function buildQueueJobId(parts: Array<string | number | null | undefined>): string {
@@ -165,6 +166,15 @@ const handlers: Record<string, JobHandler> = {
 
     const { generationManager } = await import("@/server/services/generation-manager");
     await generationManager.processGenerationTimeout(generationId, "auth");
+  },
+  [GENERATION_PREPARING_STUCK_CHECK_JOB_NAME]: async (job) => {
+    const generationId = job.data?.generationId;
+    if (!generationId || typeof generationId !== "string") {
+      throw new Error(`Missing generationId in preparing-stuck-check job "${job.id}"`);
+    }
+
+    const { generationManager } = await import("@/server/services/generation-manager");
+    await generationManager.processPreparingStuckCheck(generationId);
   },
   [SLACK_EVENT_JOB_NAME]: async (job) => {
     const payload = job.data?.payload;

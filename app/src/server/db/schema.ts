@@ -209,6 +209,9 @@ export type MessageTiming = {
   sandboxStartupMode?: "created" | "reused" | "unknown";
   generationDurationMs?: number;
   phaseDurationsMs?: {
+    sandboxConnectOrCreateMs?: number;
+    opencodeReadyMs?: number;
+    sessionReadyMs?: number;
     agentInitMs?: number;
     prePromptSetupMs?: number;
     agentReadyToPromptMs?: number;
