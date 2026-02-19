@@ -199,6 +199,7 @@ export function extractConversationId(output: string): string {
 export async function runChatMessage(args: {
   message: string;
   model?: string;
+  conversation?: string;
   autoApprove?: boolean;
   questionAnswers?: string[];
   files?: string[];
@@ -208,6 +209,10 @@ export async function runChatMessage(args: {
 
   if (args.model) {
     commandArgs.push("--model", args.model);
+  }
+
+  if (args.conversation) {
+    commandArgs.push("--conversation", args.conversation);
   }
 
   if (args.autoApprove) {
