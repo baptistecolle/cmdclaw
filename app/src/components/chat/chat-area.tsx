@@ -53,6 +53,7 @@ import {
   useCancelGeneration,
   useDetectUserMessageLanguage,
   usePlatformSkillList,
+  useSkillList,
   useUpdateAutoApprove,
   type SandboxFileData,
 } from "@/orpc/hooks";
@@ -79,7 +80,7 @@ type QueuedMessage = {
   id: string;
   content: string;
   attachments?: AttachmentData[];
-  selectedSkillSlugs?: string[];
+  selectedSkillKeys?: string[];
 };
 
 type InputPrefillRequest = {
@@ -90,6 +91,7 @@ type InputPrefillRequest = {
 
 const CHAT_CONVERSATION_ID_SYNC_EVENT = "chat:conversation-id-sync";
 const EMPTY_SELECTED_SKILLS: string[] = [];
+const CUSTOM_SKILL_PREFIX = "custom:";
 
 type PersistedContentPart =
   | { type: "text"; text: string }
@@ -124,10 +126,14 @@ type PersistedConversationMessage = {
     sizeBytes: number | null;
   }>;
   timing?: {
+    endToEndDurationMs?: number;
     sandboxStartupDurationMs?: number;
     sandboxStartupMode?: "created" | "reused" | "unknown";
     generationDurationMs?: number;
     phaseDurationsMs?: {
+      sandboxConnectOrCreateMs?: number;
+      opencodeReadyMs?: number;
+      sessionReadyMs?: number;
       agentInitMs?: number;
       prePromptSetupMs?: number;
       agentReadyToPromptMs?: number;
@@ -216,6 +222,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function withEndToEndDuration(
+  timing: Message["timing"] | undefined,
+  startedAtMs: number | undefined,
+  completedAtMs = Date.now(),
+): Message["timing"] | undefined {
+  if (!startedAtMs) {
+    return timing;
+  }
+  return {
+    ...timing,
+    endToEndDurationMs: Math.max(0, completedAtMs - startedAtMs),
+  };
+}
+
 function buildSkillInstructionBlock(skillSlugs: string[], isFrench: boolean): string {
   const heading = isFrench
     ? "Utilise les skills suivants pour résoudre la tâche:"
@@ -267,6 +287,7 @@ export function ChatArea({ conversationId }: Props) {
   const queryClient = useQueryClient();
   const posthog = usePostHog();
   const { data: platformSkills, isLoading: isPlatformSkillsLoading } = usePlatformSkillList();
+  const { data: personalSkills, isLoading: isPersonalSkillsLoading } = useSkillList();
   const { data: existingConversation, isLoading } = useConversation(conversationId);
   const { startGeneration, subscribeToGeneration, abort } = useGeneration();
   const { mutateAsync: submitApproval, isPending: isApproving } = useSubmitApproval();
@@ -301,7 +322,7 @@ export function ChatArea({ conversationId }: Props) {
     [conversationId, draftConversationId],
   );
   const selectedSkillSlugsByScope = useChatSkillStore((state) => state.selectedSkillSlugsByScope);
-  const selectedPlatformSkillSlugs =
+  const selectedSkillKeys =
     selectedSkillSlugsByScope[skillSelectionScopeKey] ?? EMPTY_SELECTED_SKILLS;
   const toggleSelectedSkillSlug = useChatSkillStore((state) => state.toggleSelectedSkillSlug);
   const clearSelectedSkillSlugs = useChatSkillStore((state) => state.clearSelectedSkillSlugs);
@@ -1083,7 +1104,7 @@ export function ChatArea({ conversationId }: Props) {
     async (
       content: string,
       attachments?: AttachmentData[],
-      selectedSkillSlugsOverride?: string[],
+      selectedSkillKeysOverride?: string[],
     ) => {
       // Reset scroll lock so auto-scroll works for the new response
       userScrolledUpRef.current = false;
@@ -1110,7 +1131,12 @@ export function ChatArea({ conversationId }: Props) {
       syncFromRuntime(runtime);
       const streamScope = streamScopeRef.current;
       let streamGenerationId: string | undefined;
+      const generationRequestStartedAtMs = Date.now();
 
+      const selectedKeys = selectedSkillKeysOverride ?? selectedSkillKeys;
+      const selectedPlatformSkillSlugs = selectedKeys.filter(
+        (key) => !key.startsWith(CUSTOM_SKILL_PREFIX),
+      );
       const effectiveConversationId = currentConversationIdRef.current ?? conversationId;
       await startGeneration(
         {
@@ -1119,7 +1145,7 @@ export function ChatArea({ conversationId }: Props) {
           model: selectedModel,
           autoApprove: autoApproveEnabled,
           deviceId: selectedDeviceId,
-          selectedPlatformSkillSlugs: selectedSkillSlugsOverride ?? selectedPlatformSkillSlugs,
+          selectedPlatformSkillSlugs,
           attachments,
         },
         {
@@ -1269,7 +1295,12 @@ export function ChatArea({ conversationId }: Props) {
             ) {
               return;
             }
-            const timing = artifacts?.timing;
+            const doneAtMs = Date.now();
+            const timing = withEndToEndDuration(
+              artifacts?.timing,
+              generationRequestStartedAtMs,
+              doneAtMs,
+            );
             markInitSignal("done");
             runtime.handleDone({
               generationId,
@@ -1378,7 +1409,7 @@ export function ChatArea({ conversationId }: Props) {
       queryClient,
       resetInitTracking,
       selectedDeviceId,
-      selectedPlatformSkillSlugs,
+      selectedSkillKeys,
       selectedModel,
       startGeneration,
       submitApproval,
@@ -1398,8 +1429,8 @@ export function ChatArea({ conversationId }: Props) {
   }, [runGeneration]);
 
   const buildOutgoingContent = useCallback(
-    async (content: string, selectedSkillSlugs: string[]): Promise<string> => {
-      if (selectedSkillSlugs.length === 0) {
+    async (content: string, selectedSkillNames: string[]): Promise<string> => {
+      if (selectedSkillNames.length === 0) {
         return content;
       }
 
@@ -1411,7 +1442,7 @@ export function ChatArea({ conversationId }: Props) {
         console.error("Failed to detect user message language:", error);
       }
 
-      const instructions = buildSkillInstructionBlock(selectedSkillSlugs, isFrench);
+      const instructions = buildSkillInstructionBlock(selectedSkillNames, isFrench);
       return `${content}\n\n${instructions}`;
     },
     [detectUserMessageLanguage],
@@ -1420,8 +1451,11 @@ export function ChatArea({ conversationId }: Props) {
   const handleSend = useCallback(
     (content: string, attachments?: AttachmentData[]) => {
       const send = async () => {
-        const selectedSkillSlugsSnapshot = [...selectedPlatformSkillSlugs];
-        const outgoingContent = await buildOutgoingContent(content, selectedSkillSlugsSnapshot);
+        const selectedSkillKeysSnapshot = [...selectedSkillKeys];
+        const selectedSkillNamesSnapshot = selectedSkillKeysSnapshot.map((key) =>
+          key.startsWith(CUSTOM_SKILL_PREFIX) ? key.slice(CUSTOM_SKILL_PREFIX.length) : key,
+        );
+        const outgoingContent = await buildOutgoingContent(content, selectedSkillNamesSnapshot);
 
         if (isStreaming) {
           if (!queueingEnabled) {
@@ -1432,14 +1466,14 @@ export function ChatArea({ conversationId }: Props) {
             id: prev?.id ?? `queued-${Date.now()}`,
             content: outgoingContent,
             attachments,
-            selectedSkillSlugs: selectedSkillSlugsSnapshot,
+            selectedSkillKeys: selectedSkillKeysSnapshot,
           }));
           clearSelectedSkillSlugs(skillSelectionScopeKey);
           return;
         }
 
         clearSelectedSkillSlugs(skillSelectionScopeKey);
-        await runGeneration(outgoingContent, attachments, selectedSkillSlugsSnapshot);
+        await runGeneration(outgoingContent, attachments, selectedSkillKeysSnapshot);
       };
 
       void send();
@@ -1450,7 +1484,7 @@ export function ChatArea({ conversationId }: Props) {
       isStreaming,
       queueingEnabled,
       runGeneration,
-      selectedPlatformSkillSlugs,
+      selectedSkillKeys,
       skillSelectionScopeKey,
     ],
   );
@@ -1461,7 +1495,7 @@ export function ChatArea({ conversationId }: Props) {
       return;
     }
     setQueuedMessage(null);
-    void runGeneration(queued.content, queued.attachments, queued.selectedSkillSlugs);
+    void runGeneration(queued.content, queued.attachments, queued.selectedSkillKeys);
   }, [runGeneration]);
 
   const handleClearQueued = useCallback(() => {
@@ -1652,37 +1686,63 @@ export function ChatArea({ conversationId }: Props) {
   );
 
   const selectedSkillLabel = useMemo(() => {
-    if (selectedPlatformSkillSlugs.length === 0) {
+    const selectableSkills = [
+      ...(platformSkills ?? []).map((skill) => ({
+        key: skill.slug,
+        title: skill.title,
+        searchable: `${skill.title} ${skill.slug}`.toLowerCase(),
+      })),
+      ...((personalSkills ?? [])
+        .filter((skill) => skill.enabled)
+        .map((skill) => ({
+          key: `${CUSTOM_SKILL_PREFIX}${skill.name}`,
+          title: skill.displayName,
+          searchable: `${skill.displayName} ${skill.name}`.toLowerCase(),
+        })) ?? []),
+    ];
+
+    if (selectedSkillKeys.length === 0) {
       return "Skills";
     }
-    if (selectedPlatformSkillSlugs.length === 1) {
-      const only = platformSkills?.find((skill) => skill.slug === selectedPlatformSkillSlugs[0]);
-      return only?.title ?? selectedPlatformSkillSlugs[0] ?? "1 skill";
+    if (selectedSkillKeys.length === 1) {
+      const only = selectableSkills.find((skill) => skill.key === selectedSkillKeys[0]);
+      const fallback = selectedSkillKeys[0] ?? "1 skill";
+      return only?.title ?? fallback.replace(CUSTOM_SKILL_PREFIX, "");
     }
-    return `${selectedPlatformSkillSlugs.length} skills`;
-  }, [platformSkills, selectedPlatformSkillSlugs]);
+    return `${selectedSkillKeys.length} skills`;
+  }, [platformSkills, personalSkills, selectedSkillKeys]);
 
-  const filteredPlatformSkills = useMemo(() => {
+  const filteredSelectableSkills = useMemo(() => {
+    const selectableSkills = [
+      ...(platformSkills ?? []).map((skill) => ({
+        key: skill.slug,
+        title: skill.title,
+        searchable: `${skill.title} ${skill.slug}`.toLowerCase(),
+      })),
+      ...((personalSkills ?? [])
+        .filter((skill) => skill.enabled)
+        .map((skill) => ({
+          key: `${CUSTOM_SKILL_PREFIX}${skill.name}`,
+          title: skill.displayName,
+          searchable: `${skill.displayName} ${skill.name}`.toLowerCase(),
+        })) ?? []),
+    ];
     const query = skillSearchQuery.trim().toLowerCase();
     if (!query) {
-      return platformSkills ?? [];
+      return selectableSkills;
     }
-    return (platformSkills ?? []).filter((skill) => {
-      const title = skill.title.toLowerCase();
-      const slug = skill.slug.toLowerCase();
-      return title.includes(query) || slug.includes(query);
-    });
-  }, [platformSkills, skillSearchQuery]);
+    return selectableSkills.filter((skill) => skill.searchable.includes(query));
+  }, [platformSkills, personalSkills, skillSearchQuery]);
 
   const handleSkillDropdownSelect = useCallback(
     (event: Event) => {
       event.preventDefault();
       const target = event.currentTarget as HTMLElement | null;
-      const slug = target?.dataset.skillSlug;
-      if (!slug) {
+      const key = target?.dataset.skillSlug;
+      if (!key) {
         return;
       }
-      toggleSelectedSkillSlug(skillSelectionScopeKey, slug);
+      toggleSelectedSkillSlug(skillSelectionScopeKey, key);
     },
     [skillSelectionScopeKey, toggleSelectedSkillSlug],
   );
@@ -1976,66 +2036,72 @@ export function ChatArea({ conversationId }: Props) {
 
       <div className="bg-background border-t p-4">
         <div className="mx-auto w-full space-y-2">
-          {(isRecording || isProcessingVoice || voiceError) && (
-            <VoiceIndicator
-              isRecording={isRecording}
-              isProcessing={isProcessingVoice}
-              error={voiceError}
-            />
-          )}
-          {queuedMessage && (
-            <div className="from-muted/75 to-background rounded-3xl border bg-gradient-to-b px-4 py-3 shadow-[0_1px_0_0_hsl(var(--background))_inset,0_12px_24px_-22px_hsl(var(--foreground)/0.5)]">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="bg-background/80 border-border/70 inline-flex size-7 items-center justify-center rounded-full border">
-                    <ListTree className="text-muted-foreground h-3.5 w-3.5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm leading-none font-medium">
-                      {queuedMessage.content ||
-                        `${queuedMessage.attachments?.length ?? 0} queued attachment${(queuedMessage.attachments?.length ?? 0) === 1 ? "" : "s"}`}
-                    </p>
+          <div className="mx-auto w-full max-w-[1276px]">
+            <div className="grid grid-cols-1 items-end gap-2 md:grid-cols-[52px_minmax(0,896px)_52px] md:justify-center">
+              <div className="min-w-0 space-y-2 md:col-span-2">
+                {(isRecording || isProcessingVoice || voiceError) && (
+                  <VoiceIndicator
+                    isRecording={isRecording}
+                    isProcessing={isProcessingVoice}
+                    error={voiceError}
+                  />
+                )}
+                {queuedMessage && (
+                  <div className="from-muted/75 to-background rounded-3xl border bg-gradient-to-b px-4 py-3 shadow-[0_1px_0_0_hsl(var(--background))_inset,0_12px_24px_-22px_hsl(var(--foreground)/0.5)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="bg-background/80 border-border/70 inline-flex size-7 items-center justify-center rounded-full border">
+                          <ListTree className="text-muted-foreground h-3.5 w-3.5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm leading-none font-medium">
+                            {queuedMessage.content ||
+                              `${queuedMessage.attachments?.length ?? 0} queued attachment${(queuedMessage.attachments?.length ?? 0) === 1 ? "" : "s"}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          className="h-8 rounded-full px-3"
+                          variant="secondary"
+                          onClick={handleSendQueuedNow}
+                        >
+                          Steer
+                        </Button>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          onClick={handleClearQueued}
+                          aria-label="Delete queued message"
+                          className="rounded-full"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon-sm" variant="ghost" className="rounded-full">
+                              <Ellipsis className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-56 rounded-2xl p-1.5">
+                            <DropdownMenuItem onClick={handleEditQueuedMessage}>
+                              <PenLine className="h-4 w-4" />
+                              Edit message
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleToggleQueueingEnabled}>
+                              <ListTree className="h-4 w-4" />
+                              {queueingEnabled ? "Turn off queueing" : "Turn on queueing"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    size="sm"
-                    className="h-8 rounded-full px-3"
-                    variant="secondary"
-                    onClick={handleSendQueuedNow}
-                  >
-                    Steer
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={handleClearQueued}
-                    aria-label="Delete queued message"
-                    className="rounded-full"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="icon-sm" variant="ghost" className="rounded-full">
-                        <Ellipsis className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-56 rounded-2xl p-1.5">
-                      <DropdownMenuItem onClick={handleEditQueuedMessage}>
-                        <PenLine className="h-4 w-4" />
-                        Edit message
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleToggleQueueingEnabled}>
-                        <ListTree className="h-4 w-4" />
-                        {queueingEnabled ? "Turn off queueing" : "Turn on queueing"}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
           <div className="mx-auto w-full max-w-[1276px]">
             <div className="grid grid-cols-1 items-end gap-2 md:grid-cols-[52px_minmax(0,896px)_52px] md:justify-center">
               <div className="min-w-0 self-start md:col-start-1">
@@ -2049,9 +2115,9 @@ export function ChatArea({ conversationId }: Props) {
                         className="relative h-9 w-9 px-0"
                       >
                         <Sparkles className="h-4 w-4" />
-                        {selectedPlatformSkillSlugs.length > 0 ? (
+                        {selectedSkillKeys.length > 0 ? (
                           <span className="bg-foreground text-background absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-4 font-medium">
-                            {selectedPlatformSkillSlugs.length}
+                            {selectedSkillKeys.length}
                           </span>
                         ) : null}
                       </Button>
@@ -2075,17 +2141,17 @@ export function ChatArea({ conversationId }: Props) {
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <div className="min-h-0 flex-1 overflow-y-auto p-1">
-                        {isPlatformSkillsLoading ? (
+                        {isPlatformSkillsLoading || isPersonalSkillsLoading ? (
                           <DropdownMenuItem disabled>Loading...</DropdownMenuItem>
-                        ) : filteredPlatformSkills.length === 0 ? (
+                        ) : filteredSelectableSkills.length === 0 ? (
                           <DropdownMenuItem disabled>No skills found</DropdownMenuItem>
                         ) : (
-                          filteredPlatformSkills.map((skill) => {
-                            const isSelected = selectedPlatformSkillSlugs.includes(skill.slug);
+                          filteredSelectableSkills.map((skill) => {
+                            const isSelected = selectedSkillKeys.includes(skill.key);
                             return (
                               <DropdownMenuItem
-                                key={skill.slug}
-                                data-skill-slug={skill.slug}
+                                key={skill.key}
+                                data-skill-slug={skill.key}
                                 onSelect={handleSkillDropdownSelect}
                               >
                                 <Check
@@ -2105,7 +2171,7 @@ export function ChatArea({ conversationId }: Props) {
                           type="button"
                           variant="ghost"
                           onClick={handleClearSelectedSkills}
-                          disabled={selectedPlatformSkillSlugs.length === 0}
+                          disabled={selectedSkillKeys.length === 0}
                           className="h-10 rounded-md"
                         >
                           Clear
