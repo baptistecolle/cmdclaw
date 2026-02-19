@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import {
   isUnipileMissingCredentialsError,
   UNIPILE_MISSING_CREDENTIALS_MESSAGE,
@@ -155,6 +156,7 @@ const defaultCustomForm: CustomFormState = {
 
 type IntegrationType = keyof typeof integrationConfig;
 type OAuthIntegrationType = Exclude<IntegrationType, "whatsapp">;
+const adminPreviewOnlyIntegrations = new Set<IntegrationType>(["reddit", "twitter", "whatsapp"]);
 type CustomAuthType = "oauth2" | "api_key" | "bearer_token";
 type CustomFormState = {
   slug: string;
@@ -325,6 +327,7 @@ function CustomIntegrationDeleteButton({
 }
 
 function IntegrationsPageContent() {
+  const { isAdmin } = useIsAdmin();
   const searchParams = useSearchParams();
   const { data: integrations, isLoading, refetch } = useIntegrationList();
   const { data: customIntegrations, refetch: refetchCustom } = useCustomIntegrationList();
@@ -548,13 +551,15 @@ function IntegrationsPageContent() {
     integrationsList.map((i) => [i.type, i]),
   );
 
-  // Filter integrations based on search and tab
-  const filteredIntegrations = (
+  const visibleIntegrations = (
     Object.entries(integrationConfig) as [
       IntegrationType,
       (typeof integrationConfig)[IntegrationType],
     ][]
-  ).filter(([type, config]) => {
+  ).filter(([type]) => isAdmin || !adminPreviewOnlyIntegrations.has(type));
+
+  // Filter integrations based on search and tab
+  const filteredIntegrations = visibleIntegrations.filter(([type, config]) => {
     const integration = connectedIntegrations.get(type);
     const isWhatsAppConnected = type === "whatsapp" && whatsAppBridgeStatus === "connected";
     const matchesSearch =
@@ -574,16 +579,21 @@ function IntegrationsPageContent() {
     return true;
   });
 
-  const connectedCount =
-    connectedIntegrations.size + (whatsAppBridgeStatus === "connected" ? 1 : 0);
+  const connectedCount = visibleIntegrations.reduce((count, [type]) => {
+    const integration = connectedIntegrations.get(type);
+    const isWhatsAppConnected = type === "whatsapp" && whatsAppBridgeStatus === "connected";
+    return count + (integration || isWhatsAppConnected ? 1 : 0);
+  }, 0);
+
+  const totalVisibleIntegrations = visibleIntegrations.length;
 
   const tabs: { id: FilterTab; label: string; count: number }[] = [
-    { id: "all", label: "All", count: Object.keys(integrationConfig).length },
+    { id: "all", label: "All", count: totalVisibleIntegrations },
     { id: "connected", label: "Connected", count: connectedCount },
     {
       id: "not_connected",
       label: "Not Connected",
-      count: Object.keys(integrationConfig).length - connectedCount,
+      count: totalVisibleIntegrations - connectedCount,
     },
   ];
 
@@ -807,6 +817,7 @@ function IntegrationsPageContent() {
       ) : (
         <div className="space-y-4">
           {filteredIntegrations.map(([type, config]) => {
+            const isPreviewOnly = adminPreviewOnlyIntegrations.has(type);
             const integration = connectedIntegrations.get(type);
             const isConnecting = connectingType === type;
             const isExpanded = expandedCard === type;
@@ -818,7 +829,12 @@ function IntegrationsPageContent() {
               : undefined;
 
             return (
-              <div key={type} className="overflow-hidden rounded-lg border">
+              <div key={type} className="relative overflow-hidden rounded-lg border">
+                {isPreviewOnly && (
+                  <span className="bg-muted text-muted-foreground absolute top-2 right-2 z-10 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
+                    Coming soon
+                  </span>
+                )}
                 {connectError && (
                   <div className="flex items-center gap-2 border-b border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
                     <XCircle className="h-4 w-4 shrink-0" />
@@ -833,7 +849,13 @@ function IntegrationsPageContent() {
                         config.bgColor,
                       )}
                     >
-                      <Image src={config.icon} alt={config.name} width={24} height={24} />
+                      <Image
+                        src={config.icon}
+                        alt={config.name}
+                        width={24}
+                        height={24}
+                        className="h-6 w-auto"
+                      />
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-medium">{config.name}</h3>

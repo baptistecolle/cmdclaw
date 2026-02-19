@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 const settingsTabs = [
   { label: "General", href: "/settings" },
   { label: "Subscriptions", href: "/settings/subscriptions" },
-  { label: "Billing", href: "/settings/billing" },
-  { label: "Devices", href: "/settings/devices" },
+  // { label: "Billing", href: "/settings/billing" },
+  // { label: "Devices", href: "/settings/devices" },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

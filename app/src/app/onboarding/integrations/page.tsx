@@ -129,11 +129,23 @@ function IntegrationIconButton({
         <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
       ) : isRecommended ? (
         <div className="flex h-12 w-12 items-center justify-center rounded-lg border bg-white shadow-sm dark:bg-gray-800">
-          <Image src={config.icon} alt={config.name} width={32} height={32} />
+          <Image
+            src={config.icon}
+            alt={config.name}
+            width={32}
+            height={32}
+            className="h-8 w-auto"
+          />
         </div>
       ) : (
         <div className="flex h-8 w-8 items-center justify-center">
-          <Image src={config.icon} alt={config.name} width={32} height={32} />
+          <Image
+            src={config.icon}
+            alt={config.name}
+            width={32}
+            height={32}
+            className="h-8 w-auto"
+          />
         </div>
       )}
       <span className="text-muted-foreground text-xs font-medium">{config.name}</span>

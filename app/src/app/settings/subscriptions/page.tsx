@@ -7,20 +7,14 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  useProviderAuthStatus,
-  useConnectProvider,
-  useDisconnectProvider,
-  useSetProviderApiKey,
-} from "@/orpc/hooks";
+import { useProviderAuthStatus, useConnectProvider, useDisconnectProvider } from "@/orpc/hooks";
 
-type ProviderID = "openai" | "google" | "kimi";
-type ProviderAuthType = "oauth" | "api_key";
+type ProviderID = "openai" | "google";
+type ProviderAuthType = "oauth";
 
 const PROVIDER_LABELS: Record<ProviderID, string> = {
   openai: "ChatGPT",
   google: "Gemini",
-  kimi: "Kimi",
 };
 
 const getProviderLabel = (provider: ProviderID | string) =>
@@ -35,7 +29,6 @@ const PROVIDERS: {
   logoAlt: string;
   logoClassName?: string;
   models: string[];
-  apiKeyHelp?: string;
 }[] = [
   {
     id: "openai",
@@ -61,16 +54,6 @@ const PROVIDERS: {
     logoUrl: "/integrations/gemini.svg",
     logoAlt: "Google Gemini logo",
     models: ["Gemini 2.5 Pro", "Gemini 2.5 Flash"],
-  },
-  {
-    id: "kimi",
-    authType: "api_key",
-    name: "Kimi",
-    description: "Use your Kimi for Coding subscription",
-    logoUrl: "/integrations/kimi.svg",
-    logoAlt: "Kimi logo",
-    models: ["Kimi K2.5", "Kimi K2 Thinking"],
-    apiKeyHelp: "Paste your KIMI_API_KEY from Kimi for Coding.",
   },
 ];
 
@@ -158,7 +141,6 @@ export default function SubscriptionsPage() {
   const { data, isLoading } = useProviderAuthStatus();
   const connectProvider = useConnectProvider();
   const disconnectProvider = useDisconnectProvider();
-  const setProviderApiKey = useSetProviderApiKey();
   const [connectingProvider, setConnectingProvider] = useState<ProviderID | null>(null);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
@@ -184,34 +166,6 @@ export default function SubscriptionsPage() {
     async (provider: ProviderID) => {
       setConnectingProvider(provider);
 
-      if (provider === "kimi") {
-        const apiKey = window.prompt("Paste your KIMI_API_KEY");
-        if (!apiKey?.trim()) {
-          setConnectingProvider(null);
-          return;
-        }
-
-        try {
-          await setProviderApiKey.mutateAsync({
-            provider: "kimi",
-            apiKey: apiKey.trim(),
-          });
-          setNotification({
-            type: "success",
-            message: "Kimi connected successfully!",
-          });
-        } catch (error) {
-          console.error("Failed to save Kimi API key:", error);
-          setNotification({
-            type: "error",
-            message: "Failed to connect Kimi. Please verify your API key and try again.",
-          });
-        } finally {
-          setConnectingProvider(null);
-        }
-        return;
-      }
-
       try {
         const result = await connectProvider.mutateAsync(provider);
         // Open the OAuth URL in the same window
@@ -225,7 +179,7 @@ export default function SubscriptionsPage() {
         setConnectingProvider(null);
       }
     },
-    [connectProvider, setProviderApiKey],
+    [connectProvider],
   );
 
   const handleDisconnect = useCallback(
@@ -314,9 +268,6 @@ export default function SubscriptionsPage() {
                     )}
                   </div>
                   <p className="text-muted-foreground mt-1 text-sm">{provider.description}</p>
-                  {provider.authType === "api_key" && provider.apiKeyHelp ? (
-                    <p className="text-muted-foreground mt-1 text-xs">{provider.apiKeyHelp}</p>
-                  ) : null}
                 </div>
 
                 <div className="shrink-0">
