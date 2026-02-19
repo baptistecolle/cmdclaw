@@ -243,6 +243,13 @@ export default function SubscriptionsPage() {
           });
           return;
         }
+
+        if (result.mode === "redirect") {
+          window.location.href = result.authUrl;
+          return;
+        }
+
+        setConnectingProvider(null);
       } catch (error) {
         console.error("Failed to start OAuth flow:", error);
         setNotification({

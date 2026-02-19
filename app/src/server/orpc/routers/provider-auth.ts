@@ -17,6 +17,31 @@ const pollProviderSchema = z.object({
   provider: z.literal("openai"),
   flowId: z.string().min(1),
 });
+type OpenAIAuthMode = "device" | "browser_redirect";
+let OPENAI_AUTH_MODE: OpenAIAuthMode = "device";
+
+function getOpenAIAuthMode(): OpenAIAuthMode {
+  return OPENAI_AUTH_MODE;
+}
+
+function generateCodeVerifier(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  const bytes = new Uint8Array(43);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => chars[b % chars.length])
+    .join("");
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const data = new TextEncoder().encode(verifier);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  const bytes = new Uint8Array(hash);
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
 
 function generateState(): string {
   return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
@@ -99,6 +124,42 @@ const connect = protectedProcedure
     const config = SUBSCRIPTION_PROVIDERS[input.provider];
     if (!isOAuthProviderConfig(config)) {
       throw new Error(`Provider "${input.provider}" does not support OAuth`);
+    }
+
+    if (getOpenAIAuthMode() === "browser_redirect") {
+      const state = generateState();
+      const codeVerifier = config.usePKCE ? generateCodeVerifier() : "";
+
+      await storePending(state, {
+        userId: context.user.id,
+        provider: input.provider,
+        codeVerifier,
+      });
+
+      const params = new URLSearchParams({
+        response_type: "code",
+        client_id: config.clientId,
+        redirect_uri: config.redirectUri,
+        state,
+      });
+
+      if (config.scopes?.length) {
+        params.set("scope", config.scopes.join(" "));
+      }
+
+      if (codeVerifier) {
+        params.set("code_challenge", await generateCodeChallenge(codeVerifier));
+        params.set("code_challenge_method", "S256");
+      }
+
+      params.set("id_token_add_organizations", "true");
+      params.set("codex_cli_simplified_flow", "true");
+      params.set("originator", "opencode");
+
+      return {
+        mode: "redirect" as const,
+        authUrl: `${config.authUrl}?${params}`,
+      };
     }
 
     const flowId = generateState();
