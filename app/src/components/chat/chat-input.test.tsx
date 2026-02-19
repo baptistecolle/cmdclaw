@@ -1,12 +1,18 @@
 // @vitest-environment jsdom
 
 import * as jestDomVitest from "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatDraftStore } from "./chat-draft-store";
 import { ChatInput } from "./chat-input";
 
 void jestDomVitest;
+
+const APPEND_PREFILL_REQUEST = {
+  id: "voice-1",
+  text: "hello from voice",
+  mode: "append" as const,
+};
 
 describe("ChatInput", () => {
   beforeEach(() => {
@@ -60,5 +66,21 @@ describe("ChatInput", () => {
     view.rerender(<ChatInput onSend={vi.fn()} conversationId="conv-1" />);
     inputs = screen.getAllByTestId("chat-input") as HTMLTextAreaElement[];
     expect(inputs[inputs.length - 1]?.value).toBe("Conv 1 draft");
+  });
+
+  it("appends prefilled text when append mode is requested", async () => {
+    const onSend = vi.fn();
+    const view = render(<ChatInput onSend={onSend} />);
+    const input = view.container.querySelector('[data-testid="chat-input"]') as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "Draft" } });
+
+    view.rerender(<ChatInput onSend={onSend} prefillRequest={APPEND_PREFILL_REQUEST} />);
+
+    const updatedInput = view.container.querySelector(
+      '[data-testid="chat-input"]',
+    ) as HTMLTextAreaElement;
+    await waitFor(() => {
+      expect(updatedInput.value).toBe("Draft hello from voice");
+    });
   });
 });

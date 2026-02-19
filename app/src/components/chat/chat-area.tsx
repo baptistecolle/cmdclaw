@@ -85,6 +85,7 @@ type QueuedMessage = {
 type InputPrefillRequest = {
   id: string;
   text: string;
+  mode?: "replace" | "append";
 };
 
 const CHAT_CONVERSATION_ID_SYNC_EVENT = "chat:conversation-id-sync";
@@ -1726,14 +1727,18 @@ export function ChatArea({ conversationId }: Props) {
       });
 
       if (result.text && result.text.trim()) {
-        handleSend(result.text.trim());
+        setInputPrefillRequest({
+          id: `voice-prefill-${Date.now()}`,
+          text: result.text.trim(),
+          mode: "append",
+        });
       }
     } catch (err) {
       console.error("Transcription error:", err);
     } finally {
       setIsProcessingVoice(false);
     }
-  }, [stopRecording, transcribe, handleSend]);
+  }, [stopRecording, transcribe]);
 
   // Start recording handler (for both keyboard and button)
   const handleStartRecording = useCallback(() => {

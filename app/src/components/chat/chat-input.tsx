@@ -27,6 +27,7 @@ type Props = {
   prefillRequest?: {
     id: string;
     text: string;
+    mode?: "replace" | "append";
   } | null;
   conversationId?: string;
 };
@@ -92,13 +93,18 @@ export function ChatInput({
     if (!prefillRequest) {
       return;
     }
-    setValue(prefillRequest.text);
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(
-        prefillRequest.text.length,
-        prefillRequest.text.length,
-      );
+    setValue((previousValue) => {
+      const nextValue =
+        prefillRequest.mode === "append"
+          ? `${previousValue}${previousValue && !/\s$/.test(previousValue) ? " " : ""}${prefillRequest.text}`
+          : prefillRequest.text;
+
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+        textareaRef.current?.setSelectionRange(nextValue.length, nextValue.length);
+      });
+
+      return nextValue;
     });
   }, [prefillRequest]);
 
