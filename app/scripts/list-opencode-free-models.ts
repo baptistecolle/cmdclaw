@@ -1,11 +1,11 @@
-import { fetchOpencodeFreeModels } from "../src/lib/zen-models";
+import { listOpencodeFreeModels } from "../src/server/ai/opencode-models";
 
 function isJsonOutput(argv: string[]): boolean {
   return argv.includes("--json");
 }
 
 async function main(): Promise<void> {
-  const models = await fetchOpencodeFreeModels();
+  const models = await listOpencodeFreeModels();
 
   if (isJsonOutput(process.argv.slice(2))) {
     console.log(JSON.stringify(models, null, 2));

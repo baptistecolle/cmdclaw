@@ -274,6 +274,7 @@ async function getOrCreateConversation(
       userId,
       type: "chat",
       title: "Slack conversation",
+      model: "anthropic/claude-sonnet-4-6",
     })
     .returning();
 

@@ -6,7 +6,11 @@ import readline from "node:readline";
 import type { AppRouter } from "../src/server/orpc";
 import { createGenerationRuntime } from "../src/lib/generation-runtime";
 import { runGenerationStream } from "../src/lib/generation-stream";
-import { fetchOpencodeFreeModels, resolveDefaultOpencodeFreeModel } from "../src/lib/zen-models";
+import { parseModelReference } from "../src/lib/model-reference";
+import {
+  listOpencodeFreeModels,
+  resolveDefaultOpencodeFreeModel,
+} from "../src/server/ai/opencode-models";
 import {
   DEFAULT_SERVER_URL,
   ask,
@@ -146,7 +150,9 @@ function printHelp(): void {
   console.log("  -s, --server <url>        Server URL (default http://localhost:3000)");
   console.log("  -c, --conversation <id>   Continue an existing conversation");
   console.log("  -m, --message <text>      Send one message and exit");
-  console.log("  -M, --model <id>          Model id to use (default resolves to a free model)");
+  console.log(
+    "  -M, --model <provider/model> Model reference (default resolves to first free model)",
+  );
   console.log("  --list-models             List free model ids and exit");
   console.log("  --auto-approve            Auto-approve tool calls");
   console.log("  --no-validate             Skip persisted message validation");
@@ -159,7 +165,7 @@ function printHelp(): void {
   console.log("Interactive commands:");
   console.log("  /file <path>              Attach file before sending");
   console.log("  /model                    Show current model");
-  console.log("  /model <id>               Switch model for next prompts");
+  console.log("  /model <provider/model>   Switch model for next prompts");
   console.log("  /models                   List free model ids\n");
 }
 
@@ -461,7 +467,13 @@ async function runChatLoop(
     if (input.startsWith("/model ")) {
       const model = input.slice(7).trim();
       if (!model) {
-        console.log("Usage: /model <id>");
+        console.log("Usage: /model <provider/model>");
+        return runStep();
+      }
+      try {
+        parseModelReference(model);
+      } catch (error) {
+        console.log(error instanceof Error ? error.message : String(error));
         return runStep();
       }
       options.model = model;
@@ -909,7 +921,12 @@ async function main(): Promise<void> {
     }
   }
 
-  args.model = await resolveDefaultOpencodeFreeModel(args.model ?? process.env.BAP_CHAT_MODEL);
+  try {
+    args.model = await resolveDefaultOpencodeFreeModel(args.model ?? process.env.BAP_CHAT_MODEL);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
   console.log(`[model] ${args.model}`);
 
   const client = createRpcClient(serverUrl, config.token);
@@ -948,7 +965,7 @@ async function main(): Promise<void> {
 
 async function printFreeModels(): Promise<void> {
   try {
-    const models = await fetchOpencodeFreeModels();
+    const models = await listOpencodeFreeModels();
     if (models.length === 0) {
       console.log("No free OpenCode models found.");
       return;

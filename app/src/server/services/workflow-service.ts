@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { and, eq, inArray } from "drizzle-orm";
 import type { IntegrationType } from "@/server/oauth/config";
-import { resolveDefaultOpencodeFreeModel } from "@/lib/zen-models";
+import { resolveDefaultOpencodeFreeModel } from "@/server/ai/opencode-models";
 import { db } from "@/server/db/client";
 import {
   conversation,

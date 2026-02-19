@@ -72,7 +72,7 @@ function sortModels(models: ModelOption[]): ModelOption[] {
 
 const ANTHROPIC_MODELS: ModelOption[] = [
   {
-    id: "claude-sonnet-4-6",
+    id: "anthropic/claude-sonnet-4-6",
     name: "Claude Sonnet 4.6",
     provider: "anthropic",
     providerLabel: "Anthropic",
@@ -81,55 +81,39 @@ const ANTHROPIC_MODELS: ModelOption[] = [
 
 const OPENAI_MODELS: ModelOption[] = [
   {
-    id: "gpt-5.1-codex-max",
+    id: "openai/gpt-5.1-codex-max",
     name: "GPT-5.1 Codex Max",
     provider: "openai",
     providerLabel: "ChatGPT",
   },
   {
-    id: "gpt-5.1-codex-mini",
+    id: "openai/gpt-5.1-codex-mini",
     name: "GPT-5.1 Codex Mini",
     provider: "openai",
     providerLabel: "ChatGPT",
   },
   {
-    id: "gpt-5.2",
+    id: "openai/gpt-5.2",
     name: "GPT-5.2",
     provider: "openai",
     providerLabel: "ChatGPT",
   },
   {
-    id: "gpt-5.2-codex",
+    id: "openai/gpt-5.2-codex",
     name: "GPT-5.2 Codex",
     provider: "openai",
     providerLabel: "ChatGPT",
   },
   {
-    id: "gpt-5.1-codex",
+    id: "openai/gpt-5.1-codex",
     name: "GPT-5.1 Codex",
     provider: "openai",
     providerLabel: "ChatGPT",
   },
 ];
 
-const KIMI_MODELS: ModelOption[] = [
-  {
-    id: "k2p5",
-    name: "Kimi K2.5",
-    provider: "kimi-for-coding",
-    providerLabel: "Kimi",
-  },
-  {
-    id: "kimi-k2-thinking",
-    name: "Kimi K2 Thinking",
-    provider: "kimi-for-coding",
-    providerLabel: "Kimi",
-  },
-];
-
 const SORTED_ANTHROPIC_MODELS = sortModels(ANTHROPIC_MODELS);
 const SORTED_OPENAI_MODELS = sortModels(OPENAI_MODELS);
-const SORTED_KIMI_MODELS = sortModels(KIMI_MODELS);
 
 type Props = {
   selectedModel: string;
@@ -143,7 +127,6 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
   const connected = authStatus?.connected ?? {};
 
   const isOpenAIConnected = "openai" in connected;
-  const isKimiConnected = "kimi" in connected;
 
   const zenModels: ModelOption[] = sortModels(
     (freeModelsData?.models ?? []).map((model) => ({
@@ -154,7 +137,7 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
     })),
   );
 
-  const allModels = [...ANTHROPIC_MODELS, ...OPENAI_MODELS, ...KIMI_MODELS, ...zenModels];
+  const allModels = [...ANTHROPIC_MODELS, ...OPENAI_MODELS, ...zenModels];
 
   const currentModel = allModels.find((m) => m.id === selectedModel);
   const displayName = currentModel?.name ?? selectedModel;
@@ -224,29 +207,6 @@ export function ModelSelector({ selectedModel, onModelChange, disabled }: Props)
         </DropdownMenuLabel>
         {isOpenAIConnected ? (
           SORTED_OPENAI_MODELS.map((model) => (
-            <DropdownMenuItem
-              key={model.id}
-              data-testid={`chat-model-option-${model.id}`}
-              data-model-id={model.id}
-              onClick={handleModelSelect}
-            >
-              <span className="flex-1">{model.name}</span>
-              {selectedModel === model.id && <Check className="text-foreground h-3.5 w-3.5" />}
-            </DropdownMenuItem>
-          ))
-        ) : (
-          <DropdownMenuItem className="text-muted-foreground text-xs" onClick={openSubscriptions}>
-            Connect in Settings to unlock
-          </DropdownMenuItem>
-        )}
-
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="flex items-center gap-1.5">
-          Kimi
-          {!isKimiConnected && <Lock className="text-muted-foreground h-3 w-3" />}
-        </DropdownMenuLabel>
-        {isKimiConnected ? (
-          SORTED_KIMI_MODELS.map((model) => (
             <DropdownMenuItem
               key={model.id}
               data-testid={`chat-model-option-${model.id}`}

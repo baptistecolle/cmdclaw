@@ -232,6 +232,7 @@ async function getOrCreateConversation(waJid: string, userId: string): Promise<s
       userId,
       type: "chat",
       title: "WhatsApp conversation",
+      model: "anthropic/claude-sonnet-4-6",
     })
     .returning();
 

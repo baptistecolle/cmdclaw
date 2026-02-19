@@ -15,11 +15,11 @@ import type { LLMBackend, ChatMessage, ContentBlock } from "@/server/ai/llm-back
 import type { IntegrationType } from "@/server/oauth/config";
 import type { SandboxBackend } from "@/server/sandbox/types";
 import { env } from "@/env";
-import { resolveDefaultOpencodeFreeModel } from "@/lib/zen-models";
+import { parseModelReference } from "@/lib/model-reference";
 import { AnthropicBackend } from "@/server/ai/anthropic-backend";
 import { LocalLLMBackend } from "@/server/ai/local-backend";
 import { OpenAIBackend } from "@/server/ai/openai-backend";
-import { isOpencodeFreeModel } from "@/server/ai/opencode-models";
+import { resolveDefaultOpencodeFreeModel } from "@/server/ai/opencode-models";
 import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
 import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
 import { db } from "@/server/db/client";
@@ -99,6 +99,7 @@ let cachedDefaultWorkflowModelPromise: Promise<string> | undefined;
 async function resolveWorkflowModel(model?: string): Promise<string> {
   const configured = model?.trim();
   if (configured) {
+    parseModelReference(configured);
     return configured;
   }
 
@@ -304,6 +305,7 @@ type PrePromptCacheRecord = {
 };
 
 const PRE_PROMPT_CACHE_PATH = "/app/.opencode/pre-prompt-cache.json";
+const DEFAULT_MODEL_REFERENCE = "anthropic/claude-sonnet-4-6";
 
 async function getDoneArtifacts(messageId: string): Promise<
   | {
@@ -874,6 +876,10 @@ class GenerationManager {
     selectedPlatformSkillSlugs?: string[];
   }): Promise<{ generationId: string; conversationId: string }> {
     const { content, userId, model, autoApprove } = params;
+    const requestedModel = model?.trim();
+    if (requestedModel) {
+      parseModelReference(requestedModel);
+    }
     const traceId = createTraceId();
     const startGenerationStartedAt = Date.now();
     const logContext = {
@@ -956,7 +962,7 @@ class GenerationManager {
           userId,
           title,
           type: "chat",
-          model: model ?? "claude-sonnet-4-6",
+          model: requestedModel ?? DEFAULT_MODEL_REFERENCE,
           autoApprove: autoApprove ?? false,
         })
         .returning();
@@ -1133,7 +1139,7 @@ class GenerationManager {
       startedAt: new Date(),
       lastSaveAt: new Date(),
       isNewConversation,
-      model: model ?? conv.model ?? "claude-sonnet-4-6",
+      model: requestedModel ?? conv.model ?? DEFAULT_MODEL_REFERENCE,
       userMessageContent: content,
       assistantMessageIds: new Set(),
       messageRoles: new Map(),
@@ -1405,7 +1411,7 @@ class GenerationManager {
       startedAt: genRecord.startedAt,
       lastSaveAt: new Date(),
       isNewConversation: false,
-      model: genRecord.conversation.model ?? "claude-sonnet-4-6",
+      model: genRecord.conversation.model ?? DEFAULT_MODEL_REFERENCE,
       userMessageContent: latestUserMessage?.content ?? "",
       assistantMessageIds: new Set(),
       messageRoles: new Map(),
@@ -2688,10 +2694,12 @@ class GenerationManager {
       );
       const eventStream = eventResult.stream;
 
-      // Resolve provider from model ID
+      const parsedModel = parseModelReference(ctx.model);
+
+      // Resolve provider from model reference
       const modelConfig = {
-        providerID: await resolveProviderID(ctx.model),
-        modelID: ctx.model,
+        providerID: parsedModel.providerID,
+        modelID: parsedModel.modelID,
       };
 
       // Build prompt parts (text + file attachments)
@@ -3092,6 +3100,7 @@ class GenerationManager {
 
       // 6. Agentic tool loop
       const loopMessages = [...chatMessages];
+      const directModelID = parseModelReference(ctx.model).modelID;
       let hasToolCalls = true;
       let iterationCount = 0;
       const MAX_ITERATIONS = 50;
@@ -3119,7 +3128,7 @@ class GenerationManager {
           messages: loopMessages,
           tools,
           system: systemPrompt,
-          model: ctx.model,
+          model: directModelID,
           signal: ctx.abortController.signal,
         });
 
@@ -3578,7 +3587,7 @@ class GenerationManager {
    * Get the appropriate LLM backend for a generation context.
    */
   private async getLLMBackend(ctx: GenerationContext): Promise<LLMBackend> {
-    const providerID = await resolveProviderID(ctx.model);
+    const { providerID } = parseModelReference(ctx.model);
 
     switch (providerID) {
       case "anthropic":
@@ -3778,7 +3787,7 @@ class GenerationManager {
 
     const newSummary = await this.generateCompactionSummary(
       options.llm,
-      ctx.model,
+      parseModelReference(ctx.model).modelID,
       messagesToSummarize,
       summaryText,
     );
@@ -3884,7 +3893,7 @@ class GenerationManager {
         messages: loopMessages,
         tools,
         system: MEMORY_FLUSH_SYSTEM_PROMPT,
-        model: ctx.model,
+        model: parseModelReference(ctx.model).modelID,
       });
 
       await this.consumeAsyncStream(stream, async (event) => {
@@ -5482,33 +5491,6 @@ class GenerationManager {
       payload: event,
     });
   }
-}
-
-/**
- * Map a model ID to its provider ID.
- */
-async function resolveProviderID(modelID: string): Promise<string> {
-  if (await isOpencodeFreeModel(modelID)) {
-    return "opencode";
-  }
-  if (modelID.startsWith("claude")) {
-    return "anthropic";
-  }
-  if (
-    modelID.startsWith("gpt") ||
-    modelID.startsWith("o3") ||
-    modelID.startsWith("o4") ||
-    modelID.startsWith("codex")
-  ) {
-    return "openai";
-  }
-  if (modelID.startsWith("gemini")) {
-    return "google";
-  }
-  if (modelID === "k2p5" || modelID === "kimi-k2-thinking") {
-    return "kimi-for-coding";
-  }
-  return "anthropic"; // default
 }
 
 // Stable singleton across dev hot-reloads/module re-evaluation.

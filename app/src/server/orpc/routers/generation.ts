@@ -1,6 +1,7 @@
 import { eventIterator } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { parseModelReference } from "@/lib/model-reference";
 import { db } from "@/server/db/client";
 import { generation, conversation } from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
@@ -154,12 +155,24 @@ const generationEventSchema = z.discriminatedUnion("type", [
 ]);
 
 // Start a new generation (returns immediately with generationId)
+const modelReferenceSchema = z
+  .string()
+  .min(3)
+  .refine((value) => {
+    try {
+      parseModelReference(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Model must use provider/model format");
+
 const startGeneration = protectedProcedure
   .input(
     z.object({
       conversationId: z.string().optional(),
       content: z.string().min(1).max(100000),
-      model: z.string().optional(),
+      model: modelReferenceSchema.optional(),
       autoApprove: z.boolean().optional(),
       deviceId: z.string().optional(),
       selectedPlatformSkillSlugs: z.array(z.string().max(128)).max(50).optional(),

@@ -12,6 +12,7 @@ import {
   PenLine,
   Search,
   Sparkles,
+  Timer,
   Trash2,
 } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
@@ -33,6 +34,7 @@ import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import {
   createGenerationRuntime,
   type GenerationRuntime,
+  type RuntimeActivityStats,
   type RuntimeActivitySegment,
   type RuntimeSnapshot,
 } from "@/lib/generation-runtime";
@@ -60,6 +62,7 @@ import {
 import { ActivityFeed, type ActivityItemData } from "./activity-feed";
 import { AuthRequestCard } from "./auth-request-card";
 import { ChatInput } from "./chat-input";
+import { formatDuration } from "./chat-performance-metrics";
 import { useChatSkillStore } from "./chat-skill-store";
 import { DeviceSelector } from "./device-selector";
 import { MessageList, type Message, type MessagePart, type AttachmentData } from "./message-list";
@@ -146,6 +149,13 @@ type PersistedConversationMessage = {
       at: string;
       elapsedMs: number;
     }>;
+    activityDurationsMs?: {
+      totalToolCalls?: number;
+      completedToolCalls?: number;
+      totalToolDurationMs?: number;
+      maxToolDurationMs?: number;
+      perToolUseIdMs?: Record<string, number>;
+    };
   };
 };
 
@@ -236,6 +246,29 @@ function withEndToEndDuration(
   };
 }
 
+function withActivityDurations(
+  timing: Message["timing"] | undefined,
+  stats: RuntimeActivityStats,
+): Message["timing"] | undefined {
+  if (stats.totalToolCalls === 0) {
+    return timing;
+  }
+  return {
+    ...timing,
+    activityDurationsMs: {
+      ...timing?.activityDurationsMs,
+      totalToolCalls: stats.totalToolCalls,
+      completedToolCalls: stats.completedToolCalls,
+      totalToolDurationMs: stats.totalToolDurationMs,
+      maxToolDurationMs: stats.maxToolDurationMs,
+      perToolUseIdMs: {
+        ...timing?.activityDurationsMs?.perToolUseIdMs,
+        ...stats.perToolUseIdMs,
+      },
+    },
+  };
+}
+
 function buildSkillInstructionBlock(skillSlugs: string[], isFrench: boolean): string {
   const heading = isFrench
     ? "Utilise les skills suivants pour résoudre la tâche:"
@@ -307,7 +340,7 @@ export function ChatArea({ conversationId }: Props) {
   const [streamError, setStreamError] = useState<string | null>(null);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [localAutoApprove, setLocalAutoApprove] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-6");
+  const [selectedModel, setSelectedModel] = useState<string>(PREFERRED_ZEN_FREE_MODEL);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
   const [queuedMessage, setQueuedMessage] = useState<QueuedMessage | null>(null);
   const [queueingEnabled, setQueueingEnabled] = useState(true);
@@ -332,6 +365,7 @@ export function ChatArea({ conversationId }: Props) {
   const [, setIntegrationsUsed] = useState<Set<IntegrationType>>(new Set());
   const [, setTraceStatus] = useState<TraceStatus>("complete");
   const [agentInitStatus, setAgentInitStatus] = useState<string | null>(null);
+  const [initPhaseNow, setInitPhaseNow] = useState(() => Date.now());
 
   // Sandbox files collected during streaming
   const [, setStreamingSandboxFiles] = useState<SandboxFileData[]>([]);
@@ -349,6 +383,16 @@ export function ChatArea({ conversationId }: Props) {
   useEffect(() => {
     viewedConversationIdRef.current = conversationId;
   }, [conversationId]);
+
+  useEffect(() => {
+    const shouldShowInitTimer =
+      isStreaming && segments.length === 0 && initTrackingStartedAtRef.current !== null;
+    if (!shouldShowInitTimer) {
+      return;
+    }
+    const interval = window.setInterval(() => setInitPhaseNow(Date.now()), 250);
+    return () => window.clearInterval(interval);
+  }, [isStreaming, segments.length]);
 
   const isStreamEventForActiveScope = useCallback(
     ({
@@ -515,6 +559,13 @@ export function ChatArea({ conversationId }: Props) {
     },
     [posthog, selectedModel],
   );
+
+  const initElapsedLabel = useMemo(() => {
+    if (!isStreaming || segments.length > 0 || !initTrackingStartedAtRef.current) {
+      return null;
+    }
+    return formatDuration(Math.max(0, initPhaseNow - initTrackingStartedAtRef.current));
+  }, [initPhaseNow, isStreaming, segments.length]);
 
   const handleInitStatusChange = useCallback(
     (status: string) => {
@@ -1296,10 +1347,9 @@ export function ChatArea({ conversationId }: Props) {
               return;
             }
             const doneAtMs = Date.now();
-            const timing = withEndToEndDuration(
-              artifacts?.timing,
-              generationRequestStartedAtMs,
-              doneAtMs,
+            const timing = withActivityDurations(
+              withEndToEndDuration(artifacts?.timing, generationRequestStartedAtMs, doneAtMs),
+              runtime.getActivityStats(),
             );
             markInitSignal("done");
             runtime.handleDone({
@@ -1909,6 +1959,12 @@ export function ChatArea({ conversationId }: Props) {
                         <span className="text-muted-foreground text-sm">
                           {getAgentInitLabel(agentInitStatus)}
                         </span>
+                        {initElapsedLabel && (
+                          <div className="text-muted-foreground/70 inline-flex items-center gap-1 text-xs">
+                            <Timer className="h-3 w-3" />
+                            <span>{initElapsedLabel}</span>
+                          </div>
+                        )}
                         <div className="ml-auto flex gap-1">
                           <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
                           <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />

@@ -1,4 +1,4 @@
-import { resolveDefaultOpencodeFreeModel } from "../../src/lib/zen-models";
+import { resolveDefaultOpencodeFreeModel } from "../../src/server/ai/opencode-models";
 
 let cachedDefaultModelPromise: Promise<string> | undefined;
 
