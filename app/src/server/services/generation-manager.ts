@@ -467,9 +467,10 @@ function shouldAutoApproveOpenCodePermission(
 
     // Allow common sandbox working directories without interactive approval.
     if (
-      (permissionType === "external_directory" &&
-        (normalized.startsWith("/tmp") || normalized.startsWith("/app"))) ||
-      normalized.startsWith("/home/user")
+      permissionType === "external_directory" &&
+      (normalized.startsWith("/tmp") ||
+        normalized.startsWith("/app") ||
+        normalized.startsWith("/home/user"))
     ) {
       return true;
     }
