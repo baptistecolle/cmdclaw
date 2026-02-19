@@ -59,6 +59,8 @@ const list = protectedProcedure.handler(async ({ context }) => {
     type: i.type,
     displayName: i.displayName,
     enabled: i.enabled,
+    authStatus: i.authStatus,
+    authErrorCode: i.authErrorCode,
     scopes: i.scopes,
     createdAt: i.createdAt,
   }));
@@ -289,6 +291,10 @@ const handleCallback = protectedProcedure
           displayName: userInfo.displayName,
           metadata: userInfo.metadata,
           enabled: true,
+          authStatus: "connected",
+          authErrorCode: null,
+          authErrorAt: null,
+          authErrorDetail: null,
         })
         .where(eq(integration.id, existingIntegration.id));
       integId = existingIntegration.id;
@@ -302,6 +308,10 @@ const handleCallback = protectedProcedure
           displayName: userInfo.displayName,
           scopes: config.scopes,
           metadata: userInfo.metadata,
+          authStatus: "connected",
+          authErrorCode: null,
+          authErrorAt: null,
+          authErrorDetail: null,
         })
         .returning();
       integId = newInteg.id;
@@ -386,6 +396,10 @@ const linkLinkedIn = protectedProcedure
         providerAccountId: input.accountId,
         displayName: account.name || account.identifier,
         enabled: true,
+        authStatus: "connected" as const,
+        authErrorCode: null,
+        authErrorAt: null,
+        authErrorDetail: null,
         metadata: {
           unipileAccountId: input.accountId,
           linkedinIdentifier: account.identifier,

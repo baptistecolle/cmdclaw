@@ -6,8 +6,11 @@ const {
   updateMock,
   updateSetMock,
   updateWhereMock,
+  deleteWhereMock,
+  executeMock,
   selectWhereMock,
   findManyMock,
+  integrationTokenFindFirstMock,
   dbMock,
   getOAuthConfigMock,
   decryptMock,
@@ -15,18 +18,39 @@ const {
   const updateWhereMock = vi.fn();
   const updateSetMock = vi.fn(() => ({ where: updateWhereMock }));
   const updateMock = vi.fn(() => ({ set: updateSetMock }));
+  const deleteWhereMock = vi.fn();
+  const deleteMock = vi.fn(() => ({ where: deleteWhereMock }));
+  const executeMock = vi.fn();
 
   const selectWhereMock = vi.fn();
   const selectInnerJoinMock = vi.fn(() => ({ where: selectWhereMock }));
   const selectFromMock = vi.fn(() => ({ innerJoin: selectInnerJoinMock }));
   const selectMock = vi.fn(() => ({ from: selectFromMock }));
   const findManyMock = vi.fn();
+  const integrationTokenFindFirstMock = vi.fn();
   const decryptMock = vi.fn((value: string) => value);
+
+  const txMock = {
+    update: updateMock,
+    delete: deleteMock,
+    execute: executeMock,
+    query: {
+      integrationToken: {
+        findFirst: integrationTokenFindFirstMock,
+      },
+    },
+  };
 
   const dbMock = {
     update: updateMock,
+    delete: deleteMock,
+    execute: executeMock,
     select: selectMock,
+    transaction: vi.fn(async (fn: (tx: typeof txMock) => Promise<unknown>) => await fn(txMock)),
     query: {
+      integrationToken: {
+        findFirst: integrationTokenFindFirstMock,
+      },
       customIntegrationCredential: {
         findMany: findManyMock,
       },
@@ -39,8 +63,11 @@ const {
     updateMock,
     updateSetMock,
     updateWhereMock,
+    deleteWhereMock,
+    executeMock,
     selectWhereMock,
     findManyMock,
+    integrationTokenFindFirstMock,
     dbMock,
     getOAuthConfigMock,
     decryptMock,
@@ -86,8 +113,15 @@ describe("token-refresh", () => {
     fetchSpy = vi.spyOn(globalThis, "fetch");
 
     updateWhereMock.mockResolvedValue(undefined);
+    deleteWhereMock.mockResolvedValue(undefined);
+    executeMock.mockResolvedValue(undefined);
     selectWhereMock.mockResolvedValue([]);
     findManyMock.mockResolvedValue([]);
+    integrationTokenFindFirstMock.mockResolvedValue({
+      accessToken: "db-current-token",
+      refreshToken: "db-refresh-token",
+      expiresAt: new Date(Date.now() - 1000),
+    });
     getOAuthConfigMock.mockReturnValue({
       clientId: "client-id",
       clientSecret: "client-secret",
@@ -157,7 +191,8 @@ describe("token-refresh", () => {
     expect(capturedBody?.get("grant_type")).toBe("refresh_token");
     expect(capturedBody?.get("client_id")).toBe("client-id");
     expect(capturedBody?.get("client_secret")).toBe("client-secret");
-    expect(updateMock).toHaveBeenCalledOnce();
+    expect(executeMock).toHaveBeenCalledOnce();
+    expect(updateMock).toHaveBeenCalledTimes(2);
     expect(updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({
         accessToken: "new-access-token",
@@ -236,6 +271,72 @@ describe("token-refresh", () => {
         type: "github",
       }),
     ).rejects.toThrow("Failed to refresh github token: oauth failed");
+  });
+
+  it("disables integration and clears tokens on definitive auth failure", async () => {
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () =>
+          new HttpResponse(
+            JSON.stringify({ error: "invalid_grant", error_description: "revoked" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+      ),
+    );
+
+    await expect(
+      getValidAccessToken({
+        accessToken: "existing-token",
+        refreshToken: "refresh-token",
+        expiresAt: new Date(Date.now() - 1000),
+        integrationId: "int-definitive",
+        type: "airtable",
+      }),
+    ).rejects.toThrow("Failed to refresh airtable token");
+
+    expect(updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        enabled: false,
+        authStatus: "reauth_required",
+        authErrorCode: "invalid_grant",
+      }),
+    );
+    expect(deleteWhereMock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps integration enabled on transient refresh failure", async () => {
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () =>
+          new HttpResponse("service unavailable", {
+            status: 503,
+            headers: { "Content-Type": "text/plain" },
+          }),
+      ),
+    );
+
+    await expect(
+      getValidAccessToken({
+        accessToken: "existing-token",
+        refreshToken: "refresh-token",
+        expiresAt: new Date(Date.now() - 1000),
+        integrationId: "int-transient",
+        type: "github",
+      }),
+    ).rejects.toThrow("Failed to refresh github token: service unavailable");
+
+    expect(updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authStatus: "transient_error",
+      }),
+    );
+    expect(updateSetMock).not.toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+    expect(deleteWhereMock).not.toHaveBeenCalled();
   });
 
   it("throws when refresh token is missing", async () => {

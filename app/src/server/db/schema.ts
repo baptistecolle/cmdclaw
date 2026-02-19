@@ -349,6 +349,12 @@ export const integrationTypeEnum = pgEnum("integration_type", [
   "twitter",
 ]);
 
+export const integrationAuthStatusEnum = pgEnum("integration_auth_status", [
+  "connected",
+  "reauth_required",
+  "transient_error",
+]);
+
 // ========== WORKFLOW SCHEMA ==========
 
 export const workflowStatusEnum = pgEnum("workflow_status", ["on", "off"]);
@@ -360,6 +366,12 @@ export const workflowRunStatusEnum = pgEnum("workflow_run_status", [
   "completed",
   "error",
   "cancelled",
+]);
+export const workflowEmailAliasStatusEnum = pgEnum("workflow_email_alias_status", [
+  "active",
+  "disabled",
+  "rotated",
+  "deleted",
 ]);
 
 export const workflow = pgTable(
@@ -419,6 +431,31 @@ export const workflowRun = pgTable(
   ],
 );
 
+export const workflowEmailAlias = pgTable(
+  "workflow_email_alias",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workflowId: text("workflow_id")
+      .notNull()
+      .references(() => workflow.id, { onDelete: "cascade" }),
+    localPart: text("local_part").notNull(),
+    domain: text("domain").notNull(),
+    status: workflowEmailAliasStatusEnum("status").default("active").notNull(),
+    replacedByAliasId: text("replaced_by_alias_id"),
+    disabledReason: text("disabled_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    disabledAt: timestamp("disabled_at"),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (table) => [
+    index("workflow_email_alias_workflow_id_idx").on(table.workflowId),
+    index("workflow_email_alias_status_idx").on(table.status),
+    uniqueIndex("workflow_email_alias_address_idx").on(table.localPart, table.domain),
+  ],
+);
+
 export const workflowRunEvent = pgTable(
   "workflow_run_event",
   {
@@ -452,6 +489,10 @@ export const integration = pgTable(
     // Display name (e.g., email address, workspace name)
     displayName: text("display_name"),
     enabled: boolean("enabled").default(true).notNull(),
+    authStatus: integrationAuthStatusEnum("auth_status").default("connected").notNull(),
+    authErrorCode: text("auth_error_code"),
+    authErrorAt: timestamp("auth_error_at"),
+    authErrorDetail: text("auth_error_detail"),
     // Scopes granted by user
     scopes: text("scopes").array(),
     // Provider-specific metadata (e.g., workspace ID for Notion)
@@ -592,6 +633,7 @@ export const generationRelations = relations(generation, ({ one }) => ({
 export const workflowRelations = relations(workflow, ({ one, many }) => ({
   owner: one(user, { fields: [workflow.ownerId], references: [user.id] }),
   runs: many(workflowRun),
+  emailAliases: many(workflowEmailAlias),
 }));
 
 export const workflowRunRelations = relations(workflowRun, ({ one, many }) => ({
@@ -610,6 +652,18 @@ export const workflowRunEventRelations = relations(workflowRunEvent, ({ one }) =
   run: one(workflowRun, {
     fields: [workflowRunEvent.workflowRunId],
     references: [workflowRun.id],
+  }),
+}));
+
+export const workflowEmailAliasRelations = relations(workflowEmailAlias, ({ one }) => ({
+  workflow: one(workflow, {
+    fields: [workflowEmailAlias.workflowId],
+    references: [workflow.id],
+  }),
+  replacedByAlias: one(workflowEmailAlias, {
+    fields: [workflowEmailAlias.replacedByAliasId],
+    references: [workflowEmailAlias.id],
+    relationName: "replacedByAlias",
   }),
 }));
 

@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { integration, integrationToken, customIntegrationCredential } from "@/server/db/schema";
 import { decrypt } from "@/server/lib/encryption";
@@ -13,6 +13,102 @@ interface TokenWithMetadata {
   expiresAt: Date | null;
   integrationId: string;
   type: IntegrationType;
+}
+
+type OAuthFailureType = "definitive_auth_failure" | "transient_failure" | "unknown_failure";
+
+type OAuthFailureClassification = {
+  type: OAuthFailureType;
+  code: string | null;
+  detail: string | null;
+};
+
+const DEFINITIVE_ERROR_CODES = new Set([
+  "invalid_grant",
+  "invalid_refresh_token",
+  "bad_refresh_token",
+  "token_revoked",
+  "revoked_token",
+]);
+
+const BASE_DEFINITIVE_PATTERNS = [
+  /invalid token/i,
+  /invalid refresh token/i,
+  /refresh token (?:is )?invalid/i,
+  /refresh token.*expired/i,
+  /refresh token.*revoked/i,
+  /revoked/i,
+  /expired or revoked/i,
+];
+
+const PROVIDER_DEFINITIVE_PATTERNS: Partial<Record<IntegrationType, RegExp[]>> = {
+  airtable: [/invalid token/i],
+  google_calendar: [/expired or revoked/i],
+  gmail: [/expired or revoked/i],
+  google_docs: [/expired or revoked/i],
+  google_drive: [/expired or revoked/i],
+  google_sheets: [/expired or revoked/i],
+  github: [/bad_refresh_token/i],
+  hubspot: [/refresh token.*invalid/i],
+  linear: [/invalid_grant/i],
+  notion: [/revoked/i],
+  reddit: [/invalid_grant/i],
+  salesforce: [/invalid_grant/i],
+  slack: [/invalid refresh token/i],
+  twitter: [/invalid_grant/i],
+};
+
+function parseOAuthErrorPayload(raw: string): { code: string | null; description: string | null } {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { code: null, description: null };
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: unknown; error_description?: unknown };
+    return {
+      code: typeof parsed.error === "string" ? parsed.error : null,
+      description: typeof parsed.error_description === "string" ? parsed.error_description : null,
+    };
+  } catch {
+    // fall through
+  }
+
+  const params = new URLSearchParams(trimmed);
+  const code = params.get("error");
+  const description = params.get("error_description");
+  if (code || description) {
+    return { code, description };
+  }
+
+  return { code: null, description: trimmed };
+}
+
+function classifyOAuthRefreshFailure(
+  provider: IntegrationType,
+  status: number,
+  rawError: string,
+): OAuthFailureClassification {
+  const { code, description } = parseOAuthErrorPayload(rawError);
+  const detail = description ?? (rawError.trim() || null);
+  const normalizedCode = code?.toLowerCase() ?? null;
+  const haystack = [normalizedCode, detail?.toLowerCase()].filter(Boolean).join(" ");
+
+  if (status === 429 || status >= 500) {
+    return { type: "transient_failure", code: normalizedCode, detail };
+  }
+
+  if (normalizedCode && DEFINITIVE_ERROR_CODES.has(normalizedCode)) {
+    return { type: "definitive_auth_failure", code: normalizedCode, detail };
+  }
+
+  const providerPatterns = PROVIDER_DEFINITIVE_PATTERNS[provider] ?? [];
+  const patterns = [...BASE_DEFINITIVE_PATTERNS, ...providerPatterns];
+  if (patterns.some((pattern) => pattern.test(haystack))) {
+    return { type: "definitive_auth_failure", code: normalizedCode, detail };
+  }
+
+  return { type: "unknown_failure", code: normalizedCode, detail };
 }
 
 /**
@@ -39,86 +135,167 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
     throw new Error(`No refresh token available for ${token.type} integration`);
   }
 
-  const config = getOAuthConfig(token.type);
+  return await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${token.integrationId}))`);
 
-  const tokenBody = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: token.refreshToken,
-    client_id: config.clientId,
-    client_secret: config.clientSecret,
+    const current = await tx.query.integrationToken.findFirst({
+      where: eq(integrationToken.integrationId, token.integrationId),
+      columns: {
+        accessToken: true,
+        refreshToken: true,
+        expiresAt: true,
+      },
+    });
+    if (!current) {
+      throw new Error(`Integration token not found for ${token.type}`);
+    }
+
+    const currentToken: TokenWithMetadata = {
+      ...token,
+      accessToken: current.accessToken,
+      refreshToken: current.refreshToken,
+      expiresAt: current.expiresAt,
+    };
+
+    if (!needsRefresh(currentToken)) {
+      return currentToken.accessToken;
+    }
+
+    if (!currentToken.refreshToken) {
+      throw new Error(`No refresh token available for ${token.type} integration`);
+    }
+
+    const config = getOAuthConfig(token.type);
+
+    const tokenBody = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: currentToken.refreshToken,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+    });
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+
+    // Notion, Airtable, and Reddit require Basic auth header for token refresh
+    if (token.type === "notion" || token.type === "airtable" || token.type === "reddit") {
+      headers["Authorization"] = `Basic ${Buffer.from(
+        `${config.clientId}:${config.clientSecret}`,
+      ).toString("base64")}`;
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- URLSearchParams.delete, not a Drizzle query
+      tokenBody.delete("client_id");
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- URLSearchParams.delete, not a Drizzle query
+      tokenBody.delete("client_secret");
+    }
+
+    // Reddit requires User-Agent header for all API calls
+    if (token.type === "reddit") {
+      headers["User-Agent"] = "bap-app:v1.0.0 (by /u/bap-integration)";
+    }
+
+    const now = new Date();
+    const tokenAge = currentToken.expiresAt
+      ? Math.round((now.getTime() - currentToken.expiresAt.getTime()) / 1000 / 60)
+      : "unknown";
+    console.log(`[Token Refresh] Refreshing ${token.type} token...`);
+    console.log(`[Token Refresh] Integration ID: ${token.integrationId}`);
+    console.log(
+      `[Token Refresh] Token expired at: ${currentToken.expiresAt?.toISOString() ?? "no expiry"}`,
+    );
+    console.log(`[Token Refresh] Token age (mins past expiry): ${tokenAge}`);
+    console.log(
+      `[Token Refresh] Refresh token present: ${!!currentToken.refreshToken} (length: ${
+        currentToken.refreshToken?.length ?? 0
+      })`,
+    );
+
+    const response = await fetch(config.tokenUrl, {
+      method: "POST",
+      headers,
+      body: tokenBody,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      const classification = classifyOAuthRefreshFailure(token.type, response.status, error);
+      console.error(`[Token Refresh] Failed to refresh ${token.type} token:`, error);
+      console.error(
+        `[Token Refresh] Failure classification for ${token.type}: ${classification.type}`,
+      );
+
+      if (classification.type === "definitive_auth_failure") {
+        await tx
+          .update(integration)
+          .set({
+            enabled: false,
+            authStatus: "reauth_required",
+            authErrorCode: classification.code,
+            authErrorAt: new Date(),
+            authErrorDetail: classification.detail,
+            updatedAt: new Date(),
+          })
+          .where(eq(integration.id, token.integrationId));
+
+        await tx
+          .delete(integrationToken)
+          .where(eq(integrationToken.integrationId, token.integrationId));
+
+        console.warn(
+          `[Token Refresh] Disabled ${token.type} integration ${token.integrationId}; reauth required`,
+        );
+      } else if (classification.type === "transient_failure") {
+        await tx
+          .update(integration)
+          .set({
+            authStatus: "transient_error",
+            authErrorCode: classification.code,
+            authErrorAt: new Date(),
+            authErrorDetail: classification.detail,
+            updatedAt: new Date(),
+          })
+          .where(eq(integration.id, token.integrationId));
+      }
+
+      throw new Error(`Failed to refresh ${token.type} token: ${error}`);
+    }
+
+    const tokens = await response.json();
+
+    const newAccessToken = tokens.access_token;
+    const newRefreshToken = tokens.refresh_token || currentToken.refreshToken; // Some providers return new refresh token
+    const expiresIn = tokens.expires_in;
+
+    if (!newAccessToken) {
+      throw new Error(`No access token in refresh response for ${token.type}`);
+    }
+
+    // Update tokens in database
+    await tx
+      .update(integrationToken)
+      .set({
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(integrationToken.integrationId, token.integrationId));
+
+    await tx
+      .update(integration)
+      .set({
+        authStatus: "connected",
+        authErrorCode: null,
+        authErrorAt: null,
+        authErrorDetail: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(integration.id, token.integrationId));
+
+    console.log(`[Token Refresh] Successfully refreshed ${token.type} token`);
+
+    return newAccessToken;
   });
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/x-www-form-urlencoded",
-  };
-
-  // Notion, Airtable, and Reddit require Basic auth header for token refresh
-  if (token.type === "notion" || token.type === "airtable" || token.type === "reddit") {
-    headers["Authorization"] = `Basic ${Buffer.from(
-      `${config.clientId}:${config.clientSecret}`,
-    ).toString("base64")}`;
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- URLSearchParams.delete, not a Drizzle query
-    tokenBody.delete("client_id");
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- URLSearchParams.delete, not a Drizzle query
-    tokenBody.delete("client_secret");
-  }
-
-  // Reddit requires User-Agent header for all API calls
-  if (token.type === "reddit") {
-    headers["User-Agent"] = "bap-app:v1.0.0 (by /u/bap-integration)";
-  }
-
-  // Salesforce uses standard OAuth refresh but may return updated instance_url
-  // (handled in the response processing below)
-
-  const now = new Date();
-  const tokenAge = token.expiresAt
-    ? Math.round((now.getTime() - token.expiresAt.getTime()) / 1000 / 60)
-    : "unknown";
-  console.log(`[Token Refresh] Refreshing ${token.type} token...`);
-  console.log(`[Token Refresh] Integration ID: ${token.integrationId}`);
-  console.log(`[Token Refresh] Token expired at: ${token.expiresAt?.toISOString() ?? "no expiry"}`);
-  console.log(`[Token Refresh] Token age (mins past expiry): ${tokenAge}`);
-  console.log(
-    `[Token Refresh] Refresh token present: ${!!token.refreshToken} (length: ${token.refreshToken?.length ?? 0})`,
-  );
-
-  const response = await fetch(config.tokenUrl, {
-    method: "POST",
-    headers,
-    body: tokenBody,
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error(`[Token Refresh] Failed to refresh ${token.type} token:`, error);
-    throw new Error(`Failed to refresh ${token.type} token: ${error}`);
-  }
-
-  const tokens = await response.json();
-
-  const newAccessToken = tokens.access_token;
-  const newRefreshToken = tokens.refresh_token || token.refreshToken; // Some providers return new refresh token
-  const expiresIn = tokens.expires_in;
-
-  if (!newAccessToken) {
-    throw new Error(`No access token in refresh response for ${token.type}`);
-  }
-
-  // Update tokens in database
-  await db
-    .update(integrationToken)
-    .set({
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-      expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
-      updatedAt: new Date(),
-    })
-    .where(eq(integrationToken.integrationId, token.integrationId));
-
-  console.log(`[Token Refresh] Successfully refreshed ${token.type} token`);
-
-  return newAccessToken;
 }
 
 /**
