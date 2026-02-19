@@ -1,5 +1,9 @@
 import type { Message, MessagePart } from "./message-list";
-import { getTimingMetrics, type MessageTiming } from "./chat-performance-metrics";
+import { getTimingMetrics } from "./chat-performance-metrics";
+import {
+  mapPersistedMessagesToChatMessages,
+  type PersistedConversationMessage,
+} from "./persisted-message-mapper";
 
 function formatValue(value: unknown): string {
   if (value === undefined) {
@@ -120,29 +124,7 @@ export function formatChatTranscript(
   return lines.join("\n").trim();
 }
 
-type PersistedContentPart =
-  | { type: "text"; text: string }
-  | {
-      type: "tool_use";
-      id: string;
-      name: string;
-      input: Record<string, unknown>;
-      integration?: string;
-      operation?: string;
-    }
-  | { type: "tool_result"; tool_use_id: string; content: unknown }
-  | { type: "thinking"; id: string; content: string }
-  | { type: "system"; content: string };
-
-type PersistedMessage = {
-  id: string;
-  role: string;
-  content: string;
-  contentParts?: PersistedContentPart[];
-  timing?: MessageTiming;
-  attachments?: Array<{ filename: string; mimeType: string }>;
-  sandboxFiles?: Array<{ path: string; filename: string; mimeType: string; fileId: string }>;
-};
+type PersistedMessage = PersistedConversationMessage;
 
 export function formatPersistedChatTranscript(
   messages: PersistedMessage[],
@@ -150,61 +132,7 @@ export function formatPersistedChatTranscript(
     includeTimingMetrics?: boolean;
   },
 ): string {
-  const normalizedMessages: Message[] = messages.map((message) => {
-    let parts: MessagePart[] | undefined;
-    if (message.contentParts && message.contentParts.length > 0) {
-      const toolResults = new Map<string, unknown>();
-      for (const part of message.contentParts) {
-        if (part.type === "tool_result") {
-          toolResults.set(part.tool_use_id, part.content);
-        }
-      }
-
-      parts = message.contentParts
-        .filter((part) => part.type !== "tool_result")
-        .map((part) => {
-          if (part.type === "text") {
-            return { type: "text", content: part.text };
-          }
-          if (part.type === "thinking") {
-            return { type: "thinking", id: part.id, content: part.content };
-          }
-          if (part.type === "system") {
-            return { type: "system", content: part.content };
-          }
-
-          return {
-            type: "tool_call",
-            id: part.id,
-            name: part.name,
-            input: part.input,
-            result: toolResults.get(part.id),
-            integration: part.integration,
-            operation: part.operation,
-          };
-        });
-    }
-
-    return {
-      id: message.id,
-      role: (message.role as Message["role"]) ?? "assistant",
-      content: message.content,
-      parts,
-      timing: message.timing,
-      attachments: message.attachments?.map((attachment) => ({
-        name: attachment.filename,
-        mimeType: attachment.mimeType,
-        dataUrl: "",
-      })),
-      sandboxFiles: message.sandboxFiles?.map((file) => ({
-        path: file.path,
-        filename: file.filename,
-        mimeType: file.mimeType,
-        fileId: file.fileId,
-        sizeBytes: null,
-      })),
-    };
-  });
+  const normalizedMessages: Message[] = mapPersistedMessagesToChatMessages(messages);
 
   return formatChatTranscript(normalizedMessages, [], options);
 }

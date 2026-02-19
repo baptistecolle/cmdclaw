@@ -176,6 +176,9 @@ export const conversation = pgTable(
     // Auto-approve sensitive operations without user confirmation
     autoApprove: boolean("auto_approve").default(false).notNull(),
     isPinned: boolean("is_pinned").default(false).notNull(),
+    isShared: boolean("is_shared").default(false).notNull(),
+    shareToken: text("share_token"),
+    sharedAt: timestamp("shared_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -186,6 +189,7 @@ export const conversation = pgTable(
   (table) => [
     index("conversation_user_id_idx").on(table.userId),
     index("conversation_created_at_idx").on(table.createdAt),
+    uniqueIndex("conversation_share_token_idx").on(table.shareToken),
   ],
 );
 

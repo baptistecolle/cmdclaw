@@ -21,6 +21,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatArea } from "@/components/chat/chat-area";
 import { ChatCopyButton } from "@/components/chat/chat-copy-button";
+import { ChatShareControls } from "@/components/chat/chat-share-controls";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -930,7 +931,10 @@ export default function WorkflowEditorPage() {
               </PopoverContent>
             </Popover>
             {selectedRun?.conversationId ? (
-              <ChatCopyButton conversationId={selectedRun.conversationId} />
+              <div className="flex items-center gap-2">
+                <ChatCopyButton conversationId={selectedRun.conversationId} />
+                <ChatShareControls conversationId={selectedRun.conversationId} />
+              </div>
             ) : null}
             <Button
               variant="destructive"

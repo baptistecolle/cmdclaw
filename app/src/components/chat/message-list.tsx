@@ -42,6 +42,7 @@ export type SandboxFileData = {
   filename: string;
   mimeType: string;
   sizeBytes: number | null;
+  downloadUrl?: string | null;
 };
 
 export type Message = {

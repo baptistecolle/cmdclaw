@@ -120,6 +120,30 @@ export function useUpdateAutoApprove() {
   });
 }
 
+// Hook for sharing a conversation
+export function useShareConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => client.conversation.share({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversation"] });
+    },
+  });
+}
+
+// Hook for unsharing a conversation
+export function useUnshareConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => client.conversation.unshare({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversation"] });
+    },
+  });
+}
+
 // Hook for listing integrations
 export function useIntegrationList() {
   return useQuery({

@@ -113,10 +113,13 @@ export function MessageItem({
   const handleDownloadSandboxFile = useCallback(
     async (file: SandboxFileData) => {
       try {
-        const result = await downloadSandboxFile(file.fileId);
+        const url = file.downloadUrl ?? (await downloadSandboxFile(file.fileId)).url;
+        if (!url) {
+          return;
+        }
         // Trigger download via temporary link
         const link = document.createElement("a");
-        link.href = result.url;
+        link.href = url;
         link.download = file.filename;
         link.target = "_blank";
         document.body.appendChild(link);
@@ -141,6 +144,7 @@ export function MessageItem({
     }
 
     const result: DisplaySegment[] = [];
+    const activityTimingByToolUseId = timing?.activityDurationsMs?.perToolUseIdMs ?? {};
     let currentSegment: DisplaySegment = {
       id: "seg-0",
       items: [],
@@ -188,6 +192,7 @@ export function MessageItem({
                 : "running",
           input: part.input,
           result: part.result,
+          elapsedMs: activityTimingByToolUseId[part.id],
         });
         activityIndex++;
       } else if (part.type === "thinking") {
@@ -223,7 +228,7 @@ export function MessageItem({
     }
 
     return result;
-  }, [hasInterruptedMarker, parts]);
+  }, [hasInterruptedMarker, parts, timing]);
 
   // Check if there were any text, tool calls or thinking (need to show trace)
   const hasTrace =

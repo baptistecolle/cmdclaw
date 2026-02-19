@@ -10,6 +10,7 @@ import {
 } from "@/components/animate-ui/components/radix/sidebar";
 import { AppShell } from "@/components/app-shell";
 import { ChatCopyButton } from "@/components/chat/chat-copy-button";
+import { ChatShareControls } from "@/components/chat/chat-share-controls";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -92,6 +93,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               </span>
             )}
             <ChatCopyButton conversationId={liveConversationId} className="ml-auto" />
+            <ChatShareControls conversationId={liveConversationId} />
           </header>
           <div className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">{children}</div>
         </SidebarInset>
