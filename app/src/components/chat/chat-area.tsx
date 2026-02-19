@@ -2038,7 +2038,7 @@ export function ChatArea({ conversationId }: Props) {
           )}
           <div className="mx-auto w-full max-w-[1276px]">
             <div className="grid grid-cols-1 items-end gap-2 md:grid-cols-[52px_minmax(0,896px)_52px] md:justify-center">
-              <div className="min-w-0 md:col-start-1">
+              <div className="min-w-0 self-start md:col-start-1">
                 <div className="bg-muted/50 border-input flex h-[52px] items-center justify-center rounded-lg border p-2">
                   <DropdownMenu open={skillsMenuOpen} onOpenChange={handleOpenSkillsChange}>
                     <DropdownMenuTrigger asChild>
