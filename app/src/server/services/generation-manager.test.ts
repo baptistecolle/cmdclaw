@@ -255,7 +255,7 @@ function createCtx(overrides: Partial<GenerationCtx> = {}): GenerationCtx {
     startedAt: new Date(),
     lastSaveAt: new Date(),
     isNewConversation: false,
-    model: "gpt-4",
+    model: "openai/gpt-4",
     userMessageContent: "hello",
     assistantMessageIds: new Set(),
     messageRoles: new Map(),
@@ -288,6 +288,8 @@ describe("generationManager transitions", () => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
     updateWhereMock.mockResolvedValue(undefined);
+    insertValuesMock.mockReset();
+    insertReturningMock.mockReset();
     insertValuesMock.mockImplementation(() => ({
       returning: insertReturningMock,
     }));
@@ -924,7 +926,7 @@ describe("generationManager transitions", () => {
         {
           id: "conv-workflow",
           userId: "user-1",
-          model: "gpt-4.1-mini",
+          model: "openai/gpt-4.1-mini",
           autoApprove: true,
           type: "workflow",
         },
@@ -938,7 +940,7 @@ describe("generationManager transitions", () => {
       autoApprove: true,
       allowedIntegrations: ["github"],
       allowedCustomIntegrations: ["custom-slug"],
-      model: "gpt-4.1-mini",
+      model: "openai/gpt-4.1-mini",
     });
 
     expect(result).toEqual({
@@ -1567,6 +1569,110 @@ describe("generationManager transitions", () => {
     expect(ctx.uploadedSandboxFileIds?.has("sandbox-file-1")).toBe(true);
   });
 
+  it("streams OpenCode reasoning parts as thinking events", async () => {
+    Object.defineProperty(env, "ANTHROPIC_API_KEY", { value: "test-key", configurable: true });
+
+    vi.mocked(getCliEnvForUser).mockResolvedValue({});
+    vi.mocked(getEnabledIntegrationTypes).mockResolvedValue([]);
+    vi.mocked(getCliInstructionsWithCustom).mockResolvedValue("");
+    vi.mocked(writeSkillsToSandbox).mockResolvedValue([]);
+    vi.mocked(getSkillsSystemPrompt).mockReturnValue("");
+    vi.mocked(writeResolvedIntegrationSkillsToSandbox).mockResolvedValue([]);
+    vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("");
+    vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
+    vi.mocked(buildMemorySystemPrompt).mockReturnValue("");
+    vi.mocked(collectNewE2BFiles).mockResolvedValue([]);
+
+    conversationFindFirstMock.mockResolvedValue({
+      id: "conv-reasoning",
+      title: "Conversation",
+      opencodeSessionId: "session-existing",
+    });
+
+    const promptMock = vi.fn().mockResolvedValue(undefined);
+    const subscribeMock = vi.fn().mockResolvedValue({
+      stream: asAsyncIterable([
+        { type: "server.connected", properties: {} },
+        {
+          type: "message.part.updated",
+          properties: {
+            part: {
+              id: "reason-1",
+              sessionID: "session-1",
+              messageID: "msg-1",
+              type: "reasoning",
+              text: "plan",
+              time: { start: Date.now() },
+            },
+          },
+        },
+        {
+          type: "message.part.updated",
+          properties: {
+            part: {
+              id: "reason-1",
+              sessionID: "session-1",
+              messageID: "msg-1",
+              type: "reasoning",
+              text: "plan more",
+              time: { start: Date.now() },
+            },
+          },
+        },
+        { type: "session.idle", properties: {} },
+      ]),
+    });
+    vi.mocked(getOrCreateSession).mockResolvedValue({
+      client: {
+        event: { subscribe: subscribeMock },
+        session: { prompt: promptMock },
+      },
+      sessionId: "session-1",
+      sandbox: {
+        sandboxId: "sandbox-1",
+        files: { write: vi.fn().mockResolvedValue(undefined) },
+        commands: { run: vi.fn().mockResolvedValue({}) },
+      },
+    } as unknown as Awaited<ReturnType<typeof getOrCreateSession>>);
+
+    const mgr = asTestManager();
+    vi.spyOn(mgr, "importIntegrationSkillDraftsFromE2B").mockResolvedValue(undefined);
+    vi.spyOn(mgr, "handleOpenCodeActionableEvent").mockResolvedValue({ type: "none" });
+    const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
+
+    const streamedEvents: unknown[] = [];
+    const ctx = createCtx({
+      id: "gen-reasoning",
+      conversationId: "conv-reasoning",
+      backendType: "opencode",
+      model: "openai/gpt-5.2-codex",
+      subscribers: new Map([
+        [
+          "sub-1",
+          {
+            id: "sub-1",
+            callback: (event: unknown) => {
+              streamedEvents.push(event);
+            },
+          },
+        ],
+      ]),
+    });
+
+    await mgr.runOpenCodeGeneration(ctx);
+
+    expect(finishSpy).toHaveBeenCalledWith(ctx, "completed");
+    expect(streamedEvents).toEqual(
+      expect.arrayContaining([
+        { type: "thinking", content: "plan", thinkingId: "reason-1" },
+        { type: "thinking", content: " more", thinkingId: "reason-1" },
+      ]),
+    );
+    expect(ctx.contentParts).toEqual(
+      expect.arrayContaining([{ type: "thinking", id: "reason-1", content: "plan more" }]),
+    );
+  });
+
   it("runs direct generation through multi-tool paths and completes", async () => {
     vi.mocked(getEnabledIntegrationTypes).mockResolvedValue(["github"]);
     vi.mocked(resolvePreferredCommunitySkillsForUser).mockResolvedValue([
@@ -1720,7 +1826,7 @@ describe("generationManager transitions", () => {
       id: "gen-direct-heavy",
       conversationId: "conv-direct-heavy",
       backendType: "direct",
-      model: "gpt-4.1",
+      model: "openai/gpt-4.1",
       allowedIntegrations: ["github"],
       uploadedSandboxFileIds: new Set(),
     });

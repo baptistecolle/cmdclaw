@@ -128,6 +128,7 @@ describe("generationRouter", () => {
 
     expect(result).toEqual({
       generationId: "gen-db",
+      startedAt: null,
       status: "generating",
     });
   });

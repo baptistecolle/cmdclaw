@@ -4519,6 +4519,43 @@ class GenerationManager {
       }
     }
 
+    // Reasoning content ("internal thoughts") from OpenCode.
+    // OpenCode updates this part cumulatively, so emit only the delta while
+    // persisting the full content for replay/history.
+    if (part.type === "reasoning") {
+      setCurrentTextPart(null, null);
+      const fullReasoning = part.text ?? "";
+      const existingThinking = ctx.contentParts.find(
+        (p): p is ContentPart & { type: "thinking" } => p.type === "thinking" && p.id === partId,
+      );
+
+      const previousReasoning = existingThinking?.content ?? "";
+      const delta = fullReasoning.startsWith(previousReasoning)
+        ? fullReasoning.slice(previousReasoning.length)
+        : fullReasoning;
+
+      if (existingThinking) {
+        existingThinking.content = fullReasoning;
+      } else {
+        ctx.contentParts.push({
+          type: "thinking",
+          id: partId,
+          content: fullReasoning,
+        });
+      }
+
+      if (delta) {
+        this.broadcast(ctx, {
+          type: "thinking",
+          content: delta,
+          thinkingId: partId,
+        });
+      }
+
+      this.scheduleSave(ctx);
+      return;
+    }
+
     // Tool call (OpenCode uses "tool" type with callID, tool, and state properties)
     // See @opencode-ai/sdk ToolPart type: state contains input/output
     // Status flow: pending (no input) -> running (has input) -> completed (has output)

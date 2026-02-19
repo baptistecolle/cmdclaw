@@ -999,6 +999,7 @@ export function ChatArea({ conversationId }: Props) {
               artifacts?.sandboxFiles ?? (assistant.sandboxFiles as SandboxFileData[] | undefined),
             timing,
           };
+          upsertMessageById(fallbackAssistant);
           setStreamingParts([]);
           setStreamingSandboxFiles([]);
           setIsStreaming(false);
@@ -1407,6 +1408,7 @@ export function ChatArea({ conversationId }: Props) {
                 (assistant.sandboxFiles as SandboxFileData[] | undefined),
               timing,
             };
+            upsertMessageById(fallbackAssistant);
             setStreamingParts([]);
             setStreamingSandboxFiles([]);
             setIsStreaming(false);
