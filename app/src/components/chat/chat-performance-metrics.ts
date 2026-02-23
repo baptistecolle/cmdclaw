@@ -50,7 +50,16 @@ export function formatDuration(ms: number): string {
   if (ms < 1000) {
     return `${ms}ms`;
   }
-  return `${(ms / 1000).toFixed(1)}s`;
+
+  const totalSeconds = ms / 1000;
+  if (totalSeconds < 60) {
+    return `${totalSeconds.toFixed(1)}s`;
+  }
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const secondsLabel = seconds < 10 ? `0${seconds.toFixed(1)}` : seconds.toFixed(1);
+  return `${minutes}m ${secondsLabel}s`;
 }
 
 export function getTimingMetrics(timing?: MessageTiming): TimingMetric[] {
