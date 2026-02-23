@@ -6,6 +6,8 @@ import { appRouter } from "@/server/orpc";
 import { createORPCContext } from "@/server/orpc/context";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const handler = new RPCHandler(appRouter);
 
@@ -55,6 +57,20 @@ function logUnauthorizedRpcRequest(request: Request, response: Response): void {
   });
 }
 
+function withNoStore(response: Response): Response {
+  const nextHeaders = new Headers(response.headers);
+  nextHeaders.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  nextHeaders.set("Pragma", "no-cache");
+  nextHeaders.set("Expires", "0");
+  nextHeaders.append("Vary", "Cookie");
+  nextHeaders.append("Vary", "Authorization");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: nextHeaders,
+  });
+}
+
 async function handleRequest(request: Request) {
   try {
     let response: Response | null = null;
@@ -65,7 +81,7 @@ async function handleRequest(request: Request) {
     if (internalHandler) {
       response = await internalHandler(request);
       logUnauthorizedRpcRequest(request, response);
-      return response;
+      return withNoStore(response);
     }
 
     const context = await createORPCContext({ headers: request.headers });
@@ -76,13 +92,15 @@ async function handleRequest(request: Request) {
 
     response = handlerResult.response ?? new Response("Not found", { status: 404 });
     logUnauthorizedRpcRequest(request, response);
-    return response;
+    return withNoStore(response);
   } catch (error) {
     console.error("[RPC Handler Error]", error);
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return withNoStore(
+      new Response(JSON.stringify({ error: String(error) }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
   }
 }
 

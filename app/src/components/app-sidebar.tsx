@@ -46,6 +46,7 @@ export function AppSidebar() {
   const [reportAttachment, setReportAttachment] = useState<File | null>(null);
   const [reportError, setReportError] = useState("");
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [stoppingImpersonation, setStoppingImpersonation] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -77,9 +78,25 @@ export function AppSidebar() {
     }
   }, [router]);
 
+  const handleStopImpersonating = useCallback(async () => {
+    setStoppingImpersonation(true);
+    try {
+      const result = await authClient.admin.stopImpersonating();
+      if (!result.error) {
+        window.location.assign("/admin/impersonation");
+      }
+    } finally {
+      setStoppingImpersonation(false);
+    }
+  }, []);
+
   const userEmail = session?.user?.email ?? "";
   const avatarInitial = userEmail ? userEmail.charAt(0).toUpperCase() : "";
   const isAdmin = session?.user?.role === "admin";
+  const impersonatedBy = (
+    session as (SessionData & { session?: { impersonatedBy?: string | null } }) | null
+  )?.session?.impersonatedBy;
+  const isImpersonating = Boolean(impersonatedBy);
   const navItems = [
     { icon: MessageSquare, label: "Chat", href: "/chat" },
     { icon: Workflow, label: "Workflows", href: "/workflows" },
@@ -322,6 +339,14 @@ export function AppSidebar() {
                 <span>Settings</span>
               </Link>
             </DropdownMenuItem>
+            {isImpersonating && (
+              <DropdownMenuItem onClick={handleStopImpersonating} disabled={stoppingImpersonation}>
+                <Shield className="h-4 w-4" />
+                <span>
+                  {stoppingImpersonation ? "Stopping impersonation..." : "Stop impersonating"}
+                </span>
+              </DropdownMenuItem>
+            )}
             {session?.user ? (
               <DropdownMenuItem
                 onClick={handleSignOut}

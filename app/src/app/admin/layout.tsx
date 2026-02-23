@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 const adminTabs = [
   { label: "Settings", href: "/admin" },
+  { label: "Impersonation", href: "/admin/impersonation" },
   { label: "WhatsApp", href: "/admin/whatsapp" },
 ];
 
