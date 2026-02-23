@@ -36,6 +36,7 @@ describe("ActivityItem", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Show tool details" }));
 
+    expect(screen.getByText("Request (Bash)")).toBeInTheDocument();
     expect(screen.getByText("google-gmail list -l 1")).toBeInTheDocument();
     expect(screen.getByText("done")).toBeInTheDocument();
   });

@@ -230,6 +230,7 @@ export function ActivityItem({ item }: Props) {
   const formattedInput = formatInput(input, toolName);
   const formattedResult = formatValue(result);
   const hasDetails = Boolean(formattedInput || formattedResult);
+  const requestLabel = toolName ? `Request (${toolName})` : "Request";
 
   return (
     <div className="py-0.5 text-xs">
@@ -271,7 +272,7 @@ export function ActivityItem({ item }: Props) {
               {formattedInput && (
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
-                    Request
+                    {requestLabel}
                   </p>
                   <pre className="text-muted-foreground rounded-sm px-2 py-1 font-mono whitespace-pre-wrap">
                     {formattedInput}
