@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { PREFERRED_ZEN_FREE_MODEL } from "@/lib/zen-models";
+import { resolveDefaultChatModel } from "@/lib/chat-model-defaults";
 
 const STORAGE_KEY = "chat-selected-model-v1";
 
@@ -14,7 +14,7 @@ type ChatModelState = {
 export const useChatModelStore = create<ChatModelState>()(
   persist(
     (set) => ({
-      selectedModel: PREFERRED_ZEN_FREE_MODEL,
+      selectedModel: resolveDefaultChatModel({ isOpenAIConnected: false }),
       setSelectedModel: (model) => {
         const trimmed = model.trim();
         if (!trimmed) {

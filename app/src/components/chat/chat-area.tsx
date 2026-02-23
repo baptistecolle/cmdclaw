@@ -32,6 +32,10 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
 import {
+  resolveDefaultChatModel,
+  shouldMigrateLegacyDefaultModel,
+} from "@/lib/chat-model-defaults";
+import {
   createGenerationRuntime,
   type GenerationRuntime,
   type RuntimeActivityStats,
@@ -56,6 +60,8 @@ import {
   usePlatformSkillList,
   useSkillList,
   useUpdateAutoApprove,
+  useProviderAuthStatus,
+  useOpencodeFreeModels,
   type SandboxFileData,
 } from "@/orpc/hooks";
 import { ActivityFeed, type ActivityItemData } from "./activity-feed";
@@ -329,6 +335,8 @@ export function ChatArea({ conversationId }: Props) {
   const { mutateAsync: cancelGeneration } = useCancelGeneration();
   const { mutateAsync: detectUserMessageLanguage } = useDetectUserMessageLanguage();
   const { data: activeGeneration } = useActiveGeneration(conversationId);
+  const { data: providerAuthStatus } = useProviderAuthStatus();
+  const { data: opencodeFreeModelsData } = useOpencodeFreeModels();
 
   // Track current generation ID
   const currentGenerationIdRef = useRef<string | undefined>(undefined);
@@ -360,6 +368,7 @@ export function ChatArea({ conversationId }: Props) {
     selectedSkillSlugsByScope[skillSelectionScopeKey] ?? EMPTY_SELECTED_SKILLS;
   const toggleSelectedSkillSlug = useChatSkillStore((state) => state.toggleSelectedSkillSlug);
   const clearSelectedSkillSlugs = useChatSkillStore((state) => state.clearSelectedSkillSlugs);
+  const connectedProviders = providerAuthStatus?.connected;
 
   // Segmented activity feed state
   const [segments, setSegments] = useState<ActivitySegment[]>([]);
@@ -380,6 +389,17 @@ export function ChatArea({ conversationId }: Props) {
     () => {},
   );
   const autoApproveEnabled = useMemo(() => localAutoApprove, [localAutoApprove]);
+  const isOpenAIConnected = Boolean(connectedProviders?.openai);
+  const resolvedDefaultModel = useMemo(
+    () =>
+      resolveDefaultChatModel({
+        isOpenAIConnected,
+        availableOpencodeFreeModelIDs: (opencodeFreeModelsData?.models ?? []).map(
+          (model) => model.id,
+        ),
+      }),
+    [isOpenAIConnected, opencodeFreeModelsData],
+  );
   const conversationModel = (
     existingConversation as
       | {
@@ -395,6 +415,25 @@ export function ChatArea({ conversationId }: Props) {
   useEffect(() => {
     viewedConversationIdRef.current = conversationId;
   }, [conversationId]);
+
+  useEffect(() => {
+    if (conversationId) {
+      return;
+    }
+
+    if (
+      !shouldMigrateLegacyDefaultModel({
+        currentModel: selectedModel,
+        isOpenAIConnected,
+      })
+    ) {
+      return;
+    }
+
+    if (resolvedDefaultModel !== selectedModel) {
+      setSelectedModel(resolvedDefaultModel);
+    }
+  }, [conversationId, isOpenAIConnected, resolvedDefaultModel, selectedModel, setSelectedModel]);
 
   useEffect(() => {
     const shouldRunStreamTimer = isStreaming && initTrackingStartedAtRef.current !== null;

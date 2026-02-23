@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { resolveDefaultChatModel } from "@/lib/chat-model-defaults";
 import { parseModelReference } from "@/lib/model-reference";
 import {
   fetchOpencodeFreeModels,
@@ -92,11 +93,15 @@ export async function resolveDefaultOpencodeFreeModel(
 
   try {
     const models = await listOpencodeFreeModels();
-    if (models.length > 0) {
-      return models[0]!.id;
-    }
+    return resolveDefaultChatModel({
+      isOpenAIConnected: false,
+      availableOpencodeFreeModelIDs: models.map((model) => model.id),
+    });
   } catch {
     // Fall back to configured static preference below.
   }
-  return PREFERRED_ZEN_FREE_MODEL;
+  return resolveDefaultChatModel({
+    isOpenAIConnected: false,
+    availableOpencodeFreeModelIDs: [PREFERRED_ZEN_FREE_MODEL],
+  });
 }

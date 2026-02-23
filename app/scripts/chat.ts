@@ -4,13 +4,11 @@ import { createReadStream, createWriteStream, existsSync, readFileSync } from "n
 import { basename, resolve, extname } from "node:path";
 import readline from "node:readline";
 import type { AppRouter } from "../src/server/orpc";
+import { resolveDefaultChatModel } from "../src/lib/chat-model-defaults";
 import { createGenerationRuntime } from "../src/lib/generation-runtime";
 import { runGenerationStream } from "../src/lib/generation-stream";
 import { parseModelReference } from "../src/lib/model-reference";
-import {
-  listOpencodeFreeModels,
-  resolveDefaultOpencodeFreeModel,
-} from "../src/server/ai/opencode-models";
+import { listOpencodeFreeModels } from "../src/server/ai/opencode-models";
 import {
   DEFAULT_SERVER_URL,
   ask,
@@ -151,7 +149,7 @@ function printHelp(): void {
   console.log("  -c, --conversation <id>   Continue an existing conversation");
   console.log("  -m, --message <text>      Send one message and exit");
   console.log(
-    "  -M, --model <provider/model> Model reference (default resolves to first free model)",
+    "  -M, --model <provider/model> Model reference (default prefers ChatGPT when connected)",
   );
   console.log("  --list-models             List free model ids and exit");
   console.log("  --auto-approve            Auto-approve tool calls");
@@ -921,15 +919,30 @@ async function main(): Promise<void> {
     }
   }
 
+  const client = createRpcClient(serverUrl, config.token);
+
   try {
-    args.model = await resolveDefaultOpencodeFreeModel(args.model ?? process.env.BAP_CHAT_MODEL);
+    const overrideModel = args.model ?? process.env.BAP_CHAT_MODEL;
+    if (overrideModel?.trim()) {
+      const trimmedOverride = overrideModel.trim();
+      parseModelReference(trimmedOverride);
+      args.model = trimmedOverride;
+    } else {
+      const [authStatus, freeModels] = await Promise.all([
+        client.providerAuth.status(),
+        client.providerAuth.freeModels(),
+      ]);
+      args.model = resolveDefaultChatModel({
+        isOpenAIConnected: "openai" in (authStatus.connected ?? {}),
+        availableOpencodeFreeModelIDs: freeModels.models.map((model) => model.id),
+      });
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
   console.log(`[model] ${args.model}`);
 
-  const client = createRpcClient(serverUrl, config.token);
   await printAuthenticatedUser(client);
 
   if (args.message) {
