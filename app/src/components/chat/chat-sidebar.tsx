@@ -4,7 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -39,6 +39,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import {
   useConversationList,
   useDeleteConversation,
+  useMarkConversationSeen,
   useUpdateConversationPinned,
   useUpdateConversationTitle,
 } from "@/orpc/hooks";
@@ -58,6 +59,7 @@ type ConversationListData = {
       | "error";
     updatedAt: Date;
     messageCount: number;
+    seenMessageCount: number;
   }>;
   nextCursor?: string;
 };
@@ -68,7 +70,6 @@ const RUNNING_CONVERSATION_STATUSES = new Set([
   "awaiting_auth",
   "paused",
 ]);
-const SIDEBAR_SEEN_COUNTS_STORAGE_KEY = "chat-sidebar-seen-message-counts-v1";
 
 export function ChatSidebar() {
   const isMobile = useIsMobile();
@@ -77,40 +78,13 @@ export function ChatSidebar() {
   const { data: rawData, isLoading } = useConversationList();
   const data = rawData as ConversationListData | undefined;
   const deleteConversation = useDeleteConversation();
+  const markConversationSeenMutation = useMarkConversationSeen();
   const updateConversationPinned = useUpdateConversationPinned();
   const updateConversationTitle = useUpdateConversationTitle();
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [renameConversationId, setRenameConversationId] = useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
-  const [seenMessageCountsByConversation, setSeenMessageCountsByConversation] = useState<
-    Record<string, number>
-  >({});
-
-  const persistSeenMessageCounts = useCallback((counts: Record<string, number>) => {
-    try {
-      localStorage.setItem(SIDEBAR_SEEN_COUNTS_STORAGE_KEY, JSON.stringify(counts));
-    } catch {
-      // Ignore localStorage failures and keep in-memory state as fallback.
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    try {
-      const raw = localStorage.getItem(SIDEBAR_SEEN_COUNTS_STORAGE_KEY);
-      if (!raw) {
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        setSeenMessageCountsByConversation(parsed as Record<string, number>);
-      }
-    } catch {
-      // Ignore malformed storage payload.
-    }
-  }, []);
+  const latestSeenRef = useRef<Record<string, number>>({});
 
   const renameTitleTrimmed = useMemo(() => renameTitle.trim(), [renameTitle]);
   const isRenameDisabled =
@@ -206,21 +180,6 @@ export function ChatSidebar() {
     [handleRenameSubmit],
   );
 
-  const markConversationAsSeen = useCallback(
-    (conversationId: string, messageCount: number) => {
-      setSeenMessageCountsByConversation((prev) => {
-        const previousCount = prev[conversationId] ?? 0;
-        if (messageCount <= previousCount) {
-          return prev;
-        }
-        const next = { ...prev, [conversationId]: messageCount };
-        persistSeenMessageCounts(next);
-        return next;
-      });
-    },
-    [persistSeenMessageCounts],
-  );
-
   useEffect(() => {
     const activeConversationId = pathname.startsWith("/chat/")
       ? pathname.slice("/chat/".length)
@@ -232,8 +191,22 @@ export function ChatSidebar() {
     if (!activeConversation) {
       return;
     }
-    markConversationAsSeen(activeConversation.id, activeConversation.messageCount);
-  }, [data?.conversations, markConversationAsSeen, pathname]);
+
+    const targetSeenCount = activeConversation.messageCount;
+    const serverSeenCount = activeConversation.seenMessageCount ?? 0;
+    const localLatestSeenCount = latestSeenRef.current[activeConversation.id] ?? 0;
+    const currentSeenCount = Math.max(serverSeenCount, localLatestSeenCount);
+
+    if (targetSeenCount <= currentSeenCount) {
+      return;
+    }
+
+    latestSeenRef.current[activeConversation.id] = targetSeenCount;
+    markConversationSeenMutation.mutate({
+      id: activeConversation.id,
+      seenMessageCount: targetSeenCount,
+    });
+  }, [data?.conversations, markConversationSeenMutation, pathname]);
 
   return (
     <Sidebar collapsible="icon" className="border-r">
@@ -263,7 +236,7 @@ export function ChatSidebar() {
                   const isConversationRunning = RUNNING_CONVERSATION_STATUSES.has(
                     conv.generationStatus,
                   );
-                  const seenMessageCount = seenMessageCountsByConversation[conv.id] ?? 0;
+                  const seenMessageCount = conv.seenMessageCount ?? 0;
                   const hasUnreadResults =
                     !isConversationRunning &&
                     !isActiveConversation &&

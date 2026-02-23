@@ -107,6 +107,19 @@ export function useUpdateConversationPinned() {
   });
 }
 
+// Hook for marking a conversation as seen in sidebar
+export function useMarkConversationSeen() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, seenMessageCount }: { id: string; seenMessageCount: number }) =>
+      client.conversation.markSeen({ id, seenMessageCount }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversation"] });
+    },
+  });
+}
+
 // Hook for updating conversation auto-approve setting
 export function useUpdateAutoApprove() {
   const queryClient = useQueryClient();

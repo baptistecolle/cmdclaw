@@ -43,6 +43,7 @@ const list = protectedProcedure
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
         messageCount: c.messages.length,
+        seenMessageCount: c.seenMessageCount,
       })),
       nextCursor: hasMore ? items[items.length - 1]?.id : undefined,
     };
@@ -162,6 +163,56 @@ const updatePinned = protectedProcedure
     }
 
     return { success: true, isPinned: result[0].isPinned };
+  });
+
+// Mark conversation as seen up to a given message count
+const markSeen = protectedProcedure
+  .input(
+    z.object({
+      id: z.string(),
+      seenMessageCount: z.number().int().min(0),
+    }),
+  )
+  .handler(async ({ input, context }) => {
+    const existing = await context.db.query.conversation.findFirst({
+      where: and(
+        eq(conversation.id, input.id),
+        eq(conversation.userId, context.user.id),
+        eq(conversation.type, "chat"),
+      ),
+      columns: {
+        id: true,
+        seenMessageCount: true,
+      },
+    });
+
+    if (!existing) {
+      throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }
+
+    if (input.seenMessageCount <= existing.seenMessageCount) {
+      return { success: true, seenMessageCount: existing.seenMessageCount };
+    }
+
+    const result = await context.db
+      .update(conversation)
+      .set({ seenMessageCount: input.seenMessageCount })
+      .where(
+        and(
+          eq(conversation.id, input.id),
+          eq(conversation.userId, context.user.id),
+          eq(conversation.type, "chat"),
+        ),
+      )
+      .returning({
+        seenMessageCount: conversation.seenMessageCount,
+      });
+
+    if (result.length === 0) {
+      throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }
+
+    return { success: true, seenMessageCount: result[0].seenMessageCount };
   });
 
 // Update conversation auto-approve setting
@@ -405,6 +456,7 @@ export const conversationRouter = {
   get,
   updateTitle,
   updatePinned,
+  markSeen,
   updateAutoApprove,
   share,
   unshare,

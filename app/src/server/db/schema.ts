@@ -175,6 +175,8 @@ export const conversation = pgTable(
     currentGenerationId: text("current_generation_id"),
     // Auto-approve sensitive operations without user confirmation
     autoApprove: boolean("auto_approve").default(false).notNull(),
+    // Number of messages this user has acknowledged in the sidebar
+    seenMessageCount: integer("seen_message_count").default(0).notNull(),
     isPinned: boolean("is_pinned").default(false).notNull(),
     isShared: boolean("is_shared").default(false).notNull(),
     shareToken: text("share_token"),
