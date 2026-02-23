@@ -18,8 +18,12 @@ import { parseModelReference } from "@/lib/model-reference";
 import { AnthropicBackend } from "@/server/ai/anthropic-backend";
 import { LocalLLMBackend } from "@/server/ai/local-backend";
 import { OpenAIBackend } from "@/server/ai/openai-backend";
-import { resolveDefaultOpencodeFreeModel } from "@/server/ai/opencode-models";
+import {
+  listOpencodeFreeModels,
+  resolveDefaultOpencodeFreeModel,
+} from "@/server/ai/opencode-models";
 import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
+import { getProviderModels } from "@/server/ai/subscription-providers";
 import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
 import { db } from "@/server/db/client";
 import {
@@ -249,7 +253,7 @@ interface GenerationContext {
   model: string;
   userMessageContent: string;
   // File attachments from user
-  attachments?: { name: string; mimeType: string; dataUrl: string }[];
+  attachments?: UserFileAttachment[];
   // Track assistant message IDs to filter out user message parts
   assistantMessageIds: Set<string>;
   messageRoles: Map<string, string>;
@@ -294,6 +298,14 @@ interface GenerationContext {
   lastCancellationCheckAt?: number;
   isFinalizing?: boolean;
 }
+
+type ModelAccessCheckResult =
+  | { allowed: true }
+  | {
+      allowed: false;
+      reason: string;
+      userMessage: string;
+    };
 
 type ToolUseMetadata = {
   integration?: string;
@@ -463,12 +475,14 @@ function buildExecutionPolicy(params: {
   allowedCustomIntegrations?: string[];
   autoApprove: boolean;
   selectedPlatformSkillSlugs?: string[];
+  queuedFileAttachments?: UserFileAttachment[];
 }): GenerationExecutionPolicy {
   return {
     allowedIntegrations: params.allowedIntegrations,
     allowedCustomIntegrations: params.allowedCustomIntegrations,
     autoApprove: params.autoApprove,
     selectedPlatformSkillSlugs: params.selectedPlatformSkillSlugs,
+    queuedFileAttachments: params.queuedFileAttachments,
   };
 }
 
@@ -585,6 +599,7 @@ function buildQuestionCommand(request: QuestionRequest): string {
 }
 
 type MessageRow = typeof message.$inferSelect;
+type UserFileAttachment = { name: string; mimeType: string; dataUrl: string };
 
 function estimateTokensFromText(text: string): number {
   return Math.ceil(text.length / 4);
@@ -867,6 +882,7 @@ class GenerationManager {
     allowedCustomIntegrations?: string[];
     autoApprove?: boolean;
     selectedPlatformSkillSlugs?: string[];
+    queuedFileAttachments?: UserFileAttachment[];
   } {
     const policy =
       (genRecord.executionPolicy as GenerationExecutionPolicy | null | undefined) ?? undefined;
@@ -882,6 +898,16 @@ class GenerationManager {
       selectedPlatformSkillSlugs: Array.isArray(policy?.selectedPlatformSkillSlugs)
         ? policy.selectedPlatformSkillSlugs.filter(
             (entry): entry is string => typeof entry === "string",
+          )
+        : undefined,
+      queuedFileAttachments: Array.isArray(policy?.queuedFileAttachments)
+        ? policy.queuedFileAttachments.filter(
+            (entry): entry is UserFileAttachment =>
+              !!entry &&
+              typeof entry === "object" &&
+              typeof entry.name === "string" &&
+              typeof entry.mimeType === "string" &&
+              typeof entry.dataUrl === "string",
           )
         : undefined,
     };
@@ -904,6 +930,86 @@ class GenerationManager {
       atMs: now,
       elapsedMs: Math.max(0, now - startedAtMs),
     });
+  }
+
+  private async checkModelAccessForUser(params: {
+    userId: string;
+    model: string;
+  }): Promise<ModelAccessCheckResult> {
+    const { providerID, modelID } = parseModelReference(params.model);
+
+    if (providerID === "anthropic") {
+      return { allowed: true };
+    }
+
+    if (providerID === "opencode") {
+      const models = await listOpencodeFreeModels();
+      if (models.some((model) => model.id === params.model)) {
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        reason: "opencode_model_unavailable",
+        userMessage:
+          "Selected OpenCode model is no longer available. Choose another model and retry.",
+      };
+    }
+
+    if (providerID === "openai") {
+      const { providerAuth } = await import("@/server/db/schema");
+      const auth = await db.query.providerAuth.findFirst({
+        where: and(eq(providerAuth.userId, params.userId), eq(providerAuth.provider, "openai")),
+      });
+      if (!auth) {
+        return {
+          allowed: false,
+          reason: "openai_not_connected",
+          userMessage:
+            "This ChatGPT model requires an active ChatGPT subscription connection. Connect it in Settings > Subscriptions, then retry.",
+        };
+      }
+      const allowedIDs = new Set(getProviderModels("openai").map((model) => model.id));
+      if (!allowedIDs.has(modelID)) {
+        return {
+          allowed: false,
+          reason: "openai_model_not_allowed",
+          userMessage:
+            "Selected ChatGPT model is not available for your current connection. Choose another model and retry.",
+        };
+      }
+      return { allowed: true };
+    }
+
+    if (providerID === "kimi-for-coding") {
+      const { providerAuth } = await import("@/server/db/schema");
+      const auth = await db.query.providerAuth.findFirst({
+        where: and(eq(providerAuth.userId, params.userId), eq(providerAuth.provider, "kimi")),
+      });
+      if (!auth) {
+        return {
+          allowed: false,
+          reason: "kimi_not_connected",
+          userMessage:
+            "This Kimi model requires a connected Kimi API key in Settings > Subscriptions.",
+        };
+      }
+      const allowedIDs = new Set(getProviderModels("kimi").map((model) => model.id));
+      if (!allowedIDs.has(modelID)) {
+        return {
+          allowed: false,
+          reason: "kimi_model_not_allowed",
+          userMessage:
+            "Selected Kimi model is not available for your current connection. Choose another model and retry.",
+        };
+      }
+      return { allowed: true };
+    }
+
+    return {
+      allowed: false,
+      reason: "provider_not_supported",
+      userMessage: `Selected model provider "${providerID}" is not supported in this environment.`,
+    };
   }
 
   private buildMessageTiming(ctx: GenerationContext): MessageTiming {
@@ -1014,7 +1120,7 @@ class GenerationManager {
     autoApprove?: boolean;
     allowedIntegrations?: IntegrationType[];
     deviceId?: string;
-    fileAttachments?: { name: string; mimeType: string; dataUrl: string }[];
+    fileAttachments?: UserFileAttachment[];
     selectedPlatformSkillSlugs?: string[];
   }): Promise<{ generationId: string; conversationId: string }> {
     const { content, userId, model, autoApprove } = params;
@@ -1036,6 +1142,7 @@ class GenerationManager {
       "START_GENERATION_REQUESTED",
       {
         hasConversationId: Boolean(params.conversationId),
+        requestedModel: requestedModel ?? null,
         hasDeviceId: Boolean(params.deviceId),
         hasAllowedIntegrations: params.allowedIntegrations !== undefined,
         fileAttachmentsCount: fileAttachments?.length ?? 0,
@@ -1098,6 +1205,7 @@ class GenerationManager {
       }
     } else {
       isNewConversation = true;
+      const resolvedModel = requestedModel ?? DEFAULT_MODEL_REFERENCE;
       const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
       const [newConv] = await db
         .insert(conversation)
@@ -1105,12 +1213,40 @@ class GenerationManager {
           userId,
           title,
           type: "chat",
-          model: requestedModel ?? DEFAULT_MODEL_REFERENCE,
+          model: resolvedModel,
           autoApprove: autoApprove ?? false,
         })
         .returning();
       conv = newConv;
     }
+    const resolvedModel = requestedModel ?? conv.model ?? DEFAULT_MODEL_REFERENCE;
+    const accessCheck = await this.checkModelAccessForUser({
+      userId,
+      model: resolvedModel,
+    });
+    if (!accessCheck.allowed) {
+      logServerEvent(
+        "warn",
+        "START_GENERATION_MODEL_ACCESS_DENIED",
+        {
+          requestedModel: requestedModel ?? null,
+          resolvedModel,
+          reason: accessCheck.reason,
+        },
+        { ...logContext, conversationId: conv.id },
+      );
+      throw new Error(accessCheck.userMessage);
+    }
+    logServerEvent(
+      "info",
+      "START_GENERATION_PHASE_DONE",
+      {
+        phase: "model_access_validated",
+        elapsedMs: Date.now() - startGenerationStartedAt,
+        resolvedModel,
+      },
+      { ...logContext, conversationId: conv.id },
+    );
     logServerEvent(
       "info",
       "START_GENERATION_PHASE_DONE",
@@ -1201,6 +1337,7 @@ class GenerationManager {
           allowedIntegrations: params.allowedIntegrations,
           autoApprove: conv.autoApprove,
           selectedPlatformSkillSlugs,
+          queuedFileAttachments: fileAttachments,
         }),
         contentParts: [],
         inputTokens: 0,
@@ -1254,7 +1391,11 @@ class GenerationManager {
       logServerEvent(
         "info",
         "GENERATION_ENQUEUED",
-        { backendType, delivery: "queue" },
+        {
+          backendType,
+          delivery: "queue",
+          enqueuedAttachmentsCount: fileAttachments?.length ?? 0,
+        },
         {
           source: "generation-manager",
           traceId,
@@ -1560,6 +1701,7 @@ class GenerationManager {
       isNewConversation: false,
       model: genRecord.conversation.model ?? DEFAULT_MODEL_REFERENCE,
       userMessageContent: latestUserMessage?.content ?? "",
+      attachments: executionPolicy.queuedFileAttachments,
       assistantMessageIds: new Set(),
       messageRoles: new Map(),
       pendingMessageParts: new Map(),
@@ -1590,6 +1732,21 @@ class GenerationManager {
       phaseMarks: {},
       phaseTimeline: [],
     };
+
+    logServerEvent(
+      "info",
+      "QUEUED_GENERATION_CONTEXT_REHYDRATED",
+      {
+        rehydratedAttachmentsCount: ctx.attachments?.length ?? 0,
+      },
+      {
+        source: "generation-manager",
+        traceId: ctx.traceId,
+        generationId: ctx.id,
+        conversationId: ctx.conversationId,
+        userId: ctx.userId,
+      },
+    );
 
     this.activeGenerations.set(genRecord.id, ctx);
     this.markPhase(ctx, "generation_started");
@@ -3308,6 +3465,21 @@ class GenerationManager {
                 : typeof errorObj?.message === "string"
                   ? errorObj.message
                   : JSON.stringify(error);
+          logServerEvent(
+            "error",
+            "OPENCODE_SESSION_ERROR",
+            {
+              errorMessage,
+            },
+            {
+              source: "generation-manager",
+              traceId: ctx.traceId,
+              generationId: ctx.id,
+              conversationId: ctx.conversationId,
+              userId: ctx.userId,
+              sessionId,
+            },
+          );
           throw new Error(errorMessage);
         }
       }

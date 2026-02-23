@@ -11,6 +11,7 @@ const {
   conversationFindFirstMock,
   workflowRunFindFirstMock,
   workflowFindFirstMock,
+  providerAuthFindFirstMock,
   queueAddMock,
   dbMock,
 } = vi.hoisted(() => {
@@ -27,6 +28,7 @@ const {
   const conversationFindFirstMock = vi.fn();
   const workflowRunFindFirstMock = vi.fn();
   const workflowFindFirstMock = vi.fn();
+  const providerAuthFindFirstMock = vi.fn();
   const queueAddMock = vi.fn();
 
   const dbMock = {
@@ -36,6 +38,7 @@ const {
       conversation: { findFirst: conversationFindFirstMock },
       workflowRun: { findFirst: workflowRunFindFirstMock },
       workflow: { findFirst: workflowFindFirstMock },
+      providerAuth: { findFirst: providerAuthFindFirstMock, findMany: vi.fn(() => []) },
       skill: { findMany: vi.fn(() => []) },
       customIntegrationCredential: { findMany: vi.fn(() => []) },
     },
@@ -54,6 +57,7 @@ const {
     conversationFindFirstMock,
     workflowRunFindFirstMock,
     workflowFindFirstMock,
+    providerAuthFindFirstMock,
     queueAddMock,
     dbMock,
   };
@@ -305,6 +309,7 @@ describe("generationManager transitions", () => {
     conversationFindFirstMock.mockResolvedValue(null);
     workflowRunFindFirstMock.mockResolvedValue(null);
     workflowFindFirstMock.mockResolvedValue(null);
+    providerAuthFindFirstMock.mockResolvedValue(null);
     queueAddMock.mockReset();
     delete process.env.VERCEL;
     delete process.env.KUMA_PUSH_URL;
@@ -817,6 +822,11 @@ describe("generationManager transitions", () => {
     process.env.VERCEL = "1";
     const mgr = asTestManager();
     const runSpy = vi.spyOn(mgr, "runGeneration").mockResolvedValue(undefined);
+    const pdfAttachment = {
+      name: "questionnaire.pdf",
+      mimeType: "application/pdf",
+      dataUrl: "data:application/pdf;base64,JVBERi0xLjQK",
+    };
 
     insertReturningMock
       .mockResolvedValueOnce([
@@ -834,6 +844,7 @@ describe("generationManager transitions", () => {
     await generationManager.startGeneration({
       content: "hi",
       userId: "user-1",
+      fileAttachments: [pdfAttachment],
     });
 
     expect(runSpy).not.toHaveBeenCalled();
@@ -851,6 +862,58 @@ describe("generationManager transitions", () => {
       "generation:chat-run",
       { generationId: "gen-new" },
       expect.any(Object),
+    );
+    expect(insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        executionPolicy: expect.objectContaining({
+          queuedFileAttachments: [pdfAttachment],
+        }),
+      }),
+    );
+  });
+
+  it("rehydrates queued file attachments into generation context", async () => {
+    const mgr = asTestManager();
+    const runSpy = vi.spyOn(mgr, "runGeneration").mockResolvedValue(undefined);
+    const queuedAttachment = {
+      name: "questionnaire.pdf",
+      mimeType: "application/pdf",
+      dataUrl: "data:application/pdf;base64,JVBERi0xLjQK",
+    };
+
+    generationFindFirstMock.mockResolvedValueOnce({
+      id: "gen-queued",
+      status: "running",
+      conversationId: "conv-queued",
+      conversation: {
+        id: "conv-queued",
+        userId: "user-1",
+        autoApprove: false,
+        model: "anthropic/claude-sonnet-4-6",
+      },
+      contentParts: [],
+      pendingApproval: null,
+      pendingAuth: null,
+      inputTokens: 0,
+      outputTokens: 0,
+      startedAt: new Date(),
+      executionPolicy: {
+        autoApprove: false,
+        queuedFileAttachments: [queuedAttachment],
+      },
+    });
+    messageFindFirstMock.mockResolvedValueOnce({
+      content: "fill this pdf",
+    });
+    workflowRunFindFirstMock.mockResolvedValueOnce(null);
+
+    await generationManager.runQueuedGeneration("gen-queued");
+
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    expect(runSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [queuedAttachment],
+      }),
     );
   });
 
@@ -921,6 +984,28 @@ describe("generationManager transitions", () => {
         userId: "user-1",
       }),
     ).rejects.toThrow("Access denied");
+  });
+
+  it("rejects startGeneration when an OpenAI model is selected without ChatGPT connection", async () => {
+    insertReturningMock.mockResolvedValueOnce([
+      {
+        id: "conv-new",
+        userId: "user-1",
+        model: "openai/gpt-5.2-codex",
+        autoApprove: false,
+        type: "chat",
+      },
+    ]);
+
+    await expect(
+      generationManager.startGeneration({
+        content: "hello",
+        userId: "user-1",
+        model: "openai/gpt-5.2-codex",
+      }),
+    ).rejects.toThrow(
+      "This ChatGPT model requires an active ChatGPT subscription connection. Connect it in Settings > Subscriptions, then retry.",
+    );
   });
 
   it("starts workflow generation and keeps workflow context fields", async () => {

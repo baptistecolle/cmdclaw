@@ -293,6 +293,11 @@ export type GenerationExecutionPolicy = {
   allowedCustomIntegrations?: string[];
   autoApprove?: boolean;
   selectedPlatformSkillSlugs?: string[];
+  queuedFileAttachments?: Array<{
+    name: string;
+    mimeType: string;
+    dataUrl: string;
+  }>;
 };
 
 export const generation = pgTable(
