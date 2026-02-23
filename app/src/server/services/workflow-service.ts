@@ -1,11 +1,13 @@
 import { ORPCError } from "@orpc/server";
 import { and, eq, inArray } from "drizzle-orm";
 import type { IntegrationType } from "@/server/oauth/config";
+import { DEFAULT_CONNECTED_CHATGPT_MODEL } from "@/lib/chat-model-defaults";
 import { resolveDefaultOpencodeFreeModel } from "@/server/ai/opencode-models";
 import { db } from "@/server/db/client";
 import {
   conversation,
   generation,
+  providerAuth,
   workflow,
   workflowRun,
   workflowRunEvent,
@@ -23,8 +25,22 @@ const WORKFLOW_PREPARING_TIMEOUT_MS = (() => {
   return Math.floor(seconds * 1000);
 })();
 
-async function resolveWorkflowDefaultModel(): Promise<string> {
-  return resolveDefaultOpencodeFreeModel(process.env.BAP_CHAT_MODEL);
+async function resolveWorkflowDefaultModelForUser(userId: string): Promise<string> {
+  const configured = process.env.BAP_CHAT_MODEL?.trim();
+  if (configured) {
+    return resolveDefaultOpencodeFreeModel(configured);
+  }
+
+  const openAIAuth = await db.query.providerAuth.findFirst({
+    where: and(eq(providerAuth.userId, userId), eq(providerAuth.provider, "openai")),
+    columns: { id: true },
+  });
+
+  if (openAIAuth) {
+    return DEFAULT_CONNECTED_CHATGPT_MODEL;
+  }
+
+  return resolveDefaultOpencodeFreeModel();
 }
 
 function mapGenerationStatusToWorkflowRunStatus(
@@ -221,7 +237,7 @@ export async function triggerWorkflowRun(params: {
   let generationId: string;
   let conversationId: string;
   try {
-    const workflowModel = await resolveWorkflowDefaultModel();
+    const workflowModel = await resolveWorkflowDefaultModelForUser(wf.ownerId);
     const startResult = await generationManager.startWorkflowGeneration({
       workflowRunId: run.id,
       content: userContent,

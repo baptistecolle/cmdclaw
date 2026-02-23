@@ -4,15 +4,18 @@ const {
   workflowFindFirstMock,
   workflowRunFindManyMock,
   workflowRunFindFirstMock,
+  providerAuthFindFirstMock,
   insertValuesMock,
   updateWhereMock,
   updateSetMock,
   dbMock,
   startWorkflowGenerationMock,
+  resolveDefaultOpencodeFreeModelMock,
 } = vi.hoisted(() => {
   const workflowFindFirstMock = vi.fn();
   const workflowRunFindManyMock = vi.fn();
   const workflowRunFindFirstMock = vi.fn();
+  const providerAuthFindFirstMock = vi.fn();
 
   const insertValuesMock = vi.fn();
   const insertMock = vi.fn(() => ({ values: insertValuesMock }));
@@ -30,22 +33,28 @@ const {
         findMany: workflowRunFindManyMock,
         findFirst: workflowRunFindFirstMock,
       },
+      providerAuth: {
+        findFirst: providerAuthFindFirstMock,
+      },
     },
     insert: insertMock,
     update: updateMock,
   };
 
   const startWorkflowGenerationMock = vi.fn();
+  const resolveDefaultOpencodeFreeModelMock = vi.fn();
 
   return {
     workflowFindFirstMock,
     workflowRunFindManyMock,
     workflowRunFindFirstMock,
+    providerAuthFindFirstMock,
     insertValuesMock,
     updateWhereMock,
     updateSetMock,
     dbMock,
     startWorkflowGenerationMock,
+    resolveDefaultOpencodeFreeModelMock,
   };
 });
 
@@ -57,6 +66,10 @@ vi.mock("@/server/services/generation-manager", () => ({
   generationManager: {
     startWorkflowGeneration: startWorkflowGenerationMock,
   },
+}));
+
+vi.mock("@/server/ai/opencode-models", () => ({
+  resolveDefaultOpencodeFreeModel: resolveDefaultOpencodeFreeModelMock,
 }));
 
 import { triggerWorkflowRun } from "./workflow-service";
@@ -81,6 +94,7 @@ describe("triggerWorkflowRun", () => {
 
     workflowRunFindManyMock.mockResolvedValue([]);
     workflowRunFindFirstMock.mockResolvedValue(null);
+    providerAuthFindFirstMock.mockResolvedValue(null);
 
     insertValuesMock.mockImplementation((values: unknown) => ({
       returning: vi.fn().mockResolvedValue([
@@ -100,6 +114,10 @@ describe("triggerWorkflowRun", () => {
       generationId: "gen-1",
       conversationId: "conv-1",
     });
+
+    resolveDefaultOpencodeFreeModelMock.mockImplementation((override?: string) =>
+      Promise.resolve(override ?? "opencode/glm-5-free"),
+    );
   });
 
   it("throws NOT_FOUND when workflow is missing", async () => {
@@ -169,9 +187,57 @@ describe("triggerWorkflowRun", () => {
     expect(startWorkflowGenerationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         workflowRunId: "run-1",
+        model: "opencode/glm-5-free",
         userId: "user-1",
         allowedIntegrations: ["slack"],
         allowedCustomIntegrations: ["custom-crm"],
+      }),
+    );
+  });
+
+  it("prefers OpenAI default model when OpenAI is connected", async () => {
+    providerAuthFindFirstMock.mockResolvedValue({ id: "auth-1" });
+
+    await triggerWorkflowRun({
+      workflowId: "wf-1",
+      triggerPayload: { source: "manual" },
+      userId: "user-1",
+      userRole: "admin",
+    });
+
+    expect(startWorkflowGenerationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "openai/gpt-5.2-codex",
+      }),
+    );
+    expect(resolveDefaultOpencodeFreeModelMock).not.toHaveBeenCalled();
+  });
+
+  it("uses BAP_CHAT_MODEL override when configured", async () => {
+    const previous = process.env.BAP_CHAT_MODEL;
+    process.env.BAP_CHAT_MODEL = "openai/gpt-4.1-mini";
+    providerAuthFindFirstMock.mockResolvedValue({ id: "auth-1" });
+    resolveDefaultOpencodeFreeModelMock.mockResolvedValue("openai/gpt-4.1-mini");
+
+    try {
+      await triggerWorkflowRun({
+        workflowId: "wf-1",
+        triggerPayload: { source: "manual" },
+        userId: "user-1",
+        userRole: "admin",
+      });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.BAP_CHAT_MODEL;
+      } else {
+        process.env.BAP_CHAT_MODEL = previous;
+      }
+    }
+
+    expect(resolveDefaultOpencodeFreeModelMock).toHaveBeenCalledWith("openai/gpt-4.1-mini");
+    expect(startWorkflowGenerationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "openai/gpt-4.1-mini",
       }),
     );
   });
