@@ -88,6 +88,7 @@ vi.mock("@/server/utils/generate-title", () => ({
 }));
 
 vi.mock("@/server/sandbox/factory", () => ({
+  getPreferredCloudSandboxProvider: vi.fn(() => "e2b"),
   getSandboxBackend: vi.fn(),
 }));
 
