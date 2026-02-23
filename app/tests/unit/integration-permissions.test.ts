@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getCallbackBaseUrls } from "@/e2b-template/plugins/integration-permissions";
+import { getCallbackBaseUrls } from "@/sandbox-templates/common/plugins/integration-permissions";
 
 describe("getCallbackBaseUrls", () => {
   afterEach(() => {

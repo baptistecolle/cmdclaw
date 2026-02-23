@@ -35,7 +35,7 @@ export default defineConfig({
         "src/**/*.d.ts",
         "src/**/*.test.{ts,tsx}",
         "src/**/*.spec.{ts,tsx}",
-        "src/e2b-template/**",
+        "src/sandbox-templates/common/**",
       ],
       thresholds: enforceCoverageThreshold
         ? {

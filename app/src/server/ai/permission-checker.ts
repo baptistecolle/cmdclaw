@@ -1,6 +1,6 @@
 /**
  * Server-side permission checker for BYOC direct mode.
- * Ported from e2b-template/plugins/integration-permissions.ts.
+ * Ported from sandbox-templates/common/plugins/integration-permissions.ts.
  *
  * Checks bash commands for integration CLI usage and enforces
  * read/write permissions and auth requirements.

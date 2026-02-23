@@ -178,7 +178,7 @@ export async function getOfficialIntegrationSkillIndex(): Promise<
   Map<string, OfficialIntegrationSkill>
 > {
   const result = new Map<string, OfficialIntegrationSkill>();
-  const skillsRoot = path.join(process.cwd(), "src", "e2b-template", "skills");
+  const skillsRoot = path.join(process.cwd(), "src", "sandbox-templates/common", "skills");
 
   let entries: Array<import("node:fs").Dirent> = [];
   try {

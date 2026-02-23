@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-const SKILLS_ROOT = path.join(process.cwd(), "src", "e2b-template", "skills");
+const SKILLS_ROOT = path.join(process.cwd(), "src", "sandbox-templates/common", "skills");
 
 const NON_SELECTABLE_SKILL_DIRS = new Set(["_test-utils"]);
 

@@ -202,8 +202,10 @@ bap-daemon auth
 bap-daemon start
 ```
 
-If you don't want BYOC, set `E2B_API_KEY` and `E2B_TEMPLATE` to use E2B cloud
-sandboxes instead.
+If you don't want BYOC:
+
+- Set `E2B_API_KEY` and `E2B_TEMPLATE` to use E2B cloud sandboxes.
+- Or set `DAYTONA_API_KEY` (plus optional `DAYTONA_SERVER_URL` / `DAYTONA_TARGET`) to use Daytona sandboxes.
 
 ## Background worker
 
@@ -247,4 +249,4 @@ bun ws:dev
 | AI | Anthropic Claude, OpenAI, Google Gemini |
 | Queue | BullMQ, Redis |
 | Storage | S3 / MinIO |
-| Sandbox | E2B |
+| Sandbox | E2B, Daytona |

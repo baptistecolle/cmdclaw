@@ -54,6 +54,7 @@ import {
   getQueue,
 } from "@/server/queues";
 import { buildRedisOptions } from "@/server/redis/connection-options";
+import { isDaytonaConfigured } from "@/server/sandbox/daytona";
 import {
   getOrCreateSession,
   writeSkillsToSandbox,
@@ -1190,8 +1191,11 @@ class GenerationManager {
       { ...logContext, conversationId: conv.id, generationId: genRecord.id },
     );
 
-    // Determine backend type: if deviceId is provided, use direct mode
-    const backendType: BackendType = params.deviceId ? "direct" : "opencode";
+    // Determine backend type:
+    // - Device-attached runs use direct mode.
+    // - Daytona-only cloud setup (no E2B) uses direct mode as well.
+    const backendType: BackendType =
+      params.deviceId || (!env.E2B_API_KEY && isDaytonaConfigured()) ? "direct" : "opencode";
     if (this.shouldDeferGenerationToWorker() && backendType === "direct") {
       throw new Error(
         "Direct device generations require a dedicated stateful runtime and are not supported on Vercel functions.",

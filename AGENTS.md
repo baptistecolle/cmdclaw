@@ -18,9 +18,6 @@ Avoid mocks as much as possible, Test actual implementation, do not duplicate lo
 try to colocated tests with the code they test when relevant. for collacting use this format `*.test.ts` or `*.e2e.test.ts`
 
 
-## Bun
-always use bun not npm or pnpm
-
 ## Commit policy
 -  Do not commit unless the user explicitly asks.
 -  Create commits with `scripts/committer "<msg>" <file...>`; avoid manual `git add`/`git commit` so staging stays scoped.
