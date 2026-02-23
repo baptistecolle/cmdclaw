@@ -120,6 +120,18 @@ export function useMarkConversationSeen() {
   });
 }
 
+// Hook for marking all conversations as seen in sidebar
+export function useMarkAllConversationsSeen() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => client.conversation.markAllSeen({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversation"] });
+    },
+  });
+}
+
 // Hook for updating conversation auto-approve setting
 export function useUpdateAutoApprove() {
   const queryClient = useQueryClient();
@@ -871,7 +883,7 @@ export function useGeneration() {
         autoApprove?: boolean;
         deviceId?: string;
         selectedPlatformSkillSlugs?: string[];
-        attachments?: { name: string; mimeType: string; dataUrl: string }[];
+        fileAttachments?: { name: string; mimeType: string; dataUrl: string }[];
       },
       callbacks: GenerationCallbacks,
     ): Promise<{ generationId: string; conversationId: string } | null> => {

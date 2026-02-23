@@ -25,10 +25,11 @@ export const template = Template({
   .runCmd("sudo ln -s $HOME/.bun/bin/opencode /usr/local/bin/opencode")
   .runCmd("sudo ln -s $HOME/.bun/bin/tsx /usr/local/bin/tsx")
   .setWorkdir("/app")
-  // Copy OpenCode config and plugins
+  // Copy OpenCode config, plugins, and custom tools
   .copy(`${COMMON_ROOT}/opencode.json`, "/app/opencode.json")
-  .runCmd("mkdir -p /app/.opencode/plugins")
+  .runCmd("mkdir -p /app/.opencode/plugins /app/.opencode/tools")
   .copy(`${COMMON_ROOT}/plugins`, "/app/.opencode/plugins")
+  .copy(`${COMMON_ROOT}/tools`, "/app/.opencode/tools")
   // Prewarm OpenCode runtime/plugin deps to avoid 3-5s lazy install on first health request
   .runCmd("mkdir -p $HOME/.config/opencode /app/.opencode $HOME/.cache/opencode")
   .runCmd("cp /app/opencode.json /app/.opencode/opencode.json")

@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { eq, desc, and, isNull, asc } from "drizzle-orm";
+import { eq, desc, and, isNull, asc, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { conversation, message, messageAttachment, sandboxFile } from "@/server/db/schema";
@@ -214,6 +214,37 @@ const markSeen = protectedProcedure
 
     return { success: true, seenMessageCount: result[0].seenMessageCount };
   });
+
+// Mark all user chat conversations as seen up to their current message count
+const markAllSeen = protectedProcedure.input(z.object({})).handler(async ({ context }) => {
+  const result = await context.db.execute(sql`
+    with message_counts as (
+      select
+        ${message.conversationId} as "conversationId",
+        count(*)::int as "messageCount"
+      from ${message}
+      group by ${message.conversationId}
+    ),
+    updated as (
+      update ${conversation} as c
+      set seen_message_count = message_counts."messageCount"
+      from message_counts
+      where c.id = message_counts."conversationId"
+        and c.user_id = ${context.user.id}
+        and c.type = 'chat'
+        and c.archived_at is null
+        and c.seen_message_count < message_counts."messageCount"
+      returning c.id
+    )
+    select count(*)::int as "updatedCount" from updated
+  `);
+
+  const rows = (result.rows ?? []) as Array<{ updatedCount: number }>;
+  return {
+    success: true,
+    updatedCount: rows[0]?.updatedCount ?? 0,
+  };
+});
 
 // Update conversation auto-approve setting
 const updateAutoApprove = protectedProcedure
@@ -457,6 +488,7 @@ export const conversationRouter = {
   updateTitle,
   updatePinned,
   markSeen,
+  markAllSeen,
   updateAutoApprove,
   share,
   unshare,

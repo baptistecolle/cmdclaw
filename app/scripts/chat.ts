@@ -525,7 +525,7 @@ async function runGeneration(
         content,
         model: options.model,
         autoApprove: options.autoApprove,
-        attachments: attachments?.length ? attachments : undefined,
+        fileAttachments: attachments?.length ? attachments : undefined,
       },
       callbacks: {
         onText: (text) => {

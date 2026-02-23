@@ -176,7 +176,7 @@ const startGeneration = protectedProcedure
       autoApprove: z.boolean().optional(),
       deviceId: z.string().optional(),
       selectedPlatformSkillSlugs: z.array(z.string().max(128)).max(50).optional(),
-      attachments: z
+      fileAttachments: z
         .array(
           z.object({
             name: z.string(),
@@ -211,7 +211,7 @@ const startGeneration = protectedProcedure
         autoApprove: input.autoApprove,
         deviceId: input.deviceId,
         selectedPlatformSkillSlugs: input.selectedPlatformSkillSlugs,
-        attachments: input.attachments,
+        fileAttachments: input.fileAttachments,
       });
 
       const successLogContext = {

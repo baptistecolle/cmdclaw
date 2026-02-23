@@ -6,6 +6,7 @@ Shared files used by both E2B and Daytona sandbox builds.
 
 - `skills/` - Built-in platform and integration skills.
 - `plugins/` - OpenCode plugins shared by providers.
+- `tools/` - OpenCode custom tools shared by providers.
 - `opencode.json` - Base OpenCode configuration.
 - `setup.sh` - Shared runtime setup script.
 - `cli/` - Shared CLI setup assets.

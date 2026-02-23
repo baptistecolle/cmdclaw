@@ -79,7 +79,7 @@ export type GenerationStartInput = {
   autoApprove?: boolean;
   deviceId?: string;
   selectedPlatformSkillSlugs?: string[];
-  attachments?: { name: string; mimeType: string; dataUrl: string }[];
+  fileAttachments?: { name: string; mimeType: string; dataUrl: string }[];
 };
 
 export type GenerationCallbacks = {

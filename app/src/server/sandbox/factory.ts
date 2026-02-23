@@ -2,12 +2,45 @@
  * Factory for selecting the appropriate SandboxBackend based on context.
  */
 
+import { env } from "@/env";
 import { isDeviceOnline } from "@/server/ws/server";
 import type { SandboxBackend } from "./types";
 import { BYOCSandboxBackend } from "./byoc";
 import { DaytonaSandboxBackend, isDaytonaConfigured } from "./daytona";
 import { E2BSandboxBackend } from "./e2b";
 import { isE2BConfigured } from "./e2b";
+
+export type CloudSandboxProvider = "e2b" | "daytona";
+
+/**
+ * Resolve which cloud sandbox provider should be used when no BYOC device is active.
+ *
+ * Priority:
+ * 1. SANDBOX_DEFAULT when set and provider is configured
+ * 2. E2B when configured
+ * 3. Daytona when configured
+ */
+export function getPreferredCloudSandboxProvider(): CloudSandboxProvider | null {
+  const configuredDefault = env.SANDBOX_DEFAULT;
+
+  if (configuredDefault === "daytona" && isDaytonaConfigured()) {
+    return "daytona";
+  }
+
+  if (configuredDefault === "e2b" && isE2BConfigured()) {
+    return "e2b";
+  }
+
+  if (isE2BConfigured()) {
+    return "e2b";
+  }
+
+  if (isDaytonaConfigured()) {
+    return "daytona";
+  }
+
+  return null;
+}
 
 /**
  * Get a SandboxBackend for a generation.
@@ -25,11 +58,11 @@ export function getSandboxBackend(
     return new BYOCSandboxBackend(deviceId);
   }
 
-  if (isE2BConfigured()) {
+  const provider = getPreferredCloudSandboxProvider();
+  if (provider === "e2b") {
     return new E2BSandboxBackend();
   }
-
-  if (isDaytonaConfigured()) {
+  if (provider === "daytona") {
     return new DaytonaSandboxBackend();
   }
 

@@ -1,7 +1,16 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import {
+  CheckCheck,
+  LoaderCircle,
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  PinOff,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -39,6 +48,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import {
   useConversationList,
   useDeleteConversation,
+  useMarkAllConversationsSeen,
   useMarkConversationSeen,
   useUpdateConversationPinned,
   useUpdateConversationTitle,
@@ -78,6 +88,7 @@ export function ChatSidebar() {
   const { data: rawData, isLoading } = useConversationList();
   const data = rawData as ConversationListData | undefined;
   const deleteConversation = useDeleteConversation();
+  const markAllConversationsSeenMutation = useMarkAllConversationsSeen();
   const markConversationSeenMutation = useMarkConversationSeen();
   const updateConversationPinned = useUpdateConversationPinned();
   const updateConversationTitle = useUpdateConversationTitle();
@@ -180,6 +191,34 @@ export function ChatSidebar() {
     [handleRenameSubmit],
   );
 
+  const unreadConversationCount = useMemo(() => {
+    if (!data?.conversations?.length) {
+      return 0;
+    }
+
+    return data.conversations.filter((conv) => conv.messageCount > (conv.seenMessageCount ?? 0))
+      .length;
+  }, [data?.conversations]);
+
+  const handleMarkAllRead = useCallback(async () => {
+    if (!data?.conversations?.length || markAllConversationsSeenMutation.isPending) {
+      return;
+    }
+
+    for (const conv of data.conversations) {
+      latestSeenRef.current[conv.id] = Math.max(
+        latestSeenRef.current[conv.id] ?? 0,
+        conv.messageCount,
+      );
+    }
+
+    await markAllConversationsSeenMutation.mutateAsync();
+  }, [data?.conversations, markAllConversationsSeenMutation]);
+
+  const handleMarkAllReadClick = useCallback(() => {
+    void handleMarkAllRead();
+  }, [handleMarkAllRead]);
+
   useEffect(() => {
     const activeConversationId = pathname.startsWith("/chat/")
       ? pathname.slice("/chat/".length)
@@ -211,14 +250,43 @@ export function ChatSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader>
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
-          onClick={handleCreateNewChat}
-        >
-          <Plus className="h-4 w-4 shrink-0" />
-          <span className="group-data-[collapsible=icon]:hidden">New chat</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="min-w-0 flex-1 justify-start gap-2 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
+            onClick={handleCreateNewChat}
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className="truncate group-data-[collapsible=icon]:hidden">New chat</span>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:hidden"
+                aria-label="Chat actions"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="bottom">
+              <DropdownMenuItem
+                onClick={handleMarkAllReadClick}
+                disabled={
+                  unreadConversationCount === 0 || markAllConversationsSeenMutation.isPending
+                }
+              >
+                {markAllConversationsSeenMutation.isPending ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCheck className="h-4 w-4" />
+                )}
+                <span>Mark all as read</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </SidebarHeader>
 
       <SidebarContent>

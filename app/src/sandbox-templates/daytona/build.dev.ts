@@ -34,7 +34,13 @@ function getDaytonaConfig(): {
 }
 
 async function createOrReplaceSnapshot(daytona: Daytona, name: string) {
-  const tryCreate = () => daytona.snapshot.create({ name, image });
+  const tryCreate = () =>
+    daytona.snapshot.create(
+      { name, image },
+      {
+        onLogs: (chunk) => console.log(`[daytona] ${chunk}`),
+      },
+    );
   const retryCreate = async (attempt: number, lastError?: unknown) => {
     if (attempt > 8) {
       throw new Error(`Unable to recreate snapshot "${name}" after replacement retries.`, {

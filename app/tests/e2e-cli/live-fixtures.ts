@@ -8,7 +8,7 @@ import { getValidTokensForUser } from "../../src/server/integrations/token-refre
 import { resolveLiveE2EModel } from "../e2e/live-chat-model";
 
 export const liveEnabled = process.env.E2E_LIVE === "1";
-export const defaultServerUrl = process.env.BAP_SERVER_URL ?? "http://127.0.0.1:3000";
+export const defaultServerUrl = process.env.BAP_SERVER_URL ?? "http://localhost:3000";
 export const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "180000");
 export const commandTimeoutMs = Number(process.env.E2E_CLI_TIMEOUT_MS ?? String(responseTimeoutMs));
 export const artifactTimeoutMs = Number(process.env.E2E_ARTIFACT_TIMEOUT_MS ?? "45000");

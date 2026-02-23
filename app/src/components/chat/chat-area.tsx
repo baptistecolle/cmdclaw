@@ -1288,7 +1288,7 @@ export function ChatArea({ conversationId }: Props) {
           autoApprove: autoApproveEnabled,
           deviceId: selectedDeviceId,
           selectedPlatformSkillSlugs,
-          attachments,
+          fileAttachments: attachments,
         },
         {
           onStarted: (generationId, newConversationId) => {
