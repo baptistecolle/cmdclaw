@@ -54,7 +54,6 @@ import {
   getQueue,
 } from "@/server/queues";
 import { buildRedisOptions } from "@/server/redis/connection-options";
-import { isDaytonaConfigured } from "@/server/sandbox/daytona";
 import {
   getOrCreateSession,
   writeSkillsToSandbox,
@@ -62,7 +61,7 @@ import {
   writeResolvedIntegrationSkillsToSandbox,
   getIntegrationSkillsSystemPrompt,
 } from "@/server/sandbox/e2b";
-import { getSandboxBackend } from "@/server/sandbox/factory";
+import { getPreferredCloudSandboxProvider, getSandboxBackend } from "@/server/sandbox/factory";
 import {
   createCommunityIntegrationSkill,
   resolvePreferredCommunitySkillsForUser,
@@ -399,6 +398,52 @@ const STALE_REAPER_PAUSED_MAX_AGE_MS = 60 * 60 * 1000;
 const PENDING_MESSAGE_PARTS_MAX_PER_MESSAGE = 100;
 const PENDING_MESSAGE_PARTS_TTL_MS = 5 * 60 * 1000;
 const MAX_TOOL_RESULT_CONTENT_CHARS = 100_000;
+
+type AutoCollectedSandboxFile = {
+  path: string;
+  content: Buffer;
+};
+
+function extractFinalAnswerTextForFileHeuristic(
+  ctx: Pick<GenerationContext, "assistantContent" | "contentParts">,
+): string {
+  const textFromParts = ctx.contentParts.flatMap((part) => {
+    if (!part || typeof part !== "object") {
+      return [];
+    }
+    const record = part as { type?: unknown; text?: unknown; content?: unknown };
+    if (record.type === "text" && typeof record.text === "string") {
+      return [record.text];
+    }
+    if (record.type === "system" && typeof record.content === "string") {
+      return [record.content];
+    }
+    return [];
+  });
+
+  const segments = [ctx.assistantContent, ...textFromParts].filter(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
+  );
+  return segments.join("\n");
+}
+
+function filterAutoCollectedFilesMentionedInAnswer(
+  files: AutoCollectedSandboxFile[],
+  finalAnswerText: string,
+): AutoCollectedSandboxFile[] {
+  // This heuristic is only for auto-collected files discovered after generation.
+  // Files explicitly exposed via the send_file tool bypass this path and are always kept.
+  const haystack = finalAnswerText.toLowerCase();
+  if (!haystack.trim()) {
+    return [];
+  }
+
+  return files.filter((file) => {
+    const filename = path.basename(file.path).toLowerCase();
+    const fullPath = file.path.toLowerCase();
+    return haystack.includes(filename) || haystack.includes(fullPath);
+  });
+}
 
 const MEMORY_FLUSH_SYSTEM_PROMPT = [
   "You are performing a silent memory flush before compaction.",
@@ -969,10 +1014,11 @@ class GenerationManager {
     autoApprove?: boolean;
     allowedIntegrations?: IntegrationType[];
     deviceId?: string;
-    attachments?: { name: string; mimeType: string; dataUrl: string }[];
+    fileAttachments?: { name: string; mimeType: string; dataUrl: string }[];
     selectedPlatformSkillSlugs?: string[];
   }): Promise<{ generationId: string; conversationId: string }> {
     const { content, userId, model, autoApprove } = params;
+    const fileAttachments = params.fileAttachments;
     const requestedModel = model?.trim();
     if (requestedModel) {
       parseModelReference(requestedModel);
@@ -992,7 +1038,7 @@ class GenerationManager {
         hasConversationId: Boolean(params.conversationId),
         hasDeviceId: Boolean(params.deviceId),
         hasAllowedIntegrations: params.allowedIntegrations !== undefined,
-        attachmentsCount: params.attachments?.length ?? 0,
+        fileAttachmentsCount: fileAttachments?.length ?? 0,
         selectedPlatformSkillCount: params.selectedPlatformSkillSlugs?.length ?? 0,
       },
       logContext,
@@ -1101,13 +1147,13 @@ class GenerationManager {
       { ...logContext, conversationId: conv.id },
     );
 
-    // Upload attachments to S3 and save metadata
-    if (params.attachments && params.attachments.length > 0) {
+    // Upload user file attachments to S3 and save metadata
+    if (fileAttachments && fileAttachments.length > 0) {
       try {
         const { uploadToS3, ensureBucket } = await import("@/server/storage/s3-client");
         await ensureBucket();
         await Promise.all(
-          params.attachments.map(async (a) => {
+          fileAttachments.map(async (a) => {
             const base64Data = a.dataUrl.split(",")[1] || "";
             const buffer = Buffer.from(base64Data, "base64");
             const sanitizedFilename = a.name.replace(/[^a-zA-Z0-9.-]/g, "_");
@@ -1128,7 +1174,7 @@ class GenerationManager {
           {
             phase: "attachments_uploaded",
             elapsedMs: Date.now() - startGenerationStartedAt,
-            attachmentsCount: params.attachments.length,
+            fileAttachmentsCount: fileAttachments.length,
           },
           { ...logContext, conversationId: conv.id },
         );
@@ -1194,8 +1240,9 @@ class GenerationManager {
     // Determine backend type:
     // - Device-attached runs use direct mode.
     // - Daytona-only cloud setup (no E2B) uses direct mode as well.
+    const preferredCloudSandbox = getPreferredCloudSandboxProvider();
     const backendType: BackendType =
-      params.deviceId || (!env.E2B_API_KEY && isDaytonaConfigured()) ? "direct" : "opencode";
+      params.deviceId || preferredCloudSandbox === "daytona" ? "direct" : "opencode";
     if (this.shouldDeferGenerationToWorker() && backendType === "direct") {
       throw new Error(
         "Direct device generations require a dedicated stateful runtime and are not supported on Vercel functions.",
@@ -1248,7 +1295,7 @@ class GenerationManager {
       deviceId: params.deviceId,
       allowedIntegrations: params.allowedIntegrations,
       autoApprove: conv.autoApprove,
-      attachments: params.attachments,
+      attachments: fileAttachments,
       selectedPlatformSkillSlugs,
       userStagedFilePaths: new Set(),
       uploadedSandboxFileIds: new Set(),
@@ -3292,11 +3339,17 @@ class GenerationManager {
             ctx.generationMarkerTime,
             Array.from(new Set([...(ctx.sentFilePaths ?? []), ...(ctx.userStagedFilePaths ?? [])])),
           );
+          const filesToUpload = filterAutoCollectedFilesMentionedInAnswer(
+            newFiles,
+            extractFinalAnswerTextForFileHeuristic(ctx),
+          );
 
-          console.log(`[GenerationManager] Found ${newFiles.length} new files in E2B sandbox`);
+          console.log(
+            `[GenerationManager] Found ${newFiles.length} new files in E2B sandbox; exposing ${filesToUpload.length} based on final-answer mentions`,
+          );
 
           await Promise.all(
-            newFiles.map(async (file) => {
+            filesToUpload.map(async (file) => {
               try {
                 const fileRecord = await uploadSandboxFile({
                   path: file.path,
@@ -5636,9 +5689,17 @@ class GenerationManager {
               ctx.generationMarkerTime,
               Array.from(new Set([...excludePaths, ...stagedPaths])),
             );
+            const filesToUpload = filterAutoCollectedFilesMentionedInAnswer(
+              newFiles,
+              extractFinalAnswerTextForFileHeuristic(ctx),
+            );
+
+            console.log(
+              `[GenerationManager] Found ${newFiles.length} new sandbox files; exposing ${filesToUpload.length} based on final-answer mentions`,
+            );
 
             await Promise.all(
-              newFiles.map(async (file) => {
+              filesToUpload.map(async (file) => {
                 try {
                   const fileRecord = await uploadSandboxFile({
                     path: file.path,

@@ -179,6 +179,7 @@ import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integr
 import { syncMemoryToSandbox, buildMemorySystemPrompt } from "@/server/services/memory-service";
 import {
   uploadSandboxFile,
+  collectNewSandboxFiles,
   collectNewE2BFiles,
   readSandboxFileAsBuffer,
 } from "@/server/services/sandbox-file-service";
@@ -1223,6 +1224,68 @@ describe("generationManager transitions", () => {
     expect(mgr.activeGenerations.has(ctx.id)).toBe(false);
   });
 
+  it("auto-collects only sandbox files mentioned in final answer text", async () => {
+    insertReturningMock.mockResolvedValueOnce([{ id: "msg-assistant-files-1" }]);
+    vi.mocked(collectNewSandboxFiles).mockResolvedValue([
+      { path: "/app/QUESTIONNAIRE_RCP_rempli.pdf", content: Buffer.from("pdf") },
+      { path: "/app/rcp_payload.json", content: Buffer.from("{}") },
+    ]);
+    vi.mocked(uploadSandboxFile).mockResolvedValue({
+      id: "sandbox-file-mentioned",
+      filename: "QUESTIONNAIRE_RCP_rempli.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 3,
+      path: "/app/QUESTIONNAIRE_RCP_rempli.pdf",
+      storageKey: "k/QUESTIONNAIRE_RCP_rempli.pdf",
+    });
+
+    const ctx = createCtx({
+      assistantContent:
+        "Questionnaire rempli avec les informations personnelles fournies et télécharge ici : `QUESTIONNAIRE_RCP_rempli.pdf`.",
+      contentParts: [
+        {
+          type: "text",
+          text: "Questionnaire rempli avec les informations personnelles fournies et télécharge ici : `QUESTIONNAIRE_RCP_rempli.pdf`.",
+        },
+      ],
+      generationMarkerTime: Date.now() - 1_000,
+      sandbox: {} as unknown,
+      uploadedSandboxFileIds: new Set(),
+    });
+
+    const mgr = asTestManager();
+    await mgr.finishGeneration(ctx, "completed");
+
+    expect(vi.mocked(uploadSandboxFile)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(uploadSandboxFile)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "/app/QUESTIONNAIRE_RCP_rempli.pdf",
+      }),
+    );
+    expect(ctx.uploadedSandboxFileIds?.has("sandbox-file-mentioned")).toBe(true);
+  });
+
+  it("does not auto-collect sandbox files when none are mentioned in final answer text", async () => {
+    insertReturningMock.mockResolvedValueOnce([{ id: "msg-assistant-files-2" }]);
+    vi.mocked(collectNewSandboxFiles).mockResolvedValue([
+      { path: "/app/questionnaire-rcp-pdf.template.json", content: Buffer.from("{}") },
+    ]);
+
+    const ctx = createCtx({
+      assistantContent: "Traitement terminé.",
+      contentParts: [{ type: "text", text: "Traitement terminé." }],
+      generationMarkerTime: Date.now() - 1_000,
+      sandbox: {} as unknown,
+      uploadedSandboxFileIds: new Set(),
+    });
+
+    const mgr = asTestManager();
+    await mgr.finishGeneration(ctx, "completed");
+
+    expect(vi.mocked(uploadSandboxFile)).not.toHaveBeenCalled();
+    expect(ctx.uploadedSandboxFileIds?.size).toBe(0);
+  });
+
   it("finishes cancelled generation with interruption marker and emits cancelled", async () => {
     insertReturningMock.mockResolvedValueOnce([{ id: "msg-assistant-2" }]);
 
@@ -1545,6 +1608,7 @@ describe("generationManager transitions", () => {
       model: "anthropic/claude-sonnet-4-6",
       allowedIntegrations: ["github"],
       userMessageContent: "Process these files",
+      assistantContent: "The generated file is report.txt.",
       attachments: [
         {
           name: "image.png",
@@ -1677,7 +1741,7 @@ describe("generationManager transitions", () => {
     );
   });
 
-  it("runs direct generation through multi-tool paths and completes", async () => {
+  it("runs direct generation through multi-tool paths and keeps send_file artifacts even when not mentioned", async () => {
     vi.mocked(getEnabledIntegrationTypes).mockResolvedValue(["github"]);
     vi.mocked(resolvePreferredCommunitySkillsForUser).mockResolvedValue([
       {
@@ -1838,6 +1902,7 @@ describe("generationManager transitions", () => {
     await mgr.runDirectGeneration(ctx);
 
     expect(finishSpy).toHaveBeenCalledWith(ctx, "completed");
+    expect(ctx.assistantContent).not.toContain("report.txt");
     expect(vi.mocked(uploadSandboxFile)).toHaveBeenCalled();
     expect(ctx.uploadedSandboxFileIds?.has("uploaded-send-file-1")).toBe(true);
     expect(ctx.assistantContent).toContain("Hello done");
