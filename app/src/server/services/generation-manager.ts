@@ -7,8 +7,7 @@ import type {
   ToolPart,
 } from "@opencode-ai/sdk/v2/client";
 import type { Sandbox } from "e2b";
-import { eq, asc, inArray } from "drizzle-orm";
-import { and } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt } from "drizzle-orm";
 import IORedis from "ioredis";
 import path from "path";
 import type { LLMBackend, ChatMessage, ContentBlock } from "@/server/ai/llm-backend";
@@ -254,7 +253,13 @@ interface GenerationContext {
   // Track assistant message IDs to filter out user message parts
   assistantMessageIds: Set<string>;
   messageRoles: Map<string, string>;
-  pendingMessageParts: Map<string, OpencodePart[]>;
+  pendingMessageParts: Map<
+    string,
+    {
+      firstQueuedAtMs: number;
+      parts: OpencodePart[];
+    }
+  >;
   // BYOC fields
   backendType: BackendType;
   deviceId?: string;
@@ -386,6 +391,13 @@ const COMPACTION_SUMMARY_MAX_TOKENS = 1800;
 const MEMORY_FLUSH_MAX_ITERATIONS = 4;
 const SESSION_RESET_COMMANDS = new Set(["/new"]);
 type GenerationTimeoutKind = "approval" | "auth";
+const STALE_REAPER_RUNNING_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const STALE_REAPER_AWAITING_APPROVAL_MAX_AGE_MS = 30 * 60 * 1000;
+const STALE_REAPER_AWAITING_AUTH_MAX_AGE_MS = 60 * 60 * 1000;
+const STALE_REAPER_PAUSED_MAX_AGE_MS = 60 * 60 * 1000;
+const PENDING_MESSAGE_PARTS_MAX_PER_MESSAGE = 100;
+const PENDING_MESSAGE_PARTS_TTL_MS = 5 * 60 * 1000;
+const MAX_TOOL_RESULT_CONTENT_CHARS = 100_000;
 
 const MEMORY_FLUSH_SYSTEM_PROMPT = [
   "You are performing a silent memory flush before compaction.",
@@ -587,6 +599,29 @@ function formatErrorMessage(error: unknown): string {
   return String(error);
 }
 
+function truncateString(value: string, maxChars: number): string {
+  if (value.length <= maxChars) {
+    return value;
+  }
+  return `${value.slice(0, maxChars)}\n... (output truncated)`;
+}
+
+function limitToolResultContent(value: unknown): unknown {
+  if (typeof value === "string") {
+    return truncateString(value, MAX_TOOL_RESULT_CONTENT_CHARS);
+  }
+
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized.length <= MAX_TOOL_RESULT_CONTENT_CHARS) {
+      return value;
+    }
+    return truncateString(serialized, MAX_TOOL_RESULT_CONTENT_CHARS);
+  } catch {
+    return truncateString(String(value), MAX_TOOL_RESULT_CONTENT_CHARS);
+  }
+}
+
 class GenerationManager {
   private activeGenerations = new Map<string, GenerationContext>();
   private activeSubscriptionCounts = new Map<string, number>();
@@ -620,6 +655,39 @@ class GenerationManager {
       ...this.streamCounters,
       active,
     };
+  }
+
+  private evictActiveGenerationContext(generationId: string): void {
+    const ctx = this.activeGenerations.get(generationId);
+    if (!ctx) {
+      return;
+    }
+
+    if (ctx.saveDebounceId) {
+      clearTimeout(ctx.saveDebounceId);
+    }
+    if (ctx.approvalTimeoutId) {
+      clearTimeout(ctx.approvalTimeoutId);
+    }
+    if (ctx.authTimeoutId) {
+      clearTimeout(ctx.authTimeoutId);
+    }
+
+    ctx.pendingMessageParts.clear();
+    ctx.subscribers.clear();
+
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
+    this.activeGenerations.delete(generationId);
+  }
+
+  private pruneStalePendingMessageParts(ctx: GenerationContext): void {
+    const now = Date.now();
+    for (const [messageID, queued] of ctx.pendingMessageParts.entries()) {
+      if (now - queued.firstQueuedAtMs > PENDING_MESSAGE_PARTS_TTL_MS) {
+        // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
+        ctx.pendingMessageParts.delete(messageID);
+      }
+    }
   }
 
   private getLockRedis(): IORedis {
@@ -2056,6 +2124,7 @@ class GenerationManager {
       if (ctx && ctx.status === "awaiting_approval") {
         ctx.status = "paused";
         this.broadcast(ctx, { type: "status_change", status: "paused" });
+        this.evictActiveGenerationContext(generationId);
       }
       return;
     }
@@ -2107,6 +2176,7 @@ class GenerationManager {
         generationId: ctx.id,
         conversationId: ctx.conversationId,
       });
+      this.evictActiveGenerationContext(generationId);
     }
   }
 
@@ -2195,6 +2265,147 @@ class GenerationManager {
         },
       );
     }
+  }
+
+  async reapStaleGenerations(): Promise<{
+    scanned: number;
+    stale: number;
+    finalizedRunningAsError: number;
+    finalizedOtherAsCancelled: number;
+  }> {
+    const candidates = await db.query.generation.findMany({
+      where: and(
+        isNull(generation.completedAt),
+        inArray(generation.status, ["running", "awaiting_approval", "awaiting_auth", "paused"]),
+        lt(
+          generation.startedAt,
+          new Date(
+            Date.now() -
+              Math.min(
+                STALE_REAPER_RUNNING_MAX_AGE_MS,
+                STALE_REAPER_AWAITING_APPROVAL_MAX_AGE_MS,
+                STALE_REAPER_AWAITING_AUTH_MAX_AGE_MS,
+                STALE_REAPER_PAUSED_MAX_AGE_MS,
+              ),
+          ),
+        ),
+      ),
+      columns: {
+        id: true,
+        status: true,
+        startedAt: true,
+      },
+    });
+
+    const nowMs = Date.now();
+    const staleRows = candidates.filter((row) => {
+      const ageMs = nowMs - row.startedAt.getTime();
+      switch (row.status) {
+        case "running":
+          return ageMs > STALE_REAPER_RUNNING_MAX_AGE_MS;
+        case "awaiting_approval":
+          return ageMs > STALE_REAPER_AWAITING_APPROVAL_MAX_AGE_MS;
+        case "awaiting_auth":
+          return ageMs > STALE_REAPER_AWAITING_AUTH_MAX_AGE_MS;
+        case "paused":
+          return ageMs > STALE_REAPER_PAUSED_MAX_AGE_MS;
+        default:
+          return false;
+      }
+    });
+
+    if (staleRows.length === 0) {
+      return {
+        scanned: candidates.length,
+        stale: 0,
+        finalizedRunningAsError: 0,
+        finalizedOtherAsCancelled: 0,
+      };
+    }
+
+    const staleRunningIds = staleRows
+      .filter((row) => row.status === "running")
+      .map((row) => row.id);
+    const staleCancelledIds = staleRows
+      .filter((row) => row.status !== "running")
+      .map((row) => row.id);
+
+    const completedAt = new Date();
+    const staleRunningMessage =
+      "Generation was marked as stale by the worker reaper after exceeding max running age.";
+
+    if (staleRunningIds.length > 0) {
+      await db
+        .update(generation)
+        .set({
+          status: "error",
+          errorMessage: staleRunningMessage,
+          pendingApproval: null,
+          pendingAuth: null,
+          isPaused: false,
+          cancelRequestedAt: null,
+          completedAt,
+        })
+        .where(inArray(generation.id, staleRunningIds));
+    }
+
+    if (staleCancelledIds.length > 0) {
+      await db
+        .update(generation)
+        .set({
+          status: "cancelled",
+          pendingApproval: null,
+          pendingAuth: null,
+          isPaused: false,
+          cancelRequestedAt: null,
+          completedAt,
+        })
+        .where(inArray(generation.id, staleCancelledIds));
+    }
+
+    if (staleRunningIds.length > 0) {
+      await db
+        .update(workflowRun)
+        .set({
+          status: "error",
+          finishedAt: completedAt,
+          errorMessage: staleRunningMessage,
+        })
+        .where(inArray(workflowRun.generationId, staleRunningIds));
+      await db
+        .update(conversation)
+        .set({ generationStatus: "error" })
+        .where(inArray(conversation.currentGenerationId, staleRunningIds));
+    }
+
+    if (staleCancelledIds.length > 0) {
+      await db
+        .update(workflowRun)
+        .set({
+          status: "cancelled",
+          finishedAt: completedAt,
+        })
+        .where(inArray(workflowRun.generationId, staleCancelledIds));
+      await db
+        .update(conversation)
+        .set({ generationStatus: "idle" })
+        .where(inArray(conversation.currentGenerationId, staleCancelledIds));
+    }
+
+    for (const row of staleRows) {
+      const ctx = this.activeGenerations.get(row.id);
+      if (ctx) {
+        ctx.abortController.abort();
+      }
+      this.evictActiveGenerationContext(row.id);
+    }
+
+    return {
+      scanned: candidates.length,
+      stale: staleRows.length,
+      finalizedRunningAsError: staleRunningIds.length,
+      finalizedOtherAsCancelled: staleCancelledIds.length,
+    };
   }
 
   private async refreshCancellationSignal(
@@ -4367,11 +4578,10 @@ class GenerationManager {
     generationId: string,
     toolUseId: string,
   ): Promise<{ decision: "allow" | "deny"; questionAnswers?: string[][] } | null> {
-    const poll = async (): Promise<{
-      decision: "allow" | "deny";
-      questionAnswers?: string[][];
-    } | null> => {
+    while (true) {
+      // eslint-disable-next-line no-await-in-loop -- polling by design
       await new Promise((resolve) => setTimeout(resolve, 400));
+      // eslint-disable-next-line no-await-in-loop -- polling by design
       const latest = await db.query.generation.findFirst({
         where: eq(generation.id, generationId),
       });
@@ -4387,7 +4597,7 @@ class GenerationManager {
         if (latest.status === "cancelled" || latest.status === "error") {
           return { decision: "deny" };
         }
-        return poll();
+        continue;
       }
 
       const expiresAtMs = resolveExpiryMs(
@@ -4409,11 +4619,7 @@ class GenerationManager {
       if (latest.cancelRequestedAt || latest.status === "cancelled" || latest.status === "error") {
         return { decision: "deny" };
       }
-
-      return poll();
-    };
-
-    return poll();
+    }
   }
 
   private async applyOpenCodeApprovalDecision(
@@ -4524,8 +4730,8 @@ class GenerationManager {
 
         if (messageId && role === "assistant") {
           ctx.assistantMessageIds.add(messageId);
-          const pendingParts = ctx.pendingMessageParts.get(messageId);
-          if (pendingParts && pendingParts.length > 0) {
+          const pendingQueue = ctx.pendingMessageParts.get(messageId);
+          if (pendingQueue && pendingQueue.parts.length > 0) {
             // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
             ctx.pendingMessageParts.delete(messageId);
             let replayTextPart = currentTextPart;
@@ -4539,7 +4745,7 @@ class GenerationManager {
               setCurrentTextPart(part, partId);
             };
             await Promise.all(
-              pendingParts.map(async (pendingPart) => {
+              pendingQueue.parts.map(async (pendingPart) => {
                 await this.processOpencodeMessagePart(
                   ctx,
                   pendingPart,
@@ -4557,6 +4763,7 @@ class GenerationManager {
       case "message.part.updated": {
         const part = event.properties.part;
         const messageID = part.messageID;
+        this.pruneStalePendingMessageParts(ctx);
 
         if (messageID) {
           const role = ctx.messageRoles.get(messageID);
@@ -4567,9 +4774,19 @@ class GenerationManager {
             // Preserve live streaming: process likely assistant parts immediately.
             // Queue only parts that strongly look like user-echo updates.
             if (!this.shouldProcessUnknownMessagePart(ctx, part)) {
-              const queued = ctx.pendingMessageParts.get(messageID) ?? [];
-              queued.push(part);
-              ctx.pendingMessageParts.set(messageID, queued);
+              const now = Date.now();
+              const existing = ctx.pendingMessageParts.get(messageID);
+              const resetQueue =
+                !existing || now - existing.firstQueuedAtMs > PENDING_MESSAGE_PARTS_TTL_MS;
+              const parts = resetQueue ? [] : [...existing.parts];
+              if (parts.length >= PENDING_MESSAGE_PARTS_MAX_PER_MESSAGE) {
+                parts.shift();
+              }
+              parts.push(part);
+              ctx.pendingMessageParts.set(messageID, {
+                firstQueuedAtMs: resetQueue ? now : existing.firstQueuedAtMs,
+                parts,
+              });
               return;
             }
           }
@@ -4751,7 +4968,7 @@ class GenerationManager {
           if (!existingToolUse) {
             return;
           }
-          const result = part.state.output;
+          const result = limitToolResultContent(part.state.output);
           this.broadcast(ctx, {
             type: "tool_result",
             toolName: existingToolUse.name,
@@ -4770,7 +4987,7 @@ class GenerationManager {
           if (!existingToolUse) {
             return;
           }
-          const result = { error: part.state.error };
+          const result = limitToolResultContent({ error: part.state.error });
           this.broadcast(ctx, {
             type: "tool_result",
             toolName: existingToolUse.name,
@@ -4964,33 +5181,22 @@ class GenerationManager {
     items: readonly T[],
     handler: (item: T, index: number) => Promise<void>,
   ): Promise<void> {
-    const run = async (index: number): Promise<void> => {
-      if (index >= items.length) {
-        return;
-      }
-      await handler(items[index], index);
-      await run(index + 1);
-    };
-    await run(0);
+    for (const [index, item] of items.entries()) {
+      // eslint-disable-next-line no-await-in-loop -- sequential ordering is required
+      await handler(item, index);
+    }
   }
 
   private async consumeAsyncStream<T>(
     stream: AsyncIterable<T>,
     onEvent: (event: T) => Promise<boolean | void>,
   ): Promise<void> {
-    const iterator = stream[Symbol.asyncIterator]();
-    const consumeNext = async (): Promise<void> => {
-      const { value, done } = await iterator.next();
-      if (done) {
-        return;
-      }
-      const shouldStop = await onEvent(value);
+    for await (const event of stream) {
+      const shouldStop = await onEvent(event);
       if (shouldStop) {
-        return;
+        break;
       }
-      await consumeNext();
-    };
-    await consumeNext();
+    }
   }
 
   private async handleApprovalTimeout(ctx: GenerationContext): Promise<void> {
@@ -5021,6 +5227,7 @@ class GenerationManager {
     // For now, we'll just keep the sandbox alive but paused in our state
 
     this.broadcast(ctx, { type: "status_change", status: "paused" });
+    this.evictActiveGenerationContext(ctx.id);
   }
 
   private async handleAuthTimeout(ctx: GenerationContext): Promise<void> {
@@ -5189,16 +5396,20 @@ class GenerationManager {
       .where(eq(conversation.id, genRecord.conversationId));
     await this.enqueueGenerationTimeout(generationId, "approval", expiresAt);
 
-    const pollDecision = async (): Promise<"allow" | "deny" | null> => {
+    let resolved: "allow" | "deny" | null = null;
+    while (resolved === null) {
       if (Date.now() >= Date.parse(expiresAt)) {
-        return null;
+        break;
       }
+      // eslint-disable-next-line no-await-in-loop -- polling by design
       await new Promise((resolve) => setTimeout(resolve, 400));
+      // eslint-disable-next-line no-await-in-loop -- polling by design
       const latest = await db.query.generation.findFirst({
         where: eq(generation.id, generationId),
       });
       if (!latest) {
-        return "deny";
+        resolved = "deny";
+        break;
       }
 
       const latestApproval = latest.pendingApproval as PendingApproval | null;
@@ -5208,21 +5419,24 @@ class GenerationManager {
             console.warn(
               `[GenerationManager] approval_reconciled generation=${generationId} toolUseId=${toolUseId} status=${latest.status}`,
             );
-            return "allow";
+            resolved = "allow";
+            break;
           }
           if (
             latest.status === "cancelled" ||
             latest.status === "error" ||
             latest.status === "paused"
           ) {
-            return "deny";
+            resolved = "deny";
+            break;
           }
         }
-        return pollDecision();
+        continue;
       }
 
       if (latestApproval.decision) {
         const resolvedDecision = latestApproval.decision;
+        // eslint-disable-next-line no-await-in-loop -- decision must be persisted before returning
         await db
           .update(generation)
           .set({
@@ -5230,21 +5444,21 @@ class GenerationManager {
             pendingApproval: null,
           })
           .where(eq(generation.id, generationId));
+        // eslint-disable-next-line no-await-in-loop -- decision must be persisted before returning
         await db
           .update(conversation)
           .set({ generationStatus: "generating" })
           .where(eq(conversation.id, genRecord.conversationId));
-        return resolvedDecision;
+        resolved = resolvedDecision;
+        break;
       }
 
       if (latest.cancelRequestedAt || latest.status === "cancelled" || latest.status === "error") {
-        return "deny";
+        resolved = "deny";
+        break;
       }
+    }
 
-      return pollDecision();
-    };
-
-    const resolved = await pollDecision();
     if (resolved) {
       return resolved;
     }
@@ -5307,26 +5521,31 @@ class GenerationManager {
     }
     await this.enqueueGenerationTimeout(generationId, "auth", expiresAt);
 
-    const pollResult = async (): Promise<{ success: boolean; userId?: string } | null> => {
+    let resolved: { success: boolean; userId?: string } | null = null;
+    while (resolved === null) {
       if (Date.now() >= Date.parse(expiresAt)) {
-        return null;
+        break;
       }
 
+      // eslint-disable-next-line no-await-in-loop -- polling by design
       await new Promise((resolve) => setTimeout(resolve, 400));
 
+      // eslint-disable-next-line no-await-in-loop -- polling by design
       const latest = await db.query.generation.findFirst({
         where: eq(generation.id, generationId),
         with: { conversation: true },
       });
       if (!latest) {
-        return { success: false };
+        resolved = { success: false };
+        break;
       }
 
       const latestPendingAuth = latest.pendingAuth as PendingAuth | null;
       if (latestPendingAuth?.connectedIntegrations.includes(request.integration)) {
-        return latest.conversation.userId
+        resolved = latest.conversation.userId
           ? { success: true, userId: latest.conversation.userId }
           : { success: false };
+        break;
       }
 
       if (
@@ -5337,23 +5556,23 @@ class GenerationManager {
           console.warn(
             `[GenerationManager] auth_reconciled generation=${generationId} integration=${request.integration} status=${latest.status}`,
           );
-          return latest.conversation.userId
+          resolved = latest.conversation.userId
             ? { success: true, userId: latest.conversation.userId }
             : { success: false };
+          break;
         }
         if (latest.status === "cancelled" || latest.status === "error") {
-          return { success: false };
+          resolved = { success: false };
+          break;
         }
       }
 
       if (latest.cancelRequestedAt || latest.status === "cancelled" || latest.status === "error") {
-        return { success: false };
+        resolved = { success: false };
+        break;
       }
+    }
 
-      return pollResult();
-    };
-
-    const resolved = await pollResult();
     if (resolved) {
       return resolved;
     }
@@ -5584,8 +5803,7 @@ class GenerationManager {
       ctx.status = status;
 
       // Cleanup
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- Map.delete, not a Drizzle query
-      this.activeGenerations.delete(ctx.id);
+      this.evictActiveGenerationContext(ctx.id);
     } finally {
       ctx.isFinalizing = false;
     }

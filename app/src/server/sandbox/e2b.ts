@@ -106,7 +106,7 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
   const start = Date.now();
   let attempts = 0;
   let lastError: string | null = null;
-  const pollUntilReady = async (): Promise<void> => {
+  while (true) {
     if (Date.now() - start >= maxWait) {
       throw new Error(
         `OpenCode server in sandbox failed to start (url=${url}, attempts=${attempts}, waitedMs=${Date.now() - start}, lastError=${lastError || "unknown"})`,
@@ -115,6 +115,7 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
 
     attempts += 1;
     try {
+      // eslint-disable-next-line no-await-in-loop -- readiness polling is intentional
       const res = await fetch(`${url}/doc`, { method: "GET" });
       if (res.ok) {
         return;
@@ -124,11 +125,9 @@ async function waitForServer(url: string, maxWait = 30000): Promise<void> {
       // Server not ready yet
       lastError = "network_error";
     }
+    // eslint-disable-next-line no-await-in-loop -- readiness polling is intentional
     await new Promise((r) => setTimeout(r, 500));
-    return pollUntilReady();
-  };
-
-  return pollUntilReady();
+  }
 }
 
 /**

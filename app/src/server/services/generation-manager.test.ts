@@ -6,6 +6,7 @@ const {
   insertReturningMock,
   insertValuesMock,
   generationFindFirstMock,
+  generationFindManyMock,
   messageFindFirstMock,
   conversationFindFirstMock,
   workflowRunFindFirstMock,
@@ -21,6 +22,7 @@ const {
   const insertValuesMock = vi.fn(() => ({ returning: insertReturningMock }));
   const insertMock = vi.fn(() => ({ values: insertValuesMock }));
   const generationFindFirstMock = vi.fn();
+  const generationFindManyMock = vi.fn();
   const messageFindFirstMock = vi.fn();
   const conversationFindFirstMock = vi.fn();
   const workflowRunFindFirstMock = vi.fn();
@@ -29,7 +31,7 @@ const {
 
   const dbMock = {
     query: {
-      generation: { findFirst: generationFindFirstMock },
+      generation: { findFirst: generationFindFirstMock, findMany: generationFindManyMock },
       message: { findFirst: messageFindFirstMock },
       conversation: { findFirst: conversationFindFirstMock },
       workflowRun: { findFirst: workflowRunFindFirstMock },
@@ -47,6 +49,7 @@ const {
     insertReturningMock,
     insertValuesMock,
     generationFindFirstMock,
+    generationFindManyMock,
     messageFindFirstMock,
     conversationFindFirstMock,
     workflowRunFindFirstMock,
@@ -295,6 +298,7 @@ describe("generationManager transitions", () => {
     }));
     insertReturningMock.mockResolvedValue([]);
     generationFindFirstMock.mockResolvedValue(null);
+    generationFindManyMock.mockResolvedValue([]);
     messageFindFirstMock.mockResolvedValue(null);
     conversationFindFirstMock.mockResolvedValue(null);
     workflowRunFindFirstMock.mockResolvedValue(null);
@@ -1848,5 +1852,157 @@ describe("generationManager transitions", () => {
         }),
       ]),
     );
+  });
+
+  it("reaps stale generations and evicts matching active contexts", async () => {
+    const now = Date.now();
+    generationFindManyMock.mockResolvedValue([
+      {
+        id: "gen-stale-running",
+        status: "running",
+        startedAt: new Date(now - 7 * 60 * 60 * 1000),
+      },
+      {
+        id: "gen-stale-paused",
+        status: "paused",
+        startedAt: new Date(now - 2 * 60 * 60 * 1000),
+      },
+      {
+        id: "gen-fresh-running",
+        status: "running",
+        startedAt: new Date(now - 30 * 60 * 1000),
+      },
+    ]);
+
+    const mgr = asTestManager();
+    mgr.activeGenerations.set("gen-stale-running", createCtx({ id: "gen-stale-running" }));
+    mgr.activeGenerations.set("gen-stale-paused", createCtx({ id: "gen-stale-paused" }));
+    mgr.activeGenerations.set("gen-fresh-running", createCtx({ id: "gen-fresh-running" }));
+
+    const summary = await generationManager.reapStaleGenerations();
+
+    expect(summary).toEqual({
+      scanned: 3,
+      stale: 2,
+      finalizedRunningAsError: 1,
+      finalizedOtherAsCancelled: 1,
+    });
+
+    expect(updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "error",
+        completedAt: expect.any(Date),
+      }),
+    );
+    expect(updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "cancelled",
+        completedAt: expect.any(Date),
+      }),
+    );
+
+    expect(mgr.activeGenerations.has("gen-stale-running")).toBe(false);
+    expect(mgr.activeGenerations.has("gen-stale-paused")).toBe(false);
+    expect(mgr.activeGenerations.has("gen-fresh-running")).toBe(true);
+  });
+
+  it("bounds pending unknown message parts and resets queue after TTL", async () => {
+    const mgr = asTestManager();
+    const ctx = createCtx({
+      userMessageContent: "hello",
+    });
+
+    const processEvent = async (id: string, text = "hello") => {
+      await mgr.processOpencodeEvent(
+        ctx,
+        {
+          type: "message.part.updated",
+          properties: {
+            part: {
+              id,
+              type: "text",
+              text,
+              messageID: "msg-unknown",
+            },
+          },
+        } as unknown,
+        null,
+        null,
+        () => {},
+      );
+    };
+
+    for (let i = 0; i < 120; i += 1) {
+      // eslint-disable-next-line no-await-in-loop -- sequential enqueueing is intentional in this test
+      await processEvent(`part-${i}`);
+    }
+
+    const queuedBeforeTtl = ctx.pendingMessageParts.get("msg-unknown") as
+      | { firstQueuedAtMs: number; parts: unknown[] }
+      | undefined;
+    expect(queuedBeforeTtl).toBeDefined();
+    expect(queuedBeforeTtl?.parts).toHaveLength(100);
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+    await processEvent("part-after-ttl");
+
+    const queuedAfterTtl = ctx.pendingMessageParts.get("msg-unknown") as
+      | { firstQueuedAtMs: number; parts: unknown[] }
+      | undefined;
+    expect(queuedAfterTtl).toBeDefined();
+    expect(queuedAfterTtl?.parts).toHaveLength(1);
+  });
+
+  it("truncates oversized OpenCode tool results before storing content parts", async () => {
+    const mgr = asTestManager();
+    const ctx = createCtx({
+      contentParts: [
+        {
+          type: "tool_use",
+          id: "tool-1",
+          name: "bash",
+          input: { command: "echo big" },
+        },
+      ],
+      messageRoles: new Map([["assistant-msg", "assistant"]]),
+    });
+
+    const hugeOutput = "x".repeat(120_000);
+
+    await mgr.processOpencodeEvent(
+      ctx,
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "tool-part-1",
+            type: "tool",
+            tool: "bash",
+            callID: "tool-1",
+            messageID: "assistant-msg",
+            state: {
+              status: "completed",
+              output: hugeOutput,
+            },
+          },
+        },
+      } as unknown,
+      null,
+      null,
+      () => {},
+    );
+
+    const toolResult = ctx.contentParts.find(
+      (part) =>
+        !!part &&
+        typeof part === "object" &&
+        (part as { type?: unknown }).type === "tool_result" &&
+        (part as { tool_use_id?: unknown }).tool_use_id === "tool-1",
+    ) as { content?: unknown } | undefined;
+
+    expect(toolResult).toBeDefined();
+    expect(typeof toolResult?.content).toBe("string");
+    expect(String(toolResult?.content)).toContain("... (output truncated)");
+    expect(String(toolResult?.content).length).toBeLessThanOrEqual(100_024);
   });
 });
