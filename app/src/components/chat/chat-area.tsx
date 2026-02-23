@@ -31,6 +31,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useVoiceRecording, blobToBase64 } from "@/hooks/use-voice-recording";
+import { isModelAccessibleForNewChat } from "@/lib/chat-model-access";
 import {
   resolveDefaultChatModel,
   shouldMigrateLegacyDefaultModel,
@@ -421,19 +422,29 @@ export function ChatArea({ conversationId }: Props) {
       return;
     }
 
-    if (
-      !shouldMigrateLegacyDefaultModel({
-        currentModel: selectedModel,
-        isOpenAIConnected,
-      })
-    ) {
-      return;
-    }
+    const shouldMigrateLegacyModel = shouldMigrateLegacyDefaultModel({
+      currentModel: selectedModel,
+      isOpenAIConnected,
+    });
+    const isAccessible = isModelAccessibleForNewChat({
+      model: selectedModel,
+      isOpenAIConnected,
+      availableOpencodeFreeModelIDs: (opencodeFreeModelsData?.models ?? []).map(
+        (model) => model.id,
+      ),
+    });
 
-    if (resolvedDefaultModel !== selectedModel) {
+    if ((shouldMigrateLegacyModel || !isAccessible) && resolvedDefaultModel !== selectedModel) {
       setSelectedModel(resolvedDefaultModel);
     }
-  }, [conversationId, isOpenAIConnected, resolvedDefaultModel, selectedModel, setSelectedModel]);
+  }, [
+    conversationId,
+    isOpenAIConnected,
+    opencodeFreeModelsData,
+    resolvedDefaultModel,
+    selectedModel,
+    setSelectedModel,
+  ]);
 
   useEffect(() => {
     const shouldRunStreamTimer = isStreaming && initTrackingStartedAtRef.current !== null;
