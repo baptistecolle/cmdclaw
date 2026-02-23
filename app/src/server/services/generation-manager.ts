@@ -589,9 +589,37 @@ function formatErrorMessage(error: unknown): string {
 
 class GenerationManager {
   private activeGenerations = new Map<string, GenerationContext>();
+  private activeSubscriptionCounts = new Map<string, number>();
+  private streamCounters = {
+    opened: 0,
+    closed: 0,
+    timedOut: 0,
+    deduped: 0,
+  };
 
   private shouldDeferGenerationToWorker(): boolean {
     return process.env.VERCEL === "1";
+  }
+
+  private getSubscriptionKey(generationId: string, userId: string): string {
+    return `${generationId}:${userId}`;
+  }
+
+  getStreamCountersSnapshot(): {
+    opened: number;
+    closed: number;
+    timedOut: number;
+    deduped: number;
+    active: number;
+  } {
+    let active = 0;
+    for (const value of this.activeSubscriptionCounts.values()) {
+      active += value;
+    }
+    return {
+      ...this.streamCounters,
+      active,
+    };
   }
 
   private getLockRedis(): IORedis {
@@ -1569,163 +1597,283 @@ class GenerationManager {
       return;
     }
 
-    const pollIntervalMs = 500;
+    const subscriptionKey = this.getSubscriptionKey(generationId, userId);
+    const existingSubscriptionCount = this.activeSubscriptionCounts.get(subscriptionKey) ?? 0;
+    if (existingSubscriptionCount > 0) {
+      this.streamCounters.deduped += 1;
+      logServerEvent(
+        "info",
+        "GENERATION_STREAM_DUPLICATE_DETECTED",
+        {
+          ...this.getStreamCountersSnapshot(),
+          existingSubscriptionCount,
+        },
+        {
+          source: "generation-manager",
+          generationId: initial.id,
+          conversationId: initial.conversationId,
+          userId,
+        },
+      );
+    }
+
+    this.activeSubscriptionCounts.set(subscriptionKey, existingSubscriptionCount + 1);
+    this.streamCounters.opened += 1;
+
+    const basePollIntervalMs = 500;
+    const maxPollIntervalMs = initial.conversation.type === "workflow" ? 5_000 : 3_000;
+    const awaitingPollFloorMs = 2_000;
     const heartbeatIntervalMs = 10_000;
     const maxWaitMs = initial.conversation.type === "workflow" ? 10 * 60 * 1000 : 3 * 60 * 1000;
     const startedAt = Date.now();
+    const streamId = createTraceId();
     let lastHeartbeatAt = 0;
     let lastStatus: typeof generation.$inferSelect.status | null = null;
     let emittedPendingApprovalToolUseId: string | null = null;
     let emittedPendingAuthRequestedAt: string | null = null;
     let observedParts: ContentPart[] = [];
+    let nextPollDelayMs = 0;
+    let idlePollStreak = 0;
     let terminated = false;
+    let terminatedBy:
+      | "completed"
+      | "cancelled"
+      | "error"
+      | "not_found"
+      | "access_denied"
+      | "timeout"
+      | null = null;
+    let polls = 0;
+    let eventsYielded = 0;
+    let activityPolls = 0;
+    let idlePolls = 0;
 
-    const poll = async function* (first: boolean): AsyncGenerator<GenerationEvent, void, unknown> {
-      if (Date.now() - startedAt >= maxWaitMs) {
-        return;
-      }
+    try {
+      const poll = async function* (): AsyncGenerator<GenerationEvent, void, unknown> {
+        if (Date.now() - startedAt >= maxWaitMs || terminated) {
+          return;
+        }
 
-      if (!first) {
-        await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
-      }
+        if (nextPollDelayMs > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, nextPollDelayMs));
+        }
 
-      const latest = await db.query.generation.findFirst({
-        where: eq(generation.id, generationId),
-        with: { conversation: true },
-      });
+        polls += 1;
+        const latest = await db.query.generation.findFirst({
+          where: eq(generation.id, generationId),
+          with: { conversation: true },
+        });
 
-      if (!latest) {
-        terminated = true;
-        yield { type: "error", message: "Generation not found" };
-        return;
-      }
-      if (latest.conversation.userId !== userId) {
-        terminated = true;
-        yield { type: "error", message: "Access denied" };
-        return;
-      }
+        if (!latest) {
+          terminated = true;
+          terminatedBy = "not_found";
+          eventsYielded += 1;
+          yield { type: "error", message: "Generation not found" };
+          return;
+        }
+        if (latest.conversation.userId !== userId) {
+          terminated = true;
+          terminatedBy = "access_denied";
+          eventsYielded += 1;
+          yield { type: "error", message: "Access denied" };
+          return;
+        }
 
-      const latestParts = (latest.contentParts ?? []) as ContentPart[];
-      const sharedLength = Math.min(observedParts.length, latestParts.length);
-      for (let i = 0; i < sharedLength; i += 1) {
-        const previousPart = observedParts[i];
-        const currentPart = latestParts[i];
-        if (previousPart.type === "text" && currentPart.type === "text") {
-          if (currentPart.text.length > previousPart.text.length) {
+        let hadActivity = false;
+        const latestParts = (latest.contentParts ?? []) as ContentPart[];
+        const sharedLength = Math.min(observedParts.length, latestParts.length);
+        for (let i = 0; i < sharedLength; i += 1) {
+          const previousPart = observedParts[i];
+          const currentPart = latestParts[i];
+          if (
+            previousPart.type === "text" &&
+            currentPart.type === "text" &&
+            currentPart.text.length > previousPart.text.length
+          ) {
+            hadActivity = true;
+            eventsYielded += 1;
             yield { type: "text", content: currentPart.text.slice(previousPart.text.length) };
           }
         }
-      }
-      for (let i = observedParts.length; i < latestParts.length; i += 1) {
-        const partEvent = emitPartEvent(latestParts[i], latestParts);
-        if (partEvent) {
-          yield partEvent;
+        for (let i = observedParts.length; i < latestParts.length; i += 1) {
+          const partEvent = emitPartEvent(latestParts[i], latestParts);
+          if (partEvent) {
+            hadActivity = true;
+            eventsYielded += 1;
+            yield partEvent;
+          }
         }
-      }
-      observedParts = latestParts;
+        observedParts = latestParts;
 
-      if (latest.status !== lastStatus) {
-        lastStatus = latest.status;
-        yield { type: "status_change", status: latest.status };
-      } else if (Date.now() - lastHeartbeatAt >= heartbeatIntervalMs) {
-        lastHeartbeatAt = Date.now();
-        yield { type: "status_change", status: latest.status };
-      }
+        if (latest.status !== lastStatus) {
+          hadActivity = true;
+          lastStatus = latest.status;
+          eventsYielded += 1;
+          yield { type: "status_change", status: latest.status };
+        } else if (Date.now() - lastHeartbeatAt >= heartbeatIntervalMs) {
+          lastHeartbeatAt = Date.now();
+          eventsYielded += 1;
+          yield { type: "status_change", status: latest.status };
+        }
 
-      if (latest.status === "awaiting_approval" && latest.pendingApproval) {
-        const pendingApproval = latest.pendingApproval as PendingApproval;
-        if (emittedPendingApprovalToolUseId !== pendingApproval.toolUseId) {
-          emittedPendingApprovalToolUseId = pendingApproval.toolUseId;
+        if (latest.status === "awaiting_approval" && latest.pendingApproval) {
+          const pendingApproval = latest.pendingApproval as PendingApproval;
+          if (emittedPendingApprovalToolUseId !== pendingApproval.toolUseId) {
+            hadActivity = true;
+            emittedPendingApprovalToolUseId = pendingApproval.toolUseId;
+            eventsYielded += 1;
+            yield {
+              type: "pending_approval",
+              generationId: latest.id,
+              conversationId: latest.conversationId,
+              toolUseId: pendingApproval.toolUseId,
+              toolName: pendingApproval.toolName,
+              toolInput: pendingApproval.toolInput,
+              integration: pendingApproval.integration,
+              operation: pendingApproval.operation,
+              command: pendingApproval.command,
+            };
+          }
+        }
+
+        if (latest.status === "awaiting_auth" && latest.pendingAuth) {
+          const pendingAuth = latest.pendingAuth as PendingAuth;
+          if (emittedPendingAuthRequestedAt !== pendingAuth.requestedAt) {
+            hadActivity = true;
+            emittedPendingAuthRequestedAt = pendingAuth.requestedAt;
+            eventsYielded += 1;
+            yield {
+              type: "auth_needed",
+              generationId: latest.id,
+              conversationId: latest.conversationId,
+              integrations: pendingAuth.integrations,
+              reason: pendingAuth.reason,
+            };
+          }
+        }
+
+        if (latest.status === "completed" && latest.messageId) {
+          const artifacts = await getDoneArtifacts(latest.messageId);
+          terminated = true;
+          terminatedBy = "completed";
+          eventsYielded += 1;
           yield {
-            type: "pending_approval",
+            type: "done",
             generationId: latest.id,
             conversationId: latest.conversationId,
-            toolUseId: pendingApproval.toolUseId,
-            toolName: pendingApproval.toolName,
-            toolInput: pendingApproval.toolInput,
-            integration: pendingApproval.integration,
-            operation: pendingApproval.operation,
-            command: pendingApproval.command,
+            messageId: latest.messageId,
+            usage: {
+              inputTokens: latest.inputTokens,
+              outputTokens: latest.outputTokens,
+              totalCostUsd: 0,
+            },
+            artifacts,
           };
+          return;
         }
-      }
-
-      if (latest.status === "awaiting_auth" && latest.pendingAuth) {
-        const pendingAuth = latest.pendingAuth as PendingAuth;
-        if (emittedPendingAuthRequestedAt !== pendingAuth.requestedAt) {
-          emittedPendingAuthRequestedAt = pendingAuth.requestedAt;
+        if (latest.status === "cancelled") {
+          terminated = true;
+          terminatedBy = "cancelled";
+          eventsYielded += 1;
           yield {
-            type: "auth_needed",
+            type: "cancelled",
             generationId: latest.id,
             conversationId: latest.conversationId,
-            integrations: pendingAuth.integrations,
-            reason: pendingAuth.reason,
+            messageId: latest.messageId ?? undefined,
           };
+          return;
         }
-      }
+        if (latest.status === "error") {
+          terminated = true;
+          terminatedBy = "error";
+          eventsYielded += 1;
+          yield {
+            type: "error",
+            message: latest.errorMessage || "Unknown error",
+          };
+          return;
+        }
 
-      if (latest.status === "completed" && latest.messageId) {
-        const artifacts = await getDoneArtifacts(latest.messageId);
-        terminated = true;
-        yield {
-          type: "done",
-          generationId: latest.id,
-          conversationId: latest.conversationId,
-          messageId: latest.messageId,
-          usage: {
-            inputTokens: latest.inputTokens,
-            outputTokens: latest.outputTokens,
-            totalCostUsd: 0,
+        if (hadActivity) {
+          activityPolls += 1;
+          idlePollStreak = 0;
+          nextPollDelayMs = basePollIntervalMs;
+        } else {
+          idlePolls += 1;
+          idlePollStreak += 1;
+          const dynamicFloorMs =
+            latest.status === "awaiting_approval" || latest.status === "awaiting_auth"
+              ? awaitingPollFloorMs
+              : basePollIntervalMs;
+          const backoffMultiplier = Math.pow(2, Math.min(4, Math.floor(idlePollStreak / 2)));
+          nextPollDelayMs = Math.min(maxPollIntervalMs, dynamicFloorMs * backoffMultiplier);
+        }
+
+        yield* poll();
+      };
+
+      yield* poll();
+
+      if (!terminated) {
+        const errorMessage =
+          "Generation is still processing but cannot be streamed from this server yet. Please refresh shortly.";
+        terminatedBy = "timeout";
+        this.streamCounters.timedOut += 1;
+        logServerEvent(
+          "warn",
+          "GENERATION_STREAM_POLL_TIMEOUT",
+          {
+            status: lastStatus,
+            maxWaitMs,
+            conversationType: initial.conversation.type,
+            streamId,
+            polls,
+            eventsYielded,
+            activityPolls,
+            idlePolls,
           },
-          artifacts,
-        };
-        return;
+          {
+            source: "generation-manager",
+            generationId: initial.id,
+            conversationId: initial.conversationId,
+            userId,
+          },
+        );
+        eventsYielded += 1;
+        yield { type: "error", message: errorMessage };
       }
-      if (latest.status === "cancelled") {
-        terminated = true;
-        yield {
-          type: "cancelled",
-          generationId: latest.id,
-          conversationId: latest.conversationId,
-          messageId: latest.messageId ?? undefined,
-        };
-        return;
+    } finally {
+      const currentCount = this.activeSubscriptionCounts.get(subscriptionKey) ?? 0;
+      if (currentCount <= 1) {
+        this.activeSubscriptionCounts.delete(subscriptionKey);
+      } else {
+        this.activeSubscriptionCounts.set(subscriptionKey, currentCount - 1);
       }
-      if (latest.status === "error") {
-        terminated = true;
-        yield {
-          type: "error",
-          message: latest.errorMessage || "Unknown error",
-        };
-        return;
-      }
+      this.streamCounters.closed += 1;
 
-      yield* poll(false);
-    };
-
-    yield* poll(true);
-    if (terminated) {
-      return;
+      logServerEvent(
+        "info",
+        "GENERATION_STREAM_SUBSCRIPTION_SUMMARY",
+        {
+          ...this.getStreamCountersSnapshot(),
+          streamId,
+          durationMs: Date.now() - startedAt,
+          maxWaitMs,
+          polls,
+          eventsYielded,
+          activityPolls,
+          idlePolls,
+          termination: terminatedBy ?? "consumer_closed",
+          conversationType: initial.conversation.type,
+        },
+        {
+          source: "generation-manager",
+          generationId: initial.id,
+          conversationId: initial.conversationId,
+          userId,
+        },
+      );
     }
-
-    const errorMessage =
-      "Generation is still processing but cannot be streamed from this server yet. Please refresh shortly.";
-    logServerEvent(
-      "warn",
-      "GENERATION_STREAM_POLL_TIMEOUT",
-      {
-        status: lastStatus,
-        maxWaitMs,
-        conversationType: initial.conversation.type,
-      },
-      {
-        source: "generation-manager",
-        generationId: initial.id,
-        conversationId: initial.conversationId,
-        userId,
-      },
-    );
-    yield { type: "error", message: errorMessage };
   }
 
   /**

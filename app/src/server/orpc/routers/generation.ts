@@ -7,7 +7,7 @@ import { generation, conversation } from "@/server/db/schema";
 import { generationManager } from "@/server/services/generation-manager";
 import { listSelectablePlatformSkills } from "@/server/services/platform-skill-service";
 import { detectMessageLanguage } from "@/server/utils/detect-message-language";
-import { logServerEvent } from "@/server/utils/observability";
+import { createTraceId, logServerEvent } from "@/server/utils/observability";
 import { protectedProcedure } from "../middleware";
 
 // Schema for generation events (same structure as GenerationEvent type)
@@ -283,14 +283,22 @@ const subscribeGeneration = protectedProcedure
   )
   .output(eventIterator(generationEventSchema))
   .handler(async function* ({ input, context }) {
+    const streamId = createTraceId();
+    const openedAt = Date.now();
     const logContext = {
       source: "rpc",
       route: "/api/rpc/generation/subscribeGeneration",
       rpcProcedure: "generation.subscribeGeneration",
       generationId: input.generationId,
       userId: context.user.id,
+      traceId: streamId,
     };
-    logServerEvent("info", "RPC_SUBSCRIBE_GENERATION_OPENED", {}, logContext);
+    logServerEvent(
+      "info",
+      "RPC_SUBSCRIBE_GENERATION_OPENED",
+      generationManager.getStreamCountersSnapshot(),
+      logContext,
+    );
 
     const stream = generationManager.subscribeToGeneration(input.generationId, context.user.id);
 
@@ -299,7 +307,15 @@ const subscribeGeneration = protectedProcedure
         yield event;
       }
     } finally {
-      logServerEvent("info", "RPC_SUBSCRIBE_GENERATION_CLOSED", {}, logContext);
+      logServerEvent(
+        "info",
+        "RPC_SUBSCRIBE_GENERATION_CLOSED",
+        {
+          elapsedMs: Date.now() - openedAt,
+          ...generationManager.getStreamCountersSnapshot(),
+        },
+        logContext,
+      );
     }
   });
 
