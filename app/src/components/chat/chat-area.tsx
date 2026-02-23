@@ -729,6 +729,18 @@ export function ChatArea({ conversationId }: Props) {
     );
   }, []);
 
+  const syncConversationForNewChat = useCallback(
+    (id: string) => {
+      currentConversationIdRef.current = id;
+      setDraftConversationId(id);
+      notifyConversationIdSync(id);
+      if (!conversationId) {
+        window.history.replaceState(null, "", `/chat/${id}`);
+      }
+    },
+    [conversationId, notifyConversationIdSync],
+  );
+
   const persistInterruptedRuntimeMessage = useCallback(
     (runtime: GenerationRuntime, messageId?: string, timing?: Message["timing"]) => {
       runtime.handleCancelled();
@@ -934,6 +946,9 @@ export function ChatArea({ conversationId }: Props) {
             command: data.command,
           });
           currentGenerationIdRef.current = data.generationId;
+          if (data.conversationId) {
+            syncConversationForNewChat(data.conversationId);
+          }
           runtime.handlePendingApproval(data);
           syncFromRuntime(runtime);
           if (autoApproveEnabled) {
@@ -969,8 +984,7 @@ export function ChatArea({ conversationId }: Props) {
           markInitSignal("auth_needed", { integrations: data.integrations });
           currentGenerationIdRef.current = data.generationId;
           if (data.conversationId) {
-            currentConversationIdRef.current = data.conversationId;
-            setDraftConversationId(data.conversationId);
+            syncConversationForNewChat(data.conversationId);
           }
           runtime.handleAuthNeeded(data);
           syncFromRuntime(runtime);
@@ -1064,6 +1078,9 @@ export function ChatArea({ conversationId }: Props) {
             return;
           }
           upsertMessageById(hydratedAssistant);
+          if (!conversationId && newConversationId) {
+            syncConversationForNewChat(newConversationId);
+          }
           maybeSendQueuedWhenReady();
         },
         onError: (message) => {
@@ -1108,6 +1125,7 @@ export function ChatArea({ conversationId }: Props) {
     activeGeneration?.status,
     autoApproveEnabled,
     beginInitTracking,
+    conversationId,
     handleInitStatusChange,
     markInitMissingAtEnd,
     markInitSignal,
@@ -1116,6 +1134,7 @@ export function ChatArea({ conversationId }: Props) {
     submitApproval,
     subscribeToGeneration,
     syncFromRuntime,
+    syncConversationForNewChat,
     hydrateAssistantMessage,
     maybeSendQueuedWhenReady,
     isStreamEventForActiveScope,
@@ -1282,9 +1301,7 @@ export function ChatArea({ conversationId }: Props) {
               `[AgentInit][Client] generation_started generationId=${generationId} conversationId=${newConversationId}`,
             );
             if (!conversationId && newConversationId) {
-              currentConversationIdRef.current = newConversationId;
-              setDraftConversationId(newConversationId);
-              notifyConversationIdSync(newConversationId);
+              syncConversationForNewChat(newConversationId);
             }
           },
           onText: (text) => {
@@ -1333,9 +1350,7 @@ export function ChatArea({ conversationId }: Props) {
             markInitSignal("pending_approval", { toolName: data.toolName });
             currentGenerationIdRef.current = data.generationId;
             if (data.conversationId) {
-              currentConversationIdRef.current = data.conversationId;
-              setDraftConversationId(data.conversationId);
-              notifyConversationIdSync(data.conversationId);
+              syncConversationForNewChat(data.conversationId);
             }
             runtime.handlePendingApproval(data);
             syncFromRuntime(runtime);
@@ -1372,9 +1387,7 @@ export function ChatArea({ conversationId }: Props) {
             markInitSignal("auth_needed", { integrations: data.integrations });
             currentGenerationIdRef.current = data.generationId;
             if (data.conversationId) {
-              currentConversationIdRef.current = data.conversationId;
-              setDraftConversationId(data.conversationId);
-              notifyConversationIdSync(data.conversationId);
+              syncConversationForNewChat(data.conversationId);
             }
             runtime.handleAuthNeeded(data);
             syncFromRuntime(runtime);
@@ -1479,8 +1492,7 @@ export function ChatArea({ conversationId }: Props) {
 
             // Update URL for new conversations without remounting
             if (!conversationId && newConversationId) {
-              setDraftConversationId(newConversationId);
-              window.history.replaceState(null, "", `/chat/${newConversationId}`);
+              syncConversationForNewChat(newConversationId);
             }
             maybeSendQueuedWhenReady();
           },
@@ -1546,7 +1558,7 @@ export function ChatArea({ conversationId }: Props) {
       startGeneration,
       submitApproval,
       syncFromRuntime,
-      notifyConversationIdSync,
+      syncConversationForNewChat,
       hydrateAssistantMessage,
       maybeSendQueuedWhenReady,
       isStreamEventForActiveScope,
