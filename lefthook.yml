@@ -14,6 +14,14 @@ pre-commit:
 pre-push:
   parallel: false
   commands:
+    clean-tree:
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "pre-push blocked: working tree is not clean."
+          echo "Commit or stash changes before pushing so checks run on the exact pushed code."
+          git status --short
+          exit 1
+        fi
     check:
       root: app
       run: bun run check
