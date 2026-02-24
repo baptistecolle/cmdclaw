@@ -3,6 +3,6 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.app"
 
 [deploy]
-startCommand = "next start -H 0.0.0.0 -p $PORT"
+startCommand = "bun run --silent start -- -H 0.0.0.0 -p $PORT"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
