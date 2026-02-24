@@ -7,28 +7,25 @@ export const env = createEnv({
    * isn't built with invalid env vars.
    */
   server: {
-    BETTER_AUTH_SECRET: process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
-    APP_URL: z.string().url().optional(),
-    DATABASE_URL: z.string().url(),
+    BETTER_AUTH_SECRET: z.string(),
+    APP_URL: z.url().optional(),
+    DATABASE_URL: z.url(),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    RESEND_API_KEY: process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
-    RESEND_WEBHOOK_SECRET:
-      process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
+    RESEND_API_KEY: z.string(),
+    RESEND_WEBHOOK_SECRET: z.string(),
     RESEND_RECEIVING_DOMAIN: z.string().optional(),
-    EMAIL_FROM:
-      process.env.NODE_ENV === "production" ? z.string().email() : z.string().email().optional(),
-    REDIS_URL: z.string().url().optional(),
-    REDIS_HOST: z.string().default("localhost"),
-    REDIS_PORT: z.string().default("6379"),
-    OPENAI_API_KEY: process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
+    EMAIL_FROM: z.email(),
+    REDIS_URL: z.url(),
+    OPENAI_API_KEY: z.string(),
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
     // Anthropic
-    ANTHROPIC_API_KEY: z.string().optional(),
+    ANTHROPIC_API_KEY: z.string(),
     // E2B Sandbox
     E2B_API_KEY: z.string().optional(),
     E2B_TEMPLATE: z.string().optional(),
     SANDBOX_DEFAULT: z.enum(["daytona", "e2b"]),
+    DAYTONA_API_KEY: z.string().optional(),
     ANVIL_API_KEY: z.string().optional(),
     // OAuth credentials
     GOOGLE_CLIENT_ID: z.string().optional(),
@@ -66,18 +63,18 @@ export const env = createEnv({
     // Gemini (title generation)
     GEMINI_API_KEY: z.string().optional(),
     // Encryption key for provider OAuth tokens (32-byte hex string)
-    ENCRYPTION_KEY: z.string().optional(),
+    ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/),
     // OpenCode plugin callback secret
-    CMDCLAW_SERVER_SECRET: z.string().optional(),
+    CMDCLAW_SERVER_SECRET: z.string(),
     // Public callback URL for sandbox -> app internal routes (approval/auth)
-    E2B_CALLBACK_BASE_URL: z.string().url().optional(),
+    E2B_CALLBACK_BASE_URL: z.url().optional(),
     // BYOC WebSocket server port
     WS_PORT: z.string().default("4097"),
     // S3/MinIO Configuration
-    S3_ENDPOINT: z.string().url().optional(),
+    S3_ENDPOINT: z.url(),
     S3_REGION: z.string().default("us-east-1"),
-    S3_ACCESS_KEY_ID: z.string().optional(),
-    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string(),
+    S3_SECRET_ACCESS_KEY: z.string(),
     S3_BUCKET_NAME: z.string().default("cmdclaw-documents"),
     S3_FORCE_PATH_STYLE: z
       .string()
@@ -103,7 +100,7 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    NEXT_PUBLIC_APP_URL: z.string().url(),
+    NEXT_PUBLIC_APP_URL: z.url(),
     NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
     NEXT_PUBLIC_POSTHOG_HOST: z.string().optional(),
     NEXT_PUBLIC_NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -123,15 +120,14 @@ export const env = createEnv({
     RESEND_RECEIVING_DOMAIN: process.env.RESEND_RECEIVING_DOMAIN,
     EMAIL_FROM: process.env.EMAIL_FROM,
     REDIS_URL: process.env.REDIS_URL,
-    REDIS_HOST: process.env.REDIS_HOST,
-    REDIS_PORT: process.env.REDIS_PORT,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
     POSTHOG_HOST: process.env.POSTHOG_HOST,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     E2B_API_KEY: process.env.E2B_API_KEY,
     E2B_TEMPLATE: process.env.E2B_TEMPLATE,
-    SANDBOX_DEFAULT: process.env.SANDBOX_DEFAULT ?? process.env.ANDBOX_DEFAULT,
+    SANDBOX_DEFAULT: process.env.SANDBOX_DEFAULT,
+    DAYTONA_API_KEY: process.env.DAYTONA_API_KEY,
     ANVIL_API_KEY: process.env.ANVIL_API_KEY,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
@@ -163,7 +159,7 @@ export const env = createEnv({
     DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
-    CMDCLAW_SERVER_SECRET: process.env.CMDCLAW_SERVER_SECRET,
+    CMDCLAW_SERVER_SECRET: process.env.CMDCLAW_SERVER_SECRET ?? process.env.BAP_SERVER_SECRET,
     E2B_CALLBACK_BASE_URL: process.env.E2B_CALLBACK_BASE_URL,
     WS_PORT: process.env.WS_PORT,
     S3_ENDPOINT: process.env.S3_ENDPOINT,
