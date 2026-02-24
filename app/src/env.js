@@ -186,6 +186,25 @@ export const env = createEnv({
     NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     NEXT_PUBLIC_NODE_ENV: process.env.NEXT_PUBLIC_NODE_ENV ?? process.env.NODE_ENV,
   },
+  onValidationError: (issues) => {
+    const formattedIssues = issues.map((issue) => {
+      const path = Array.isArray(issue.path)
+        ? issue.path
+            .map((segment) => {
+              const key = segment?.key;
+              return typeof key === "string" || typeof key === "number" ? String(key) : null;
+            })
+            .filter(Boolean)
+            .join(".")
+        : "";
+
+      const label = path || "unknown";
+      return `${label}: ${issue.message}`;
+    });
+
+    console.error("❌ Invalid environment variables:", formattedIssues);
+    throw new Error(`Invalid environment variables: ${formattedIssues.join("; ")}`);
+  },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
    * useful for Docker builds.
