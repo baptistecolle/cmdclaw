@@ -1,5 +1,5 @@
 /**
- * Cross-platform build script for the Bap daemon.
+ * Cross-platform build script for the CmdClaw daemon.
  * Produces standalone executables using `bun build --compile`.
  */
 
@@ -33,7 +33,7 @@ async function build(): Promise<void> {
 
   const buildJobs = filteredTargets.map((target) => {
     const ext = target.os === "win32" ? ".exe" : "";
-    const outPath = `${outputDir}/bap-daemon-${target.os}-${target.arch}${ext}`;
+    const outPath = `${outputDir}/cmdclaw-daemon-${target.os}-${target.arch}${ext}`;
 
     console.log(`Building for ${target.os}-${target.arch}...`);
 

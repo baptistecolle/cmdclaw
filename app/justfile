@@ -1,7 +1,7 @@
 set dotenv-load := true
 
-app_image := "bap-app"
-worker_image := "bap-worker"
+app_image := "cmdclaw-app"
+worker_image := "cmdclaw-worker"
 
 docker-run-app:
   docker build -f Dockerfile.app -t {{app_image}} .

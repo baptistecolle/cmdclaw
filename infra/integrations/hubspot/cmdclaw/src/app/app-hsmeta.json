@@ -1,15 +1,15 @@
 {
-  "uid": "heybap_app",
+  "uid": "cmdclaw_app",
   "type": "app",
   "config": {
-    "description": "HeyBap AI Agent - Connect your HubSpot to automate CRM tasks",
-    "name": "HeyBap",
+    "description": "CmdClaw AI Agent - Connect your HubSpot to automate CRM tasks",
+    "name": "CmdClaw",
     "logo": "/app/app-logo.png",
     "distribution": "marketplace",
     "auth": {
       "type": "oauth",
       "redirectUrls": [
-        "https://heybap.com/api/oauth/callback",
+        "https://cmdclaw.com/api/oauth/callback",
         "http://localhost:3000/api/oauth/callback"
       ],
       "requiredScopes": [
@@ -32,9 +32,9 @@
       "img": []
     },
     "support": {
-      "supportEmail": "baptiste@heybap.com",
-      "documentationUrl": "https://app.heybap.com",
-      "supportUrl": "https://app.heybap.com/support",
+      "supportEmail": "baptiste@cmdclaw.com",
+      "documentationUrl": "https://app.cmdclaw.com",
+      "supportUrl": "https://app.cmdclaw.com/support",
       "supportPhone": "+41788732135"
     }
   }

@@ -32,7 +32,7 @@ async function runChatCommand(args: string[], timeoutMs: number): Promise<Comman
     const child = spawn("bun", args, {
       env: {
         ...process.env,
-        BAP_SERVER_URL: defaultServerUrl,
+        CMDCLAW_SERVER_URL: defaultServerUrl,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

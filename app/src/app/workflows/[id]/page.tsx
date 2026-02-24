@@ -79,7 +79,7 @@ import {
 const TRIGGERS = [
   { value: "manual", label: "Manual only" },
   { value: "schedule", label: "Run on a schedule" },
-  { value: EMAIL_FORWARDED_TRIGGER_TYPE, label: "Email forwarded to Bap" },
+  { value: EMAIL_FORWARDED_TRIGGER_TYPE, label: "Email forwarded to CmdClaw" },
   { value: "gmail.new_email", label: "New Gmail email" },
   ...(isComingSoonIntegration("twitter")
     ? []

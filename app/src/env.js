@@ -68,7 +68,7 @@ export const env = createEnv({
     // Encryption key for provider OAuth tokens (32-byte hex string)
     ENCRYPTION_KEY: z.string().optional(),
     // OpenCode plugin callback secret
-    BAP_SERVER_SECRET: z.string().optional(),
+    CMDCLAW_SERVER_SECRET: z.string().optional(),
     // Public callback URL for sandbox -> app internal routes (approval/auth)
     E2B_CALLBACK_BASE_URL: z.string().url().optional(),
     // BYOC WebSocket server port
@@ -78,7 +78,7 @@ export const env = createEnv({
     S3_REGION: z.string().default("us-east-1"),
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
-    S3_BUCKET_NAME: z.string().default("bap-documents"),
+    S3_BUCKET_NAME: z.string().default("cmdclaw-documents"),
     S3_FORCE_PATH_STYLE: z
       .string()
       .transform((v) => v === "true")
@@ -93,8 +93,8 @@ export const env = createEnv({
     SLACK_BOT_RELAY_ALLOWED_CHANNELS: z.string().optional(),
     // Community Integration Repo
     COMMUNITY_REPO_GITHUB_TOKEN: z.string().optional(),
-    COMMUNITY_REPO_OWNER: z.string().default("bap-community"),
-    COMMUNITY_REPO_NAME: z.string().default("bap-community-integrations"),
+    COMMUNITY_REPO_OWNER: z.string().default("cmdclaw-community"),
+    COMMUNITY_REPO_NAME: z.string().default("cmdclaw-community-integrations"),
   },
 
   /**
@@ -163,7 +163,7 @@ export const env = createEnv({
     DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
-    BAP_SERVER_SECRET: process.env.BAP_SERVER_SECRET,
+    CMDCLAW_SERVER_SECRET: process.env.CMDCLAW_SERVER_SECRET,
     E2B_CALLBACK_BASE_URL: process.env.E2B_CALLBACK_BASE_URL,
     WS_PORT: process.env.WS_PORT,
     S3_ENDPOINT: process.env.S3_ENDPOINT,

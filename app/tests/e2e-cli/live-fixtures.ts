@@ -8,7 +8,7 @@ import { getValidTokensForUser } from "../../src/server/integrations/token-refre
 import { resolveLiveE2EModel } from "../e2e/live-chat-model";
 
 export const liveEnabled = process.env.E2E_LIVE === "1";
-export const defaultServerUrl = process.env.BAP_SERVER_URL ?? "http://localhost:3000";
+export const defaultServerUrl = process.env.CMDCLAW_SERVER_URL ?? "http://localhost:3000";
 export const responseTimeoutMs = Number(process.env.E2E_RESPONSE_TIMEOUT_MS ?? "180000");
 export const commandTimeoutMs = Number(process.env.E2E_CLI_TIMEOUT_MS ?? String(responseTimeoutMs));
 export const artifactTimeoutMs = Number(process.env.E2E_ARTIFACT_TIMEOUT_MS ?? "45000");
@@ -18,8 +18,8 @@ export const slackPostVerifyTimeoutMs = Number(
 );
 export const gmailPollIntervalMs = Number(process.env.E2E_GMAIL_POLL_INTERVAL_MS ?? "2500");
 
-export const expectedUserEmail = "baptiste@heybap.com";
-export const sourceChannelName = "bap-experiments";
+export const expectedUserEmail = "baptiste@cmdclaw.com";
+export const sourceChannelName = "cmdclaw-experiments";
 export const targetChannelName = "e2e-slack-testing";
 export const echoPrefix = "test message: the previous message is:";
 
@@ -114,7 +114,7 @@ export function runBunCommand(
     const child = spawn("bun", args, {
       env: {
         ...process.env,
-        BAP_SERVER_URL: defaultServerUrl,
+        CMDCLAW_SERVER_URL: defaultServerUrl,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -230,7 +230,7 @@ export async function resolveLiveModel(): Promise<string> {
 }
 
 export function getCliClient() {
-  const serverUrl = process.env.BAP_SERVER_URL || defaultServerUrl;
+  const serverUrl = process.env.CMDCLAW_SERVER_URL || defaultServerUrl;
   const config = loadConfig(serverUrl);
   if (!config?.token) {
     throw new Error(

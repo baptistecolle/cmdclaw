@@ -12,19 +12,19 @@ export type ChatConfig = {
   token: string;
 };
 
-const BAP_DIR = join(homedir(), ".bap");
-const PROFILES_DIR = join(BAP_DIR, "profiles");
+const CMDCLAW_DIR = join(homedir(), ".cmdclaw");
+const PROFILES_DIR = join(CMDCLAW_DIR, "profiles");
 
 export const DEFAULT_SERVER_URL = "http://localhost:3000";
 
-export function ensureBapDir(): void {
-  if (!existsSync(BAP_DIR)) {
-    mkdirSync(BAP_DIR, { recursive: true });
+export function ensureCmdClawDir(): void {
+  if (!existsSync(CMDCLAW_DIR)) {
+    mkdirSync(CMDCLAW_DIR, { recursive: true });
   }
 }
 
 function ensureProfilesDir(): void {
-  ensureBapDir();
+  ensureCmdClawDir();
   if (!existsSync(PROFILES_DIR)) {
     mkdirSync(PROFILES_DIR, { recursive: true });
   }
@@ -47,7 +47,7 @@ export function getConfigPathForServerUrl(serverUrl: string): string {
 }
 
 export function loadConfig(
-  serverUrl = process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL,
+  serverUrl = process.env.CMDCLAW_SERVER_URL || DEFAULT_SERVER_URL,
 ): ChatConfig | null {
   try {
     const configPath = getConfigPathForServerUrl(serverUrl);
@@ -67,7 +67,9 @@ export function saveConfig(config: ChatConfig): void {
   writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
 }
 
-export function clearConfig(serverUrl = process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL): void {
+export function clearConfig(
+  serverUrl = process.env.CMDCLAW_SERVER_URL || DEFAULT_SERVER_URL,
+): void {
   const configPath = getConfigPathForServerUrl(serverUrl);
   if (existsSync(configPath)) {
     unlinkSync(configPath);

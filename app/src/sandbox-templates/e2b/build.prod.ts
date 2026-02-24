@@ -11,7 +11,7 @@ async function main() {
   console.log("Template source:", path.join(process.cwd(), "src/sandbox-templates"));
 
   const result = await Template.build(template, {
-    alias: "bap-agent-prod",
+    alias: "cmdclaw-agent-prod",
     cpuCount: 2,
     memoryMB: 2048,
     onBuildLogs: defaultBuildLogger(),
@@ -22,8 +22,8 @@ async function main() {
 
   console.log("\nTemplate built successfully!");
   console.log("Template ID:", result.templateId);
-  console.log("Alias: bap-agent");
-  console.log("\nUse with: Sandbox.create('bap-agent')");
+  console.log("Alias: cmdclaw-agent");
+  console.log("\nUse with: Sandbox.create('cmdclaw-agent')");
 }
 
 main().catch((error) => {

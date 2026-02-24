@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - Bap",
-  description: "Privacy policy for Bap services",
+  title: "Privacy Policy - CmdClaw",
+  description: "Privacy policy for CmdClaw services",
 };
 
 export default function PrivacyPolicyPage() {
@@ -17,14 +17,14 @@ export default function PrivacyPolicyPage() {
         Article 1 - Legal Notice
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
-        This website, accessible at the URL &apos;https://www.heybap.com/&apos; (the
-        &quot;Site&quot;), is published by HeyBap.
+        This website, accessible at the URL &apos;https://www.cmdclaw.com/&apos; (the
+        &quot;Site&quot;), is published by CmdClaw.
       </p>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
         (Hereinafter referred to as the &quot;Service Provider&quot;).
       </p>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
-        For any inquiries, please contact us by email at baptiste@heybap.com.
+        For any inquiries, please contact us by email at baptiste@cmdclaw.com.
       </p>
 
       <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
@@ -49,7 +49,7 @@ export default function PrivacyPolicyPage() {
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
         The purpose of the Site is to provide the following services online: Presentation of the
-        HeyBap offer and services (hereinafter referred to as the &quot;Services&quot;). Each
+        CmdClaw offer and services (hereinafter referred to as the &quot;Services&quot;). Each
         Service presented on the Site is accompanied by a description stating its essential
         characteristics. This description may include descriptions, photographs, and graphics that
         are provided for illustrative purposes only and may be subject to modification/update on the

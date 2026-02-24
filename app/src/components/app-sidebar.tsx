@@ -249,7 +249,7 @@ export function AppSidebar() {
           prefetch={false}
           className="mb-4 flex h-9 w-9 items-center justify-center"
         >
-          <Image src="/logo.png" alt="Bap" width={28} height={28} className="object-contain" />
+          <Image src="/logo.png" alt="CmdClaw" width={28} height={28} className="object-contain" />
         </Link>
 
         {/* Nav items */}

@@ -61,7 +61,7 @@ docker compose down && docker compose up -d --build
 ## Notes
 
 - `test:e2e:live` currently includes auth bootstrap (`test:e2e:auth`) before tests.
-- `test:e2e:live:prod` targets `https://app.heybap.com` and skips local web server startup/build.
+- `test:e2e:live:prod` targets `https://app.cmdclaw.com` and skips local web server startup/build.
 - `test:e2e:live:prod:monitor` also writes:
   - `test-results/monitor/results.json`
   - `playwright-report/monitor/index.html`

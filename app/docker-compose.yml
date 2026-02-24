@@ -1,17 +1,17 @@
-name: bap-local
+name: cmdclaw-local
 
 services:
   database:
     image: pgvector/pgvector:pg16
-    container_name: bap-postgres-local
+    container_name: cmdclaw-postgres-local
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: bap
+      POSTGRES_DB: cmdclaw
     ports:
       - "5432:5432"
     volumes:
-      - bap_postgres_data:/var/lib/postgresql/data
+      - cmdclaw_postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -21,11 +21,11 @@ services:
 
   redis:
     image: redis:8-alpine
-    container_name: bap-redis-local
+    container_name: cmdclaw-redis-local
     ports:
       - "6379:6379"
     volumes:
-      - bap_redis_data:/data
+      - cmdclaw_redis_data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -35,7 +35,7 @@ services:
 
   minio:
     image: minio/minio
-    container_name: bap-minio-local
+    container_name: cmdclaw-minio-local
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID}
@@ -44,7 +44,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - bap_minio_data:/data
+      - cmdclaw_minio_data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
@@ -53,6 +53,6 @@ services:
       retries: 5
 
 volumes:
-  bap_postgres_data:
-  bap_redis_data:
-  bap_minio_data:
+  cmdclaw_postgres_data:
+  cmdclaw_redis_data:
+  cmdclaw_minio_data:

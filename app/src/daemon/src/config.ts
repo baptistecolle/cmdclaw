@@ -1,6 +1,6 @@
 /**
- * Configuration management for the Bap daemon.
- * Stores settings in ~/.bap/config.json
+ * Configuration management for the CmdClaw daemon.
+ * Stores settings in ~/.cmdclaw/config.json
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
@@ -13,12 +13,12 @@ export interface DaemonConfig {
   deviceId: string;
 }
 
-const BAP_DIR = join(homedir(), ".bap");
-const CONFIG_PATH = join(BAP_DIR, "config.json");
+const CMDCLAW_DIR = join(homedir(), ".cmdclaw");
+const CONFIG_PATH = join(CMDCLAW_DIR, "config.json");
 
-function ensureBapDir(): void {
-  if (!existsSync(BAP_DIR)) {
-    mkdirSync(BAP_DIR, { recursive: true });
+function ensureCmdClawDir(): void {
+  if (!existsSync(CMDCLAW_DIR)) {
+    mkdirSync(CMDCLAW_DIR, { recursive: true });
   }
 }
 
@@ -35,7 +35,7 @@ export function loadConfig(): DaemonConfig | null {
 }
 
 export function saveConfig(config: DaemonConfig): void {
-  ensureBapDir();
+  ensureCmdClawDir();
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
 }
 
@@ -50,11 +50,11 @@ export function clearConfig(): void {
 }
 
 export function getSandboxDir(conversationId: string): string {
-  const dir = join(BAP_DIR, "sandboxes", conversationId);
+  const dir = join(CMDCLAW_DIR, "sandboxes", conversationId);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
   return dir;
 }
 
-export const BAP_HOME = BAP_DIR;
+export const CMDCLAW_HOME = CMDCLAW_DIR;

@@ -142,7 +142,7 @@ export function AuthRequestCard({
                       />
                     )}
                     <span className="text-sm">
-                      <span className="font-medium">Bap</span> needs access to{" "}
+                      <span className="font-medium">CmdClaw</span> needs access to{" "}
                       <span className="font-medium">{displayName}</span>
                     </span>
                   </div>

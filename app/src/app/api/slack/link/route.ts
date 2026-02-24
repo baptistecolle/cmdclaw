@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 <html><body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
 <div style="text-align:center">
 <h1>Account linked!</h1>
-<p>You can now use @bap in Slack. Head back to your workspace and try it out.</p>
+<p>You can now use @cmdclaw in Slack. Head back to your workspace and try it out.</p>
 </div>
 </body></html>`,
     {

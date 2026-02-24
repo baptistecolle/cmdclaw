@@ -213,9 +213,9 @@ describe("triggerWorkflowRun", () => {
     expect(resolveDefaultOpencodeFreeModelMock).not.toHaveBeenCalled();
   });
 
-  it("uses BAP_CHAT_MODEL override when configured", async () => {
-    const previous = process.env.BAP_CHAT_MODEL;
-    process.env.BAP_CHAT_MODEL = "openai/gpt-4.1-mini";
+  it("uses CMDCLAW_CHAT_MODEL override when configured", async () => {
+    const previous = process.env.CMDCLAW_CHAT_MODEL;
+    process.env.CMDCLAW_CHAT_MODEL = "openai/gpt-4.1-mini";
     providerAuthFindFirstMock.mockResolvedValue({ id: "auth-1" });
     resolveDefaultOpencodeFreeModelMock.mockResolvedValue("openai/gpt-4.1-mini");
 
@@ -228,9 +228,9 @@ describe("triggerWorkflowRun", () => {
       });
     } finally {
       if (previous === undefined) {
-        delete process.env.BAP_CHAT_MODEL;
+        delete process.env.CMDCLAW_CHAT_MODEL;
       } else {
-        process.env.BAP_CHAT_MODEL = previous;
+        process.env.CMDCLAW_CHAT_MODEL = previous;
       }
     }
 

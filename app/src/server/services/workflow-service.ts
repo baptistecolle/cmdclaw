@@ -26,7 +26,7 @@ const WORKFLOW_PREPARING_TIMEOUT_MS = (() => {
 })();
 
 async function resolveWorkflowDefaultModelForUser(userId: string): Promise<string> {
-  const configured = process.env.BAP_CHAT_MODEL?.trim();
+  const configured = process.env.CMDCLAW_CHAT_MODEL?.trim();
   if (configured) {
     return resolveDefaultOpencodeFreeModel(configured);
   }

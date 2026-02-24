@@ -366,7 +366,7 @@ async function requestApproval(params: {
   toolInput: unknown;
 }): Promise<{ decision?: "allow" | "deny"; error?: string }> {
   const serverUrls = getCallbackBaseUrls();
-  const serverSecret = process.env.BAP_SERVER_SECRET;
+  const serverSecret = process.env.CMDCLAW_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
   const sandboxId = process.env.SANDBOX_ID;
   const generationId = process.env.GENERATION_ID;
@@ -439,7 +439,7 @@ async function requestAuth(params: {
   reason: string;
 }): Promise<{ success: boolean; tokens?: Record<string, string>; error?: string }> {
   const serverUrls = getCallbackBaseUrls();
-  const serverSecret = process.env.BAP_SERVER_SECRET;
+  const serverSecret = process.env.CMDCLAW_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
   const sandboxId = process.env.SANDBOX_ID;
   const generationId = process.env.GENERATION_ID;

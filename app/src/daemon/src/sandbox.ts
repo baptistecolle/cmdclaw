@@ -1,5 +1,5 @@
 /**
- * Local sandbox execution for the Bap daemon.
+ * Local sandbox execution for the CmdClaw daemon.
  * Runs commands in isolated workspace directories using Bun.spawn().
  */
 

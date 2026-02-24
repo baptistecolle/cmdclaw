@@ -4,8 +4,8 @@ import { SignJWT, importPKCS8 } from "jose";
 // Apple Sign In Configuration
 const TEAM_ID = "H4LAG3Q6BJ";
 const KEY_ID = "5TUU49X577";
-const CLIENT_ID = "com.heybap.bap.client";
-const PRIVATE_KEY_PATH = "/Users/baptiste/Git/bap/app/scripts/apple_authkey";
+const CLIENT_ID = "com.cmdclaw.cmdclaw.client";
+const PRIVATE_KEY_PATH = "/Users/baptiste/Git/cmdclaw/app/scripts/apple_authkey";
 
 // JWT valid for 6 months (max allowed by Apple)
 const EXPIRATION_DAYS = 180;

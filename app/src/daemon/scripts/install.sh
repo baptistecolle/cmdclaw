@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Bap Daemon Installer
-# Usage: curl -fsSL https://heybap.com/i | sh
+# CmdClaw Daemon Installer
+# Usage: curl -fsSL https://cmdclaw.com/i | sh
 set -euo pipefail
 
-REPO="heybap/bap"
-INSTALL_DIR="$HOME/.bap"
-BIN_NAME="bap-daemon"
+REPO="cmdclaw/cmdclaw"
+INSTALL_DIR="$HOME/.cmdclaw"
+BIN_NAME="cmdclaw-daemon"
 
 # Detect OS and architecture
 detect_platform() {
@@ -32,7 +32,7 @@ get_download_url() {
   local url
 
   url=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep "browser_download_url.*bap-daemon-${platform}" \
+    | grep "browser_download_url.*cmdclaw-daemon-${platform}" \
     | head -1 \
     | cut -d '"' -f 4)
 
@@ -46,7 +46,7 @@ get_download_url() {
 
 main() {
   echo ""
-  echo "  Installing Bap Daemon..."
+  echo "  Installing CmdClaw Daemon..."
   echo ""
 
   local platform
@@ -76,22 +76,22 @@ main() {
     shell_profile="$HOME/.profile"
   fi
 
-  local path_entry="export PATH=\"\$HOME/.bap/bin:\$PATH\""
+  local path_entry="export PATH=\"\$HOME/.cmdclaw/bin:\$PATH\""
 
   if [ -n "$shell_profile" ]; then
-    if ! grep -q ".bap/bin" "$shell_profile" 2>/dev/null; then
+    if ! grep -q ".cmdclaw/bin" "$shell_profile" 2>/dev/null; then
       echo "" >> "$shell_profile"
-      echo "# Bap Daemon" >> "$shell_profile"
+      echo "# CmdClaw Daemon" >> "$shell_profile"
       echo "$path_entry" >> "$shell_profile"
       echo "  Added to PATH in ${shell_profile}"
     fi
   fi
 
   # Make available in current session
-  export PATH="$HOME/.bap/bin:$PATH"
+  export PATH="$HOME/.cmdclaw/bin:$PATH"
 
   echo ""
-  echo "  Run 'bap-daemon start' to connect your machine."
+  echo "  Run 'cmdclaw-daemon start' to connect your machine."
   echo ""
 
   # Start auth flow

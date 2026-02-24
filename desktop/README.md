@@ -1,6 +1,6 @@
-# Bap Desktop (Electron)
+# CmdClaw Desktop (Electron)
 
-This package wraps the web app in `/Users/baptiste/Git/bap/app` as an Electron desktop app.
+This package wraps the web app in `/Users/baptiste/Git/cmdclaw/app` as an Electron desktop app.
 
 ## Commands
 

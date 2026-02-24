@@ -87,7 +87,7 @@ async function requestOpenAIDeviceCode(config: {
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "User-Agent": "opencode/bap",
+      "User-Agent": "opencode/cmdclaw",
     },
     body: JSON.stringify({ client_id: config.clientId }),
   });
@@ -229,7 +229,7 @@ const poll = protectedProcedure.input(pollProviderSchema).handler(async ({ input
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "User-Agent": "opencode/bap",
+      "User-Agent": "opencode/cmdclaw",
     },
     body: JSON.stringify({
       device_auth_id: flowState.deviceAuthId,

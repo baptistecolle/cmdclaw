@@ -9,9 +9,9 @@ describe("getCallbackBaseUrls", () => {
   it("prefers public non-vercel URLs and excludes localcan in production", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("APP_URL", "http://localhost:3000");
-    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.heybap.com");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.cmdclaw.com");
 
-    expect(getCallbackBaseUrls()).toEqual(["https://app.heybap.com"]);
+    expect(getCallbackBaseUrls()).toEqual(["https://app.cmdclaw.com"]);
   });
 
   it("uses localcan fallback only in non-production localhost setups", () => {

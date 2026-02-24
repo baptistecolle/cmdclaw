@@ -323,7 +323,7 @@ describe("integrationRouter", () => {
     });
 
     expect(headers?.get("authorization")).toMatch(/^Basic /);
-    expect(headers?.get("user-agent")).toContain("bap-app");
+    expect(headers?.get("user-agent")).toContain("cmdclaw-app");
     expect(body?.get("client_id")).toBeNull();
     expect(body?.get("client_secret")).toBeNull();
     expect(body?.get("code_verifier")).toBe("pkce-verifier");

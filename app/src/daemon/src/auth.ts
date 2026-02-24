@@ -1,5 +1,5 @@
 /**
- * Device authentication flow for the Bap daemon.
+ * Device authentication flow for the CmdClaw daemon.
  * Uses Better Auth's device authorization plugin (RFC 8628):
  * 1. Request a device code from the Better Auth endpoint
  * 2. Display user code to the user
@@ -11,7 +11,7 @@ import { hostname, platform, arch } from "os";
 import { saveConfig, type DaemonConfig } from "./config";
 import { logger } from "./logger";
 
-const CLIENT_ID = "bap-daemon";
+const CLIENT_ID = "cmdclaw-daemon";
 
 export async function authenticate(serverUrl: string): Promise<DaemonConfig | null> {
   console.log("\n  Authenticating with", serverUrl, "\n");

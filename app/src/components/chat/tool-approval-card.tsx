@@ -157,7 +157,7 @@ export function ToolApprovalCard({
   const displayName = getIntegrationDisplayName(integration);
   const isQuestionRequest =
     (operation === "question" || toolName.toLowerCase() === "question") &&
-    integration.toLowerCase() === "bap";
+    integration.toLowerCase() === "cmdclaw";
   const questionPayload = useMemo(
     () => (isQuestionRequest ? parseQuestionRequestPayload(toolInput) : null),
     [isQuestionRequest, toolInput],
@@ -471,7 +471,7 @@ export function ToolApprovalCard({
           <Wrench className="text-muted-foreground h-4 w-4" />
         )}
         {isQuestionRequest ? (
-          <span className="font-medium">Bap wants to ask a question</span>
+          <span className="font-medium">CmdClaw wants to ask a question</span>
         ) : (
           <>
             <span className="font-medium">{displayName}</span>

@@ -311,7 +311,7 @@ export default function SubscriptionsPage() {
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Subscriptions</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Connect your existing AI subscriptions to use additional models in Bap.
+          Connect your existing AI subscriptions to use additional models in cmdclaw.
         </p>
       </div>
 
@@ -413,8 +413,8 @@ export default function SubscriptionsPage() {
             className="mt-0.5 h-4 w-auto shrink-0 dark:invert"
           />
           <p className="text-muted-foreground text-xs">
-            Anthropic models (Claude) are always available through Bap&apos;s platform. Connecting a
-            subscription gives you access to additional models from that provider.
+            Anthropic models (Claude) are always available through CmdClaw&apos;s platform.
+            Connecting a subscription gives you access to additional models from that provider.
           </p>
         </div>
       </div>

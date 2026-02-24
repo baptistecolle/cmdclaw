@@ -69,7 +69,7 @@ async function slackApi(
 }
 
 async function ensureLiveUserId(): Promise<string> {
-  const email = process.env.E2E_TEST_EMAIL ?? "baptiste@heybap.com";
+  const email = process.env.E2E_TEST_EMAIL ?? "baptiste@cmdclaw.com";
   const name = process.env.E2E_TEST_NAME ?? "Playwright E2E";
   const now = new Date();
 

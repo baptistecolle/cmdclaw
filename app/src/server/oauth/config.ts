@@ -332,7 +332,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
       const res = await fetch("https://oauth.reddit.com/api/v1/me", {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          "User-Agent": "bap-app:v1.0.0 (by /u/bap-integration)",
+          "User-Agent": "cmdclaw-app:v1.0.0 (by /u/cmdclaw-integration)",
         },
       });
       const data = await res.json();

@@ -2,7 +2,7 @@
  * OpenCode Plugin: Memory Tools
  *
  * Registers memory_search, memory_get, and memory_write tools that proxy
- * to the HeyBap server so memory lives in Postgres while files are synced
+ * to the CmdClaw server so memory lives in Postgres while files are synced
  * into the sandbox.
  */
 
@@ -56,7 +56,7 @@ const MEMORY_TOOLS = [
 
 async function callMemoryApi(operation: string, payload: MemoryToolInput) {
   const serverUrl = process.env.APP_URL;
-  const serverSecret = process.env.BAP_SERVER_SECRET;
+  const serverSecret = process.env.CMDCLAW_SERVER_SECRET;
   const conversationId = process.env.CONVERSATION_ID;
 
   if (!serverUrl || !conversationId) {

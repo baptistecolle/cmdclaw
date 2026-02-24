@@ -99,7 +99,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bap-daemon-${{ matrix.target }}
+          name: cmdclaw-daemon-${{ matrix.target }}
           path: app/src/daemon/dist/
 
   release:

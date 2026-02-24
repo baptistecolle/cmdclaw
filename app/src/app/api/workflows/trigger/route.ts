@@ -4,7 +4,7 @@ import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
 export async function POST(request: Request) {
   const auth = request.headers.get("authorization") ?? "";
-  const expected = env.BAP_SERVER_SECRET ? `Bearer ${env.BAP_SERVER_SECRET}` : "";
+  const expected = env.CMDCLAW_SERVER_SECRET ? `Bearer ${env.CMDCLAW_SERVER_SECRET}` : "";
 
   if (!expected || auth !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

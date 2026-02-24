@@ -6,11 +6,11 @@
  * OpenCode's registered redirect URI.
  *
  * Flow:
- *  1. User clicks "Connect ChatGPT" → Bap generates auth URL
+ *  1. User clicks "Connect ChatGPT" → CmdClaw generates auth URL
  *  2. Browser opens OpenAI auth page
  *  3. OpenAI redirects to http://localhost:1455/auth/callback
  *  4. This server catches the callback, exchanges code for tokens
- *  5. Redirects browser back to Bap's settings page
+ *  5. Redirects browser back to CmdClaw's settings page
  */
 import { createServer, type Server } from "node:http";
 import { env } from "@/env";

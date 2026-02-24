@@ -1,5 +1,5 @@
 /**
- * Local LLM proxy for the Bap daemon.
+ * Local LLM proxy for the CmdClaw daemon.
  * Detects and proxies requests to Ollama and LM Studio.
  */
 

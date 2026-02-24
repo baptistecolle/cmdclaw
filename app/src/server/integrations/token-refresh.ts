@@ -191,7 +191,7 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
 
     // Reddit requires User-Agent header for all API calls
     if (token.type === "reddit") {
-      headers["User-Agent"] = "bap-app:v1.0.0 (by /u/bap-integration)";
+      headers["User-Agent"] = "cmdclaw-app:v1.0.0 (by /u/cmdclaw-integration)";
     }
 
     const now = new Date();

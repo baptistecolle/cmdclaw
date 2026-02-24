@@ -4,7 +4,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const appName = process.env.DESKTOP_APP_NAME || "Bap";
+const appName = process.env.DESKTOP_APP_NAME || "CmdClaw";
 const electronBinary = require("electron");
 
 function setPlistKey(plistPath, key, value) {

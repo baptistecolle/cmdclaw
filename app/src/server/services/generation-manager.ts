@@ -752,16 +752,18 @@ class GenerationManager {
   }
 
   private getLockRedis(): IORedis {
-    const globalForLocks = globalThis as typeof globalThis & { __bapGenerationLockRedis?: IORedis };
-    if (!globalForLocks.__bapGenerationLockRedis) {
-      globalForLocks.__bapGenerationLockRedis = new IORedis(
+    const globalForLocks = globalThis as typeof globalThis & {
+      __cmdclawGenerationLockRedis?: IORedis;
+    };
+    if (!globalForLocks.__cmdclawGenerationLockRedis) {
+      globalForLocks.__cmdclawGenerationLockRedis = new IORedis(
         buildRedisOptions(process.env.REDIS_URL ?? "redis://localhost:6379", {
           maxRetriesPerRequest: null,
           enableReadyCheck: false,
         }),
       );
     }
-    return globalForLocks.__bapGenerationLockRedis;
+    return globalForLocks.__cmdclawGenerationLockRedis;
   }
 
   private async acquireGenerationLease(generationId: string): Promise<string | null> {
@@ -3218,7 +3220,7 @@ class GenerationManager {
         getIntegrationSkillsSystemPrompt(writtenIntegrationSkills);
 
       // Build system prompt
-      const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
+      const baseSystemPrompt = "You are CmdClaw, an AI agent that helps do work.";
       const fileShareInstructions = [
         "## File Sharing",
         "When you create files that the user needs (PDFs, images, documents, code files, etc.), ",
@@ -3659,7 +3661,7 @@ class GenerationManager {
         resolvedCommunityIntegrationSkills.map((skill) => skill.slug),
       );
 
-      const baseSystemPrompt = "You are Bap, an AI agent that helps do work.";
+      const baseSystemPrompt = "You are CmdClaw, an AI agent that helps do work.";
       const workflowPrompt = this.buildWorkflowPrompt(ctx);
       const memoryPrompt = buildMemorySystemPrompt();
       const integrationSkillDraftInstructions = this.getIntegrationSkillDraftInstructions();
@@ -4638,7 +4640,7 @@ class GenerationManager {
         toolName: "Permission",
         toolInput: request as Record<string, unknown>,
         requestedAt: new Date().toISOString(),
-        integration: "Bap",
+        integration: "cmdclaw",
         operation: permissionType,
         command,
       },
@@ -4680,7 +4682,7 @@ class GenerationManager {
         toolName: "Question",
         toolInput: request as unknown as Record<string, unknown>,
         requestedAt: new Date().toISOString(),
-        integration: "Bap",
+        integration: "cmdclaw",
         operation: "question",
         command,
       },
@@ -6135,12 +6137,12 @@ class GenerationManager {
 
 // Stable singleton across dev hot-reloads/module re-evaluation.
 const globalForGenerationManager = globalThis as typeof globalThis & {
-  __bapGenerationManager?: GenerationManager;
+  __cmdclawGenerationManager?: GenerationManager;
 };
 
 export const generationManager =
-  globalForGenerationManager.__bapGenerationManager ?? new GenerationManager();
+  globalForGenerationManager.__cmdclawGenerationManager ?? new GenerationManager();
 
 if (process.env.NODE_ENV !== "production") {
-  globalForGenerationManager.__bapGenerationManager = generationManager;
+  globalForGenerationManager.__cmdclawGenerationManager = generationManager;
 }

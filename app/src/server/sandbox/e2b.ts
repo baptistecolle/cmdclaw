@@ -15,7 +15,7 @@ import { logServerEvent, type ObservabilityContext } from "@/server/utils/observ
 import type { SandboxBackend, ExecuteResult } from "./types";
 
 // Use custom template with OpenCode pre-installed
-const TEMPLATE_NAME = env.E2B_TEMPLATE || "bap-agent-dev";
+const TEMPLATE_NAME = env.E2B_TEMPLATE || "cmdclaw-agent-dev";
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const OPENCODE_PORT = 4096;
 
@@ -244,7 +244,7 @@ export async function getOrCreateSandbox(
         ANTHROPIC_API_KEY: config.anthropicApiKey,
         ANVIL_API_KEY: env.ANVIL_API_KEY || "",
         APP_URL: resolveSandboxAppUrl(),
-        BAP_SERVER_SECRET: env.BAP_SERVER_SECRET || "",
+        CMDCLAW_SERVER_SECRET: env.CMDCLAW_SERVER_SECRET || "",
         CONVERSATION_ID: config.conversationId,
         GENERATION_ID: config.generationId ?? "",
         ...config.integrationEnvs,

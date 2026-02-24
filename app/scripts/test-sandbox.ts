@@ -19,7 +19,7 @@ import * as schema from "../src/server/db/schema";
 
 void dotenvConfig;
 
-const TEMPLATE_NAME = process.env.E2B_TEMPLATE || "bap-agent-dev";
+const TEMPLATE_NAME = process.env.E2B_TEMPLATE || "cmdclaw-agent-dev";
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const TEST_USER_EMAIL = "collebaptiste@gmail.com";
 

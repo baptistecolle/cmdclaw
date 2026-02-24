@@ -1,29 +1,29 @@
 <p align="center">
-  <img src="app/public/logo.png" alt="Bap" width="80" />
+  <img src="app/public/logo.png" alt="CmdClaw" width="80" />
 </p>
 
-<h1 align="center">Bap</h1>
+<h1 align="center">CmdClaw</h1>
 
 <p align="center">
   Your voice coworker — an open-source AI assistant that connects to the tools you use every day.
 </p>
 
 <p align="center">
-  <a href="https://docs.heybap.com"><img src="https://img.shields.io/badge/docs-heybap.com-blue" alt="Documentation" /></a>
+  <a href="https://docs.cmdclaw.com"><img src="https://img.shields.io/badge/docs-cmdclaw.com-blue" alt="Documentation" /></a>
   <a href="https://discord.com/invite/NHQy8gXerd"><img src="https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" /></a>
 </p>
 
 <p align="center">
-  <a href="https://heybap.com">Website</a> &middot;
-  <a href="https://app.heybap.com">App</a> &middot;
-  <a href="https://docs.heybap.com">Docs</a> &middot;
+  <a href="https://cmdclaw.com">Website</a> &middot;
+  <a href="https://app.cmdclaw.com">App</a> &middot;
+  <a href="https://docs.cmdclaw.com">Docs</a> &middot;
   <a href="https://discord.com/invite/NHQy8gXerd">Discord</a>
 </p>
 
 ---
 
-Bap is an open-source, multi-platform AI assistant that lets you interact with your favorite services through conversation. Connect your tools, talk to Bap, and let it handle the rest — from sending emails and scheduling meetings to managing issues and updating your CRM.
+CmdClaw is an open-source, multi-platform AI assistant that lets you interact with your favorite services through conversation. Connect your tools, talk to CmdClaw, and let it handle the rest — from sending emails and scheduling meetings to managing issues and updating your CRM.
 
 ## Features
 
@@ -51,7 +51,7 @@ Bap is an open-source, multi-platform AI assistant that lets you interact with y
 ## Project Structure
 
 ```
-bap/
+cmdclaw/
 ├── app/          # Next.js web application
 ├── apple/        # macOS and iOS SwiftUI applications
 ├── docs/         # Documentation site (Mintlify)
@@ -70,8 +70,8 @@ bap/
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-username/bap.git
-cd bap/app
+git clone https://github.com/your-username/cmdclaw.git
+cd cmdclaw/app
 
 # Install dependencies
 bun install
@@ -110,7 +110,7 @@ bun worker          # Start background job worker
 
 ## Native Apps
 
-The `apple/` directory contains SwiftUI applications for macOS and iOS. Open `apple/Bap.xcodeproj` in Xcode to build and run.
+The `apple/` directory contains SwiftUI applications for macOS and iOS. Open `apple/cmdclaw.xcodeproj` in Xcode to build and run.
 
 Features specific to native apps:
 - Voice input with Whisper transcription
@@ -119,7 +119,7 @@ Features specific to native apps:
 
 ## Contributing
 
-Bap is open source and contributions are welcome. Feel free to open issues, submit pull requests, or suggest new integrations.
+CmdClaw is open source and contributions are welcome. Feel free to open issues, submit pull requests, or suggest new integrations.
 
 ## License
 

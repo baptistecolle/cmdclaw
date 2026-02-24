@@ -68,8 +68,8 @@ const DEFAULT_CHUNK_OVERLAP = 80;
 const DEFAULT_SEARCH_LIMIT = 8;
 const DEFAULT_SCORE_THRESHOLD = 0.35;
 
-const MEMORY_BASE_PATH = "/app/bap";
-const SESSION_BASE_PATH = "/app/bap/sessions";
+const MEMORY_BASE_PATH = "/app/cmdclaw";
+const SESSION_BASE_PATH = "/app/cmdclaw/sessions";
 
 export function getMemoryBasePath(): string {
   return MEMORY_BASE_PATH;

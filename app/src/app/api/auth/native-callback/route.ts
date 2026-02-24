@@ -12,7 +12,7 @@ import { auth } from "@/lib/auth";
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const redirect = searchParams.get("redirect") || "bap://auth/callback";
+  const redirect = searchParams.get("redirect") || "cmdclaw://auth/callback";
 
   try {
     // Log cookies for debugging

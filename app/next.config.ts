@@ -5,7 +5,7 @@ void envConfig;
 
 const posthogApiDestination = "https://eu.i.posthog.com";
 const posthogAssetsDestination = "https://eu-assets.i.posthog.com";
-const posthogProxyPath = "/_bap_lattice";
+const posthogProxyPath = "/_cmdclaw_lattice";
 
 const nextConfig: NextConfig = {
   /* config options here */

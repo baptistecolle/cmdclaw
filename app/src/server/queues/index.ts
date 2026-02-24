@@ -5,7 +5,7 @@ import { buildRedisOptions } from "@/server/redis/connection-options";
 import { processForwardedEmailEvent } from "@/server/services/workflow-email-forwarding";
 import { triggerWorkflowRun } from "@/server/services/workflow-service";
 
-const rawQueueName = process.env.BULLMQ_QUEUE_NAME ?? "bap-default";
+const rawQueueName = process.env.BULLMQ_QUEUE_NAME ?? "cmdclaw-default";
 export const queueName = rawQueueName.replaceAll(":", "-");
 export const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 const redisOptions = {

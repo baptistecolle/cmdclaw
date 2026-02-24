@@ -1,13 +1,13 @@
 /**
- * Structured logging for the Bap daemon.
- * Logs to ~/.bap/daemon.log and optionally to stdout.
+ * Structured logging for the CmdClaw daemon.
+ * Logs to ~/.cmdclaw/daemon.log and optionally to stdout.
  */
 
 import { appendFileSync, existsSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
-const LOG_DIR = join(homedir(), ".bap");
+const LOG_DIR = join(homedir(), ".cmdclaw");
 const LOG_PATH = join(LOG_DIR, "daemon.log");
 
 function ensureLogDir(): void {

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Support - Bap",
-  description: "Get help and support for Bap",
+  title: "Support - CmdClaw",
+  description: "Get help and support for CmdClaw",
 };
 
 export default function SupportPage() {
@@ -16,10 +16,10 @@ export default function SupportPage() {
       </div>
 
       <a
-        href="mailto:baptiste@heybap.com"
+        href="mailto:baptiste@cmdclaw.com"
         className="text-primary text-lg font-medium hover:underline"
       >
-        baptiste@heybap.com
+        baptiste@cmdclaw.com
       </a>
     </div>
   );

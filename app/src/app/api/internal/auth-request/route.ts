@@ -37,18 +37,18 @@ function verifyPluginSecret(
 ): boolean {
   const providedAuth = authHeader ?? requestAuthHeader ?? undefined;
 
-  if (!env.BAP_SERVER_SECRET) {
+  if (!env.CMDCLAW_SERVER_SECRET) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
-        "[Internal] BAP_SERVER_SECRET not configured, allowing internal auth request in development",
+        "[Internal] CMDCLAW_SERVER_SECRET not configured, allowing internal auth request in development",
       );
       return true;
     }
-    console.warn("[Internal] BAP_SERVER_SECRET not configured");
+    console.warn("[Internal] CMDCLAW_SERVER_SECRET not configured");
     return false;
   }
 
-  return providedAuth === `Bearer ${env.BAP_SERVER_SECRET}`;
+  return providedAuth === `Bearer ${env.CMDCLAW_SERVER_SECRET}`;
 }
 
 export async function POST(request: Request) {

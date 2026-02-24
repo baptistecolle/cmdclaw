@@ -7,7 +7,7 @@ import {
   saveConfig,
 } from "./lib/cli-shared";
 
-const DEFAULT_CHAT_AUTH_EMAIL = "baptiste@heybap.com";
+const DEFAULT_CHAT_AUTH_EMAIL = "baptiste@cmdclaw.com";
 const DEFAULT_CHAT_AUTH_NAME = "Baptiste";
 
 function isLocalServerUrl(serverUrl: string): boolean {
@@ -32,7 +32,7 @@ function formatError(err: unknown): string {
 }
 
 async function main(): Promise<void> {
-  const serverUrl = process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const serverUrl = process.env.CMDCLAW_SERVER_URL || DEFAULT_SERVER_URL;
   const loaded = loadConfig(serverUrl);
 
   if (!isLocalServerUrl(serverUrl)) {

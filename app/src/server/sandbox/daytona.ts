@@ -1,6 +1,6 @@
 import type { ExecuteResult, SandboxBackend } from "./types";
 
-const DEFAULT_DAYTONA_SNAPSHOT = "bap-agent-dev";
+const DEFAULT_DAYTONA_SNAPSHOT = "cmdclaw-agent-dev";
 const DEFAULT_WORKDIR = "/app";
 
 type DaytonaProcessResult = {

@@ -41,7 +41,7 @@ type Args = {
   questionAnswers: string[];
 };
 
-const DEFAULT_CLIENT_ID = "bap-cli";
+const DEFAULT_CLIENT_ID = "cmdclaw-cli";
 const AUTH_INTEGRATION_TYPES = [
   "gmail",
   "google_calendar",
@@ -230,7 +230,7 @@ async function authenticate(serverUrl: string): Promise<ChatConfig | null> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        client_id: process.env.BAP_CLI_CLIENT_ID || DEFAULT_CLIENT_ID,
+        client_id: process.env.CMDCLAW_CLI_CLIENT_ID || DEFAULT_CLIENT_ID,
       }),
     });
 
@@ -273,7 +273,7 @@ async function authenticate(serverUrl: string): Promise<ChatConfig | null> {
         body: JSON.stringify({
           grant_type: "urn:ietf:params:oauth:grant-type:device_code",
           device_code: deviceCode,
-          client_id: process.env.BAP_CLI_CLIENT_ID || DEFAULT_CLIENT_ID,
+          client_id: process.env.CMDCLAW_CLI_CLIENT_ID || DEFAULT_CLIENT_ID,
         }),
       });
 
@@ -514,7 +514,8 @@ async function runGeneration(
   const runtime = createGenerationRuntime();
   const streamedSandboxFileIds = new Set<string>();
   const authHandlingInProgress = new Set<string>();
-  const resolvedServerUrl = options.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const resolvedServerUrl =
+    options.serverUrl || process.env.CMDCLAW_SERVER_URL || DEFAULT_SERVER_URL;
   const normalizedServerUrl = resolvedServerUrl.replace(/\/$/, "");
 
   try {
@@ -885,7 +886,7 @@ async function printAuthenticatedUser(client: RouterClient<AppRouter>): Promise<
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const requestedServerUrl = args.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const requestedServerUrl = args.serverUrl || process.env.CMDCLAW_SERVER_URL || DEFAULT_SERVER_URL;
 
   if (args.listModels) {
     await printFreeModels();
@@ -922,7 +923,7 @@ async function main(): Promise<void> {
   const client = createRpcClient(serverUrl, config.token);
 
   try {
-    const overrideModel = args.model ?? process.env.BAP_CHAT_MODEL;
+    const overrideModel = args.model ?? process.env.CMDCLAW_CHAT_MODEL;
     if (overrideModel?.trim()) {
       const trimmedOverride = overrideModel.trim();
       parseModelReference(trimmedOverride);

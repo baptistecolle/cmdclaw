@@ -63,7 +63,7 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  const serverUrl = args.serverUrl || process.env.BAP_SERVER_URL || DEFAULT_SERVER_URL;
+  const serverUrl = args.serverUrl || process.env.CMDCLAW_SERVER_URL || DEFAULT_SERVER_URL;
   const config = loadConfig(serverUrl);
   const token = args.token || config?.token;
 

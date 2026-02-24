@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 /**
- * Bap Daemon CLI
+ * CmdClaw Daemon CLI
  *
- * Connects your local machine to heybap.com as a compute backend.
+ * Connects your local machine to cmdclaw.com as a compute backend.
  *
  * Usage:
- *   bap-daemon start          Start the daemon
- *   bap-daemon stop           Stop the daemon
- *   bap-daemon status         Show connection status
- *   bap-daemon auth           Re-run authentication
- *   bap-daemon auth --server  Specify a custom server URL
+ *   cmdclaw-daemon start          Start the daemon
+ *   cmdclaw-daemon stop           Stop the daemon
+ *   cmdclaw-daemon status         Show connection status
+ *   cmdclaw-daemon auth           Re-run authentication
+ *   cmdclaw-daemon auth --server  Specify a custom server URL
  */
 
 import { platform, arch } from "os";
@@ -19,18 +19,18 @@ import { detectLocalProviders } from "./llm-proxy";
 import { logger, setVerbose } from "./logger";
 import { WSClient } from "./ws-client";
 
-const DEFAULT_SERVER_URL = "https://heybap.com";
+const DEFAULT_SERVER_URL = "https://cmdclaw.com";
 
 function printHelp(): void {
   console.log(`
-  \x1b[1mbap-daemon\x1b[0m - Connect your machine to heybap.com
+  \x1b[1mcmdclaw-daemon\x1b[0m - Connect your machine to cmdclaw.com
 
   \x1b[2mUsage:\x1b[0m
-    bap-daemon start [--server URL] [--verbose]   Start the daemon
-    bap-daemon stop                                Stop the daemon
-    bap-daemon status                              Show connection status
-    bap-daemon auth [--server URL]                 Run authentication
-    bap-daemon help                                Show this help
+    cmdclaw-daemon start [--server URL] [--verbose]   Start the daemon
+    cmdclaw-daemon stop                                Stop the daemon
+    cmdclaw-daemon status                              Show connection status
+    cmdclaw-daemon auth [--server URL]                 Run authentication
+    cmdclaw-daemon help                                Show this help
 `);
 }
 
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
 }
 
 async function startDaemon(serverUrlOverride?: string): Promise<void> {
-  console.log("\n  \x1b[1mBap Daemon\x1b[0m\n");
+  console.log("\n  \x1b[1mCmdClaw Daemon\x1b[0m\n");
 
   // Check for existing config
   let config = loadConfig();
@@ -152,7 +152,7 @@ async function showStatus(): Promise<void> {
   const config = loadConfig();
 
   if (!config || !config.token) {
-    console.log("  Not authenticated. Run: bap-daemon auth");
+    console.log("  Not authenticated. Run: cmdclaw-daemon auth");
     return;
   }
 

@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bap",
+  title: "CmdClaw",
   description: "Your AI Assistant",
   icons: {
     icon: [

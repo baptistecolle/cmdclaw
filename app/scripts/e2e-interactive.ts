@@ -11,7 +11,7 @@ type TestMeta = {
   live: boolean;
 };
 
-const DEFAULT_E2E_EMAIL = "baptiste@heybap.com";
+const DEFAULT_E2E_EMAIL = "baptiste@cmdclaw.com";
 const SERVICE_TOKENS = [
   "slack",
   "discord",

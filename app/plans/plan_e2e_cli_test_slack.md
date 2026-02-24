@@ -12,7 +12,7 @@ Create a live end-to-end CLI test for the slack integration that validates the f
 
 ## Reference implementation
 Use Slack as the reference pattern for structure, fixtures, and assertions:
-- `/Users/baptiste/Git/bap/app/src/app/chat/chat.slack.cli.live.test.ts`
+- `/Users/baptiste/Git/cmdclaw/app/src/app/chat/chat.slack.cli.live.test.ts`
 
 Reuse the same conventions as Slack:
 - `describe.runIf(liveEnabled)` gating

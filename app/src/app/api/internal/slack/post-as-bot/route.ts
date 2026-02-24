@@ -13,7 +13,7 @@ type RelayPayload = {
 };
 
 function getRelaySecret(): string | undefined {
-  return env.SLACK_BOT_RELAY_SECRET ?? env.BAP_SERVER_SECRET;
+  return env.SLACK_BOT_RELAY_SECRET ?? env.CMDCLAW_SERVER_SECRET;
 }
 
 function isAuthorized(request: Request): boolean {

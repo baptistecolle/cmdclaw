@@ -10,7 +10,7 @@ let mainWindow = null;
 const desktopRoot = path.resolve(__dirname, "..");
 const iconPngPath = path.join(desktopRoot, "build", "icons", "icon-512.png");
 
-app.setName("Bap");
+app.setName("CmdClaw");
 
 function createWindow(startUrl) {
   const win = new BrowserWindow({
@@ -162,7 +162,7 @@ app.whenReady().then(async () => {
     });
   } catch (error) {
     const message = error && error.stack ? error.stack : String(error);
-    dialog.showErrorBox("Bap failed to start", message);
+    dialog.showErrorBox("CmdClaw failed to start", message);
     app.quit();
   }
 });

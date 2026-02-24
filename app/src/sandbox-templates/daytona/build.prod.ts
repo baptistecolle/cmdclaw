@@ -93,7 +93,7 @@ async function createOrReplaceSnapshot(daytona: Daytona, name: string) {
 async function main() {
   const daytona = new Daytona(getDaytonaConfig());
 
-  const name = process.env.DAYTONA_SNAPSHOT_PROD || "bap-agent-prod";
+  const name = process.env.DAYTONA_SNAPSHOT_PROD || "cmdclaw-agent-prod";
   console.log(`Creating Daytona prod snapshot: ${name}`);
 
   const snapshot = await createOrReplaceSnapshot(daytona, name);

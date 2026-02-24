@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "bap-desktop",
+      "name": "cmdclaw-desktop",
       "devDependencies": {
         "concurrently": "latest",
         "cross-env": "latest",

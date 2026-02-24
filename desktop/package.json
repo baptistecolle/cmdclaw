@@ -1,15 +1,15 @@
 {
-  "name": "bap-desktop",
+  "name": "cmdclaw-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Electron desktop wrapper for Bap web app",
-  "homepage": "https://app.heybap.com",
+  "description": "Electron desktop wrapper for CmdClaw web app",
+  "homepage": "https://app.cmdclaw.com",
   "bugs": {
-    "url": "https://app.heybap.com/support"
+    "url": "https://app.cmdclaw.com/support"
   },
   "author": {
     "name": "Baptiste Colle",
-    "email": "baptiste@heybap.com"
+    "email": "baptiste@cmdclaw.com"
   },
   "main": "electron/main.cjs",
   "scripts": {
@@ -32,10 +32,10 @@
     "wait-on": "latest"
   },
   "build": {
-    "appId": "com.heybap.desktop",
-    "productName": "Bap",
+    "appId": "com.cmdclaw.desktop",
+    "productName": "CmdClaw",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
-    "copyright": "Copyright (c) 2026 Bap. All rights reserved.",
+    "copyright": "Copyright (c) 2026 CmdClaw. All rights reserved.",
     "icon": "build/icons/icon-512.png",
     "directories": {
       "output": "dist"
@@ -65,7 +65,7 @@
     },
     "linux": {
       "category": "Utility",
-      "maintainer": "Baptiste Colle <baptiste@heybap.com>",
+      "maintainer": "Baptiste Colle <baptiste@cmdclaw.com>",
       "icon": "build/icons/icon-512.png",
       "target": [
         "AppImage",

@@ -14,7 +14,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "bap"
+      Project     = "cmdclaw"
       ManagedBy   = "opentofu"
       Environment = var.environment
     }

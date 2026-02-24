@@ -19,10 +19,10 @@ const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 const appUrl =
   env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
-const ADMIN_EMAILS = new Set(["baptiste@heybap.com"]);
+const ADMIN_EMAILS = new Set(["baptiste@cmdclaw.com"]);
 
 export const auth = betterAuth({
-  appName: "Bap",
+  appName: "CmdClaw",
   baseURL: appUrl,
   user: {
     additionalFields: {
@@ -49,13 +49,13 @@ export const auth = betterAuth({
   },
   trustedOrigins: [
     "https://appleid.apple.com",
-    "https://heybap.com",
-    "https://www.heybap.com",
-    "https://app.heybap.com",
+    "https://cmdclaw.com",
+    "https://www.cmdclaw.com",
+    "https://app.cmdclaw.com",
     `http://localhost:${process.env.PORT ?? 3000}`,
     `http://127.0.0.1:${process.env.PORT ?? 3000}`,
     "https://localcan.baptistecolle.com",
-    "bap://",
+    "cmdclaw://",
   ],
   // Don't forget to regenerate the schema if you add a new plugin
   // Run "bun auth:generate" to regenerate the schema
@@ -79,9 +79,9 @@ export const auth = betterAuth({
         console.log(`[auth] Sending magic link to ${email}`);
         if (resend && env.EMAIL_FROM) {
           await resend.emails.send({
-            from: `Bap <${env.EMAIL_FROM}>`,
+            from: `CmdClaw <${env.EMAIL_FROM}>`,
             to: email,
-            subject: `Sign in to Bap | ${new Date().toISOString().slice(0, 19).replace("T", " ")}`,
+            subject: `Sign in to CmdClaw | ${new Date().toISOString().slice(0, 19).replace("T", " ")}`,
             html: `
 <!DOCTYPE html>
 <html>
@@ -96,7 +96,7 @@ export const auth = betterAuth({
         <table role="presentation" style="max-width: 480px; width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
           <tr>
             <td style="padding: 48px 40px; text-align: center;">
-              <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #18181b;">Sign in to Bap</h1>
+              <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #18181b;">Sign in to CmdClaw</h1>
               <p style="margin: 0 0 32px 0; font-size: 15px; color: #71717a; line-height: 1.5;">Click the button below to securely sign in to your account.</p>
               <a href="${url}" style="display: inline-block; padding: 14px 32px; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 500; border-radius: 8px;">Sign in</a>
               <p style="margin: 32px 0 0 0; font-size: 13px; color: #a1a1aa; line-height: 1.5;">If you didn't request this email, you can safely ignore it.</p>

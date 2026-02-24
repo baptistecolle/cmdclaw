@@ -3,15 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
 const trustedOrigins = new Set([
-  "https://app.heybap.com",
-  "https://heybap.com",
-  "https://www.heybap.com",
+  "https://app.cmdclaw.com",
+  "https://cmdclaw.com",
+  "https://www.cmdclaw.com",
   "https://localcan.baptistecolle.com",
   `http://localhost:${process.env.PORT ?? 3000}`,
   `http://127.0.0.1:${process.env.PORT ?? 3000}`,
 ]);
 
-const DEFAULT_ALLOWED_ORIGIN = "https://app.heybap.com";
+const DEFAULT_ALLOWED_ORIGIN = "https://app.cmdclaw.com";
 
 function getCorsHeaders(origin: string | null) {
   const isAllowed = origin && trustedOrigins.has(origin);

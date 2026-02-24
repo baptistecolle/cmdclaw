@@ -1,5 +1,5 @@
 /**
- * WebSocket client for the Bap daemon.
+ * WebSocket client for the CmdClaw daemon.
  * Connects to the server, handles reconnection with exponential backoff,
  * and routes incoming messages to handlers.
  */

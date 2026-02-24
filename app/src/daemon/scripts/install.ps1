@@ -1,12 +1,12 @@
-# Bap Daemon Installer for Windows
-# Usage: irm https://heybap.com/i.ps1 | iex
+# CmdClaw Daemon Installer for Windows
+# Usage: irm https://cmdclaw.com/i.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
-$REPO = "heybap/bap"
-$INSTALL_DIR = "$env:USERPROFILE\.bap"
+$REPO = "cmdclaw/cmdclaw"
+$INSTALL_DIR = "$env:USERPROFILE\.cmdclaw"
 $BIN_DIR = "$INSTALL_DIR\bin"
-$BIN_NAME = "bap-daemon.exe"
+$BIN_NAME = "cmdclaw-daemon.exe"
 
 function Get-Platform {
     $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
@@ -23,7 +23,7 @@ function Get-DownloadUrl {
     param([string]$Platform)
 
     $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$REPO/releases/latest"
-    $asset = $releases.assets | Where-Object { $_.name -like "*bap-daemon-$Platform*" } | Select-Object -First 1
+    $asset = $releases.assets | Where-Object { $_.name -like "*cmdclaw-daemon-$Platform*" } | Select-Object -First 1
 
     if (-not $asset) {
         Write-Error "No release found for platform: $Platform"
@@ -34,7 +34,7 @@ function Get-DownloadUrl {
 }
 
 Write-Host ""
-Write-Host "  Installing Bap Daemon..."
+Write-Host "  Installing CmdClaw Daemon..."
 Write-Host ""
 
 $platform = Get-Platform
@@ -52,7 +52,7 @@ Write-Host "  Installed to $BIN_DIR\$BIN_NAME"
 
 # Add to PATH if not already there
 $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-if ($currentPath -notlike "*\.bap\bin*") {
+if ($currentPath -notlike "*\.cmdclaw\bin*") {
     [Environment]::SetEnvironmentVariable("PATH", "$BIN_DIR;$currentPath", "User")
     Write-Host "  Added to PATH"
 }
@@ -61,7 +61,7 @@ if ($currentPath -notlike "*\.bap\bin*") {
 $env:PATH = "$BIN_DIR;$env:PATH"
 
 Write-Host ""
-Write-Host "  Run 'bap-daemon start' to connect your machine."
+Write-Host "  Run 'cmdclaw-daemon start' to connect your machine."
 Write-Host ""
 
 # Start auth flow

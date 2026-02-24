@@ -68,7 +68,7 @@ function formatSlackErrorMessage(err: unknown): string {
   const clipped = compact.length > 500 ? `${compact.slice(0, 497)}...` : compact;
 
   return [
-    "There was an issue processing your message. Please contact heybap with this error so we can solve it.",
+    "There was an issue processing your message. Please contact CmdClaw with this error so we can solve it.",
     "",
     "```",
     clipped || "Unknown error",
@@ -167,15 +167,15 @@ export async function handleSlackEvent(payload: SlackEvent) {
   }
 
   try {
-    // Look up linked Bap user
+    // Look up linked CmdClaw user
     const link = await resolveUser(team_id, slackUserId);
 
     if (!link) {
-      const appUrl = env.NEXT_PUBLIC_APP_URL ?? "https://heybap.com";
+      const appUrl = env.NEXT_PUBLIC_APP_URL ?? "https://cmdclaw.com";
       const linkUrl = `${appUrl}/api/slack/link?slackUserId=${slackUserId}&slackTeamId=${team_id}`;
       await postMessage(
         channel,
-        `To use @bap, connect your account first: ${linkUrl}`,
+        `To use @cmdclaw, connect your account first: ${linkUrl}`,
         isDirectMessage ? undefined : threadTs,
       );
       return;
@@ -184,7 +184,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
     // Add typing indicator
     await addReaction(channel, event.ts, "hourglass_flowing_sand");
 
-    // Get or create Bap conversation for this Slack thread
+    // Get or create CmdClaw conversation for this Slack thread
     const convId = await getOrCreateConversation(team_id, channel, threadTs, link.userId);
 
     // Get Slack user display name for context
@@ -267,7 +267,7 @@ async function getOrCreateConversation(
     return existing.conversationId;
   }
 
-  // Create a new Bap conversation
+  // Create a new CmdClaw conversation
   const [newConv] = await db
     .insert(conversation)
     .values({
@@ -278,7 +278,7 @@ async function getOrCreateConversation(
     })
     .returning();
 
-  // Map Slack thread to Bap conversation
+  // Map Slack thread to CmdClaw conversation
   await db.insert(slackConversation).values({
     teamId,
     channelId,

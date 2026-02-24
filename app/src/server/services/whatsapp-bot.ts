@@ -284,7 +284,7 @@ async function handleLinkCode(waJid: string, messageText: string) {
 
   if (!userNumber || userNumber !== senderNumber) {
     await socket?.sendMessage(waJid, {
-      text: "This WhatsApp number doesn't match the phone number on your Bap profile. Update your phone number in Settings and try again.",
+      text: "This WhatsApp number doesn't match the phone number on your CmdClaw profile. Update your phone number in Settings and try again.",
     });
     return true;
   }
@@ -314,7 +314,7 @@ async function handleLinkCode(waJid: string, messageText: string) {
     .where(eq(whatsappLinkCode.id, linkCode.id));
 
   await socket?.sendMessage(waJid, {
-    text: "✅ WhatsApp linked! You can now chat with Bap here.",
+    text: "✅ WhatsApp linked! You can now chat with CmdClaw here.",
   });
 
   return true;
@@ -331,7 +331,7 @@ async function handleIncomingMessage(waJid: string, text: string, displayName: s
       return;
     }
     await socket?.sendMessage(waJid, {
-      text: "To link this WhatsApp number, open Bap Settings and generate a WhatsApp link code, then send it here.",
+      text: "To link this WhatsApp number, open CmdClaw Settings and generate a WhatsApp link code, then send it here.",
     });
     return;
   }
@@ -388,7 +388,7 @@ export async function ensureWhatsAppSocket(): Promise<void> {
     socket = createWASocket({
       auth: authState,
       printQRInTerminal: false,
-      browser: Browsers.macOS("Bap"),
+      browser: Browsers.macOS("CmdClaw"),
     });
 
     socket.ev.on("creds.update", saveCreds);

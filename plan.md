@@ -1,14 +1,14 @@
 # Plan: Add Email Forwarding Trigger (Workflow + User Inbox Modes)
 
 ## Goal
-Let users trigger workflows by forwarding emails to Bap, using:
+Let users trigger workflows by forwarding emails to CmdClaw, using:
 1. A per-workflow forwarding address.
 2. A per-user forwarding address.
 
 ## Product Decisions (Agreed)
 1. Trigger naming
 - Internal trigger key: `email.forwarded`.
-- UI label: `Email forwarded to Bap`.
+- UI label: `Email forwarded to CmdClaw`.
 
 2. Security
 - Verify Resend webhook signatures with `RESEND_WEBHOOK_SECRET`.
@@ -19,8 +19,8 @@ Let users trigger workflows by forwarding emails to Bap, using:
 
 4. Routing model
 - Support both address styles:
-  - Workflow address: `bot+wf_<workflowId>@mail.heybap.com`
-  - User address: `bot+u_<userId>@mail.heybap.com`
+  - Workflow address: `bot+wf_<workflowId>@mail.cmdclaw.com`
+  - User address: `bot+u_<userId>@mail.cmdclaw.com`
 
 ## Routing Behavior
 1. Parse recipient local part from inbound `to` addresses.
@@ -81,7 +81,7 @@ Let users trigger workflows by forwarding emails to Bap, using:
 - Defensive DB-level dedupe check before triggering run.
 
 5. UI/UX
-- In workflow editor trigger dropdown: add `Email forwarded to Bap`.
+- In workflow editor trigger dropdown: add `Email forwarded to CmdClaw`.
 - In workflow editor details:
   - Show workflow forwarding address with copy button.
   - Explain that user-level alias can route via default workflow.
