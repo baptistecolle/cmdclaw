@@ -501,9 +501,12 @@ export async function getTokensForIntegrations(
   integrationTypes: string[],
 ): Promise<Record<string, string>> {
   const tokens: Record<string, string> = {};
+  const requestedTokenIntegrations = integrationTypes.filter(
+    (type): type is Exclude<IntegrationType, "linkedin"> => type in ENV_VAR_MAP,
+  );
 
-  // Get valid tokens for these integrations
-  const allTokens = await getValidTokensForUser(userId);
+  // Get valid tokens only for requested token-based integrations
+  const allTokens = await getValidTokensForUser(userId, requestedTokenIntegrations);
 
   for (const [type, accessToken] of allTokens) {
     if (integrationTypes.includes(type)) {

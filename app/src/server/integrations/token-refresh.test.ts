@@ -402,6 +402,48 @@ describe("token-refresh", () => {
     expect(tokens.has("notion")).toBe(false);
   });
 
+  it("continues loading other integrations when one refresh fails", async () => {
+    mswServer.use(
+      http.post(
+        "https://oauth.example.com/token",
+        () =>
+          new HttpResponse(
+            JSON.stringify({ error: "invalid_grant", error_description: "Invalid token." }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+      ),
+    );
+
+    selectWhereMock.mockResolvedValue([
+      {
+        type: "slack",
+        accessToken: "slack-token",
+        refreshToken: "slack-refresh",
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        integrationId: "slack-int",
+        enabled: true,
+        tokenUpdatedAt: new Date(Date.now() - 1000),
+      },
+      {
+        type: "airtable",
+        accessToken: "old-airtable",
+        refreshToken: "expired-airtable-refresh",
+        expiresAt: new Date(Date.now() - 60 * 1000),
+        integrationId: "airtable-int",
+        enabled: true,
+        tokenUpdatedAt: new Date(Date.now()),
+      },
+    ]);
+
+    const tokens = await getValidTokensForUser("user-1");
+
+    expect(tokens.get("slack")).toBe("slack-token");
+    expect(tokens.has("airtable")).toBe(false);
+  });
+
   it("returns current custom oauth token when not expiring soon", async () => {
     findManyMock.mockResolvedValue([
       {

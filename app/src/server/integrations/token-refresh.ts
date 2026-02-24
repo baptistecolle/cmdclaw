@@ -15,6 +15,10 @@ interface TokenWithMetadata {
   type: IntegrationType;
 }
 
+type RefreshAccessTokenResult =
+  | { kind: "ok"; accessToken: string }
+  | { kind: "error"; message: string };
+
 type OAuthFailureType = "definitive_auth_failure" | "transient_failure" | "unknown_failure";
 
 type OAuthFailureClassification = {
@@ -135,11 +139,12 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
     throw new Error(`No refresh token available for ${token.type} integration`);
   }
 
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx): Promise<RefreshAccessTokenResult> => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${token.integrationId}))`);
 
     const current = await tx.query.integrationToken.findFirst({
       where: eq(integrationToken.integrationId, token.integrationId),
+      orderBy: (table, { desc }) => [desc(table.updatedAt)],
       columns: {
         accessToken: true,
         refreshToken: true,
@@ -158,7 +163,10 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
     };
 
     if (!needsRefresh(currentToken)) {
-      return currentToken.accessToken;
+      return {
+        kind: "ok",
+        accessToken: currentToken.accessToken,
+      };
     }
 
     if (!currentToken.refreshToken) {
@@ -257,7 +265,10 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
           .where(eq(integration.id, token.integrationId));
       }
 
-      throw new Error(`Failed to refresh ${token.type} token: ${error}`);
+      return {
+        kind: "error",
+        message: `Failed to refresh ${token.type} token: ${error}`,
+      };
     }
 
     const tokens = await response.json();
@@ -267,7 +278,10 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
     const expiresIn = tokens.expires_in;
 
     if (!newAccessToken) {
-      throw new Error(`No access token in refresh response for ${token.type}`);
+      return {
+        kind: "error",
+        message: `No access token in refresh response for ${token.type}`,
+      };
     }
 
     // Update tokens in database
@@ -294,8 +308,17 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
 
     console.log(`[Token Refresh] Successfully refreshed ${token.type} token`);
 
-    return newAccessToken;
+    return {
+      kind: "ok",
+      accessToken: newAccessToken,
+    };
   });
+
+  if (result.kind === "error") {
+    throw new Error(result.message);
+  }
+
+  return result.accessToken;
 }
 
 /**
@@ -313,7 +336,10 @@ export async function getValidAccessToken(token: TokenWithMetadata): Promise<str
  * Get valid access tokens for all enabled integrations for a user,
  * refreshing any that are expired or about to expire
  */
-export async function getValidTokensForUser(userId: string): Promise<Map<IntegrationType, string>> {
+export async function getValidTokensForUser(
+  userId: string,
+  integrationTypes?: readonly IntegrationType[],
+): Promise<Map<IntegrationType, string>> {
   const results = await db
     .select({
       type: integration.type,
@@ -321,6 +347,7 @@ export async function getValidTokensForUser(userId: string): Promise<Map<Integra
       refreshToken: integrationToken.refreshToken,
       expiresAt: integrationToken.expiresAt,
       integrationId: integrationToken.integrationId,
+      tokenUpdatedAt: integrationToken.updatedAt,
       enabled: integration.enabled,
     })
     .from(integration)
@@ -328,12 +355,29 @@ export async function getValidTokensForUser(userId: string): Promise<Map<Integra
     .where(eq(integration.userId, userId));
 
   const tokens = new Map<IntegrationType, string>();
+  const allowedTypes = integrationTypes ? new Set(integrationTypes) : null;
+  const latestTokenRows = new Map<string, (typeof results)[number]>();
 
-  // Process tokens in parallel, only for enabled integrations
+  for (const row of results) {
+    if (!row.enabled || !row.accessToken) {
+      continue;
+    }
+    if (allowedTypes && !allowedTypes.has(row.type)) {
+      continue;
+    }
+
+    const current = latestTokenRows.get(row.integrationId);
+    const rowUpdatedAt = row.tokenUpdatedAt?.getTime() ?? 0;
+    const currentUpdatedAt = current?.tokenUpdatedAt?.getTime() ?? 0;
+    if (!current || rowUpdatedAt >= currentUpdatedAt) {
+      latestTokenRows.set(row.integrationId, row);
+    }
+  }
+
+  // Process tokens in parallel, skipping integrations that fail refresh.
   await Promise.all(
-    results
-      .filter((row) => row.enabled && row.accessToken)
-      .map(async (row) => {
+    Array.from(latestTokenRows.values()).map(async (row) => {
+      try {
         const validToken = await getValidAccessToken({
           accessToken: row.accessToken,
           refreshToken: row.refreshToken,
@@ -343,7 +387,13 @@ export async function getValidTokensForUser(userId: string): Promise<Map<Integra
         });
 
         tokens.set(row.type, validToken);
-      }),
+      } catch (error) {
+        console.warn(
+          `[Token Refresh] Skipping ${row.type} integration ${row.integrationId} due to refresh error:`,
+          error,
+        );
+      }
+    }),
   );
 
   return tokens;
