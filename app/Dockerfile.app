@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1
 
-FROM oven/bun:1.2.8 AS deps
+FROM oven/bun:1.3.9 AS deps
 WORKDIR /app
+RUN bun --version
 COPY package.json bun.lock ./
 RUN NODE_ENV=development bun install --frozen-lockfile
 
-FROM oven/bun:1.2.8 AS builder
+FROM oven/bun:1.3.9 AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -14,7 +15,7 @@ ARG SKIP_ENV_VALIDATION=1
 ENV SKIP_ENV_VALIDATION=${SKIP_ENV_VALIDATION}
 RUN bun run build
 
-FROM oven/bun:1.2.8 AS runner
+FROM oven/bun:1.3.9 AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 COPY --from=builder /app/package.json ./package.json
