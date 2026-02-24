@@ -103,7 +103,6 @@ export const env = createEnv({
     NEXT_PUBLIC_APP_URL: z.url(),
     NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
     NEXT_PUBLIC_POSTHOG_HOST: z.string().optional(),
-    NEXT_PUBLIC_NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   },
 
   /**
@@ -180,7 +179,6 @@ export const env = createEnv({
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-    NEXT_PUBLIC_NODE_ENV: process.env.NEXT_PUBLIC_NODE_ENV ?? process.env.NODE_ENV,
   },
   onValidationError: (issues) => {
     const formattedIssues = issues.map((issue) => {
