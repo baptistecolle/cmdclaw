@@ -187,6 +187,10 @@ export const env = createEnv({
       const path = Array.isArray(issue.path)
         ? issue.path
             .map((segment) => {
+              if (typeof segment === "string" || typeof segment === "number") {
+                return String(segment);
+              }
+
               const key = segment?.key;
               return typeof key === "string" || typeof key === "number" ? String(key) : null;
             })
