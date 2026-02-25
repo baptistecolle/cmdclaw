@@ -19,8 +19,8 @@ Let users trigger workflows by forwarding emails to CmdClaw, using:
 
 4. Routing model
 - Support both address styles:
-  - Workflow address: `bot+wf_<workflowId>@mail.cmdclaw.com`
-  - User address: `bot+u_<userId>@mail.cmdclaw.com`
+  - Workflow address: `bot+wf_<workflowId>@mail.cmdclaw.ai`
+  - User address: `bot+u_<userId>@mail.cmdclaw.ai`
 
 ## Routing Behavior
 1. Parse recipient local part from inbound `to` addresses.

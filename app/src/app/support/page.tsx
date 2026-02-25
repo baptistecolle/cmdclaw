@@ -16,10 +16,10 @@ export default function SupportPage() {
       </div>
 
       <a
-        href="mailto:baptiste@cmdclaw.com"
+        href="mailto:baptiste@cmdclaw.ai"
         className="text-primary text-lg font-medium hover:underline"
       >
-        baptiste@cmdclaw.com
+        baptiste@cmdclaw.ai
       </a>
     </div>
   );

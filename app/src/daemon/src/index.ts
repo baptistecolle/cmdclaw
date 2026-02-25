@@ -2,7 +2,7 @@
 /**
  * CmdClaw Daemon CLI
  *
- * Connects your local machine to cmdclaw.com as a compute backend.
+ * Connects your local machine to cmdclaw.ai as a compute backend.
  *
  * Usage:
  *   cmdclaw-daemon start          Start the daemon
@@ -19,11 +19,11 @@ import { detectLocalProviders } from "./llm-proxy";
 import { logger, setVerbose } from "./logger";
 import { WSClient } from "./ws-client";
 
-const DEFAULT_SERVER_URL = "https://cmdclaw.com";
+const DEFAULT_SERVER_URL = "https://cmdclaw.ai";
 
 function printHelp(): void {
   console.log(`
-  \x1b[1mcmdclaw-daemon\x1b[0m - Connect your machine to cmdclaw.com
+  \x1b[1mcmdclaw-daemon\x1b[0m - Connect your machine to cmdclaw.ai
 
   \x1b[2mUsage:\x1b[0m
     cmdclaw-daemon start [--server URL] [--verbose]   Start the daemon

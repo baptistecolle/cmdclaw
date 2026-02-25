@@ -9,15 +9,15 @@
 </p>
 
 <p align="center">
-  <a href="https://docs.cmdclaw.com"><img src="https://img.shields.io/badge/docs-cmdclaw.com-blue" alt="Documentation" /></a>
+  <a href="https://docs.cmdclaw.ai"><img src="https://img.shields.io/badge/docs-cmdclaw.ai-blue" alt="Documentation" /></a>
   <a href="https://discord.com/invite/NHQy8gXerd"><img src="https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" /></a>
 </p>
 
 <p align="center">
-  <a href="https://cmdclaw.com">Website</a> &middot;
-  <a href="https://app.cmdclaw.com">App</a> &middot;
-  <a href="https://docs.cmdclaw.com">Docs</a> &middot;
+  <a href="https://cmdclaw.ai">Website</a> &middot;
+  <a href="https://app.cmdclaw.ai">App</a> &middot;
+  <a href="https://docs.cmdclaw.ai">Docs</a> &middot;
   <a href="https://discord.com/invite/NHQy8gXerd">Discord</a>
 </p>
 

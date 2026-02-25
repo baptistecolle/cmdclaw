@@ -17,14 +17,14 @@ export default function TermsPage() {
         Article 1 - Legal Notice
       </h2>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
-        This website, accessible at the URL &apos;https://www.cmdclaw.com/&apos; (the
+        This website, accessible at the URL &apos;https://www.cmdclaw.ai/&apos; (the
         &quot;Site&quot;), is published by CmdClaw.
       </p>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
         (Hereinafter referred to as the &quot;Service Provider&quot;).
       </p>
       <p className="leading-7 [&:not(:first-child)]:mt-6">
-        For any inquiries, please contact us by email at baptiste@cmdclaw.com.
+        For any inquiries, please contact us by email at baptiste@cmdclaw.ai.
       </p>
 
       <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">

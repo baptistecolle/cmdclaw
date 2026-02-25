@@ -9,12 +9,12 @@ import {
 
 describe("email-forwarding", () => {
   it("builds workflow and user forwarding aliases", () => {
-    expect(buildWorkflowForwardingAddress("beaver-strong-orange", "Mail.cmdclaw.com")).toBe(
-      "bot+beaver-strong-orange@mail.cmdclaw.com",
+    expect(buildWorkflowForwardingAddress("beaver-strong-orange", "Mail.cmdclaw.ai")).toBe(
+      "bot+beaver-strong-orange@mail.cmdclaw.ai",
     );
 
-    expect(buildUserForwardingAddress("user-123", "mail.cmdclaw.com")).toBe(
-      "bot+u_user-123@mail.cmdclaw.com",
+    expect(buildUserForwardingAddress("user-123", "mail.cmdclaw.ai")).toBe(
+      "bot+u_user-123@mail.cmdclaw.ai",
     );
   });
 
@@ -27,17 +27,14 @@ describe("email-forwarding", () => {
 
   it("parses workflow and user aliases from recipient emails", () => {
     expect(
-      parseForwardingTargetFromEmail(
-        "bot+beaver-strong-orange@mail.cmdclaw.com",
-        "mail.cmdclaw.com",
-      ),
+      parseForwardingTargetFromEmail("bot+beaver-strong-orange@mail.cmdclaw.ai", "mail.cmdclaw.ai"),
     ).toEqual({
       kind: "workflow_alias",
       localPart: "beaver-strong-orange",
     });
 
     expect(
-      parseForwardingTargetFromEmail("bot+u_user-123@mail.cmdclaw.com", "mail.cmdclaw.com"),
+      parseForwardingTargetFromEmail("bot+u_user-123@mail.cmdclaw.ai", "mail.cmdclaw.ai"),
     ).toEqual({
       kind: "user",
       id: "user-123",
@@ -45,7 +42,7 @@ describe("email-forwarding", () => {
   });
 
   it("rejects the bare default mailbox local-part", () => {
-    expect(parseForwardingTargetFromEmail("bot@mail.cmdclaw.com", "mail.cmdclaw.com")).toBeNull();
+    expect(parseForwardingTargetFromEmail("bot@mail.cmdclaw.ai", "mail.cmdclaw.ai")).toBeNull();
   });
 
   it("generates human-friendly workflow alias local-part", () => {
@@ -55,8 +52,8 @@ describe("email-forwarding", () => {
 
   it("rejects unknown domains and local parts", () => {
     expect(
-      parseForwardingTargetFromEmail("bot+beaver-strong-orange@other.com", "mail.cmdclaw.com"),
+      parseForwardingTargetFromEmail("bot+beaver-strong-orange@other.com", "mail.cmdclaw.ai"),
     ).toBeNull();
-    expect(parseForwardingTargetFromEmail("bot+@mail.cmdclaw.com", "mail.cmdclaw.com")).toBeNull();
+    expect(parseForwardingTargetFromEmail("bot+@mail.cmdclaw.ai", "mail.cmdclaw.ai")).toBeNull();
   });
 });

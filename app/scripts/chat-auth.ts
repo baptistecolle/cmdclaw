@@ -7,7 +7,7 @@ import {
   saveConfig,
 } from "./lib/cli-shared";
 
-const DEFAULT_CHAT_AUTH_EMAIL = "baptiste@cmdclaw.com";
+const DEFAULT_CHAT_AUTH_EMAIL = "baptiste@heybap.com";
 const DEFAULT_CHAT_AUTH_NAME = "Baptiste";
 
 function isLocalServerUrl(serverUrl: string): boolean {

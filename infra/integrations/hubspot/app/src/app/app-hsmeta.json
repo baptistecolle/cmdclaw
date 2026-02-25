@@ -9,7 +9,7 @@
     "auth": {
       "type": "oauth",
       "redirectUrls": [
-        "https://cmdclaw.com/api/oauth/callback",
+        "https://cmdclaw.ai/api/oauth/callback",
         "http://localhost:3000/api/oauth/callback"
       ],
       "requiredScopes": [
@@ -32,9 +32,9 @@
       "img": []
     },
     "support": {
-      "supportEmail": "baptiste@cmdclaw.com",
-      "documentationUrl": "https://app.cmdclaw.com",
-      "supportUrl": "https://app.cmdclaw.com/support",
+      "supportEmail": "baptiste@cmdclaw.ai",
+      "documentationUrl": "https://app.cmdclaw.ai",
+      "supportUrl": "https://app.cmdclaw.ai/support",
       "supportPhone": "+41788732135"
     }
   }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CmdClaw Daemon Installer
-# Usage: curl -fsSL https://cmdclaw.com/i | sh
+# Usage: curl -fsSL https://cmdclaw.ai/i | sh
 set -euo pipefail
 
 REPO="cmdclaw/cmdclaw"
