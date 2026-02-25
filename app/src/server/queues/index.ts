@@ -238,10 +238,6 @@ export const startQueues = () => {
     connection: queueEventsConnection as unknown as ConnectionOptions,
   });
 
-  queueEvents.on("completed", ({ jobId }) => {
-    console.log(`[worker] job ${jobId} completed`);
-  });
-
   queueEvents.on("failed", ({ jobId, failedReason }) => {
     console.error(`[worker] job ${jobId} failed: ${failedReason}`);
   });
