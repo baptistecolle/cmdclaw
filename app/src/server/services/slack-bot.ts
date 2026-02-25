@@ -171,7 +171,7 @@ export async function handleSlackEvent(payload: SlackEvent) {
     const link = await resolveUser(team_id, slackUserId);
 
     if (!link) {
-      const appUrl = env.NEXT_PUBLIC_APP_URL ?? "https://cmdclaw.com";
+      const appUrl = env.NEXT_PUBLIC_APP_URL ?? "https://cmdclaw.ai";
       const linkUrl = `${appUrl}/api/slack/link?slackUserId=${slackUserId}&slackTeamId=${team_id}`;
       await postMessage(
         channel,

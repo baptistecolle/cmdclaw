@@ -51,14 +51,14 @@
     "primary": {
       "type": "button",
       "label": "Open App",
-      "href": "https://app.cmdclaw.com"
+      "href": "https://app.cmdclaw.ai"
     }
   },
   "footer": {
     "socials": {
       "github": "https://github.com/baptistecolle/cmdclaw",
       "discord": "https://discord.com/invite/NHQy8gXerd",
-      "website": "https://cmdclaw.com"
+      "website": "https://cmdclaw.ai"
     }
   }
 }

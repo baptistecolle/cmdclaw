@@ -1,5 +1,5 @@
 # CmdClaw Daemon Installer for Windows
-# Usage: irm https://cmdclaw.com/i.ps1 | iex
+# Usage: irm https://cmdclaw.ai/i.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 

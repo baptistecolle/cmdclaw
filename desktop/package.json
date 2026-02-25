@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "description": "Electron desktop wrapper for CmdClaw web app",
-  "homepage": "https://app.cmdclaw.com",
+  "homepage": "https://app.cmdclaw.ai",
   "bugs": {
-    "url": "https://app.cmdclaw.com/support"
+    "url": "https://app.cmdclaw.ai/support"
   },
   "author": {
     "name": "Baptiste Colle",
-    "email": "baptiste@cmdclaw.com"
+    "email": "baptiste@cmdclaw.ai"
   },
   "main": "electron/main.cjs",
   "scripts": {
@@ -65,7 +65,7 @@
     },
     "linux": {
       "category": "Utility",
-      "maintainer": "Baptiste Colle <baptiste@cmdclaw.com>",
+      "maintainer": "Baptiste Colle <baptiste@cmdclaw.ai>",
       "icon": "build/icons/icon-512.png",
       "target": [
         "AppImage",

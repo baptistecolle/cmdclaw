@@ -19,7 +19,7 @@ const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 const appUrl =
   env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
-const ADMIN_EMAILS = new Set(["baptiste@cmdclaw.com"]);
+const ADMIN_EMAILS = new Set(["baptiste@heybap.com"]);
 
 export const auth = betterAuth({
   appName: "CmdClaw",
@@ -49,9 +49,9 @@ export const auth = betterAuth({
   },
   trustedOrigins: [
     "https://appleid.apple.com",
-    "https://cmdclaw.com",
-    "https://www.cmdclaw.com",
-    "https://app.cmdclaw.com",
+    "https://cmdclaw.ai",
+    "https://www.cmdclaw.ai",
+    "https://app.cmdclaw.ai",
     `http://localhost:${process.env.PORT ?? 3000}`,
     `http://127.0.0.1:${process.env.PORT ?? 3000}`,
     "https://localcan.baptistecolle.com",

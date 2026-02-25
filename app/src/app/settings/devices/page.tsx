@@ -102,7 +102,7 @@ export default function DevicesPage() {
             Install the CmdClaw daemon on your machine to connect it as a compute backend.
           </p>
           <pre className="bg-muted mx-auto mt-4 w-fit rounded px-4 py-2 font-mono text-sm">
-            curl -fsSL https://cmdclaw.com/i | sh
+            curl -fsSL https://cmdclaw.ai/i | sh
           </pre>
         </div>
       ) : (

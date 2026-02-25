@@ -18,7 +18,7 @@ export const slackPostVerifyTimeoutMs = Number(
 );
 export const gmailPollIntervalMs = Number(process.env.E2E_GMAIL_POLL_INTERVAL_MS ?? "2500");
 
-export const expectedUserEmail = "baptiste@cmdclaw.com";
+export const expectedUserEmail = "baptiste@heybap.com";
 export const sourceChannelName = "cmdclaw-experiments";
 export const targetChannelName = "e2e-slack-testing";
 export const echoPrefix = "test message: the previous message is:";
