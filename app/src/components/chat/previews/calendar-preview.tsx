@@ -8,20 +8,32 @@ import {
   IntegrationLogo,
 } from "./preview-styles";
 
-export function CalendarPreview({ operation, args, positionalArgs }: PreviewProps) {
+export function CalendarPreview({ integration, operation, args, positionalArgs }: PreviewProps) {
   switch (operation) {
     case "create":
-      return <CalendarCreatePreview args={args} />;
+      return <CalendarCreatePreview args={args} integration={integration} />;
     case "update":
-      return <CalendarUpdatePreview args={args} positionalArgs={positionalArgs} />;
+      return (
+        <CalendarUpdatePreview
+          args={args}
+          positionalArgs={positionalArgs}
+          integration={integration}
+        />
+      );
     case "delete":
-      return <CalendarDeletePreview positionalArgs={positionalArgs} />;
+      return <CalendarDeletePreview positionalArgs={positionalArgs} integration={integration} />;
     default:
       return null;
   }
 }
 
-function CalendarCreatePreview({ args }: { args: Record<string, string | undefined> }) {
+function CalendarCreatePreview({
+  args,
+  integration,
+}: {
+  args: Record<string, string | undefined>;
+  integration: string;
+}) {
   const summary = args.summary;
   const start = args.start;
   const end = args.end;
@@ -31,7 +43,7 @@ function CalendarCreatePreview({ args }: { args: Record<string, string | undefin
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
-        <IntegrationLogo integration="google_calendar" size={16} />
+        <IntegrationLogo integration={integration} size={16} />
         <span className="text-sm font-medium">Create Event</span>
       </div>
 
@@ -66,16 +78,18 @@ function CalendarCreatePreview({ args }: { args: Record<string, string | undefin
 function CalendarUpdatePreview({
   args,
   positionalArgs,
+  integration,
 }: {
   args: Record<string, string | undefined>;
   positionalArgs: string[];
+  integration: string;
 }) {
   const eventId = positionalArgs[0];
 
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
-        <IntegrationLogo integration="google_calendar" size={16} />
+        <IntegrationLogo integration={integration} size={16} />
         <span className="text-sm font-medium">Update Event</span>
       </div>
 
@@ -94,13 +108,19 @@ function CalendarUpdatePreview({
   );
 }
 
-function CalendarDeletePreview({ positionalArgs }: { positionalArgs: string[] }) {
+function CalendarDeletePreview({
+  positionalArgs,
+  integration,
+}: {
+  positionalArgs: string[];
+  integration: string;
+}) {
   const eventId = positionalArgs[0];
 
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
-        <IntegrationLogo integration="google_calendar" size={16} />
+        <IntegrationLogo integration={integration} size={16} />
         <span className="text-sm font-medium">Delete Event</span>
         <PreviewBadge variant="danger">Destructive</PreviewBadge>
       </div>

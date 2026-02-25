@@ -12,6 +12,7 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   slack: "slack",
   "google-gmail": "gmail",
   "outlook-mail": "outlook",
+  "outlook-calendar": "outlook_calendar",
   gcalendar: "google_calendar",
   gdocs: "google_docs",
   gsheets: "google_sheets",
@@ -40,6 +41,10 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
   outlook: {
     read: ["list", "get", "unread"],
     write: ["send"],
+  },
+  outlook_calendar: {
+    read: ["list", "get", "calendars", "today"],
+    write: ["create", "update", "delete"],
   },
   google_calendar: {
     read: ["list", "get", "calendars", "today"],
@@ -170,6 +175,7 @@ const TOKEN_ENV_VARS: Record<string, string> = {
   slack: "SLACK_ACCESS_TOKEN",
   gmail: "GMAIL_ACCESS_TOKEN",
   outlook: "OUTLOOK_ACCESS_TOKEN",
+  outlook_calendar: "OUTLOOK_CALENDAR_ACCESS_TOKEN",
   google_calendar: "GOOGLE_CALENDAR_ACCESS_TOKEN",
   google_docs: "GOOGLE_DOCS_ACCESS_TOKEN",
   google_sheets: "GOOGLE_SHEETS_ACCESS_TOKEN",
@@ -190,6 +196,7 @@ const INTEGRATION_NAMES: Record<string, string> = {
   slack: "Slack",
   gmail: "Gmail",
   outlook: "Outlook Mail",
+  outlook_calendar: "Outlook Calendar",
   google_calendar: "Google Calendar",
   google_docs: "Google Docs",
   google_sheets: "Google Sheets",

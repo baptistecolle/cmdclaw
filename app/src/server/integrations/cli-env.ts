@@ -10,6 +10,7 @@ import { getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
 const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
   gmail: "GMAIL_ACCESS_TOKEN",
   outlook: "OUTLOOK_ACCESS_TOKEN",
+  outlook_calendar: "OUTLOOK_CALENDAR_ACCESS_TOKEN",
   google_calendar: "GOOGLE_CALENDAR_ACCESS_TOKEN",
   google_docs: "GOOGLE_DOCS_ACCESS_TOKEN",
   google_sheets: "GOOGLE_SHEETS_ACCESS_TOKEN",
@@ -205,6 +206,16 @@ export function getCliInstructions(connectedIntegrations: IntegrationType[]): st
 - outlook-mail unread - Count unread emails
 - outlook-mail send --to <email> --subject <subject> --body <body>
 - Example: outlook-mail list -q "is:unread" -l 5
+
+## Outlook Calendar CLI [${statusTag("outlook_calendar")}]
+- outlook-calendar list [-t timeMin] [-m timeMax] [-l limit] [-c calendarId] - List events
+- outlook-calendar get <eventId> [-c calendarId] - Get event details
+- outlook-calendar create --summary <title> --start <datetime> --end <datetime> [--description <text>] [--location <text>]
+- outlook-calendar update <eventId> [--summary <title>] [--start <datetime>] [--end <datetime>] [--description <text>] [--location <text>]
+- outlook-calendar delete <eventId> [-c calendarId] - Delete an event
+- outlook-calendar calendars - List available calendars
+- outlook-calendar today [-c calendarId] - List today's events
+- Example: outlook-calendar list -l 10
 
 ## Google Calendar CLI [${statusTag("google_calendar")}]
 - gcalendar list [-t timeMin] [-m timeMax] [-l limit] - List events

@@ -2864,6 +2864,7 @@ class GenerationManager {
                 const envToIntegration: Record<string, IntegrationType> = {
                   GMAIL_ACCESS_TOKEN: "gmail",
                   OUTLOOK_ACCESS_TOKEN: "outlook",
+                  OUTLOOK_CALENDAR_ACCESS_TOKEN: "outlook_calendar",
                   GOOGLE_CALENDAR_ACCESS_TOKEN: "google_calendar",
                   GOOGLE_DOCS_ACCESS_TOKEN: "google_docs",
                   GOOGLE_SHEETS_ACCESS_TOKEN: "google_sheets",

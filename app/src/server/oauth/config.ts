@@ -3,6 +3,7 @@ import { env } from "@/env";
 export type IntegrationType =
   | "gmail"
   | "outlook"
+  | "outlook_calendar"
   | "google_calendar"
   | "google_docs"
   | "google_sheets"
@@ -72,6 +73,34 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
       return {
         id: data.id,
         displayName: data.mail ?? data.userPrincipalName ?? data.displayName ?? "Outlook User",
+      };
+    },
+  }),
+
+  outlook_calendar: () => ({
+    clientId: env.MICROSOFT_CLIENT_ID ?? "",
+    clientSecret: env.MICROSOFT_CLIENT_SECRET ?? "",
+    authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "offline_access",
+      "openid",
+      "profile",
+      "email",
+      "User.Read",
+      "Calendars.Read",
+      "Calendars.ReadWrite",
+    ],
+    getUserInfo: async (accessToken) => {
+      const res = await fetch("https://graph.microsoft.com/v1.0/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      return {
+        id: data.id,
+        displayName:
+          data.mail ?? data.userPrincipalName ?? data.displayName ?? "Outlook Calendar User",
       };
     },
   }),

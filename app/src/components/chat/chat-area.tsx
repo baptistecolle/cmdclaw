@@ -1750,6 +1750,7 @@ export function ChatArea({ conversationId }: Props) {
           type: integration as
             | "gmail"
             | "outlook"
+            | "outlook_calendar"
             | "google_calendar"
             | "google_docs"
             | "google_sheets"

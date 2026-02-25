@@ -19,6 +19,7 @@ const INTEGRATION_SKILL_DIRS = new Set([
   "linear",
   "linkedin",
   "notion",
+  "outlook-calendar",
   "outlook-mail",
   "reddit",
   "salesforce",
