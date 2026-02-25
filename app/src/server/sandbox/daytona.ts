@@ -37,7 +37,7 @@ export class DaytonaSandboxBackend implements SandboxBackend {
       ...(process.env.DAYTONA_TARGET ? { target: process.env.DAYTONA_TARGET } : {}),
     });
 
-    const snapshot = process.env.E2B_TEMPLATE || DEFAULT_DAYTONA_SNAPSHOT;
+    const snapshot = process.env.E2B_DAYTONA_SANDBOX_NAME || DEFAULT_DAYTONA_SNAPSHOT;
     this.sandbox = (await daytona.create({
       snapshot,
     })) as DaytonaSandboxHandle;

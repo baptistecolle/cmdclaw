@@ -21,6 +21,7 @@ Defaults:
 
 Override names with:
 
+- `E2B_DAYTONA_SANDBOX_NAME` (shared with runtime)
 - `DAYTONA_SNAPSHOT_DEV`
 - `DAYTONA_SNAPSHOT_PROD`
 

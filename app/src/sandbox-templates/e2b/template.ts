@@ -24,6 +24,10 @@ export const template = Template({
   .runCmd("$HOME/.bun/bin/bun install -g opencode-ai tsx")
   .runCmd("sudo ln -s $HOME/.bun/bin/opencode /usr/local/bin/opencode")
   .runCmd("sudo ln -s $HOME/.bun/bin/tsx /usr/local/bin/tsx")
+  // Install TypeScript tool runtime deps resolved from /app/.opencode/tools/*.ts
+  .runCmd(
+    'bash -lc \'cd /app && printf "{\\"name\\":\\"sandbox-runtime\\",\\"private\\":true}\\n" > package.json && bun install @opencode-ai/plugin\'',
+  )
   .setWorkdir("/app")
   // Copy OpenCode config, plugins, and custom tools
   .copy(`${COMMON_ROOT}/opencode.json`, "/app/opencode.json")

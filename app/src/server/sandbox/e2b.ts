@@ -15,7 +15,7 @@ import { logServerEvent, type ObservabilityContext } from "@/server/utils/observ
 import type { SandboxBackend, ExecuteResult } from "./types";
 
 // Use custom template with OpenCode pre-installed
-const TEMPLATE_NAME = env.E2B_TEMPLATE || "cmdclaw-agent-dev";
+const TEMPLATE_NAME = env.E2B_DAYTONA_SANDBOX_NAME || "cmdclaw-agent-dev";
 const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const OPENCODE_PORT = 4096;
 

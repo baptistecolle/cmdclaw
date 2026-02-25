@@ -34,13 +34,25 @@ function getDaytonaConfig(): {
 }
 
 async function createOrReplaceSnapshot(daytona: Daytona, name: string) {
-  const tryCreate = () =>
-    daytona.snapshot.create(
-      { name, image },
-      {
-        onLogs: (chunk) => console.log(`[daytona] ${chunk}`),
-      },
-    );
+  const tryCreate = async () => {
+    console.log(`[daytona] Requesting snapshot build: ${name}`);
+    const startedAt = Date.now();
+    const heartbeat = setInterval(() => {
+      const seconds = Math.floor((Date.now() - startedAt) / 1000);
+      console.log(`[daytona] Waiting for build logs... (${seconds}s)`);
+    }, 5000);
+
+    try {
+      return await daytona.snapshot.create(
+        { name, image },
+        {
+          onLogs: (chunk) => console.log(`[daytona] ${chunk}`),
+        },
+      );
+    } finally {
+      clearInterval(heartbeat);
+    }
+  };
   const retryCreate = async (attempt: number, lastError?: unknown) => {
     if (attempt > 8) {
       throw new Error(`Unable to recreate snapshot "${name}" after replacement retries.`, {
@@ -91,10 +103,13 @@ async function createOrReplaceSnapshot(daytona: Daytona, name: string) {
 }
 
 async function main() {
-  const daytona = new Daytona(getDaytonaConfig());
-
-  const name = process.env.DAYTONA_SNAPSHOT_DEV || "cmdclaw-agent-dev";
-  console.log(`Creating Daytona dev snapshot: ${name}`);
+  const name =
+    process.env.E2B_DAYTONA_SANDBOX_NAME || process.env.DAYTONA_SNAPSHOT_DEV || "cmdclaw-agent-dev";
+  console.log(`[daytona] Preparing dev snapshot build: ${name}`);
+  const config = getDaytonaConfig();
+  console.log("[daytona] Initializing client...");
+  const daytona = new Daytona(config);
+  console.log("[daytona] Client initialized, starting snapshot build...");
 
   const snapshot = await createOrReplaceSnapshot(daytona, name);
 

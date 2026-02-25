@@ -23,6 +23,10 @@ export const image = Image.debianSlim()
   .runCommands("$HOME/.bun/bin/bun install -g opencode-ai tsx")
   .runCommands("ln -s $HOME/.bun/bin/opencode /usr/local/bin/opencode")
   .runCommands("ln -s $HOME/.bun/bin/tsx /usr/local/bin/tsx")
+  // Install TypeScript tool runtime deps resolved from /app/.opencode/tools/*.ts
+  .runCommands(
+    'bash -lc \'cd /app && printf "{\\"name\\":\\"sandbox-runtime\\",\\"private\\":true}\\n" > package.json && bun install @opencode-ai/plugin\'',
+  )
   .runCommands("mkdir -p $HOME/.config/opencode /app/.opencode $HOME/.cache/opencode")
   .runCommands("cp /app/opencode.json /app/.opencode/opencode.json")
   .runCommands("chmod +x /app/setup.sh")

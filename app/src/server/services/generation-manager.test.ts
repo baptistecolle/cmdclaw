@@ -71,13 +71,12 @@ vi.mock("@/server/db/client", () => ({
   db: dbMock,
 }));
 
-vi.mock("@/server/sandbox/e2b", () => ({
+vi.mock("@/server/sandbox/opencode-session", () => ({
   getOrCreateSession: vi.fn(),
   writeSkillsToSandbox: vi.fn(),
   getSkillsSystemPrompt: vi.fn(() => ""),
   writeResolvedIntegrationSkillsToSandbox: vi.fn(),
   getIntegrationSkillsSystemPrompt: vi.fn(() => ""),
-  resetOpencodeSession: vi.fn(),
 }));
 
 vi.mock("@/server/integrations/cli-env", () => ({
@@ -93,32 +92,9 @@ vi.mock("@/server/utils/generate-title", () => ({
 
 vi.mock("@/server/sandbox/factory", () => ({
   getPreferredCloudSandboxProvider: vi.fn(() => "e2b"),
-  getSandboxBackend: vi.fn(),
-}));
-
-vi.mock("@/server/ai/anthropic-backend", () => ({
-  AnthropicBackend: vi.fn(() => ({})),
-}));
-
-vi.mock("@/server/ai/openai-backend", () => ({
-  OpenAIBackend: vi.fn(() => ({})),
-}));
-
-vi.mock("@/server/ai/local-backend", () => ({
-  LocalLLMBackend: vi.fn(() => ({})),
-}));
-
-vi.mock("@/server/ai/tools", () => ({
-  getDirectModeTools: vi.fn(() => []),
-  toolCallToCommand: vi.fn(() => ""),
 }));
 
 vi.mock("@/server/ai/permission-checker", () => ({
-  checkToolPermissions: vi.fn(() => ({
-    allowed: true,
-    needsApproval: false,
-    needsAuth: false,
-  })),
   parseBashCommand: vi.fn(() => null),
 }));
 
@@ -134,8 +110,6 @@ vi.mock("@/server/services/memory-service", () => ({
 vi.mock("@/server/services/sandbox-file-service", () => ({
   uploadSandboxFile: vi.fn(),
   collectNewSandboxFiles: vi.fn(() => []),
-  collectNewE2BFiles: vi.fn(() => []),
-  readSandboxFileAsBuffer: vi.fn(),
 }));
 
 vi.mock("@/server/services/integration-skill-service", () => ({
@@ -165,29 +139,21 @@ vi.mock("@/server/queues", () => ({
 }));
 
 import { env } from "@/env";
-import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
-import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
 import {
   getCliEnvForUser,
   getCliInstructionsWithCustom,
   getEnabledIntegrationTypes,
 } from "@/server/integrations/cli-env";
+import { getPreferredCloudSandboxProvider } from "@/server/sandbox/factory";
 import {
   getOrCreateSession,
   writeSkillsToSandbox,
   getSkillsSystemPrompt,
   writeResolvedIntegrationSkillsToSandbox,
   getIntegrationSkillsSystemPrompt,
-} from "@/server/sandbox/e2b";
-import { getSandboxBackend } from "@/server/sandbox/factory";
-import { resolvePreferredCommunitySkillsForUser } from "@/server/services/integration-skill-service";
+} from "@/server/sandbox/opencode-session";
 import { syncMemoryToSandbox, buildMemorySystemPrompt } from "@/server/services/memory-service";
-import {
-  uploadSandboxFile,
-  collectNewSandboxFiles,
-  collectNewE2BFiles,
-  readSandboxFileAsBuffer,
-} from "@/server/services/sandbox-file-service";
+import { uploadSandboxFile, collectNewSandboxFiles } from "@/server/services/sandbox-file-service";
 import { logServerEvent } from "@/server/utils/observability";
 import { generationManager } from "./generation-manager";
 
@@ -228,13 +194,8 @@ type GenerationManagerTestHarness = {
   finishGeneration: (ctx: GenerationCtx, status: string) => Promise<void>;
   runGeneration: (ctx: GenerationCtx) => Promise<void>;
   handleSessionReset: (ctx: GenerationCtx) => Promise<void>;
-  runDirectGeneration: (ctx: GenerationCtx) => Promise<void>;
   runOpenCodeGeneration: (ctx: GenerationCtx) => Promise<void>;
   buildWorkflowPrompt: (ctx: GenerationCtx) => string | null;
-  getLLMBackend: (...args: unknown[]) => Promise<unknown>;
-  buildMessageHistory: (...args: unknown[]) => Promise<unknown[]>;
-  executeMemoryTool: (...args: unknown[]) => Promise<{ content: string; isError: boolean }>;
-  importIntegrationSkillDraftsFromE2B: (...args: unknown[]) => Promise<void>;
   processOpencodeEvent: (...args: unknown[]) => Promise<void>;
   handleOpenCodeActionableEvent: (...args: unknown[]) => Promise<unknown>;
   handleOpenCodePermissionAsked: (...args: unknown[]) => Promise<void>;
@@ -269,7 +230,7 @@ function createCtx(overrides: Partial<GenerationCtx> = {}): GenerationCtx {
     assistantMessageIds: new Set(),
     messageRoles: new Map(),
     pendingMessageParts: new Map(),
-    backendType: "direct",
+    backendType: "opencode",
     autoApprove: false,
     ...overrides,
   };
@@ -310,6 +271,7 @@ describe("generationManager transitions", () => {
     workflowRunFindFirstMock.mockResolvedValue(null);
     workflowFindFirstMock.mockResolvedValue(null);
     providerAuthFindFirstMock.mockResolvedValue(null);
+    vi.mocked(getPreferredCloudSandboxProvider).mockReturnValue("e2b");
     queueAddMock.mockReset();
     delete process.env.VERCEL;
     delete process.env.KUMA_PUSH_URL;
@@ -818,6 +780,40 @@ describe("generationManager transitions", () => {
     });
   });
 
+  it("forces opencode backend for OpenAI subscription models even when Daytona is preferred", async () => {
+    vi.mocked(getPreferredCloudSandboxProvider).mockReturnValue("daytona");
+    const mgr = asTestManager();
+    const runSpy = vi.spyOn(mgr, "runGeneration").mockResolvedValue(undefined);
+
+    insertReturningMock
+      .mockResolvedValueOnce([
+        {
+          id: "conv-openai",
+          userId: "user-1",
+          model: "openai/gpt-5.2-codex",
+          autoApprove: false,
+          type: "chat",
+        },
+      ])
+      .mockResolvedValueOnce([{ id: "msg-user" }])
+      .mockResolvedValueOnce([{ id: "gen-openai" }]);
+
+    providerAuthFindFirstMock.mockResolvedValue({ id: "auth-openai" });
+
+    await generationManager.startGeneration({
+      content: "hi",
+      userId: "user-1",
+      model: "openai/gpt-5.2-codex",
+    });
+
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    expect(mgr.activeGenerations.get("gen-openai")).toMatchObject({
+      id: "gen-openai",
+      backendType: "opencode",
+      model: "openai/gpt-5.2-codex",
+    });
+  });
+
   it("enqueues run and preparing-stuck check jobs when deferred to worker", async () => {
     process.env.VERCEL = "1";
     const mgr = asTestManager();
@@ -1267,18 +1263,15 @@ describe("generationManager transitions", () => {
     );
   });
 
-  it("dispatches runGeneration to session reset, direct backend, and opencode backend", async () => {
+  it("dispatches runGeneration to session reset and opencode backend", async () => {
     const mgr = asTestManager();
     const resetSpy = vi.spyOn(mgr, "handleSessionReset").mockResolvedValue(undefined);
-    const directSpy = vi.spyOn(mgr, "runDirectGeneration").mockResolvedValue(undefined);
     const opencodeSpy = vi.spyOn(mgr, "runOpenCodeGeneration").mockResolvedValue(undefined);
 
     await mgr.runGeneration(createCtx({ userMessageContent: " /new ", backendType: "opencode" }));
-    await mgr.runGeneration(createCtx({ userMessageContent: "hello", backendType: "direct" }));
     await mgr.runGeneration(createCtx({ userMessageContent: "hello", backendType: "opencode" }));
 
     expect(resetSpy).toHaveBeenCalledTimes(1);
-    expect(directSpy).toHaveBeenCalledTimes(1);
     expect(opencodeSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -1637,7 +1630,7 @@ describe("generationManager transitions", () => {
     vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("integration skills prompt");
     vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
     vi.mocked(buildMemorySystemPrompt).mockReturnValue("memory prompt");
-    vi.mocked(collectNewE2BFiles).mockResolvedValue([
+    vi.mocked(collectNewSandboxFiles).mockResolvedValue([
       { path: "/app/out/report.txt", content: Buffer.from("report") },
     ]);
     vi.mocked(uploadSandboxFile).mockResolvedValue({
@@ -1681,7 +1674,7 @@ describe("generationManager transitions", () => {
 
     const mgr = asTestManager();
     const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
-    vi.spyOn(mgr, "importIntegrationSkillDraftsFromE2B").mockResolvedValue(undefined);
+    vi.spyOn(mgr, "importIntegrationSkillDraftsFromSandbox").mockResolvedValue(undefined);
     vi.spyOn(mgr, "processOpencodeEvent").mockResolvedValue(undefined);
     vi.spyOn(mgr, "handleOpenCodeActionableEvent").mockResolvedValue({
       type: "none",
@@ -1713,7 +1706,7 @@ describe("generationManager transitions", () => {
     await mgr.runOpenCodeGeneration(ctx);
 
     expect(promptMock).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(collectNewE2BFiles)).toHaveBeenCalledWith(
+    expect(vi.mocked(collectNewSandboxFiles)).toHaveBeenCalledWith(
       expect.anything(),
       expect.any(Number),
       expect.arrayContaining(["/home/user/uploads/notes.txt"]),
@@ -1735,7 +1728,7 @@ describe("generationManager transitions", () => {
     vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("");
     vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
     vi.mocked(buildMemorySystemPrompt).mockReturnValue("");
-    vi.mocked(collectNewE2BFiles).mockResolvedValue([]);
+    vi.mocked(collectNewSandboxFiles).mockResolvedValue([]);
 
     conversationFindFirstMock.mockResolvedValue({
       id: "conv-reasoning",
@@ -1790,7 +1783,7 @@ describe("generationManager transitions", () => {
     } as unknown as Awaited<ReturnType<typeof getOrCreateSession>>);
 
     const mgr = asTestManager();
-    vi.spyOn(mgr, "importIntegrationSkillDraftsFromE2B").mockResolvedValue(undefined);
+    vi.spyOn(mgr, "importIntegrationSkillDraftsFromSandbox").mockResolvedValue(undefined);
     vi.spyOn(mgr, "handleOpenCodeActionableEvent").mockResolvedValue({ type: "none" });
     const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
 
@@ -1824,184 +1817,6 @@ describe("generationManager transitions", () => {
     );
     expect(ctx.contentParts).toEqual(
       expect.arrayContaining([{ type: "thinking", id: "reason-1", content: "plan more" }]),
-    );
-  });
-
-  it("runs direct generation through multi-tool paths and keeps send_file artifacts even when not mentioned", async () => {
-    vi.mocked(getEnabledIntegrationTypes).mockResolvedValue(["github"]);
-    vi.mocked(resolvePreferredCommunitySkillsForUser).mockResolvedValue([
-      {
-        source: "community",
-        slug: "skill-one",
-        id: "is-1",
-        title: "Skill One",
-        description: "desc",
-        files: [
-          { path: "README.md", content: "hi" },
-          { path: "nested/file.txt", content: "content" },
-        ],
-        createdByUserId: "user-1",
-      },
-    ]);
-    vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("integration skills prompt");
-    vi.mocked(buildMemorySystemPrompt).mockReturnValue("memory prompt");
-    vi.mocked(getDirectModeTools).mockReturnValue([{ name: "bash" }] as ReturnType<
-      typeof getDirectModeTools
-    >);
-    vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
-    vi.mocked(parseBashCommand).mockImplementation((command) => {
-      if (command === "slack forbidden") {
-        return { integration: "slack" } as ReturnType<typeof parseBashCommand>;
-      }
-      return null;
-    });
-    vi.mocked(checkToolPermissions).mockImplementation((toolName) => {
-      if (toolName === "auth_tool") {
-        return {
-          allowed: false,
-          needsApproval: false,
-          needsAuth: true,
-          integration: "slack",
-          integrationName: "Slack",
-          reason: "auth needed",
-        };
-      }
-      if (toolName === "approve_tool") {
-        return {
-          allowed: false,
-          needsApproval: true,
-          needsAuth: false,
-          integration: "github",
-        };
-      }
-      return {
-        allowed: true,
-        needsApproval: false,
-        needsAuth: false,
-      };
-    });
-    vi.mocked(parseBashCommand).mockImplementation((command) => {
-      if (command === "google-gmail list -l 1") {
-        return {
-          integration: "gmail",
-          operation: "list",
-          integrationName: "Gmail",
-          isWrite: false,
-        };
-      }
-      return null;
-    });
-    vi.mocked(readSandboxFileAsBuffer).mockResolvedValue(Buffer.from("file-content"));
-    vi.mocked(uploadSandboxFile).mockResolvedValue({
-      id: "uploaded-send-file-1",
-      filename: "report.txt",
-      mimeType: "text/plain",
-      sizeBytes: 12,
-      path: "/tmp/report.txt",
-      storageKey: "k/report.txt",
-    });
-    vi.mocked(toolCallToCommand).mockImplementation((toolName) => {
-      if (toolName === "bash_exec") {
-        return { command: "run-ok", isWrite: false };
-      }
-      if (toolName === "bash_fail") {
-        return { command: "run-fail", isWrite: false };
-      }
-      return null;
-    });
-
-    const sandbox = {
-      setup: vi.fn().mockResolvedValue(undefined),
-      writeFile: vi.fn().mockResolvedValue(undefined),
-      execute: vi.fn().mockImplementation(async (command: string) => {
-        if (command === "run-ok") {
-          return { stdout: "ok", stderr: "", exitCode: 0 };
-        }
-        if (command === "run-fail") {
-          return { stdout: "out", stderr: "err", exitCode: 1 };
-        }
-        return { stdout: "", stderr: "", exitCode: 0 };
-      }),
-      teardown: vi.fn().mockResolvedValue(undefined),
-    };
-    vi.mocked(getSandboxBackend).mockReturnValue(
-      sandbox as unknown as ReturnType<typeof getSandboxBackend>,
-    );
-
-    const firstStream = asAsyncIterable([
-      { type: "text_delta", text: "Hello " },
-      { type: "tool_use_start", toolUseId: "m1", toolName: "memory_write" },
-      { type: "tool_use_delta", jsonDelta: '{"content":"note"}' },
-      { type: "tool_use_end" },
-      { type: "tool_use_start", toolUseId: "b1", toolName: "bash" },
-      { type: "tool_use_delta", jsonDelta: '{"command":"google-gmail list -l 1"}' },
-      { type: "tool_use_end" },
-      { type: "tool_use_start", toolUseId: "a1", toolName: "auth_tool" },
-      { type: "tool_use_delta", jsonDelta: "{}" },
-      { type: "tool_use_end" },
-      { type: "tool_use_start", toolUseId: "ap1", toolName: "approve_tool" },
-      { type: "tool_use_delta", jsonDelta: '{"command":"write"}' },
-      { type: "tool_use_end" },
-      { type: "tool_use_start", toolUseId: "sf1", toolName: "send_file" },
-      { type: "tool_use_delta", jsonDelta: '{"path":"/tmp/report.txt"}' },
-      { type: "tool_use_end" },
-      { type: "tool_use_start", toolUseId: "e1", toolName: "bash_exec" },
-      { type: "tool_use_delta", jsonDelta: '{"command":"echo hi"}' },
-      { type: "tool_use_end" },
-      { type: "tool_use_start", toolUseId: "e2", toolName: "bash_fail" },
-      { type: "tool_use_delta", jsonDelta: '{"command":"bad"}' },
-      { type: "tool_use_end" },
-      { type: "tool_use_start", toolUseId: "u1", toolName: "unknown_tool" },
-      { type: "tool_use_delta", jsonDelta: "{}" },
-      { type: "tool_use_end" },
-      { type: "usage", inputTokens: 2, outputTokens: 3 },
-    ]);
-    const secondStream = asAsyncIterable([
-      { type: "text_delta", text: "done" },
-      { type: "usage", inputTokens: 1, outputTokens: 1 },
-    ]);
-    const llm = {
-      chat: vi.fn().mockReturnValueOnce(firstStream).mockReturnValueOnce(secondStream),
-    };
-
-    const mgr = asTestManager();
-    const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
-    vi.spyOn(mgr, "getLLMBackend").mockResolvedValue(llm);
-    vi.spyOn(mgr, "buildMessageHistory").mockResolvedValue([]);
-    vi.spyOn(mgr, "executeMemoryTool").mockResolvedValue({
-      content: "memory ok",
-      isError: false,
-    });
-    vi.spyOn(mgr, "importIntegrationSkillDraftsFromSandbox").mockResolvedValue(undefined);
-    vi.spyOn(mgr, "waitForAuth").mockResolvedValue({ success: false });
-    vi.spyOn(mgr, "waitForApproval").mockResolvedValue("deny");
-
-    const ctx = createCtx({
-      id: "gen-direct-heavy",
-      conversationId: "conv-direct-heavy",
-      backendType: "direct",
-      model: "openai/gpt-4.1",
-      allowedIntegrations: ["github"],
-      uploadedSandboxFileIds: new Set(),
-    });
-
-    await mgr.runDirectGeneration(ctx);
-
-    expect(finishSpy).toHaveBeenCalledWith(ctx, "completed");
-    expect(ctx.assistantContent).not.toContain("report.txt");
-    expect(vi.mocked(uploadSandboxFile)).toHaveBeenCalled();
-    expect(ctx.uploadedSandboxFileIds?.has("uploaded-send-file-1")).toBe(true);
-    expect(ctx.assistantContent).toContain("Hello done");
-    expect(ctx.contentParts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: "tool_use",
-          id: "b1",
-          name: "bash",
-          integration: "gmail",
-          operation: "list",
-        }),
-      ]),
     );
   });
 
