@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -148,6 +148,8 @@ export default function SubscriptionsPage() {
   const disconnectProvider = useDisconnectProvider();
   const [connectingProvider, setConnectingProvider] = useState<ProviderID | null>(null);
   const [deviceFlow, setDeviceFlow] = useState<DeviceFlowState | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const copyFeedbackTimeoutRef = useRef<number | null>(null);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
@@ -167,6 +169,14 @@ export default function SubscriptionsPage() {
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimeoutRef.current) {
+        clearTimeout(copyFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!deviceFlow) {
@@ -285,12 +295,28 @@ export default function SubscriptionsPage() {
     if (!deviceFlow) {
       return;
     }
-    void navigator.clipboard.writeText(deviceFlow.userCode);
+    void (async () => {
+      try {
+        await navigator.clipboard.writeText(deviceFlow.userCode);
+        setCopySuccess(true);
+
+        if (copyFeedbackTimeoutRef.current) {
+          clearTimeout(copyFeedbackTimeoutRef.current);
+        }
+
+        copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+          setCopySuccess(false);
+        }, 1800);
+      } catch (error) {
+        console.error("Failed to copy device code:", error);
+      }
+    })();
   }, [deviceFlow]);
 
   const handleCancelDeviceFlow = useCallback(() => {
     setDeviceFlow(null);
     setConnectingProvider(null);
+    setCopySuccess(false);
   }, []);
 
   if (isLoading) {
@@ -339,13 +365,49 @@ export default function SubscriptionsPage() {
           <p className="text-muted-foreground mt-2 text-sm">
             Open the verification page and enter the code below.
           </p>
-          <p className="mt-2 text-sm">Go to this link: {deviceFlow.verificationUri}</p>
+          <p className="mt-2 text-sm">
+            Go to this link:{" "}
+            <a
+              href="https://auth.openai.com/codex/device"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline underline-offset-4"
+            >
+              https://auth.openai.com/codex/device
+            </a>
+          </p>
           <div className="bg-muted mt-3 rounded-md px-3 py-2 font-mono text-lg tracking-wider">
             {deviceFlow.userCode}
           </div>
+          <div className="mt-2 h-5">
+            <div
+              className={cn(
+                "flex items-center gap-1 text-xs text-green-700 transition-all duration-300 dark:text-green-400",
+                copySuccess ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0",
+              )}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 animate-pulse" />
+              Code copied
+            </div>
+          </div>
           <div className="mt-3 flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopyDeviceCode}>
-              Copy code
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyDeviceCode}
+              className={cn(
+                "transition-colors duration-300",
+                copySuccess && "border-green-500 text-green-700 dark:text-green-400",
+              )}
+            >
+              {copySuccess ? (
+                <>
+                  <CheckCircle2 className="mr-2 h-3.5 w-3.5 animate-pulse" />
+                  Copied
+                </>
+              ) : (
+                "Copy code"
+              )}
             </Button>
             <Button variant="outline" size="sm" onClick={handleCancelDeviceFlow}>
               Cancel
