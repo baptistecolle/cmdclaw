@@ -9,6 +9,7 @@ import { getValidTokensForUser, getValidCustomTokens } from "./token-refresh";
 // Token-based integrations map to their access token env var
 const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
   gmail: "GMAIL_ACCESS_TOKEN",
+  outlook: "OUTLOOK_ACCESS_TOKEN",
   google_calendar: "GOOGLE_CALENDAR_ACCESS_TOKEN",
   google_docs: "GOOGLE_DOCS_ACCESS_TOKEN",
   google_sheets: "GOOGLE_SHEETS_ACCESS_TOKEN",
@@ -197,6 +198,13 @@ export function getCliInstructions(connectedIntegrations: IntegrationType[]): st
 - google-gmail unread - Count unread emails
 - google-gmail send --to <email> --subject <subject> --body <body>
 - Example: google-gmail list -q "is:unread" -l 5
+
+## Outlook Mail CLI [${statusTag("outlook")}]
+- outlook-mail list [-q query] [-l limit] - List emails
+- outlook-mail get <messageId> - Get full email content
+- outlook-mail unread - Count unread emails
+- outlook-mail send --to <email> --subject <subject> --body <body>
+- Example: outlook-mail list -q "is:unread" -l 5
 
 ## Google Calendar CLI [${statusTag("google_calendar")}]
 - gcalendar list [-t timeMin] [-m timeMax] [-l limit] - List events

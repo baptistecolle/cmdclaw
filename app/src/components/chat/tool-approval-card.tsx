@@ -117,6 +117,7 @@ function renderPreview(integration: string, previewProps: PreviewProps) {
     case "slack":
       return <SlackPreview {...previewProps} />;
     case "gmail":
+    case "outlook":
       return <GmailPreview {...previewProps} />;
     case "google_calendar":
       return <CalendarPreview {...previewProps} />;

@@ -32,6 +32,7 @@ function generateCodeChallenge(verifier: string): string {
 
 const integrationTypeSchema = z.enum([
   "gmail",
+  "outlook",
   "google_calendar",
   "google_docs",
   "google_sheets",

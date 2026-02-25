@@ -11,6 +11,7 @@ const approvalRequestSchema = z.object({
   conversationId: z.string().min(1),
   integration: z.enum([
     "gmail",
+    "outlook",
     "google_calendar",
     "google_docs",
     "google_sheets",

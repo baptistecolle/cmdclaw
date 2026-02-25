@@ -211,6 +211,7 @@ export function useGetAuthUrl() {
     }: {
       type:
         | "gmail"
+        | "outlook"
         | "google_calendar"
         | "google_docs"
         | "google_sheets"
@@ -555,6 +556,7 @@ export function useCreateWorkflow() {
       autoApprove?: boolean;
       allowedIntegrations: (
         | "gmail"
+        | "outlook"
         | "google_calendar"
         | "google_docs"
         | "google_sheets"
@@ -598,6 +600,7 @@ export function useUpdateWorkflow() {
       autoApprove?: boolean;
       allowedIntegrations?: (
         | "gmail"
+        | "outlook"
         | "google_calendar"
         | "google_docs"
         | "google_sheets"

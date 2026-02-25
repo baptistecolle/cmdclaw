@@ -22,6 +22,10 @@ const integrationConfig = {
     name: "Gmail",
     icon: "/integrations/google-gmail.svg",
   },
+  outlook: {
+    name: "Outlook",
+    icon: "/integrations/outlook.svg",
+  },
   google_calendar: {
     name: "Calendar",
     icon: "/integrations/google-calendar.svg",
@@ -64,6 +68,7 @@ type IntegrationType = keyof typeof integrationConfig;
 
 const recommendedIntegrations: IntegrationType[] = ["gmail", "google_calendar"];
 const otherIntegrations: IntegrationType[] = [
+  "outlook",
   "google_docs",
   "google_sheets",
   "google_drive",

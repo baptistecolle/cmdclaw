@@ -26,6 +26,7 @@ export interface IntegrationPreviewConfig {
 export const INTEGRATION_PREVIEWS: Record<string, IntegrationPreviewConfig> = {
   slack: { component: SlackPreview, displayName: "Slack" },
   gmail: { component: GmailPreview, displayName: "Gmail" },
+  outlook: { component: GmailPreview, displayName: "Outlook Mail" },
   google_calendar: {
     component: CalendarPreview,
     displayName: "Google Calendar",
