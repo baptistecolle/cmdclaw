@@ -57,7 +57,7 @@ const integrationConfig = {
   outlook_calendar: {
     name: "Outlook Calendar",
     description: "Manage events and calendars",
-    icon: "/integrations/outlook.svg",
+    icon: "/integrations/outlook-calendar.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
   google_calendar: {
@@ -1016,18 +1016,19 @@ function IntegrationsPageContent() {
                 )}
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                    {/* Keep all integration icon containers fixed square size; logos must stay object-contain to preserve aspect ratio. */}
                     <div
                       className={cn(
-                        "flex shrink-0 items-center justify-center rounded-lg p-2 shadow-sm border",
+                        "flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border p-2 shadow-sm",
                         config.bgColor,
                       )}
                     >
                       <Image
                         src={config.icon}
                         alt={config.name}
-                        width={24}
-                        height={24}
-                        className="h-6 w-auto"
+                        width={32}
+                        height={32}
+                        className="h-auto max-h-8 w-auto max-w-8 object-contain"
                       />
                     </div>
                     <div className="min-w-0">
@@ -1177,11 +1178,17 @@ function IntegrationsPageContent() {
                   <div key={ci.id} className="overflow-hidden rounded-lg border">
                     <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                        <div className="flex shrink-0 items-center justify-center rounded-lg border bg-white p-2 shadow-sm dark:bg-gray-800">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border bg-white p-2 shadow-sm dark:bg-gray-800">
                           {ci.iconUrl ? (
-                            <Image src={ci.iconUrl} alt={ci.name} width={24} height={24} />
+                            <Image
+                              src={ci.iconUrl}
+                              alt={ci.name}
+                              width={32}
+                              height={32}
+                              className="h-auto max-h-8 w-auto max-w-8 object-contain"
+                            />
                           ) : (
-                            <Puzzle className="h-6 w-6 text-indigo-500" />
+                            <Puzzle className="h-8 w-8 text-indigo-500" />
                           )}
                         </div>
                         <div className="min-w-0">

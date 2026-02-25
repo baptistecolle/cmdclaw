@@ -228,7 +228,7 @@ function showHelp() {
   list [-l limit]                               List recent documents
   search <query> [-l limit]                     Search documents by content
 
-Example: gdocs get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
+Example: google-docs get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
 
 Options:
   -h, --help                                    Show this help message`);

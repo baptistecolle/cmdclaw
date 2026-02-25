@@ -235,35 +235,37 @@ export function getCliInstructions(connectedIntegrations: IntegrationType[]): st
 - Example: outlook-calendar list -l 10
 
 ## Google Calendar CLI [${statusTag("google_calendar")}]
-- gcalendar list [-t timeMin] [-m timeMax] [-l limit] - List events
-- gcalendar get <eventId> - Get event details
-- gcalendar create --summary <title> --start <datetime> --end <datetime> [--description <text>]
-- gcalendar delete <eventId> - Delete an event
-- gcalendar calendars - List available calendars
-- Example: gcalendar list -l 10
+- google-calendar list [-t timeMin] [-m timeMax] [-l limit] [-c calendarId] - List events
+- google-calendar get <eventId> [-c calendarId] - Get event details
+- google-calendar create --summary <title> --start <datetime> --end <datetime> [--description <text>] [--location <text>] [--attendees <a@x.com,b@y.com>] [-c calendarId]
+- google-calendar update <eventId> [--summary <title>] [--start <datetime>] [--end <datetime>] [--description <text>] [--location <text>] [-c calendarId]
+- google-calendar delete <eventId> [-c calendarId] - Delete an event
+- google-calendar calendars - List available calendars
+- google-calendar today [-c calendarId] - List today's events
+- Example: google-calendar list -l 10
 
 ## Google Docs CLI [${statusTag("google_docs")}]
-- gdocs get <documentId> - Get document content
-- gdocs create --title <title> [--content <text>] - Create a document
-- gdocs append <documentId> --text <text> - Append text to document
-- gdocs list - List recent documents
-- Example: gdocs get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
+- google-docs get <documentId> - Get document content
+- google-docs create --title <title> [--content <text>] - Create a document
+- google-docs append <documentId> --text <text> - Append text to document
+- google-docs list - List recent documents
+- Example: google-docs get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
 
 ## Google Sheets CLI [${statusTag("google_sheets")}]
-- gsheets get <spreadsheetId> [--range <A1:B10>] - Get spreadsheet data
-- gsheets create --title <title> - Create a spreadsheet
-- gsheets append <spreadsheetId> --range <A:B> --values '[[...]]' - Append rows
-- gsheets update <spreadsheetId> --range <A1:B2> --values '[[...]]' - Update cells
-- gsheets list - List recent spreadsheets
-- Example: gsheets get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms --range Sheet1!A1:D10
+- google-sheets get <spreadsheetId> [--range <A1:B10>] - Get spreadsheet data
+- google-sheets create --title <title> - Create a spreadsheet
+- google-sheets append <spreadsheetId> --range <A:B> --values '[[...]]' - Append rows
+- google-sheets update <spreadsheetId> --range <A1:B2> --values '[[...]]' - Update cells
+- google-sheets list - List recent spreadsheets
+- Example: google-sheets get 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms --range Sheet1!A1:D10
 
 ## Google Drive CLI [${statusTag("google_drive")}]
-- gdrive list [-q query] [-l limit] - List files
-- gdrive get <fileId> - Get file metadata
-- gdrive download <fileId> [--output <path>] - Download file
-- gdrive search -q <query> - Search files
-- gdrive upload --file <path> [--name <name>] [--folder <folderId>] - Upload file
-- Example: gdrive list -l 20
+- google-drive list [-q query] [-l limit] - List files
+- google-drive get <fileId> - Get file metadata
+- google-drive download <fileId> [--output <path>] - Download file
+- google-drive search -q <query> - Search files
+- google-drive upload --file <path> [--name <name>] [--folder <folderId>] - Upload file
+- Example: google-drive list -l 20
 
 ## Notion CLI [${statusTag("notion")}]
 - notion search [-q query] [--type page|database] - Search pages/databases

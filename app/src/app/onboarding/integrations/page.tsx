@@ -28,7 +28,7 @@ const integrationConfig = {
   },
   outlook_calendar: {
     name: "Outlook Calendar",
-    icon: "/integrations/outlook.svg",
+    icon: "/integrations/outlook-calendar.svg",
   },
   google_calendar: {
     name: "Calendar",
