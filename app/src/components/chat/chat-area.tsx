@@ -1152,6 +1152,13 @@ export function ChatArea({ conversationId }: Props) {
     upsertMessageById,
   ]);
 
+  useEffect(() => {
+    if (activeGeneration?.status !== "error") {
+      return;
+    }
+    setStreamError(activeGeneration.errorMessage || "Streaming failed. Please retry.");
+  }, [activeGeneration?.errorMessage, activeGeneration?.status]);
+
   // Track if user is near bottom of scroll
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -1742,6 +1749,7 @@ export function ChatArea({ conversationId }: Props) {
         const result = await getAuthUrl({
           type: integration as
             | "gmail"
+            | "outlook"
             | "google_calendar"
             | "google_docs"
             | "google_sheets"
@@ -1752,7 +1760,10 @@ export function ChatArea({ conversationId }: Props) {
             | "airtable"
             | "slack"
             | "hubspot"
-            | "linkedin",
+            | "linkedin"
+            | "salesforce"
+            | "reddit"
+            | "twitter",
           redirectUrl: `${window.location.origin}/chat/${convId}?auth_complete=${integration}&generation_id=${genId}`,
         });
         window.location.href = result.authUrl;
