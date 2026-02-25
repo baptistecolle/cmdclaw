@@ -4,7 +4,7 @@
   "config": {
     "description": "CmdClaw AI Agent - Connect your HubSpot to automate CRM tasks",
     "name": "CmdClaw",
-    "logo": "/app/app-logo.png",
+    "logo": "/app/logo.png",
     "distribution": "marketplace",
     "auth": {
       "type": "oauth",

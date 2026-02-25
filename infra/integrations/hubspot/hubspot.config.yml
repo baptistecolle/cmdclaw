@@ -1,0 +1,12 @@
+defaultPortal: cmdclaw
+portals:
+  - name: cmdclaw
+    env: prod
+    authType: personalaccesskey
+    accountType: STANDARD
+    personalAccessKey: ${HUBSPOT_PERSONAL_ACCESS_KEY}
+    auth:
+      tokenInfo:
+        accessToken: ${HUBSPOT_ACCESS_TOKEN}
+        expiresAt: '1970-01-01T00:00:00.000Z'
+    portalId: 147593332
