@@ -1,5 +1,7 @@
 pre-commit:
   commands:
+    secrets:
+      run: gitleaks protect --staged --config .gitleaks.toml --redact
     lint:
       root: app
       run: bun run lint
