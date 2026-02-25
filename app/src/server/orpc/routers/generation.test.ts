@@ -120,6 +120,10 @@ describe("generationRouter", () => {
       generationStatus: "generating",
       currentGenerationId: "gen-db",
     });
+    generationFindFirstMock.mockResolvedValue({
+      startedAt: null,
+      errorMessage: null,
+    });
 
     const result = await generationRouterAny.getActiveGeneration({
       input: { conversationId: "conv-1" },
@@ -129,7 +133,33 @@ describe("generationRouter", () => {
     expect(result).toEqual({
       generationId: "gen-db",
       startedAt: null,
+      errorMessage: null,
       status: "generating",
+    });
+  });
+
+  it("returns persisted error message for errored active generation", async () => {
+    conversationFindFirstMock.mockResolvedValue({
+      id: "conv-1",
+      userId: "user-1",
+      generationStatus: "error",
+      currentGenerationId: "gen-db",
+    });
+    generationFindFirstMock.mockResolvedValue({
+      startedAt: new Date("2026-02-25T07:40:22.751Z"),
+      errorMessage: "401 insufficient permissions",
+    });
+
+    const result = await generationRouterAny.getActiveGeneration({
+      input: { conversationId: "conv-1" },
+      context,
+    });
+
+    expect(result).toEqual({
+      generationId: "gen-db",
+      startedAt: "2026-02-25T07:40:22.751Z",
+      errorMessage: "401 insufficient permissions",
+      status: "error",
     });
   });
 
