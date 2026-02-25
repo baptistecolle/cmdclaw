@@ -1,5 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <path d="M10 10l22 9v36L10 44V10z" fill="#0F6CBD"/>
-  <path d="M32 19l22-9v34l-22 11V19z" fill="#2B88D8"/>
-  <path d="M10 10l22 9 22-9-22-8-22 8z" fill="#50A3E7"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="380.11 17.59 43.02 61.46" fill="none">
+  <defs>
+    <mask id="mask0" maskUnits="userSpaceOnUse" x="380.11" y="17.59" width="43.02" height="61.46">
+      <path fill="#fff" d="M423.14 37.29c0-2.6-1.63-4.91-4.08-5.79L383.4 18.77c-1.6-.57-3.29.62-3.29 2.32v19.36c0 1.04.65 1.97 1.63 2.32l15.98 5.71c1.6.57 3.29-.62 3.29-2.32V35.03c0-.86.86-1.45 1.66-1.15l4.19 1.58c2.4.9 3.98 3.19 3.98 5.75v4.84l-18.05 6.6a2.47 2.47 0 0 0-1.61 2.31v19.35c0 1.71 1.7 2.9 3.3 2.31l24.62-9c2.42-.89 4.04-3.19 4.04-5.77V37.29Z"/>
+    </mask>
+
+    <linearGradient id="grad0" x1="394.265" y1="1016.1134" x2="405.7044" y2="986.1689" gradientUnits="userSpaceOnUse" gradientTransform="matrix(1 0 0 -1 0 1034.4158)">
+      <stop offset="0" stop-color="#0B53CE"/>
+      <stop offset="1" stop-color="#7252AA"/>
+    </linearGradient>
+
+    <linearGradient id="grad1" x1="407.1558" y1="958.7491" x2="407.1558" y2="994.4423" gradientUnits="userSpaceOnUse" gradientTransform="matrix(1 0 0 -1 0 1034.4158)">
+      <stop offset="0" stop-color="#2266E3"/>
+      <stop offset="1" stop-color="#AE7FE2"/>
+    </linearGradient>
+
+    <linearGradient id="grad2" x1="423.1349" y1="976.8746" x2="410.8902" y2="976.8746" gradientUnits="userSpaceOnUse" gradientTransform="matrix(1 0 0 -1 0 1034.4158)">
+      <stop offset="0" stop-color="#94B9FF"/>
+      <stop offset="0.2878" stop-color="#94B9FF" stop-opacity="0.5236"/>
+      <stop offset="1" stop-color="#538FFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <g mask="url(#mask0)">
+    <path fill="url(#grad0)" d="M380.11 17.59 423.13 32.95v21.1c0 1.7-1.68 2.89-3.28 2.32l-9.01-3.22V41.21c0-2.56-1.59-4.85-3.98-5.75l-4.19-1.57c-.8-.3-1.66.29-1.66 1.15v14.61l-20.9-7.46V17.59Z"/>
+    <path fill="#000" fill-opacity="0.24" d="M423.13 37.51c0 2.58-1.61 4.89-4.04 5.78l-27.92 10.2v24.58l31.96-11.68V37.51Z"/>
+    <path fill="#000" fill-opacity="0.32" d="M423.13 38.49c0 2.58-1.61 4.89-4.04 5.78l-27.92 10.2v24.58l31.96-11.68V38.49Z"/>
+    <path fill="url(#grad1)" d="M423.13 37.26c0 2.58-1.61 4.89-4.04 5.78l-27.92 10.2v24.58l31.96-11.68V37.26Z"/>
+    <path fill="url(#grad2)" fill-opacity="0.5" d="M423.13 37.26c0 2.58-1.61 4.89-4.04 5.78l-27.92 10.2v24.58l31.96-11.68V37.26Z"/>
+    <path fill="#B0ADFF" fill-opacity="0.5" d="m410.84 46.06-9.84 3.6v14.42c0 .86.86 1.45 1.66 1.15l4.2-1.58c2.4-.9 3.98-3.19 3.98-5.75V46.06Z"/>
+  </g>
 </svg>

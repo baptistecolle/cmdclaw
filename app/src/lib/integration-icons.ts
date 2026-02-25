@@ -143,7 +143,7 @@ export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
 export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
   gmail: "/integrations/google-gmail.svg",
   outlook: "/integrations/outlook.svg",
-  outlook_calendar: "/integrations/outlook.svg",
+  outlook_calendar: "/integrations/outlook-calendar.svg",
   google_calendar: "/integrations/google-calendar.svg",
   google_docs: "/integrations/google-docs.svg",
   google_sheets: "/integrations/google-sheets.svg",

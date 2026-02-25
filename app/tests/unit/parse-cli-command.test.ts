@@ -65,22 +65,22 @@ describe("parseCliCommand", () => {
         operation: "list",
       },
       {
-        command: "gcalendar today",
+        command: "google-calendar today",
         integration: "google_calendar",
         operation: "today",
       },
       {
-        command: "gdocs get doc_123",
+        command: "google-docs get doc_123",
         integration: "google_docs",
         operation: "get",
       },
       {
-        command: "gsheets get sheet_123",
+        command: "google-sheets get sheet_123",
         integration: "google_sheets",
         operation: "get",
       },
       {
-        command: "gdrive list",
+        command: "google-drive list",
         integration: "google_drive",
         operation: "list",
       },
@@ -127,6 +127,13 @@ describe("parseCliCommand", () => {
       expect(parsed?.integration).toBe(item.integration);
       expect(parsed?.operation).toBe(item.operation);
     }
+  });
+
+  test("rejects legacy short aliases", () => {
+    expect(parseCliCommand("gcalendar list -l 1")).toBeNull();
+    expect(parseCliCommand("gdocs list")).toBeNull();
+    expect(parseCliCommand("gsheets list")).toBeNull();
+    expect(parseCliCommand("gdrive list")).toBeNull();
   });
 
   test("parses boolean long and short flags", () => {

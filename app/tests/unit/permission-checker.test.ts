@@ -48,6 +48,62 @@ describe("parseBashCommand", () => {
       isWrite: false,
     });
   });
+
+  test("supports google-* command names", () => {
+    expect(parseBashCommand("google-calendar today")).toEqual({
+      integration: "google_calendar",
+      operation: "today",
+      integrationName: "Google Calendar",
+      isWrite: false,
+    });
+
+    expect(parseBashCommand("google-docs list")).toEqual({
+      integration: "google_docs",
+      operation: "list",
+      integrationName: "Google Docs",
+      isWrite: false,
+    });
+
+    expect(parseBashCommand("google-sheets update abc --range A1:B1 --values '[[\"x\"]]'")).toEqual(
+      {
+        integration: "google_sheets",
+        operation: "update",
+        integrationName: "Google Sheets",
+        isWrite: true,
+      },
+    );
+
+    expect(parseBashCommand("google-drive search -q budget")).toEqual({
+      integration: "google_drive",
+      operation: "search",
+      integrationName: "Google Drive",
+      isWrite: false,
+    });
+  });
+
+  test("rejects legacy short aliases", () => {
+    expect(
+      parseBashCommand(
+        "gcalendar create --summary Test --start 2026-02-25T09:00:00 --end 2026-02-25T10:00:00",
+      ),
+    ).toBeNull();
+    expect(parseBashCommand("gdocs list")).toBeNull();
+    expect(parseBashCommand("gsheets list")).toBeNull();
+    expect(parseBashCommand("gdrive list")).toBeNull();
+  });
+
+  test("parses google-calendar writes", () => {
+    expect(
+      parseBashCommand(
+        "google-calendar create --summary Test --start 2026-02-25T09:00:00 --end 2026-02-25T10:00:00",
+      ),
+    ).toEqual({
+      integration: "google_calendar",
+      operation: "create",
+      integrationName: "Google Calendar",
+      isWrite: true,
+    });
+  });
 });
 
 describe("checkToolPermissions", () => {
