@@ -26,6 +26,7 @@ const authRequestSchema = z.object({
     "hubspot",
     "linkedin",
     "salesforce",
+    "dynamics",
     "reddit",
     "twitter",
   ]),

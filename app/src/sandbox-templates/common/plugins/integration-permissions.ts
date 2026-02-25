@@ -24,6 +24,7 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   hubspot: "hubspot",
   linkedin: "linkedin",
   salesforce: "salesforce",
+  dynamics: "dynamics",
   twitter: "twitter",
   discord: "discord",
 };
@@ -140,6 +141,10 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
     read: ["query", "get", "describe", "objects", "search"],
     write: ["create", "update"],
   },
+  dynamics: {
+    read: ["whoami", "tables.list", "tables.get", "rows.list", "rows.get"],
+    write: ["rows.create", "rows.update", "rows.delete"],
+  },
   twitter: {
     read: [
       "me",
@@ -187,6 +192,7 @@ const TOKEN_ENV_VARS: Record<string, string> = {
   hubspot: "HUBSPOT_ACCESS_TOKEN",
   linkedin: "LINKEDIN_ACCOUNT_ID",
   salesforce: "SALESFORCE_ACCESS_TOKEN",
+  dynamics: "DYNAMICS_ACCESS_TOKEN",
   twitter: "TWITTER_ACCESS_TOKEN",
   discord: "DISCORD_BOT_TOKEN",
 };
@@ -208,6 +214,7 @@ const INTEGRATION_NAMES: Record<string, string> = {
   hubspot: "HubSpot",
   linkedin: "LinkedIn",
   salesforce: "Salesforce",
+  dynamics: "Microsoft Dynamics 365",
   twitter: "X (Twitter)",
   discord: "Discord",
 };
@@ -269,6 +276,16 @@ function parseBashCommand(command: string): { integration: string; operation: st
     const action = parts[2];
     if (resource === "search") {
       return { integration, operation: "search" };
+    }
+    return { integration, operation: `${resource}.${action}` };
+  }
+
+  // Dynamics has nested pattern: dynamics <resource> <action>
+  if (integration === "dynamics" && parts.length >= 3) {
+    const resource = parts[1];
+    const action = parts[2];
+    if (resource === "whoami") {
+      return { integration, operation: "whoami" };
     }
     return { integration, operation: `${resource}.${action}` };
   }
@@ -565,6 +582,9 @@ export const IntegrationPermissionsPlugin = async () => {
       if (!hasToken && integration.startsWith("custom-")) {
         const slug = integration.replace("custom-", "").toUpperCase().replace(/-/g, "_");
         hasToken = !!(process.env[`${slug}_ACCESS_TOKEN`] || process.env[`${slug}_API_KEY`]);
+      }
+      if (hasToken && integration === "dynamics" && !process.env.DYNAMICS_INSTANCE_URL) {
+        hasToken = false;
       }
 
       // slack send --as bot can use relay without a Slack user token

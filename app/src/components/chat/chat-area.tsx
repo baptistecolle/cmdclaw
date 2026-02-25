@@ -1763,6 +1763,7 @@ export function ChatArea({ conversationId }: Props) {
             | "hubspot"
             | "linkedin"
             | "salesforce"
+            | "dynamics"
             | "reddit"
             | "twitter",
           redirectUrl: `${window.location.origin}/chat/${convId}?auth_complete=${integration}&generation_id=${genId}`,

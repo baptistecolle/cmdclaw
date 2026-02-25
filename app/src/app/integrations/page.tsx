@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useRef } from "react";
+import { Suspense, useCallback, useMemo, useRef } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,6 +132,12 @@ const integrationConfig = {
     icon: "/integrations/salesforce.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
+  dynamics: {
+    name: "Microsoft Dynamics 365",
+    description: "Manage Dataverse tables and CRM rows",
+    icon: "/integrations/dynamics.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
   reddit: {
     name: "Reddit",
     description: "Browse, vote, comment, and post on Reddit",
@@ -174,6 +180,12 @@ const adminPreviewOnlyIntegrations = new Set<IntegrationType>(
   ),
 );
 type CustomAuthType = "oauth2" | "api_key" | "bearer_token";
+type DynamicsInstanceOption = {
+  id: string;
+  friendlyName: string;
+  instanceUrl: string;
+  apiUrl: string;
+};
 type CustomFormState = {
   slug: string;
   name: string;
@@ -374,6 +386,32 @@ function IntegrationsPageContent() {
   >(null);
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [customForm, setCustomForm] = useState<CustomFormState>(defaultCustomForm);
+  const [dynamicsInstances, setDynamicsInstances] = useState<DynamicsInstanceOption[]>([]);
+  const [dynamicsPickerOpen, setDynamicsPickerOpen] = useState(false);
+  const [dynamicsPickerLoading, setDynamicsPickerLoading] = useState(false);
+  const [selectedDynamicsInstance, setSelectedDynamicsInstance] = useState<string>("");
+
+  const loadDynamicsPicker = useCallback(async () => {
+    setDynamicsPickerLoading(true);
+    try {
+      const response = await fetch("/api/oauth/dynamics/pending");
+      if (!response.ok) {
+        throw new Error("Failed to load Dynamics environments");
+      }
+      const payload = (await response.json()) as { instances: DynamicsInstanceOption[] };
+      setDynamicsInstances(payload.instances);
+      setSelectedDynamicsInstance(payload.instances[0]?.instanceUrl ?? "");
+      setDynamicsPickerOpen(true);
+    } catch (error) {
+      console.error("Failed to load Dynamics environments:", error);
+      setNotification({
+        type: "error",
+        message: "Unable to load Dynamics environments. Please reconnect and try again.",
+      });
+    } finally {
+      setDynamicsPickerLoading(false);
+    }
+  }, []);
 
   // Handle LinkedIn account_id from redirect (Unipile hosted auth)
   useEffect(() => {
@@ -427,6 +465,13 @@ function IntegrationsPageContent() {
       window.history.replaceState({}, "", "/integrations");
     }
   }, [searchParams, refetch]);
+
+  useEffect(() => {
+    const shouldSelectDynamics = searchParams.get("dynamics_select") === "true";
+    if (shouldSelectDynamics) {
+      void loadDynamicsPicker();
+    }
+  }, [loadDynamicsPicker, searchParams]);
 
   // Auto-dismiss notification
   useEffect(() => {
@@ -487,6 +532,59 @@ function IntegrationsPageContent() {
     },
     [disconnectIntegration, refetch],
   );
+
+  const handleCompleteDynamicsSelection = useCallback(async () => {
+    if (!selectedDynamicsInstance) {
+      setNotification({
+        type: "error",
+        message: "Select a Dynamics environment to continue.",
+      });
+      return;
+    }
+
+    setDynamicsPickerLoading(true);
+    try {
+      const response = await fetch("/api/oauth/dynamics/pending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instanceUrl: selectedDynamicsInstance,
+          generationId: searchParams.get("generation_id") ?? undefined,
+          integration: searchParams.get("auth_complete") ?? undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to complete Dynamics connection");
+      }
+
+      setDynamicsPickerOpen(false);
+      setDynamicsInstances([]);
+      setSelectedDynamicsInstance("");
+      window.history.replaceState({}, "", "/integrations?success=true");
+      refetch();
+      setNotification({
+        type: "success",
+        message: "Microsoft Dynamics 365 connected successfully!",
+      });
+    } catch (error) {
+      console.error("Failed to complete Dynamics selection:", error);
+      setNotification({
+        type: "error",
+        message: "Failed to finalize Dynamics connection. Please try again.",
+      });
+    } finally {
+      setDynamicsPickerLoading(false);
+    }
+  }, [refetch, searchParams, selectedDynamicsInstance]);
+
+  const handleDynamicsInstanceChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedDynamicsInstance(event.target.value);
+  }, []);
+
+  const handleOpenDynamicsSetup = useCallback(() => {
+    void loadDynamicsPicker();
+  }, [loadDynamicsPicker]);
 
   const handleToggleCustom = useCallback(
     async (customIntegrationId: string, enabled: boolean) => {
@@ -563,10 +661,23 @@ function IntegrationsPageContent() {
     };
   }, []);
 
-  const integrationsList = Array.isArray(integrations) ? integrations : [];
+  const integrationsList = useMemo(
+    () => (Array.isArray(integrations) ? integrations : []),
+    [integrations],
+  );
   const connectedIntegrations = new Map<string, (typeof integrationsList)[number]>(
     integrationsList.map((i) => [i.type, i]),
   );
+
+  useEffect(() => {
+    if (dynamicsPickerOpen) {
+      return;
+    }
+    const dynamicsIntegration = integrationsList.find((item) => item.type === "dynamics");
+    if (dynamicsIntegration?.setupRequired) {
+      void loadDynamicsPicker();
+    }
+  }, [dynamicsPickerOpen, integrationsList, loadDynamicsPicker]);
 
   const visibleIntegrations = (
     Object.entries(integrationConfig) as [
@@ -781,6 +892,51 @@ function IntegrationsPageContent() {
         </div>
       )}
 
+      {dynamicsPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background w-full max-w-lg rounded-lg border p-6 shadow-xl">
+            <h3 className="text-lg font-semibold">Select Dynamics Environment</h3>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Choose the Microsoft Dynamics 365 environment to finish connecting.
+            </p>
+            <div className="mt-4 space-y-2">
+              {dynamicsInstances.map((instance) => (
+                <label
+                  key={instance.id}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors",
+                    selectedDynamicsInstance === instance.instanceUrl
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/40",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="dynamics-instance"
+                    value={instance.instanceUrl}
+                    checked={selectedDynamicsInstance === instance.instanceUrl}
+                    onChange={handleDynamicsInstanceChange}
+                    className="mt-0.5"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-medium">{instance.friendlyName}</p>
+                    <p className="text-muted-foreground truncate text-xs">{instance.instanceUrl}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button
+                onClick={handleCompleteDynamicsSelection}
+                disabled={dynamicsPickerLoading || !selectedDynamicsInstance}
+              >
+                {dynamicsPickerLoading ? "Saving..." : "Continue"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="bg-muted grid w-full grid-cols-3 gap-1 rounded-lg p-1 sm:flex sm:w-fit">
           {tabs.map((tab) => (
@@ -876,7 +1032,11 @@ function IntegrationsPageContent() {
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-medium">{config.name}</h3>
-                      {integration ? (
+                      {integration?.setupRequired ? (
+                        <p className="text-muted-foreground truncate text-sm">
+                          Finish environment selection to complete connection.
+                        </p>
+                      ) : integration ? (
                         <p className="text-muted-foreground truncate text-sm">
                           Connected as{" "}
                           <span className="font-medium">{integration.displayName}</span>
@@ -916,23 +1076,40 @@ function IntegrationsPageContent() {
                       </Button>
                     ) : integration ? (
                       <>
-                        <label
-                          className="flex cursor-pointer items-center gap-2 whitespace-nowrap"
-                          onClick={handleStopPropagation}
-                        >
-                          <IntegrationEnabledSwitch
-                            checked={integration.enabled}
-                            integrationId={integration.id}
-                            onToggle={handleToggle}
-                          />
-                          <span className="inline-block w-8 text-sm">
-                            {integration.enabled ? "On" : "Off"}
-                          </span>
-                        </label>
-                        <IntegrationDisconnectButton
-                          integrationId={integration.id}
-                          onDisconnect={handleDisconnect}
-                        />
+                        {type === "dynamics" && integration.setupRequired ? (
+                          <>
+                            <Button
+                              onClick={handleOpenDynamicsSetup}
+                              disabled={dynamicsPickerLoading}
+                            >
+                              Complete setup
+                            </Button>
+                            <IntegrationDisconnectButton
+                              integrationId={integration.id}
+                              onDisconnect={handleDisconnect}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <label
+                              className="flex cursor-pointer items-center gap-2 whitespace-nowrap"
+                              onClick={handleStopPropagation}
+                            >
+                              <IntegrationEnabledSwitch
+                                checked={integration.enabled}
+                                integrationId={integration.id}
+                                onToggle={handleToggle}
+                              />
+                              <span className="inline-block w-8 text-sm">
+                                {integration.enabled ? "On" : "Off"}
+                              </span>
+                            </label>
+                            <IntegrationDisconnectButton
+                              integrationId={integration.id}
+                              onDisconnect={handleDisconnect}
+                            />
+                          </>
+                        )}
                       </>
                     ) : (
                       <IntegrationConnectButton

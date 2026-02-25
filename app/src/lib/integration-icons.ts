@@ -39,6 +39,7 @@ export type IntegrationType =
   | "hubspot"
   | "linkedin"
   | "salesforce"
+  | "dynamics"
   | "reddit"
   | "twitter";
 
@@ -58,6 +59,7 @@ export const ALL_INTEGRATION_TYPES: IntegrationType[] = [
   "hubspot",
   "linkedin",
   "salesforce",
+  "dynamics",
   "reddit",
   "twitter",
 ];
@@ -91,6 +93,7 @@ export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   hubspot: Users,
   linkedin: Linkedin,
   salesforce: Cloud,
+  dynamics: Cloud,
   reddit: MessageCircle,
   twitter: Twitter,
 };
@@ -111,6 +114,7 @@ export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
   hubspot: "HubSpot",
   linkedin: "LinkedIn",
   salesforce: "Salesforce",
+  dynamics: "Microsoft Dynamics 365",
   reddit: "Reddit",
   twitter: "X (Twitter)",
 };
@@ -131,6 +135,7 @@ export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
   hubspot: "text-orange-500",
   linkedin: "text-[#0A66C2]",
   salesforce: "text-[#00A1E0]",
+  dynamics: "text-[#0F6CBD]",
   reddit: "text-[#FF4500]",
   twitter: "text-gray-900 dark:text-gray-100",
 };
@@ -151,6 +156,7 @@ export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
   hubspot: "/integrations/hubspot.svg",
   linkedin: "/integrations/linkedin.svg",
   salesforce: "/integrations/salesforce.svg",
+  dynamics: "/integrations/dynamics.svg",
   reddit: "/integrations/reddit.svg",
   twitter: "/integrations/twitter.svg",
 };
@@ -318,6 +324,16 @@ export const INTEGRATION_OPERATION_LABELS: Record<IntegrationType, Record<string
     search: "Searching records",
     create: "Creating record",
     update: "Updating record",
+  },
+  dynamics: {
+    whoami: "Getting current user",
+    "tables.list": "Listing tables",
+    "tables.get": "Getting table metadata",
+    "rows.list": "Listing rows",
+    "rows.get": "Getting row",
+    "rows.create": "Creating row",
+    "rows.update": "Updating row",
+    "rows.delete": "Deleting row",
   },
   reddit: {
     feed: "Getting home feed",

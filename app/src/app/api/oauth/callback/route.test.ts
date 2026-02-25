@@ -6,6 +6,7 @@ import { mswServer } from "@/test/msw/server";
 const {
   getSessionMock,
   getOAuthConfigMock,
+  fetchDynamicsInstancesMock,
   submitAuthResultMock,
   integrationFindFirstMock,
   updateWhereMock,
@@ -16,6 +17,7 @@ const {
 } = vi.hoisted(() => {
   const getSessionMock = vi.fn();
   const getOAuthConfigMock = vi.fn();
+  const fetchDynamicsInstancesMock = vi.fn();
   const submitAuthResultMock = vi.fn();
 
   const integrationFindFirstMock = vi.fn();
@@ -45,6 +47,7 @@ const {
   return {
     getSessionMock,
     getOAuthConfigMock,
+    fetchDynamicsInstancesMock,
     submitAuthResultMock,
     integrationFindFirstMock,
     updateWhereMock,
@@ -71,6 +74,10 @@ vi.mock("@/server/oauth/config", () => ({
   getOAuthConfig: getOAuthConfigMock,
 }));
 
+vi.mock("@/server/integrations/dynamics", () => ({
+  fetchDynamicsInstances: fetchDynamicsInstancesMock,
+}));
+
 vi.mock("@/server/services/generation-manager", () => ({
   generationManager: {
     submitAuthResult: submitAuthResultMock,
@@ -95,6 +102,14 @@ describe("GET /api/oauth/callback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getSessionMock.mockResolvedValue({ user: { id: "user-1" } });
+    fetchDynamicsInstancesMock.mockResolvedValue([
+      {
+        id: "env-1",
+        friendlyName: "Prod",
+        instanceUrl: "https://acme.crm.dynamics.com",
+        apiUrl: "https://acme.crm.dynamics.com/api/data/v9.2",
+      },
+    ]);
     submitAuthResultMock.mockResolvedValue(true);
     integrationFindFirstMock.mockResolvedValue(null);
     insertReturningMock.mockResolvedValue([{ id: "integration-1" }]);
@@ -312,5 +327,44 @@ describe("GET /api/oauth/callback", () => {
         },
       }),
     );
+  });
+
+  it("redirects dynamics callback to environment selection and stores pending metadata", async () => {
+    mswServer.use(
+      http.post("https://oauth.example.com/token", () =>
+        HttpResponse.json({
+          access_token: "dyn-access",
+          refresh_token: "dyn-refresh",
+          expires_in: 3600,
+        }),
+      ),
+    );
+
+    const state = encodeState({
+      userId: "user-1",
+      type: "dynamics",
+      redirectUrl: "/integrations",
+    });
+
+    const request = new NextRequest(
+      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`,
+    );
+
+    const response = await GET(request);
+
+    expect(getLocation(response)).toBe("https://app.example.com/integrations?dynamics_select=true");
+    const integrationInsertCall = (
+      insertValuesMock.mock.calls as unknown as Array<[Record<string, unknown>]>
+    ).find((call) => call[0] && typeof call[0] === "object" && "providerAccountId" in call[0]);
+
+    expect(integrationInsertCall?.[0]).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        metadata: expect.objectContaining({
+          pendingInstanceSelection: true,
+        }),
+      }),
+    );
+    expect(submitAuthResultMock).not.toHaveBeenCalled();
   });
 });

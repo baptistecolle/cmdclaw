@@ -60,6 +60,7 @@ const PROVIDER_DEFINITIVE_PATTERNS: Partial<Record<IntegrationType, RegExp[]>> =
   notion: [/revoked/i],
   reddit: [/invalid_grant/i],
   salesforce: [/invalid_grant/i],
+  dynamics: [/invalid_grant/i],
   slack: [/invalid refresh token/i],
   twitter: [/invalid_grant/i],
 };

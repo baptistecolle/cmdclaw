@@ -25,6 +25,7 @@ const approvalRequestSchema = z.object({
     "hubspot",
     "linkedin",
     "salesforce",
+    "dynamics",
     "reddit",
     "twitter",
   ]),

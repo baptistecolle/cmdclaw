@@ -358,6 +358,7 @@ export const integrationTypeEnum = pgEnum("integration_type", [
   "hubspot",
   "linkedin",
   "salesforce",
+  "dynamics",
   "reddit",
   "twitter",
 ]);

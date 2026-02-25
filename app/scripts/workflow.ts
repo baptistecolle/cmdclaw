@@ -42,6 +42,7 @@ type WorkflowIntegrationType =
   | "hubspot"
   | "linkedin"
   | "salesforce"
+  | "dynamics"
   | "reddit"
   | "twitter";
 
@@ -59,6 +60,7 @@ const integrationTypes = new Set<WorkflowIntegrationType>([
   "hubspot",
   "linkedin",
   "salesforce",
+  "dynamics",
   "reddit",
   "twitter",
 ]);

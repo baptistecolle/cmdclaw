@@ -30,6 +30,7 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   hubspot: "hubspot",
   linkedin: "linkedin",
   salesforce: "salesforce",
+  dynamics: "dynamics",
   reddit: "reddit",
   twitter: "twitter",
 };
@@ -82,6 +83,17 @@ export function parseCliCommand(command: string): ParsedCommand | null {
       argStartIndex = 2;
     } else {
       operation = `${resource}.${action}`;
+      argStartIndex = 3;
+    }
+  }
+
+  // Dynamics has nested pattern: dynamics <resource> <action>
+  if (integration === "dynamics") {
+    if (tokens[1] === "whoami") {
+      operation = "whoami";
+      argStartIndex = 2;
+    } else if (tokens.length >= 3) {
+      operation = `${tokens[1]}.${tokens[2]}`;
       argStartIndex = 3;
     }
   }
