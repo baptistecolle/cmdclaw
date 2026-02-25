@@ -27,5 +27,5 @@ jobs:
       - name: Build E2B Sandbox
         working-directory: app
         env:
-          E2B_ACCESS_TOKEN: ${{ secrets.E2B_ACCESS_TOKEN }}
+          E2B_ACCESS_TOKEN: ${{ secrets.E2B_API_KEY }}
         run: bun run e2b:build:prod
