@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Outlook">
+  <rect x="26" y="10" width="30" height="44" rx="4" fill="#0A5CBD"/>
+  <rect x="8" y="16" width="28" height="32" rx="4" fill="#106EBE"/>
+  <path d="M12 23h20l-10 9z" fill="#C7E0F4"/>
+  <path d="M12 41V26l10 9 10-9v15z" fill="#EAF4FF"/>
+  <circle cx="22" cy="32" r="8" fill="#0A5CBD"/>
+  <circle cx="22" cy="32" r="4.2" fill="#EAF4FF"/>
+</svg>

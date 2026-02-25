@@ -33,15 +33,17 @@ describe("getTokensForIntegrations", () => {
     getValidTokensForUserMock.mockResolvedValue(
       new Map([
         ["airtable", "airtable-token"],
+        ["outlook", "outlook-token"],
         ["github", "github-token"],
       ]),
     );
 
-    const tokens = await getTokensForIntegrations("user-1", ["airtable"]);
+    const tokens = await getTokensForIntegrations("user-1", ["airtable", "outlook"]);
 
-    expect(getValidTokensForUserMock).toHaveBeenCalledWith("user-1", ["airtable"]);
+    expect(getValidTokensForUserMock).toHaveBeenCalledWith("user-1", ["airtable", "outlook"]);
     expect(tokens).toEqual({
       AIRTABLE_ACCESS_TOKEN: "airtable-token",
+      OUTLOOK_ACCESS_TOKEN: "outlook-token",
     });
   });
 });

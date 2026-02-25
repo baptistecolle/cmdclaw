@@ -1377,11 +1377,18 @@ class GenerationManager {
     );
 
     // Determine backend type:
-    // - Device-attached runs use direct mode.
+    // - Subscription provider models (ChatGPT/Kimi) must run through OpenCode session auth.
+    // - Other device-attached runs use direct mode.
     // - Daytona-only cloud setup (no E2B) uses direct mode as well.
     const preferredCloudSandbox = getPreferredCloudSandboxProvider();
-    const backendType: BackendType =
-      params.deviceId || preferredCloudSandbox === "daytona" ? "direct" : "opencode";
+    const { providerID } = parseModelReference(resolvedModel);
+    const usesSubscriptionProviderAuth =
+      providerID === "openai" || providerID === "kimi-for-coding";
+    const backendType: BackendType = usesSubscriptionProviderAuth
+      ? "opencode"
+      : params.deviceId || preferredCloudSandbox === "daytona"
+        ? "direct"
+        : "opencode";
     if (this.shouldDeferGenerationToWorker() && backendType === "direct") {
       throw new Error(
         "Direct device generations require a dedicated stateful runtime and are not supported on Vercel functions.",
@@ -2856,6 +2863,7 @@ class GenerationManager {
               Object.entries(cliEnv).filter(([key]) => {
                 const envToIntegration: Record<string, IntegrationType> = {
                   GMAIL_ACCESS_TOKEN: "gmail",
+                  OUTLOOK_ACCESS_TOKEN: "outlook",
                   GOOGLE_CALENDAR_ACCESS_TOKEN: "google_calendar",
                   GOOGLE_DOCS_ACCESS_TOKEN: "google_docs",
                   GOOGLE_SHEETS_ACCESS_TOKEN: "google_sheets",

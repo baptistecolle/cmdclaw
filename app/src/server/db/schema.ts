@@ -344,6 +344,7 @@ export const generation = pgTable(
 
 export const integrationTypeEnum = pgEnum("integration_type", [
   "gmail",
+  "outlook",
   "google_calendar",
   "google_docs",
   "google_sheets",

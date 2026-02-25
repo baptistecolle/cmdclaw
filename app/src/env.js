@@ -30,6 +30,8 @@ export const env = createEnv({
     // OAuth credentials
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
+    MICROSOFT_CLIENT_ID: z.string().optional(),
+    MICROSOFT_CLIENT_SECRET: z.string().optional(),
     NOTION_CLIENT_ID: z.string().optional(),
     NOTION_CLIENT_SECRET: z.string().optional(),
     LINEAR_CLIENT_ID: z.string().optional(),
@@ -130,6 +132,8 @@ export const env = createEnv({
     ANVIL_API_KEY: process.env.ANVIL_API_KEY,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID,
+    MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET,
     NOTION_CLIENT_ID: process.env.NOTION_CLIENT_ID,
     NOTION_CLIENT_SECRET: process.env.NOTION_CLIENT_SECRET,
     LINEAR_CLIENT_ID: process.env.LINEAR_CLIENT_ID,

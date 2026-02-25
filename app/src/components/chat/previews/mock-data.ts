@@ -72,6 +72,18 @@ export const PREVIEW_MOCK_DATA: Record<string, PreviewMockData[]> = {
     },
   ],
 
+  outlook: [
+    {
+      operation: "send",
+      label: "Send Email",
+      args: {
+        to: "john@example.com",
+        subject: "Project Update - Q1 Report",
+        body: "Hi John,\n\nPlease find attached the Q1 report for your review.\n\nLet me know if you have any questions.\n\nBest regards",
+      },
+    },
+  ],
+
   google_calendar: [
     {
       operation: "create",

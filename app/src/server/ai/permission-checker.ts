@@ -10,6 +10,7 @@
 const CLI_TO_INTEGRATION: Record<string, string> = {
   slack: "slack",
   "google-gmail": "gmail",
+  "outlook-mail": "outlook",
   gcalendar: "google_calendar",
   gdocs: "google_docs",
   gsheets: "google_sheets",
@@ -31,6 +32,10 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
     write: ["send", "react", "upload"],
   },
   gmail: {
+    read: ["list", "get", "unread"],
+    write: ["send"],
+  },
+  outlook: {
     read: ["list", "get", "unread"],
     write: ["send"],
   },
@@ -174,6 +179,7 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
 const INTEGRATION_NAMES: Record<string, string> = {
   slack: "Slack",
   gmail: "Gmail",
+  outlook: "Outlook Mail",
   google_calendar: "Google Calendar",
   google_docs: "Google Docs",
   google_sheets: "Google Sheets",
