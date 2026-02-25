@@ -25,6 +25,7 @@ import { protectedProcedure } from "../middleware";
 const integrationTypeSchema = z.enum([
   "gmail",
   "outlook",
+  "outlook_calendar",
   "google_calendar",
   "google_docs",
   "google_sheets",

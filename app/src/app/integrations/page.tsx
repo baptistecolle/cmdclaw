@@ -54,6 +54,12 @@ const integrationConfig = {
     icon: "/integrations/outlook.svg",
     bgColor: "bg-white dark:bg-gray-800",
   },
+  outlook_calendar: {
+    name: "Outlook Calendar",
+    description: "Manage events and calendars",
+    icon: "/integrations/outlook.svg",
+    bgColor: "bg-white dark:bg-gray-800",
+  },
   google_calendar: {
     name: "Google Calendar",
     description: "Manage events and calendars",

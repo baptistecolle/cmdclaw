@@ -84,6 +84,35 @@ export const PREVIEW_MOCK_DATA: Record<string, PreviewMockData[]> = {
     },
   ],
 
+  outlook_calendar: [
+    {
+      operation: "create",
+      label: "Create Event",
+      args: {
+        summary: "Product Sync",
+        start: "2025-01-20T09:00:00",
+        end: "2025-01-20T10:00:00",
+        location: "Microsoft Teams",
+        description: "Weekly product status sync.",
+      },
+    },
+    {
+      operation: "update",
+      label: "Update Event",
+      args: {
+        summary: "Updated: Product Sync",
+        start: "2025-01-20T09:30:00",
+      },
+      positionalArgs: ["event_123"],
+    },
+    {
+      operation: "delete",
+      label: "Delete Event",
+      args: {},
+      positionalArgs: ["event_123"],
+    },
+  ],
+
   google_calendar: [
     {
       operation: "create",

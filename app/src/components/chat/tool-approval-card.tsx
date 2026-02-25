@@ -119,6 +119,8 @@ function renderPreview(integration: string, previewProps: PreviewProps) {
     case "gmail":
     case "outlook":
       return <GmailPreview {...previewProps} />;
+    case "outlook_calendar":
+      return <CalendarPreview {...previewProps} />;
     case "google_calendar":
       return <CalendarPreview {...previewProps} />;
     case "google_docs":

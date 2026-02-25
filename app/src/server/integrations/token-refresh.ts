@@ -50,6 +50,7 @@ const PROVIDER_DEFINITIVE_PATTERNS: Partial<Record<IntegrationType, RegExp[]>> =
   google_calendar: [/expired or revoked/i],
   gmail: [/expired or revoked/i],
   outlook: [/invalid_grant/i, /refresh token.*invalid/i],
+  outlook_calendar: [/invalid_grant/i, /refresh token.*invalid/i],
   google_docs: [/expired or revoked/i],
   google_drive: [/expired or revoked/i],
   google_sheets: [/expired or revoked/i],

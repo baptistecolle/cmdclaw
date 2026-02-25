@@ -12,6 +12,7 @@ const approvalRequestSchema = z.object({
   integration: z.enum([
     "gmail",
     "outlook",
+    "outlook_calendar",
     "google_calendar",
     "google_docs",
     "google_sheets",

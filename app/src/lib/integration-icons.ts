@@ -26,6 +26,7 @@ import {
 export type IntegrationType =
   | "gmail"
   | "outlook"
+  | "outlook_calendar"
   | "google_calendar"
   | "google_docs"
   | "google_sheets"
@@ -44,6 +45,7 @@ export type IntegrationType =
 export const ALL_INTEGRATION_TYPES: IntegrationType[] = [
   "gmail",
   "outlook",
+  "outlook_calendar",
   "google_calendar",
   "google_docs",
   "google_sheets",
@@ -76,6 +78,7 @@ export const WORKFLOW_AVAILABLE_INTEGRATION_TYPES: IntegrationType[] = ALL_INTEG
 export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
   gmail: Mail,
   outlook: Mail,
+  outlook_calendar: Calendar,
   google_calendar: Calendar,
   google_docs: FileText,
   google_sheets: Table2,
@@ -95,6 +98,7 @@ export const INTEGRATION_ICONS: Record<IntegrationType, LucideIcon> = {
 export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
   gmail: "Gmail",
   outlook: "Outlook Mail",
+  outlook_calendar: "Outlook Calendar",
   google_calendar: "Google Calendar",
   google_docs: "Google Docs",
   google_sheets: "Google Sheets",
@@ -114,6 +118,7 @@ export const INTEGRATION_DISPLAY_NAMES: Record<IntegrationType, string> = {
 export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
   gmail: "text-red-500",
   outlook: "text-[#0A5CBD]",
+  outlook_calendar: "text-[#0A5CBD]",
   google_calendar: "text-blue-500",
   google_docs: "text-blue-600",
   google_sheets: "text-green-500",
@@ -133,6 +138,7 @@ export const INTEGRATION_COLORS: Record<IntegrationType, string> = {
 export const INTEGRATION_LOGOS: Record<IntegrationType, string> = {
   gmail: "/integrations/google-gmail.svg",
   outlook: "/integrations/outlook.svg",
+  outlook_calendar: "/integrations/outlook.svg",
   google_calendar: "/integrations/google-calendar.svg",
   google_docs: "/integrations/google-docs.svg",
   google_sheets: "/integrations/google-sheets.svg",
@@ -174,6 +180,15 @@ export const INTEGRATION_OPERATION_LABELS: Record<IntegrationType, Record<string
     get: "Reading email",
     unread: "Getting unread emails",
     send: "Sending email",
+  },
+  outlook_calendar: {
+    list: "Listing events",
+    get: "Getting event",
+    calendars: "Listing calendars",
+    today: "Getting today's events",
+    create: "Creating event",
+    update: "Updating event",
+    delete: "Deleting event",
   },
   google_calendar: {
     list: "Listing events",

@@ -18,6 +18,7 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   slack: "slack",
   "google-gmail": "gmail",
   "outlook-mail": "outlook",
+  "outlook-calendar": "outlook_calendar",
   gcalendar: "google_calendar",
   gdocs: "google_docs",
   gsheets: "google_sheets",
