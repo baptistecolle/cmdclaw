@@ -1,16 +1,30 @@
 "use client";
 
 import { CheckCircle2, Loader2, Monitor, XCircle } from "lucide-react";
-import { Suspense, useCallback, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 
+function normalizeCode(value: string): string {
+  return value.toUpperCase().replace(/[\s-]/g, "");
+}
+
 function ConnectDevicePageContent() {
+  const searchParams = useSearchParams();
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    const userCode = searchParams.get("user_code");
+    if (!userCode) {
+      return;
+    }
+    setCode(normalizeCode(userCode));
+  }, [searchParams]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -24,7 +38,7 @@ function ConnectDevicePageContent() {
       setErrorMsg("");
 
       try {
-        const formattedCode = code.trim().replace(/-/g, "").toUpperCase();
+        const formattedCode = normalizeCode(code.trim());
 
         // Verify the code is valid
         const verifyResponse = await authClient.device({
@@ -58,7 +72,7 @@ function ConnectDevicePageContent() {
   );
 
   const handleCodeChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setCode(event.target.value.toUpperCase());
+    setCode(normalizeCode(event.target.value));
   }, []);
 
   return (
