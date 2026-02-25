@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { integration, integrationToken } from "@/server/db/schema";
+import { fetchDynamicsInstances } from "@/server/integrations/dynamics";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 import { generationManager } from "@/server/services/generation-manager";
 
@@ -155,6 +156,19 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    // Dynamics: require environment selection before enabling integration
+    if (stateData.type === "dynamics") {
+      const instances = await fetchDynamicsInstances(accessToken);
+      if (instances.length === 0) {
+        return NextResponse.redirect(buildRedirectUrl("error=dynamics_no_environments"));
+      }
+      userInfo.metadata = {
+        ...userInfo.metadata,
+        pendingInstanceSelection: true,
+        availableInstances: instances,
+      };
+    }
+
     // Create or update integration
     const existingIntegration = await db.query.integration.findFirst({
       where: and(eq(integration.userId, sessionData.user.id), eq(integration.type, stateData.type)),
@@ -169,7 +183,7 @@ export async function GET(request: NextRequest) {
           providerAccountId: userInfo.id,
           displayName: userInfo.displayName,
           metadata: userInfo.metadata,
-          enabled: true,
+          enabled: stateData.type !== "dynamics",
         })
         .where(eq(integration.id, existingIntegration.id));
       integId = existingIntegration.id;
@@ -183,6 +197,7 @@ export async function GET(request: NextRequest) {
           displayName: userInfo.displayName,
           scopes: config.scopes,
           metadata: userInfo.metadata,
+          enabled: stateData.type !== "dynamics",
         })
         .returning();
       integId = newInteg.id;
@@ -198,6 +213,19 @@ export async function GET(request: NextRequest) {
       expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
       idToken: tokens.id_token,
     });
+
+    if (stateData.type === "dynamics") {
+      const dynamicsRedirect = new URL("/integrations", request.url);
+      dynamicsRedirect.searchParams.set("dynamics_select", "true");
+      const authResume = resolveAuthResumeContext();
+      if (authResume.generationId) {
+        dynamicsRedirect.searchParams.set("generation_id", authResume.generationId);
+      }
+      if (authResume.integration) {
+        dynamicsRedirect.searchParams.set("auth_complete", authResume.integration);
+      }
+      return NextResponse.redirect(dynamicsRedirect);
+    }
 
     const authResume = resolveAuthResumeContext();
     if (authResume.generationId) {

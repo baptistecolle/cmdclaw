@@ -12,6 +12,7 @@ import {
   customIntegration,
   customIntegrationCredential,
 } from "@/server/db/schema";
+import { fetchDynamicsInstances } from "@/server/integrations/dynamics";
 import {
   generateLinkedInAuthUrl,
   deleteUnipileAccount,
@@ -46,6 +47,7 @@ const integrationTypeSchema = z.enum([
   "hubspot",
   "linkedin",
   "salesforce",
+  "dynamics",
   "reddit",
   "twitter",
 ]);
@@ -61,6 +63,11 @@ const list = protectedProcedure.handler(async ({ context }) => {
     type: i.type,
     displayName: i.displayName,
     enabled: i.enabled,
+    setupRequired:
+      i.type === "dynamics" &&
+      typeof i.metadata === "object" &&
+      i.metadata !== null &&
+      (i.metadata as Record<string, unknown>).pendingInstanceSelection === true,
     authStatus: i.authStatus,
     authErrorCode: i.authErrorCode,
     scopes: i.scopes,
@@ -278,6 +285,20 @@ const handleCallback = protectedProcedure
     // Get user info from provider
     const userInfo = await config.getUserInfo(accessToken);
 
+    if (stateData.type === "dynamics") {
+      const instances = await fetchDynamicsInstances(accessToken);
+      if (instances.length === 0) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "No Dynamics environments available",
+        });
+      }
+      userInfo.metadata = {
+        ...userInfo.metadata,
+        pendingInstanceSelection: true,
+        availableInstances: instances,
+      };
+    }
+
     // Create or update integration
     const existingIntegration = await context.db.query.integration.findFirst({
       where: and(eq(integration.userId, context.user.id), eq(integration.type, stateData.type)),
@@ -292,7 +313,7 @@ const handleCallback = protectedProcedure
           providerAccountId: userInfo.id,
           displayName: userInfo.displayName,
           metadata: userInfo.metadata,
-          enabled: true,
+          enabled: stateData.type !== "dynamics",
           authStatus: "connected",
           authErrorCode: null,
           authErrorAt: null,
@@ -310,6 +331,7 @@ const handleCallback = protectedProcedure
           displayName: userInfo.displayName,
           scopes: config.scopes,
           metadata: userInfo.metadata,
+          enabled: stateData.type !== "dynamics",
           authStatus: "connected",
           authErrorCode: null,
           authErrorAt: null,
@@ -346,6 +368,26 @@ const toggle = protectedProcedure
     }),
   )
   .handler(async ({ input, context }) => {
+    const existing = await context.db.query.integration.findFirst({
+      where: and(eq(integration.id, input.id), eq(integration.userId, context.user.id)),
+    });
+
+    if (!existing) {
+      throw new ORPCError("NOT_FOUND", { message: "Integration not found" });
+    }
+
+    if (
+      existing.type === "dynamics" &&
+      input.enabled &&
+      typeof existing.metadata === "object" &&
+      existing.metadata !== null &&
+      (existing.metadata as Record<string, unknown>).pendingInstanceSelection === true
+    ) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Complete Dynamics environment selection before enabling the integration",
+      });
+    }
+
     const result = await context.db
       .update(integration)
       .set({ enabled: input.enabled })

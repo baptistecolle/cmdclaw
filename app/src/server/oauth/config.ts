@@ -16,6 +16,7 @@ export type IntegrationType =
   | "hubspot"
   | "linkedin"
   | "salesforce"
+  | "dynamics"
   | "reddit"
   | "twitter";
 
@@ -355,6 +356,37 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
         metadata: {
           organizationId: data.organization_id,
           email: data.email,
+        },
+      };
+    },
+  }),
+
+  dynamics: () => ({
+    clientId: env.MICROSOFT_CLIENT_ID ?? "",
+    clientSecret: env.MICROSOFT_CLIENT_SECRET ?? "",
+    authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    redirectUri: `${getAppUrl()}/api/oauth/callback`,
+    scopes: [
+      "offline_access",
+      "openid",
+      "profile",
+      "email",
+      "User.Read",
+      "https://globaldisco.crm.dynamics.com/user_impersonation",
+    ],
+    getUserInfo: async (accessToken: string) => {
+      const res = await fetch("https://graph.microsoft.com/v1.0/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      return {
+        id: data.id,
+        displayName:
+          data.mail ?? data.userPrincipalName ?? data.displayName ?? "Microsoft Dynamics User",
+        metadata: {
+          userPrincipalName: data.userPrincipalName,
+          email: data.mail ?? data.userPrincipalName,
         },
       };
     },

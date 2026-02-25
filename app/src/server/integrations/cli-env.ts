@@ -22,6 +22,7 @@ const ENV_VAR_MAP: Record<Exclude<IntegrationType, "linkedin">, string> = {
   slack: "SLACK_ACCESS_TOKEN",
   hubspot: "HUBSPOT_ACCESS_TOKEN",
   salesforce: "SALESFORCE_ACCESS_TOKEN",
+  dynamics: "DYNAMICS_ACCESS_TOKEN",
   reddit: "REDDIT_ACCESS_TOKEN",
   twitter: "TWITTER_ACCESS_TOKEN",
 };
@@ -73,6 +74,22 @@ export async function getCliEnvForUser(userId: string): Promise<Record<string, s
     const metadata = salesforceIntegration.metadata as Record<string, unknown>;
     if (metadata.instanceUrl) {
       cliEnv.SALESFORCE_INSTANCE_URL = metadata.instanceUrl as string;
+    }
+  }
+
+  // Dynamics special case - needs selected Dataverse instance URL from metadata
+  const dynamicsIntegration = await db.query.integration.findFirst({
+    where: and(
+      eq(integration.userId, userId),
+      eq(integration.type, "dynamics"),
+      eq(integration.enabled, true),
+    ),
+  });
+
+  if (dynamicsIntegration && dynamicsIntegration.metadata) {
+    const metadata = dynamicsIntegration.metadata as Record<string, unknown>;
+    if (metadata.instanceUrl) {
+      cliEnv.DYNAMICS_INSTANCE_URL = metadata.instanceUrl as string;
     }
   }
 
@@ -408,6 +425,25 @@ salesforce search "FIND {Acme} IN ALL FIELDS RETURNING Account(Id, Name), Contac
 - Custom objects end with \`__c\` (e.g., \`Invoice__c\`)
 - Custom fields end with \`__c\` (e.g., \`Custom_Field__c\`)
 
+## Microsoft Dynamics 365 CLI [${statusTag("dynamics")}]
+
+Native Dataverse operations for tables and rows.
+
+### Commands
+- dynamics whoami - Get current Dataverse user context
+- dynamics tables list [--top 50] - List Dataverse tables
+- dynamics tables get <logicalName> - Get table metadata and attributes
+- dynamics rows list <table> [--select col1,col2] [--filter "..."] [--orderby "..."] [--top 25]
+- dynamics rows get <table> <rowId> [--select col1,col2]
+- dynamics rows create <table> '{"field":"value"}'
+- dynamics rows update <table> <rowId> '{"field":"value"}'
+- dynamics rows delete <table> <rowId>
+
+### Tips
+- Use logical table names (for example: \`accounts\`, \`contacts\`, \`opportunities\`)
+- OData filters are supported (for example: \`statecode eq 0\`)
+- Keep payload fields aligned with Dataverse schema names
+
 ## Reddit CLI [${statusTag("reddit")}]
 
 Browse, vote, comment, and post on Reddit.
@@ -571,6 +607,24 @@ export async function getTokensForIntegrations(
       const metadata = salesforceIntegration.metadata as Record<string, unknown>;
       if (metadata.instanceUrl) {
         tokens.SALESFORCE_INSTANCE_URL = metadata.instanceUrl as string;
+      }
+    }
+  }
+
+  // Dynamics special case - needs selected Dataverse instance URL from metadata
+  if (integrationTypes.includes("dynamics")) {
+    const dynamicsIntegration = await db.query.integration.findFirst({
+      where: and(
+        eq(integration.userId, userId),
+        eq(integration.type, "dynamics"),
+        eq(integration.enabled, true),
+      ),
+    });
+
+    if (dynamicsIntegration && dynamicsIntegration.metadata) {
+      const metadata = dynamicsIntegration.metadata as Record<string, unknown>;
+      if (metadata.instanceUrl) {
+        tokens.DYNAMICS_INSTANCE_URL = metadata.instanceUrl as string;
       }
     }
   }

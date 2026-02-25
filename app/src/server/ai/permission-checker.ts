@@ -23,6 +23,7 @@ const CLI_TO_INTEGRATION: Record<string, string> = {
   hubspot: "hubspot",
   linkedin: "linkedin",
   salesforce: "salesforce",
+  dynamics: "dynamics",
   reddit: "reddit",
   twitter: "twitter",
 };
@@ -138,6 +139,10 @@ const TOOL_PERMISSIONS: Record<string, { read: string[]; write: string[] }> = {
     read: ["query", "get", "describe", "objects", "search"],
     write: ["create", "update"],
   },
+  dynamics: {
+    read: ["whoami", "tables.list", "tables.get", "rows.list", "rows.get"],
+    write: ["rows.create", "rows.update", "rows.delete"],
+  },
   reddit: {
     read: ["feed", "subreddit", "post", "user", "search", "multireddit", "inbox", "subscriptions"],
     write: [
@@ -197,6 +202,7 @@ const INTEGRATION_NAMES: Record<string, string> = {
   hubspot: "HubSpot",
   linkedin: "LinkedIn",
   salesforce: "Salesforce",
+  dynamics: "Microsoft Dynamics 365",
   reddit: "Reddit",
   twitter: "X (Twitter)",
 };
@@ -243,6 +249,13 @@ export function parseBashCommand(command: string): ParsedCommand | null {
     const resource = parts[1];
     const action = parts[2];
     finalOperation = resource === "search" ? "search" : `${resource}.${action}`;
+  }
+
+  // Dynamics: dynamics <resource> <action>
+  if (integration === "dynamics" && parts.length >= 3) {
+    const resource = parts[1];
+    const action = parts[2];
+    finalOperation = resource === "whoami" ? "whoami" : `${resource}.${action}`;
   }
 
   const permissions = TOOL_PERMISSIONS[integration];

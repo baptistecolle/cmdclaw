@@ -6,25 +6,19 @@ import type {
   QuestionRequest,
   ToolPart,
 } from "@opencode-ai/sdk/v2/client";
-import type { Sandbox } from "e2b";
-import { and, asc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt } from "drizzle-orm";
 import IORedis from "ioredis";
 import path from "path";
-import type { LLMBackend, ChatMessage, ContentBlock } from "@/server/ai/llm-backend";
 import type { IntegrationType } from "@/server/oauth/config";
 import type { SandboxBackend } from "@/server/sandbox/types";
 import { env } from "@/env";
 import { parseModelReference } from "@/lib/model-reference";
-import { AnthropicBackend } from "@/server/ai/anthropic-backend";
-import { LocalLLMBackend } from "@/server/ai/local-backend";
-import { OpenAIBackend } from "@/server/ai/openai-backend";
 import {
   listOpencodeFreeModels,
   resolveDefaultOpencodeFreeModel,
 } from "@/server/ai/opencode-models";
-import { checkToolPermissions, parseBashCommand } from "@/server/ai/permission-checker";
+import { parseBashCommand } from "@/server/ai/permission-checker";
 import { getProviderModels } from "@/server/ai/subscription-providers";
-import { getDirectModeTools, toolCallToCommand } from "@/server/ai/tools";
 import { db } from "@/server/db/client";
 import {
   conversation,
@@ -44,7 +38,6 @@ import {
 import { customIntegrationCredential } from "@/server/db/schema";
 import {
   getCliEnvForUser,
-  getCliInstructions,
   getCliInstructionsWithCustom,
   getEnabledIntegrationTypes,
 } from "@/server/integrations/cli-env";
@@ -64,38 +57,18 @@ import {
   getSkillsSystemPrompt,
   writeResolvedIntegrationSkillsToSandbox,
   getIntegrationSkillsSystemPrompt,
-} from "@/server/sandbox/e2b";
-import { getPreferredCloudSandboxProvider, getSandboxBackend } from "@/server/sandbox/factory";
-import {
-  createCommunityIntegrationSkill,
-  resolvePreferredCommunitySkillsForUser,
-} from "@/server/services/integration-skill-service";
+} from "@/server/sandbox/opencode-session";
+import { createCommunityIntegrationSkill } from "@/server/services/integration-skill-service";
 import {
   buildMemorySystemPrompt,
-  type MemoryFileType,
-  readMemoryFile,
-  searchMemoryWithSessions,
   syncMemoryToSandbox,
-  writeMemoryEntry,
   writeSessionTranscriptFromConversation,
 } from "@/server/services/memory-service";
 import { resolveSelectedPlatformSkillSlugs } from "@/server/services/platform-skill-service";
-import {
-  uploadSandboxFile,
-  collectNewSandboxFiles,
-  collectNewE2BFiles,
-  readSandboxFileAsBuffer,
-} from "@/server/services/sandbox-file-service";
-import {
-  COMPACTION_SUMMARY_PREFIX,
-  SESSION_BOUNDARY_PREFIX,
-} from "@/server/services/session-constants";
+import { uploadSandboxFile, collectNewSandboxFiles } from "@/server/services/sandbox-file-service";
+import { SESSION_BOUNDARY_PREFIX } from "@/server/services/session-constants";
 import { generateConversationTitle } from "@/server/utils/generate-title";
 import { createTraceId, logServerEvent } from "@/server/utils/observability";
-
-function parseMemoryFileType(input: unknown): MemoryFileType | undefined {
-  return input === "daily" || input === "longterm" ? input : undefined;
-}
 
 let cachedDefaultWorkflowModelPromise: Promise<string> | undefined;
 
@@ -214,7 +187,7 @@ interface Subscriber {
   callback: (event: GenerationEvent) => void;
 }
 
-type BackendType = "opencode" | "direct";
+type BackendType = "opencode";
 type OpenCodeTrackedEvent = Extract<
   OpencodeEvent,
   {
@@ -280,7 +253,6 @@ interface GenerationContext {
   // Sandbox file collection
   generationMarkerTime?: number;
   sandbox?: SandboxBackend;
-  e2bSandbox?: import("e2b").Sandbox;
   sentFilePaths?: Set<string>;
   userStagedFilePaths?: Set<string>;
   uploadedSandboxFileIds?: Set<string>;
@@ -394,13 +366,6 @@ const OPENCODE_PROMPT_TIMEOUT_MS = (() => {
 })();
 // Save debounce interval for text chunks
 const SAVE_DEBOUNCE_MS = 2000;
-// Compaction + memory flush defaults
-const COMPACTION_TRIGGER_TOKENS = 120_000;
-const COMPACTION_KEEP_LAST_MESSAGES = 12;
-const COMPACTION_MIN_MESSAGES = 8;
-const MEMORY_FLUSH_TRIGGER_TOKENS = 100_000;
-const COMPACTION_SUMMARY_MAX_TOKENS = 1800;
-const MEMORY_FLUSH_MAX_ITERATIONS = 4;
 const SESSION_RESET_COMMANDS = new Set(["/new"]);
 type GenerationTimeoutKind = "approval" | "auth";
 const STALE_REAPER_RUNNING_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -456,19 +421,6 @@ function filterAutoCollectedFilesMentionedInAnswer(
     return haystack.includes(filename) || haystack.includes(fullPath);
   });
 }
-
-const MEMORY_FLUSH_SYSTEM_PROMPT = [
-  "You are performing a silent memory flush before compaction.",
-  "Review the conversation and write durable facts, preferences, decisions, and TODOs using memory_write.",
-  "Do not call any tools other than memory_write/memory_search/memory_get.",
-  "Respond with NO_REPLY when finished.",
-].join("\n");
-
-const COMPACTION_SUMMARY_SYSTEM_PROMPT = [
-  "Summarize the conversation so far for future context.",
-  "Capture decisions, preferences, TODOs, open questions, important constraints, and key tool outputs.",
-  "Be concise, factual, and keep the summary under 400 words.",
-].join("\n");
 
 function buildExecutionPolicy(params: {
   allowedIntegrations?: IntegrationType[];
@@ -598,12 +550,7 @@ function buildQuestionCommand(request: QuestionRequest): string {
     .join(" || ");
 }
 
-type MessageRow = typeof message.$inferSelect;
 type UserFileAttachment = { name: string; mimeType: string; dataUrl: string };
-
-function estimateTokensFromText(text: string): number {
-  return Math.ceil(text.length / 4);
-}
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -619,38 +566,6 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
       clearTimeout(timeoutId);
     }
   }
-}
-
-function estimateTokensFromContentParts(parts: ContentPart[] | null | undefined): number {
-  if (!parts || parts.length === 0) {
-    return 0;
-  }
-  let total = 0;
-  for (const part of parts) {
-    switch (part.type) {
-      case "text":
-        total += estimateTokensFromText(part.text);
-        break;
-      case "tool_use":
-        total += estimateTokensFromText(JSON.stringify(part.input ?? {}));
-        break;
-      case "tool_result":
-        total += estimateTokensFromText(
-          typeof part.content === "string" ? part.content : JSON.stringify(part.content ?? {}),
-        );
-        break;
-      case "thinking":
-        total += estimateTokensFromText(part.content);
-        break;
-    }
-  }
-  return total;
-}
-
-function estimateTokensForMessageRow(m: MessageRow): number {
-  const contentTokens = estimateTokensFromText(m.content || "");
-  const partsTokens = estimateTokensFromContentParts(m.contentParts as ContentPart[] | undefined);
-  return Math.max(contentTokens, partsTokens);
 }
 
 function formatErrorMessage(error: unknown): string {
@@ -1376,24 +1291,7 @@ class GenerationManager {
       { ...logContext, conversationId: conv.id, generationId: genRecord.id },
     );
 
-    // Determine backend type:
-    // - Subscription provider models (ChatGPT/Kimi) must run through OpenCode session auth.
-    // - Other device-attached runs use direct mode.
-    // - Daytona-only cloud setup (no E2B) uses direct mode as well.
-    const preferredCloudSandbox = getPreferredCloudSandboxProvider();
-    const { providerID } = parseModelReference(resolvedModel);
-    const usesSubscriptionProviderAuth =
-      providerID === "openai" || providerID === "kimi-for-coding";
-    const backendType: BackendType = usesSubscriptionProviderAuth
-      ? "opencode"
-      : params.deviceId || preferredCloudSandbox === "daytona"
-        ? "direct"
-        : "opencode";
-    if (this.shouldDeferGenerationToWorker() && backendType === "direct") {
-      throw new Error(
-        "Direct device generations require a dedicated stateful runtime and are not supported on Vercel functions.",
-      );
-    }
+    const backendType: BackendType = "opencode";
 
     if (this.shouldDeferGenerationToWorker()) {
       await this.enqueueGenerationRun(genRecord.id, "chat");
@@ -2788,9 +2686,6 @@ class GenerationManager {
         await this.handleSessionReset(ctx);
         return;
       }
-      if (ctx.backendType === "direct") {
-        return this.runDirectGeneration(ctx);
-      }
       return this.runOpenCodeGeneration(ctx);
     } finally {
       clearInterval(leaseRenewTimer);
@@ -2876,6 +2771,8 @@ class GenerationManager {
                   SLACK_ACCESS_TOKEN: "slack",
                   HUBSPOT_ACCESS_TOKEN: "hubspot",
                   SALESFORCE_ACCESS_TOKEN: "salesforce",
+                  DYNAMICS_ACCESS_TOKEN: "dynamics",
+                  DYNAMICS_INSTANCE_URL: "dynamics",
                   LINKEDIN_ACCOUNT_ID: "linkedin",
                   UNIPILE_API_KEY: "linkedin",
                   UNIPILE_DSN: "linkedin",
@@ -2939,7 +2836,7 @@ class GenerationManager {
 
       let client: Awaited<ReturnType<typeof getOrCreateSession>>["client"];
       let sessionId: string;
-      let sandbox: import("e2b").Sandbox;
+      let sandbox: Awaited<ReturnType<typeof getOrCreateSession>>["sandbox"];
       try {
         const session = await withTimeout(
           getOrCreateSession(
@@ -3060,9 +2957,39 @@ class GenerationManager {
 
       // Record marker time for file collection and store sandbox reference
       ctx.generationMarkerTime = Date.now();
-      ctx.e2bSandbox = sandbox;
       ctx.sentFilePaths = new Set();
       ctx.userStagedFilePaths = new Set();
+      ctx.sandbox = {
+        setup: async () => undefined,
+        execute: async (command, opts) => {
+          const result = await sandbox.commands.run(command, {
+            timeoutMs: opts?.timeout,
+            envs: opts?.env,
+          });
+          return {
+            exitCode: result.exitCode,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          };
+        },
+        writeFile: async (filePath, content) => {
+          if (typeof content === "string") {
+            await sandbox.files.write(filePath, content);
+            return;
+          }
+          const buffer = Buffer.from(content);
+          await sandbox.files.write(
+            filePath,
+            buffer.buffer.slice(
+              buffer.byteOffset,
+              buffer.byteOffset + buffer.byteLength,
+            ) as ArrayBuffer,
+          );
+        },
+        readFile: async (filePath) => sandbox.files.read(filePath),
+        teardown: async () => undefined,
+        isAvailable: () => true,
+      };
       this.markPhase(ctx, "pre_prompt_setup_started");
 
       // Write memory files to sandbox
@@ -3502,23 +3429,20 @@ class GenerationManager {
       await this.refreshCancellationSignal(ctx, { force: true });
       this.markPhase(ctx, "post_processing_started");
 
-      if (ctx.e2bSandbox) {
+      if (ctx.sandbox) {
         try {
-          await this.importIntegrationSkillDraftsFromE2B(ctx, ctx.e2bSandbox);
+          await this.importIntegrationSkillDraftsFromSandbox(ctx, ctx.sandbox);
         } catch (error) {
-          console.error(
-            "[GenerationManager] Failed to import integration skill drafts from E2B:",
-            error,
-          );
+          console.error("[GenerationManager] Failed to import integration skill drafts:", error);
         }
       }
 
       // Collect new files created in the sandbox during generation
       let uploadedSandboxFileCount = 0;
-      if (ctx.e2bSandbox && ctx.generationMarkerTime) {
+      if (ctx.sandbox && ctx.generationMarkerTime) {
         try {
-          const newFiles = await collectNewE2BFiles(
-            ctx.e2bSandbox,
+          const newFiles = await collectNewSandboxFiles(
+            ctx.sandbox,
             ctx.generationMarkerTime,
             Array.from(new Set([...(ctx.sentFilePaths ?? []), ...(ctx.userStagedFilePaths ?? [])])),
           );
@@ -3594,966 +3518,6 @@ class GenerationManager {
       );
       await this.finishGeneration(ctx, "error");
     }
-  }
-
-  /**
-   * Direct LLM generation flow for BYOC.
-   * Server calls LLM APIs directly and routes tool execution to the daemon via WebSocket.
-   *
-   * Tool loop:
-   * 1. Get SandboxBackend via factory
-   * 2. Get LLMBackend for the model
-   * 3. Build message history from DB
-   * 4. Call LLM -> stream response -> extract tool_use -> check permissions
-   *    -> execute on daemon -> send tool_result back to LLM -> repeat until done
-   */
-  private async runDirectGeneration(ctx: GenerationContext): Promise<void> {
-    let sandbox: SandboxBackend | null = null;
-
-    try {
-      // 1. Get sandbox backend
-      sandbox = getSandboxBackend(ctx.conversationId, ctx.userId, ctx.deviceId);
-      await sandbox.setup(ctx.conversationId);
-
-      // Record marker time for file collection and store sandbox reference
-      ctx.generationMarkerTime = Date.now();
-      ctx.sandbox = sandbox;
-      ctx.sentFilePaths = new Set();
-      ctx.userStagedFilePaths = new Set();
-
-      // Sync memory files to sandbox
-      try {
-        await syncMemoryToSandbox(
-          ctx.userId,
-          async (path, content) => {
-            await sandbox!.writeFile(path, content);
-          },
-          async (dir) => {
-            await sandbox!.execute(`mkdir -p "${dir}"`);
-          },
-        );
-      } catch (err) {
-        console.error("[GenerationManager] Failed to sync memory to sandbox:", err);
-      }
-
-      // 2. Get LLM backend
-      const llm = await this.getLLMBackend(ctx);
-
-      // 3. Get integration environment and build system prompt
-      const enabledIntegrations = await getEnabledIntegrationTypes(ctx.userId);
-      const allowedIntegrations = ctx.allowedIntegrations ?? enabledIntegrations;
-      const cliInstructions = getCliInstructions(allowedIntegrations);
-      const resolvedCommunityIntegrationSkills = await resolvePreferredCommunitySkillsForUser(
-        ctx.userId,
-        allowedIntegrations,
-      );
-      if (resolvedCommunityIntegrationSkills.length > 0) {
-        await sandbox!.execute('mkdir -p "/app/.opencode/integration-skills"');
-        await Promise.all(
-          resolvedCommunityIntegrationSkills.map(async (skill) => {
-            const skillDir = `/app/.opencode/integration-skills/${skill.slug}`;
-            await sandbox!.execute(`mkdir -p "${skillDir}"`);
-            await Promise.all(
-              skill.files.map(async (file) => {
-                const filePath = `${skillDir}/${file.path}`;
-                const idx = filePath.lastIndexOf("/");
-                if (idx > 0) {
-                  await sandbox!.execute(`mkdir -p "${filePath.slice(0, idx)}"`);
-                }
-                await sandbox!.writeFile(filePath, file.content);
-              }),
-            );
-          }),
-        );
-      }
-      const integrationSkillsPrompt = getIntegrationSkillsSystemPrompt(
-        resolvedCommunityIntegrationSkills.map((skill) => skill.slug),
-      );
-
-      const baseSystemPrompt = "You are CmdClaw, an AI agent that helps do work.";
-      const workflowPrompt = this.buildWorkflowPrompt(ctx);
-      const memoryPrompt = buildMemorySystemPrompt();
-      const integrationSkillDraftInstructions = this.getIntegrationSkillDraftInstructions();
-      const selectedPlatformSkillInstructions = getSelectedPlatformSkillPrompt(
-        ctx.selectedPlatformSkillSlugs,
-      );
-      const systemPromptParts = [
-        baseSystemPrompt,
-        cliInstructions,
-        selectedPlatformSkillInstructions,
-        integrationSkillsPrompt,
-        integrationSkillDraftInstructions,
-        memoryPrompt,
-        workflowPrompt,
-      ].filter(Boolean);
-      const systemPrompt = systemPromptParts.join("\n\n");
-
-      // 4. Build message history from DB
-      const chatMessages = await this.buildMessageHistory(ctx, {
-        sandbox,
-        llm,
-      });
-
-      // 5. Get tool definitions
-      const tools = getDirectModeTools();
-
-      // 6. Agentic tool loop
-      const loopMessages = [...chatMessages];
-      const directModelID = parseModelReference(ctx.model).modelID;
-      let hasToolCalls = true;
-      let iterationCount = 0;
-      const MAX_ITERATIONS = 50;
-
-      const runDirectToolLoop = async (): Promise<void> => {
-        if (!hasToolCalls || iterationCount >= MAX_ITERATIONS) {
-          return;
-        }
-
-        if (await this.refreshCancellationSignal(ctx)) {
-          await this.finishGeneration(ctx, "cancelled");
-          return;
-        }
-
-        iterationCount += 1;
-        hasToolCalls = false;
-
-        // Call LLM
-        const assistantContentBlocks: ContentBlock[] = [];
-        let currentToolUseId = "";
-        let currentToolName = "";
-        let currentToolJson = "";
-
-        const stream = llm.chat({
-          messages: loopMessages,
-          tools,
-          system: systemPrompt,
-          model: directModelID,
-          signal: ctx.abortController.signal,
-        });
-
-        await this.consumeAsyncStream(stream, async (event) => {
-          if (await this.refreshCancellationSignal(ctx)) {
-            return true;
-          }
-
-          switch (event.type) {
-            case "text_delta": {
-              ctx.assistantContent += event.text;
-              this.broadcast(ctx, { type: "text", content: event.text });
-
-              const lastPart = ctx.contentParts[ctx.contentParts.length - 1];
-              if (lastPart && lastPart.type === "text") {
-                lastPart.text += event.text;
-              } else {
-                ctx.contentParts.push({ type: "text", text: event.text });
-              }
-
-              const lastBlock = assistantContentBlocks[assistantContentBlocks.length - 1];
-              if (lastBlock && lastBlock.type === "text") {
-                lastBlock.text += event.text;
-              } else {
-                assistantContentBlocks.push({ type: "text", text: event.text });
-              }
-
-              this.scheduleSave(ctx);
-              break;
-            }
-            case "tool_use_start": {
-              currentToolUseId = event.toolUseId;
-              currentToolName = event.toolName;
-              currentToolJson = "";
-              break;
-            }
-            case "tool_use_delta": {
-              currentToolJson += event.jsonDelta;
-              break;
-            }
-            case "tool_use_end": {
-              let toolInput: Record<string, unknown> = {};
-              try {
-                toolInput = JSON.parse(currentToolJson);
-              } catch {
-                toolInput = { raw: currentToolJson };
-              }
-              const metadata = this.getToolUseMetadata(currentToolName, toolInput);
-
-              const toolBlock: ContentBlock = {
-                type: "tool_use",
-                id: currentToolUseId,
-                name: currentToolName,
-                input: toolInput,
-              };
-              assistantContentBlocks.push(toolBlock);
-
-              this.broadcast(ctx, {
-                type: "tool_use",
-                toolName: currentToolName,
-                toolInput,
-                toolUseId: currentToolUseId,
-                integration: metadata.integration,
-                operation: metadata.operation,
-                isWrite: metadata.isWrite,
-              });
-
-              ctx.contentParts.push({
-                type: "tool_use",
-                id: currentToolUseId,
-                name: currentToolName,
-                input: toolInput,
-                integration: metadata.integration,
-                operation: metadata.operation,
-              });
-
-              await this.saveProgress(ctx);
-              hasToolCalls = true;
-              break;
-            }
-            case "thinking": {
-              this.broadcast(ctx, {
-                type: "thinking",
-                content: event.text,
-                thinkingId: event.thinkingId,
-              });
-              break;
-            }
-            case "usage": {
-              ctx.usage.inputTokens += event.inputTokens;
-              ctx.usage.outputTokens += event.outputTokens;
-              break;
-            }
-            case "error": {
-              throw new Error(event.error);
-            }
-          }
-
-          return false;
-        });
-
-        if (await this.refreshCancellationSignal(ctx, { force: true })) {
-          await this.finishGeneration(ctx, "cancelled");
-          return;
-        }
-
-        if (hasToolCalls) {
-          loopMessages.push({
-            role: "assistant",
-            content: assistantContentBlocks,
-          });
-
-          const toolResults: ContentBlock[] = [];
-          await this.forEachSequential(assistantContentBlocks, async (block) => {
-            if (block.type !== "tool_use") {
-              return;
-            }
-
-            if (block.name.startsWith("memory_")) {
-              const memoryResult = await this.executeMemoryTool(ctx, sandbox!, block);
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: block.id,
-                content: memoryResult.content,
-                is_error: memoryResult.isError,
-              });
-              this.broadcast(ctx, {
-                type: "tool_result",
-                toolName: block.name,
-                result: memoryResult.content,
-                toolUseId: block.id,
-              });
-              ctx.contentParts.push({
-                type: "tool_result",
-                tool_use_id: block.id,
-                content: memoryResult.content,
-              });
-              await this.saveProgress(ctx);
-              return;
-            }
-
-            if (ctx.allowedIntegrations !== undefined && block.name === "bash") {
-              const command = (block.input.command as string) || "";
-              const parsed = parseBashCommand(command);
-              if (
-                parsed &&
-                !ctx.allowedIntegrations.includes(parsed.integration as IntegrationType)
-              ) {
-                toolResults.push({
-                  type: "tool_result",
-                  tool_use_id: block.id,
-                  content: `Integration "${parsed.integration}" is not allowed for this workflow.`,
-                  is_error: true,
-                });
-                this.broadcast(ctx, {
-                  type: "tool_result",
-                  toolName: block.name,
-                  result: "Integration not allowed",
-                  toolUseId: block.id,
-                });
-                ctx.contentParts.push({
-                  type: "tool_result",
-                  tool_use_id: block.id,
-                  content: "Integration not allowed",
-                });
-                return;
-              }
-            }
-
-            const permCheck = checkToolPermissions(block.name, block.input, allowedIntegrations);
-            if (permCheck.needsAuth) {
-              const authResult = await this.waitForAuth(ctx.id, {
-                integration: permCheck.integration!,
-                reason: permCheck.reason,
-              });
-              if (!authResult.success) {
-                toolResults.push({
-                  type: "tool_result",
-                  tool_use_id: block.id,
-                  content: `Authentication not completed for ${permCheck.integrationName}. The user needs to connect this integration first.`,
-                  is_error: true,
-                });
-                this.broadcast(ctx, {
-                  type: "tool_result",
-                  toolName: block.name,
-                  result: "Authentication not completed",
-                  toolUseId: block.id,
-                });
-                ctx.contentParts.push({
-                  type: "tool_result",
-                  tool_use_id: block.id,
-                  content: "Authentication not completed",
-                });
-                return;
-              }
-            }
-
-            if (permCheck.needsApproval) {
-              const decision = await this.waitForApproval(ctx.id, {
-                toolInput: block.input,
-                integration: permCheck.integration || "",
-                operation: "",
-                command: (block.input.command as string) || "",
-              });
-              if (decision === "deny") {
-                toolResults.push({
-                  type: "tool_result",
-                  tool_use_id: block.id,
-                  content: "User denied this action",
-                  is_error: true,
-                });
-                this.broadcast(ctx, {
-                  type: "tool_result",
-                  toolName: block.name,
-                  result: "User denied this action",
-                  toolUseId: block.id,
-                });
-                ctx.contentParts.push({
-                  type: "tool_result",
-                  tool_use_id: block.id,
-                  content: "User denied this action",
-                });
-                return;
-              }
-            }
-
-            if (block.name === "send_file") {
-              const filePath = block.input.path as string;
-              let resultContent: string;
-              let isError = false;
-              try {
-                const content = await readSandboxFileAsBuffer(sandbox!, filePath);
-                if (content.length === 0) {
-                  throw new Error("File not found or empty");
-                }
-                const fileRecord = await uploadSandboxFile({
-                  path: filePath,
-                  content,
-                  conversationId: ctx.conversationId,
-                  messageId: undefined,
-                });
-                ctx.uploadedSandboxFileIds?.add(fileRecord.id);
-                resultContent = `File sent successfully: ${path.basename(filePath)}`;
-                ctx.sentFilePaths?.add(filePath);
-                this.broadcast(ctx, {
-                  type: "sandbox_file",
-                  fileId: fileRecord.id,
-                  path: filePath,
-                  filename: fileRecord.filename,
-                  mimeType: fileRecord.mimeType,
-                  sizeBytes: fileRecord.sizeBytes,
-                });
-              } catch (err) {
-                resultContent = `Failed to send file: ${err instanceof Error ? err.message : "Unknown error"}`;
-                isError = true;
-              }
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: block.id,
-                content: resultContent,
-                is_error: isError,
-              });
-              this.broadcast(ctx, {
-                type: "tool_result",
-                toolName: block.name,
-                result: resultContent,
-                toolUseId: block.id,
-              });
-              ctx.contentParts.push({
-                type: "tool_result",
-                tool_use_id: block.id,
-                content: resultContent,
-              });
-              await this.saveProgress(ctx);
-              return;
-            }
-
-            const cmdInfo = toolCallToCommand(block.name, block.input);
-            let resultContent: string;
-            let isError = false;
-            if (cmdInfo) {
-              try {
-                const execResult = await sandbox!.execute(cmdInfo.command, {
-                  timeout: (block.input.timeout as number) || 120_000,
-                });
-                resultContent = execResult.stdout || execResult.stderr || "(no output)";
-                if (execResult.exitCode !== 0 && execResult.stderr) {
-                  resultContent = `Exit code: ${execResult.exitCode}\n${execResult.stderr}\n${execResult.stdout}`;
-                  isError = true;
-                }
-              } catch (err) {
-                resultContent = `Error: ${err instanceof Error ? err.message : "Unknown error"}`;
-                isError = true;
-              }
-            } else {
-              resultContent = `Unknown tool: ${block.name}`;
-              isError = true;
-            }
-            if (resultContent.length > 100_000) {
-              resultContent = resultContent.slice(0, 100_000) + "\n... (output truncated)";
-            }
-            toolResults.push({
-              type: "tool_result",
-              tool_use_id: block.id,
-              content: resultContent,
-              is_error: isError,
-            });
-            this.broadcast(ctx, {
-              type: "tool_result",
-              toolName: block.name,
-              result: resultContent,
-              toolUseId: block.id,
-            });
-            ctx.contentParts.push({
-              type: "tool_result",
-              tool_use_id: block.id,
-              content: resultContent,
-            });
-            await this.saveProgress(ctx);
-          });
-
-          loopMessages.push({
-            role: "user",
-            content: toolResults,
-          });
-        }
-
-        await runDirectToolLoop();
-      };
-
-      await runDirectToolLoop();
-
-      if (iterationCount >= MAX_ITERATIONS) {
-        console.warn("[GenerationManager] Hit max iterations in tool loop");
-      }
-
-      if (await this.refreshCancellationSignal(ctx, { force: true })) {
-        await this.finishGeneration(ctx, "cancelled");
-        return;
-      }
-
-      if (sandbox) {
-        try {
-          await this.importIntegrationSkillDraftsFromSandbox(ctx, sandbox);
-        } catch (error) {
-          console.error("[GenerationManager] Failed to import integration skill drafts:", error);
-        }
-      }
-
-      // Complete the generation
-      await this.finishGeneration(ctx, "completed");
-    } catch (error) {
-      console.error("[GenerationManager] Direct generation error:", error);
-      ctx.errorMessage = error instanceof Error ? error.message : "Unknown error";
-      await this.finishGeneration(ctx, "error");
-    } finally {
-      if (sandbox) {
-        sandbox
-          .teardown()
-          .catch((err) => console.error("[GenerationManager] Sandbox teardown error:", err));
-      }
-    }
-  }
-
-  private async executeMemoryTool(
-    ctx: GenerationContext,
-    sandbox: SandboxBackend,
-    block: Extract<ContentBlock, { type: "tool_use" }>,
-  ): Promise<{ content: string; isError?: boolean }> {
-    try {
-      const input = block.input as Record<string, unknown>;
-
-      switch (block.name) {
-        case "memory_search": {
-          const query = String(input.query || "").trim();
-          if (!query) {
-            return {
-              content: "Error: memory_search requires a query",
-              isError: true,
-            };
-          }
-          const results = await searchMemoryWithSessions({
-            userId: ctx.userId,
-            query,
-            limit: input.limit ? Number(input.limit) : undefined,
-            type: parseMemoryFileType(input.type),
-            date: input.date as string | undefined,
-          });
-          return { content: JSON.stringify({ results }, null, 2) };
-        }
-
-        case "memory_get": {
-          const path = String(input.path || "").trim();
-          if (!path) {
-            return {
-              content: "Error: memory_get requires a path",
-              isError: true,
-            };
-          }
-          const { readSessionTranscriptByPath } = await import("@/server/services/memory-service");
-          const result =
-            (await readSessionTranscriptByPath({ userId: ctx.userId, path })) ??
-            (await readMemoryFile({ userId: ctx.userId, path }));
-          if (!result) {
-            return { content: "Error: memory file not found", isError: true };
-          }
-          return { content: JSON.stringify(result, null, 2) };
-        }
-
-        case "memory_write": {
-          const content = String(input.content || "").trim();
-          if (!content) {
-            return {
-              content: "Error: memory_write requires content",
-              isError: true,
-            };
-          }
-          const entry = await writeMemoryEntry({
-            userId: ctx.userId,
-            path: input.path as string | undefined,
-            type: parseMemoryFileType(input.type),
-            date: input.date as string | undefined,
-            title: input.title as string | undefined,
-            tags: input.tags as string[] | undefined,
-            content,
-          });
-
-          await syncMemoryToSandbox(
-            ctx.userId,
-            async (path, fileContent) => {
-              await sandbox.writeFile(path, fileContent);
-            },
-            async (dir) => {
-              await sandbox.execute(`mkdir -p "${dir}"`);
-            },
-          );
-
-          return {
-            content: JSON.stringify({ success: true, entryId: entry.id }, null, 2),
-          };
-        }
-
-        default:
-          return {
-            content: `Unknown memory tool: ${block.name}`,
-            isError: true,
-          };
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      return { content: `Error: ${message}`, isError: true };
-    }
-  }
-
-  /**
-   * Get the appropriate LLM backend for a generation context.
-   */
-  private async getLLMBackend(ctx: GenerationContext): Promise<LLMBackend> {
-    const { providerID } = parseModelReference(ctx.model);
-
-    switch (providerID) {
-      case "anthropic":
-        return new AnthropicBackend();
-
-      case "openai": {
-        // Check for user's subscription token
-        const { providerAuth } = await import("@/server/db/schema");
-        const { decrypt } = await import("@/server/utils/encryption");
-        const auth = await db.query.providerAuth.findFirst({
-          where: and(eq(providerAuth.userId, ctx.userId), eq(providerAuth.provider, "openai")),
-        });
-        if (auth) {
-          return new OpenAIBackend(decrypt(auth.accessToken));
-        }
-        // Fall back to server API key
-        if (env.OPENAI_API_KEY) {
-          return new OpenAIBackend(env.OPENAI_API_KEY);
-        }
-        throw new Error("No OpenAI API key or subscription available");
-      }
-
-      case "kimi-for-coding": {
-        const { providerAuth } = await import("@/server/db/schema");
-        const { decrypt } = await import("@/server/utils/encryption");
-        const auth = await db.query.providerAuth.findFirst({
-          where: and(eq(providerAuth.userId, ctx.userId), eq(providerAuth.provider, "kimi")),
-        });
-        if (auth) {
-          return new AnthropicBackend(decrypt(auth.accessToken), "https://api.kimi.com/coding/v1");
-        }
-        throw new Error("No Kimi API key available");
-      }
-
-      default:
-        // If we have a device, try local LLM
-        if (ctx.deviceId) {
-          return new LocalLLMBackend(ctx.deviceId);
-        }
-        // Default to Anthropic
-        return new AnthropicBackend();
-    }
-  }
-
-  /**
-   * Build chat message history from the database for direct mode.
-   */
-  private async buildMessageHistory(
-    ctx: GenerationContext,
-    options?: { sandbox?: SandboxBackend; llm?: LLMBackend },
-  ): Promise<ChatMessage[]> {
-    const messages = await db.query.message.findMany({
-      where: eq(message.conversationId, ctx.conversationId),
-      orderBy: asc(message.createdAt),
-    });
-
-    const { summaryText, sessionMessages } = await this.maybeCompactConversation(
-      ctx,
-      messages,
-      options,
-    );
-
-    const chatMessages: ChatMessage[] = [];
-
-    if (summaryText) {
-      chatMessages.push({
-        role: "assistant",
-        content: `Summary of previous conversation:\n${summaryText}`,
-      });
-    }
-
-    const lastMessage = sessionMessages[sessionMessages.length - 1];
-    const skipLastUser =
-      lastMessage?.role === "user" && lastMessage.content === ctx.userMessageContent;
-
-    const messagesToRender = skipLastUser ? sessionMessages.slice(0, -1) : sessionMessages;
-
-    for (const m of messagesToRender) {
-      if (m.role === "user") {
-        chatMessages.push({ role: "user", content: m.content });
-      } else if (m.role === "assistant") {
-        if (m.contentParts && m.contentParts.length > 0) {
-          const blocks: ContentBlock[] = m.contentParts.map((p): ContentBlock => {
-            switch (p.type) {
-              case "text":
-                return { type: "text", text: p.text };
-              case "tool_use":
-                return {
-                  type: "tool_use",
-                  id: p.id,
-                  name: p.name,
-                  input: p.input,
-                };
-              case "tool_result":
-                return {
-                  type: "tool_result",
-                  tool_use_id: p.tool_use_id,
-                  content: typeof p.content === "string" ? p.content : JSON.stringify(p.content),
-                };
-              case "thinking":
-                return {
-                  type: "thinking",
-                  thinking: p.content,
-                  signature: "",
-                };
-              default:
-                return { type: "text", text: "" };
-            }
-          });
-          chatMessages.push({ role: "assistant", content: blocks });
-        } else {
-          chatMessages.push({ role: "assistant", content: m.content });
-        }
-      }
-    }
-
-    if (ctx.attachments && ctx.attachments.length > 0) {
-      const blocks: ContentBlock[] = [{ type: "text", text: ctx.userMessageContent }];
-      for (const a of ctx.attachments) {
-        if (a.mimeType.startsWith("image/")) {
-          const base64Data = a.dataUrl.split(",")[1] || "";
-          blocks.push({
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: a.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
-              data: base64Data,
-            },
-          });
-        } else {
-          const base64Data = a.dataUrl.split(",")[1] || "";
-          const textContent = Buffer.from(base64Data, "base64").toString("utf-8");
-          blocks.push({
-            type: "text",
-            text: `[File: ${a.name}]\n${textContent}`,
-          });
-        }
-      }
-      chatMessages.push({ role: "user", content: blocks });
-    } else if (!skipLastUser) {
-      chatMessages.push({ role: "user", content: ctx.userMessageContent });
-    }
-
-    return chatMessages;
-  }
-
-  private async maybeCompactConversation(
-    ctx: GenerationContext,
-    messages: MessageRow[],
-    options?: { sandbox?: SandboxBackend; llm?: LLMBackend },
-  ): Promise<{ summaryText: string | null; sessionMessages: MessageRow[] }> {
-    const boundaryIndex = messages.findLastIndex(
-      (m) => m.role === "system" && m.content.startsWith(SESSION_BOUNDARY_PREFIX),
-    );
-
-    const sessionMessages = boundaryIndex >= 0 ? messages.slice(boundaryIndex + 1) : messages;
-
-    const summaryIndex = sessionMessages.findLastIndex(
-      (m) => m.role === "system" && m.content.startsWith(COMPACTION_SUMMARY_PREFIX),
-    );
-
-    const summaryMessage = summaryIndex >= 0 ? sessionMessages[summaryIndex] : undefined;
-    const summaryText = summaryMessage
-      ? summaryMessage.content.replace(COMPACTION_SUMMARY_PREFIX, "").trim()
-      : null;
-
-    const messagesAfterSummary =
-      summaryIndex >= 0 ? sessionMessages.slice(summaryIndex + 1) : sessionMessages;
-
-    const conversationMessages = messagesAfterSummary.filter(
-      (m) => m.role === "user" || m.role === "assistant",
-    );
-
-    const tokenEstimate = conversationMessages.reduce(
-      (sum, m) => sum + estimateTokensForMessageRow(m),
-      0,
-    );
-
-    if (
-      tokenEstimate < COMPACTION_TRIGGER_TOKENS ||
-      conversationMessages.length < COMPACTION_MIN_MESSAGES ||
-      !options?.llm
-    ) {
-      return { summaryText, sessionMessages: conversationMessages };
-    }
-
-    const messagesToSummarize = conversationMessages.slice(0, -COMPACTION_KEEP_LAST_MESSAGES);
-    const messagesToKeep = conversationMessages.slice(-COMPACTION_KEEP_LAST_MESSAGES);
-
-    if (messagesToSummarize.length < COMPACTION_MIN_MESSAGES) {
-      return { summaryText, sessionMessages: conversationMessages };
-    }
-
-    if (tokenEstimate > MEMORY_FLUSH_TRIGGER_TOKENS && options?.sandbox) {
-      await this.runMemoryFlush(ctx, options.llm, options.sandbox, conversationMessages);
-    }
-
-    const newSummary = await this.generateCompactionSummary(
-      options.llm,
-      parseModelReference(ctx.model).modelID,
-      messagesToSummarize,
-      summaryText,
-    );
-
-    if (newSummary) {
-      const anchor = messagesToKeep[0]?.createdAt ?? new Date();
-      const summaryCreatedAt = new Date(anchor.getTime() - 1);
-      await db.insert(message).values({
-        conversationId: ctx.conversationId,
-        role: "system",
-        content: `${COMPACTION_SUMMARY_PREFIX}\n${newSummary}`,
-        createdAt: summaryCreatedAt,
-      });
-    }
-
-    return {
-      summaryText: newSummary ?? summaryText,
-      sessionMessages: messagesToKeep,
-    };
-  }
-
-  private buildSummaryInput(messages: MessageRow[], previousSummary: string | null): string {
-    const parts: string[] = [];
-    if (previousSummary) {
-      parts.push("Previous summary:\n" + previousSummary.trim());
-    }
-
-    const transcript = messages
-      .map((m) => {
-        if (m.role === "assistant" && m.contentParts && m.contentParts.length > 0) {
-          const textParts = m.contentParts
-            .filter((p): p is Extract<ContentPart, { type: "text" }> => p.type === "text")
-            .map((p) => p.text)
-            .join("");
-          return `${m.role}: ${textParts || m.content}`;
-        }
-        return `${m.role}: ${m.content}`;
-      })
-      .join("\n");
-
-    parts.push("Conversation:\n" + transcript);
-    return parts.join("\n\n");
-  }
-
-  private async generateCompactionSummary(
-    llm: LLMBackend,
-    model: string,
-    messages: MessageRow[],
-    previousSummary: string | null,
-  ): Promise<string | null> {
-    const input = this.buildSummaryInput(messages, previousSummary);
-    let summary = "";
-
-    const stream = llm.chat({
-      messages: [{ role: "user", content: input }],
-      system: COMPACTION_SUMMARY_SYSTEM_PROMPT,
-      model,
-      maxTokens: COMPACTION_SUMMARY_MAX_TOKENS,
-    });
-
-    try {
-      for await (const event of stream) {
-        if (event.type === "text_delta") {
-          summary += event.text;
-        }
-      }
-    } catch (err) {
-      console.error("[GenerationManager] Compaction summary error:", err);
-      return null;
-    }
-
-    return summary.trim() || null;
-  }
-
-  private async runMemoryFlush(
-    ctx: GenerationContext,
-    llm: LLMBackend,
-    sandbox: SandboxBackend,
-    messages: MessageRow[],
-  ): Promise<void> {
-    const tools = getDirectModeTools().filter((tool) => tool.name.startsWith("memory_"));
-    const loopMessages: ChatMessage[] = [
-      { role: "user", content: this.buildSummaryInput(messages, null) },
-    ];
-
-    let iterations = 0;
-    let hasToolCalls = true;
-
-    const flushMemoryLoop = async (): Promise<void> => {
-      if (!hasToolCalls || iterations >= MEMORY_FLUSH_MAX_ITERATIONS) {
-        return;
-      }
-
-      iterations += 1;
-      hasToolCalls = false;
-
-      const assistantBlocks: ContentBlock[] = [];
-      let currentToolUseId = "";
-      let currentToolName = "";
-      let currentToolJson = "";
-
-      const stream = llm.chat({
-        messages: loopMessages,
-        tools,
-        system: MEMORY_FLUSH_SYSTEM_PROMPT,
-        model: parseModelReference(ctx.model).modelID,
-      });
-
-      await this.consumeAsyncStream(stream, async (event) => {
-        if (event.type === "text_delta") {
-          assistantBlocks.push({ type: "text", text: event.text });
-        } else if (event.type === "tool_use_start") {
-          currentToolUseId = event.toolUseId;
-          currentToolName = event.toolName;
-          currentToolJson = "";
-        } else if (event.type === "tool_use_delta") {
-          currentToolJson += event.jsonDelta;
-        } else if (event.type === "tool_use_end") {
-          let toolInput: Record<string, unknown> = {};
-          try {
-            toolInput = JSON.parse(currentToolJson);
-          } catch {
-            toolInput = { raw: currentToolJson };
-          }
-          assistantBlocks.push({
-            type: "tool_use",
-            id: currentToolUseId,
-            name: currentToolName,
-            input: toolInput,
-          });
-          hasToolCalls = true;
-        } else if (event.type === "usage") {
-          ctx.usage.inputTokens += event.inputTokens;
-          ctx.usage.outputTokens += event.outputTokens;
-        }
-        return false;
-      });
-
-      if (!hasToolCalls) {
-        return;
-      }
-
-      loopMessages.push({ role: "assistant", content: assistantBlocks });
-
-      const toolResults: ContentBlock[] = [];
-      await this.forEachSequential(assistantBlocks, async (block) => {
-        if (block.type !== "tool_use" || !block.name.startsWith("memory_")) {
-          return;
-        }
-        const memoryResult = await this.executeMemoryTool(ctx, sandbox, block);
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: memoryResult.content,
-          is_error: memoryResult.isError,
-        });
-      });
-
-      if (toolResults.length === 0) {
-        return;
-      }
-
-      loopMessages.push({ role: "user", content: toolResults });
-      await flushMemoryLoop();
-    };
-
-    await flushMemoryLoop();
   }
 
   /**
@@ -5263,37 +4227,6 @@ class GenerationManager {
       '  "files": [{"path":"SKILL.md","content":"..."}]',
       "}",
     ].join("\n");
-  }
-
-  private async importIntegrationSkillDraftsFromE2B(
-    ctx: GenerationContext,
-    sandbox: Sandbox,
-  ): Promise<void> {
-    const findResult = await sandbox.commands.run(
-      `find /app/.opencode/integration-skill-drafts -maxdepth 1 -type f -name '*.json' 2>/dev/null | head -20`,
-    );
-    const paths = findResult.stdout
-      .trim()
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    await Promise.all(
-      paths.map(async (filePath) => {
-        try {
-          const content = await sandbox.files.read(filePath);
-          const created = await this.importIntegrationSkillDraftContent(ctx, String(content));
-          if (created > 0) {
-            await sandbox.commands.run(`rm -f "${filePath}"`);
-          }
-        } catch (error) {
-          console.error(
-            `[GenerationManager] Failed to import integration skill draft ${filePath}:`,
-            error,
-          );
-        }
-      }),
-    );
   }
 
   private async importIntegrationSkillDraftsFromSandbox(

@@ -9,6 +9,7 @@ const NON_SELECTABLE_SKILL_DIRS = new Set(["_test-utils"]);
 const INTEGRATION_SKILL_DIRS = new Set([
   "airtable",
   "discord",
+  "dynamics",
   "github",
   "google-calendar",
   "google-docs",

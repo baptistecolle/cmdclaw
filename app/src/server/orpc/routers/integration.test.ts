@@ -147,6 +147,7 @@ describe("integrationRouter", () => {
         type: "github",
         displayName: "GitHub",
         enabled: true,
+        setupRequired: false,
         authStatus: "connected",
         authErrorCode: null,
         scopes: ["repo"],
@@ -163,6 +164,7 @@ describe("integrationRouter", () => {
         type: "github",
         displayName: "GitHub",
         enabled: true,
+        setupRequired: false,
         authStatus: "connected",
         authErrorCode: null,
         scopes: ["repo"],
@@ -486,6 +488,11 @@ describe("integrationRouter", () => {
 
   it("toggles integration enabled state", async () => {
     const context = createContext();
+    context.db.query.integration.findFirst.mockResolvedValue({
+      id: "integration-1",
+      type: "github",
+      metadata: null,
+    });
     context.mocks.updateReturningMock.mockResolvedValueOnce([{ id: "integration-1" }]);
 
     const result = await integrationRouterAny.toggle({
@@ -501,6 +508,7 @@ describe("integrationRouter", () => {
 
   it("throws when toggling a missing integration", async () => {
     const context = createContext();
+    context.db.query.integration.findFirst.mockResolvedValue(null);
 
     await expect(
       integrationRouterAny.toggle({

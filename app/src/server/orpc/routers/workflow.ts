@@ -38,6 +38,7 @@ const integrationTypeSchema = z.enum([
   "hubspot",
   "linkedin",
   "salesforce",
+  "dynamics",
   "reddit",
   "twitter",
 ]);

@@ -225,6 +225,7 @@ export function useGetAuthUrl() {
         | "hubspot"
         | "linkedin"
         | "salesforce"
+        | "dynamics"
         | "reddit"
         | "twitter";
       redirectUrl: string;
@@ -571,6 +572,7 @@ export function useCreateWorkflow() {
         | "hubspot"
         | "linkedin"
         | "salesforce"
+        | "dynamics"
         | "reddit"
         | "twitter"
       )[];
@@ -616,6 +618,7 @@ export function useUpdateWorkflow() {
         | "hubspot"
         | "linkedin"
         | "salesforce"
+        | "dynamics"
         | "reddit"
         | "twitter"
       )[];

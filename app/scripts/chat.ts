@@ -56,6 +56,7 @@ const AUTH_INTEGRATION_TYPES = [
   "hubspot",
   "linkedin",
   "salesforce",
+  "dynamics",
   "reddit",
   "twitter",
 ] as const;
