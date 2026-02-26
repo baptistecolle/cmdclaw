@@ -6,11 +6,17 @@ import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 
 // Refresh tokens 5 minutes before expiry
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+const MISSING_EXPIRY_REFRESH_POLICY_MS: Partial<Record<IntegrationType, number>> = {
+  salesforce: 30 * 60 * 1000,
+};
+
+type RefreshReason = "expiry_window" | "missing_expiry_policy";
 
 interface TokenWithMetadata {
   accessToken: string;
   refreshToken: string | null;
   expiresAt: Date | null;
+  tokenUpdatedAt?: Date | null;
   integrationId: string;
   type: IntegrationType;
 }
@@ -121,17 +127,53 @@ function classifyOAuthRefreshFailure(
 /**
  * Check if a token needs to be refreshed
  */
-function needsRefresh(token: TokenWithMetadata): boolean {
-  if (!token.expiresAt) {
-    // No expiry set - assume it doesn't expire (e.g., some OAuth providers)
-    return false;
-  }
-
-  const expiresAtMs = token.expiresAt.getTime();
+function getRefreshDecision(token: TokenWithMetadata): {
+  shouldRefresh: boolean;
+  reason: RefreshReason | null;
+  tokenAgeMs?: number;
+} {
   const nowMs = Date.now();
 
-  // Refresh if expired or will expire within buffer
-  return nowMs >= expiresAtMs - EXPIRY_BUFFER_MS;
+  if (token.expiresAt) {
+    const expiresAtMs = token.expiresAt.getTime();
+
+    // Refresh if expired or will expire within buffer
+    if (nowMs >= expiresAtMs - EXPIRY_BUFFER_MS) {
+      return {
+        shouldRefresh: true,
+        reason: "expiry_window",
+      };
+    }
+
+    return {
+      shouldRefresh: false,
+      reason: null,
+    };
+  }
+
+  // Some providers do not return expires_in reliably.
+  // For those, refresh based on token age from the last update timestamp.
+  const syntheticTtlMs = MISSING_EXPIRY_REFRESH_POLICY_MS[token.type];
+  if (!syntheticTtlMs || !token.tokenUpdatedAt) {
+    return {
+      shouldRefresh: false,
+      reason: null,
+    };
+  }
+
+  const tokenAgeMs = nowMs - token.tokenUpdatedAt.getTime();
+  if (tokenAgeMs >= syntheticTtlMs) {
+    return {
+      shouldRefresh: true,
+      reason: "missing_expiry_policy",
+      tokenAgeMs,
+    };
+  }
+
+  return {
+    shouldRefresh: false,
+    reason: null,
+  };
 }
 
 /**
@@ -152,6 +194,7 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
         accessToken: true,
         refreshToken: true,
         expiresAt: true,
+        updatedAt: true,
       },
     });
     if (!current) {
@@ -163,9 +206,11 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
       accessToken: current.accessToken,
       refreshToken: current.refreshToken,
       expiresAt: current.expiresAt,
+      tokenUpdatedAt: current.updatedAt,
     };
 
-    if (!needsRefresh(currentToken)) {
+    const decision = getRefreshDecision(currentToken);
+    if (!decision.shouldRefresh) {
       return {
         kind: "ok",
         accessToken: currentToken.accessToken,
@@ -220,6 +265,12 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
         currentToken.refreshToken?.length ?? 0
       })`,
     );
+    if (decision.reason === "missing_expiry_policy") {
+      const tokenAgeMinutes = Math.round((decision.tokenAgeMs ?? 0) / 1000 / 60);
+      console.log(
+        `[Token Refresh] Refresh reason=missing_expiry_policy provider=${token.type} integrationId=${token.integrationId} tokenAgeMins=${tokenAgeMinutes}`,
+      );
+    }
 
     const response = await fetch(config.tokenUrl, {
       method: "POST",
@@ -328,7 +379,7 @@ async function refreshAccessToken(token: TokenWithMetadata): Promise<string> {
  * Get a valid access token for an integration, refreshing if necessary
  */
 export async function getValidAccessToken(token: TokenWithMetadata): Promise<string> {
-  if (!needsRefresh(token)) {
+  if (!getRefreshDecision(token).shouldRefresh) {
     return token.accessToken;
   }
 
@@ -385,6 +436,7 @@ export async function getValidTokensForUser(
           accessToken: row.accessToken,
           refreshToken: row.refreshToken,
           expiresAt: row.expiresAt,
+          tokenUpdatedAt: row.tokenUpdatedAt,
           integrationId: row.integrationId,
           type: row.type,
         });

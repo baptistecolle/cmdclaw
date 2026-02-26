@@ -121,6 +121,7 @@ describe("token-refresh", () => {
       accessToken: "db-current-token",
       refreshToken: "db-refresh-token",
       expiresAt: new Date(Date.now() - 1000),
+      updatedAt: new Date(Date.now() - 1000),
     });
     getOAuthConfigMock.mockReturnValue({
       clientId: "client-id",
@@ -153,6 +154,47 @@ describe("token-refresh", () => {
     });
 
     expect(token).toBe("current-token");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("refreshes salesforce token when expiry is missing and token is stale", async () => {
+    mockTokenResponse({ access_token: "new-salesforce-token", expires_in: 3600 });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    integrationTokenFindFirstMock.mockResolvedValueOnce({
+      accessToken: "old-salesforce-token-db",
+      refreshToken: "salesforce-refresh-token",
+      expiresAt: null,
+      updatedAt: new Date(Date.now() - 31 * 60 * 1000),
+    });
+
+    const token = await getValidAccessToken({
+      accessToken: "old-salesforce-token",
+      refreshToken: "salesforce-refresh-token",
+      expiresAt: null,
+      tokenUpdatedAt: new Date(Date.now() - 31 * 60 * 1000),
+      integrationId: "int-salesforce-stale",
+      type: "salesforce",
+    });
+
+    expect(token).toBe("new-salesforce-token");
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Refresh reason=missing_expiry_policy"),
+    );
+    logSpy.mockRestore();
+  });
+
+  it("does not refresh salesforce token when expiry is missing and token is still fresh", async () => {
+    const token = await getValidAccessToken({
+      accessToken: "current-salesforce-token",
+      refreshToken: "salesforce-refresh-token",
+      expiresAt: null,
+      tokenUpdatedAt: new Date(Date.now() - 10 * 60 * 1000),
+      integrationId: "int-salesforce-fresh",
+      type: "salesforce",
+    });
+
+    expect(token).toBe("current-salesforce-token");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
