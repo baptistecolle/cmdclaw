@@ -353,7 +353,7 @@ async function getOrCreateDaytonaSandbox(
   });
 
   await created.process.executeCommand(
-    `sh -lc ${escapeShell(`cd /app && nohup opencode serve --port ${OPENCODE_PORT} --hostname 0.0.0.0 >/tmp/opencode.log 2>&1 &`)}`,
+    `sh -lc ${escapeShell(`export SANDBOX_ID=${created.id} && cd /app && nohup opencode serve --port ${OPENCODE_PORT} --hostname 0.0.0.0 >/tmp/opencode.log 2>&1 &`)}`,
     "/app",
     undefined,
     10,

@@ -318,7 +318,7 @@ export async function getOrCreateSandbox(
   const stderrBuffer: string[] = [];
   try {
     await sandbox.commands.run(
-      `cd /app && opencode serve --port ${OPENCODE_PORT} --hostname 0.0.0.0`,
+      `export SANDBOX_ID=${sandbox.sandboxId} && cd /app && opencode serve --port ${OPENCODE_PORT} --hostname 0.0.0.0`,
       {
         background: true,
         onStderr: (data) => {
