@@ -121,6 +121,17 @@ const handlers: Record<string, JobHandler> = {
   },
   [EMAIL_FORWARDED_WORKFLOW_JOB_NAME]: async (job) => {
     try {
+      console.info("[worker] received forwarded-email job", {
+        jobId: job.id ?? null,
+        webhookId:
+          typeof job.data?.webhookId === "string" && job.data.webhookId.length > 0
+            ? job.data.webhookId
+            : null,
+        eventType:
+          typeof (job.data as { event?: { type?: unknown } })?.event?.type === "string"
+            ? ((job.data as { event?: { type?: string } }).event?.type ?? null)
+            : null,
+      });
       await processForwardedEmailEvent(
         job.data as Parameters<typeof processForwardedEmailEvent>[0],
       );

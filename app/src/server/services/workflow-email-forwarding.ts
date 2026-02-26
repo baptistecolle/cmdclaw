@@ -236,12 +236,29 @@ async function getReceivedEmailContent(emailId: string): Promise<{
 export async function processForwardedEmailEvent(
   payload: ForwardedEmailQueuePayload,
 ): Promise<void> {
+  const svixId = payload.webhookId ?? null;
+  const eventType = payload.event.type;
+  const emailId = payload.event.data?.email_id ?? null;
+  console.info("[workflow-email-forwarding] processing event", {
+    svixId,
+    eventType,
+    emailId,
+  });
+
   if (payload.event.type !== RESEND_EMAIL_RECEIVED_EVENT) {
+    console.info("[workflow-email-forwarding] ignored non-email.received event", {
+      svixId,
+      eventType,
+    });
     return;
   }
 
-  const emailId = payload.event.data?.email_id;
-  if (!emailId) {
+  const receivedEmailId = payload.event.data?.email_id;
+  if (!receivedEmailId) {
+    console.warn("[workflow-email-forwarding] missing email_id", {
+      svixId,
+      eventType,
+    });
     return;
   }
 
@@ -253,30 +270,60 @@ export async function processForwardedEmailEvent(
 
   const recipients = extractRecipientEmails(payload.event.data?.to);
   if (recipients.length === 0) {
+    console.info("[workflow-email-forwarding] no recipient emails extracted", {
+      svixId,
+      emailId: receivedEmailId,
+    });
     return;
   }
 
   const sender = extractEmailAddress(payload.event.data?.from);
   if (!sender) {
+    console.info("[workflow-email-forwarding] missing sender email", {
+      svixId,
+      emailId: receivedEmailId,
+    });
     return;
   }
 
   const target = await resolveTargetWorkflow({ recipients, receivingDomain });
   if (!target) {
+    console.info("[workflow-email-forwarding] no matching target workflow", {
+      svixId,
+      emailId: receivedEmailId,
+      recipientCount: recipients.length,
+      receivingDomain,
+    });
     return;
   }
 
   const senderAuthorized = await isAuthorizedSender(target.workflowId, sender);
   if (!senderAuthorized) {
+    console.info("[workflow-email-forwarding] sender not authorized for workflow owner", {
+      svixId,
+      emailId: receivedEmailId,
+      workflowId: target.workflowId,
+    });
     return;
   }
 
-  const alreadyHandled = await hasRunForEmailId(target.workflowId, emailId);
+  const alreadyHandled = await hasRunForEmailId(target.workflowId, receivedEmailId);
   if (alreadyHandled) {
+    console.info("[workflow-email-forwarding] duplicate email ignored", {
+      svixId,
+      emailId: receivedEmailId,
+      workflowId: target.workflowId,
+    });
     return;
   }
 
-  const content = await getReceivedEmailContent(emailId);
+  const content = await getReceivedEmailContent(receivedEmailId);
+  console.info("[workflow-email-forwarding] triggering workflow run", {
+    svixId,
+    emailId: receivedEmailId,
+    workflowId: target.workflowId,
+    routingMode: target.routingMode,
+  });
 
   await triggerWorkflowRun({
     workflowId: target.workflowId,
@@ -284,7 +331,7 @@ export async function processForwardedEmailEvent(
       source: EMAIL_FORWARDED_TRIGGER_TYPE,
       routingMode: target.routingMode,
       workflowId: target.workflowId,
-      emailId,
+      emailId: receivedEmailId,
       messageId: payload.event.data?.message_id ?? null,
       from: sender,
       to: recipients,
@@ -297,5 +344,10 @@ export async function processForwardedEmailEvent(
       attachmentCount: content.attachmentCount,
       resendWebhookId: payload.webhookId ?? null,
     },
+  });
+  console.info("[workflow-email-forwarding] workflow run trigger completed", {
+    svixId,
+    emailId: receivedEmailId,
+    workflowId: target.workflowId,
   });
 }
