@@ -149,6 +149,7 @@ import {
   getCliInstructionsWithCustom,
   getEnabledIntegrationTypes,
 } from "@/server/integrations/cli-env";
+import { getWorkflowSystemBehaviorPrompt } from "@/server/prompts/workflow-system-behavior-prompt";
 import { getPreferredCloudSandboxProvider } from "@/server/sandbox/factory";
 import {
   getOrCreateSession,
@@ -1722,7 +1723,7 @@ describe("generationManager transitions", () => {
 
     expect(promptMock).toHaveBeenCalledTimes(1);
     const promptArg = promptMock.mock.calls[0]?.[0] as { system?: string };
-    expect(promptArg.system).not.toContain("Act autonomously and complete the task end-to-end.");
+    expect(promptArg.system).not.toContain(getWorkflowSystemBehaviorPrompt());
     expect(vi.mocked(collectNewSandboxFiles)).toHaveBeenCalledWith(
       expect.anything(),
       expect.any(Number),
@@ -1799,7 +1800,7 @@ describe("generationManager transitions", () => {
 
     expect(promptMock).toHaveBeenCalledTimes(1);
     const promptArg = promptMock.mock.calls[0]?.[0] as { system?: string };
-    expect(promptArg.system).toContain("Act autonomously and complete the task end-to-end.");
+    expect(promptArg.system).toContain(getWorkflowSystemBehaviorPrompt());
     expect(promptArg.system).toContain("Do not ask clarifying questions.");
     expect(finishSpy).toHaveBeenCalledWith(ctx, "completed");
   });
