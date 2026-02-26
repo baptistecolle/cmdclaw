@@ -168,18 +168,6 @@ async function resolveTargetWorkflow(params: {
   return null;
 }
 
-async function isAuthorizedSender(workflowId: string, senderEmail: string): Promise<boolean> {
-  const row = await db
-    .select({ ownerEmail: user.email })
-    .from(workflow)
-    .innerJoin(user, eq(user.id, workflow.ownerId))
-    .where(eq(workflow.id, workflowId))
-    .limit(1);
-
-  const ownerEmail = row[0]?.ownerEmail?.toLowerCase();
-  return typeof ownerEmail === "string" && ownerEmail === senderEmail.toLowerCase();
-}
-
 function normalizeHeaders(headers: unknown): Record<string, string> {
   if (!Array.isArray(headers)) {
     return {};
@@ -293,16 +281,6 @@ export async function processForwardedEmailEvent(
       emailId: receivedEmailId,
       recipientCount: recipients.length,
       receivingDomain,
-    });
-    return;
-  }
-
-  const senderAuthorized = await isAuthorizedSender(target.workflowId, sender);
-  if (!senderAuthorized) {
-    console.info("[workflow-email-forwarding] sender not authorized for workflow owner", {
-      svixId,
-      emailId: receivedEmailId,
-      workflowId: target.workflowId,
     });
     return;
   }
