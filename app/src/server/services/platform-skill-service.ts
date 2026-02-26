@@ -1,7 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-
-const SKILLS_ROOT = path.join(process.cwd(), "src", "sandbox-templates/common", "skills");
+import { resolveSkillsRoot } from "@/server/services/skills-root";
 
 const NON_SELECTABLE_SKILL_DIRS = new Set(["_test-utils"]);
 
@@ -51,10 +50,19 @@ function formatSkillTitle(slug: string): string {
 }
 
 export async function listSelectablePlatformSkills(): Promise<PlatformSkillOption[]> {
+  const skillsRoot = await resolveSkillsRoot("[PlatformSkillService]");
+  if (!skillsRoot) {
+    return [];
+  }
+
   let entries: Array<import("node:fs").Dirent> = [];
   try {
-    entries = await fs.readdir(SKILLS_ROOT, { withFileTypes: true });
-  } catch {
+    entries = await fs.readdir(skillsRoot, { withFileTypes: true });
+  } catch (error) {
+    console.error("[PlatformSkillService] Failed to read skills directory", {
+      skillsRoot,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    });
     return [];
   }
 
@@ -66,7 +74,7 @@ export async function listSelectablePlatformSkills(): Promise<PlatformSkillOptio
 
   const skills = await Promise.all(
     skillDirs.map(async (dirName) => {
-      const skillMdPath = path.join(SKILLS_ROOT, dirName, "SKILL.md");
+      const skillMdPath = path.join(skillsRoot, dirName, "SKILL.md");
       try {
         const markdown = await fs.readFile(skillMdPath, "utf8");
         const description = extractFrontmatterValue(markdown, "description") ?? "";

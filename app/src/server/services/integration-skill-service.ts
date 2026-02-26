@@ -10,6 +10,7 @@ import {
   integrationTypeEnum,
   type integrationSkillSourceEnum,
 } from "@/server/db/schema";
+import { resolveSkillsRoot } from "@/server/services/skills-root";
 
 type SkillSource = (typeof integrationSkillSourceEnum.enumValues)[number];
 
@@ -178,12 +179,19 @@ export async function getOfficialIntegrationSkillIndex(): Promise<
   Map<string, OfficialIntegrationSkill>
 > {
   const result = new Map<string, OfficialIntegrationSkill>();
-  const skillsRoot = path.join(process.cwd(), "src", "sandbox-templates/common", "skills");
+  const skillsRoot = await resolveSkillsRoot("[IntegrationSkillService]");
+  if (!skillsRoot) {
+    return result;
+  }
 
   let entries: Array<import("node:fs").Dirent> = [];
   try {
     entries = await fs.readdir(skillsRoot, { withFileTypes: true });
-  } catch {
+  } catch (error) {
+    console.error("[IntegrationSkillService] Failed to read skills directory", {
+      skillsRoot,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    });
     return result;
   }
 
