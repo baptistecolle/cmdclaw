@@ -130,6 +130,22 @@ describe("generationRouter", () => {
     ).rejects.toThrow("Access denied");
   });
 
+  it("returns empty active-generation payload when conversation is missing", async () => {
+    conversationFindFirstMock.mockResolvedValue(null);
+
+    const result = await generationRouterAny.getActiveGeneration({
+      input: { conversationId: "conv-missing" },
+      context,
+    });
+
+    expect(result).toEqual({
+      generationId: null,
+      startedAt: null,
+      errorMessage: null,
+      status: null,
+    });
+  });
+
   it("returns active generation from conversation durable state", async () => {
     conversationFindFirstMock.mockResolvedValue({
       id: "conv-1",
@@ -272,6 +288,19 @@ describe("generationRouter", () => {
       "conv-1",
       "user-1",
     );
+  });
+
+  it("returns empty queued messages when conversation does not exist anymore", async () => {
+    generationManagerMock.listConversationQueuedMessages.mockRejectedValueOnce(
+      new Error("Conversation not found"),
+    );
+
+    const result = await generationRouterAny.listConversationQueuedMessages({
+      input: { conversationId: "conv-missing" },
+      context,
+    });
+
+    expect(result).toEqual([]);
   });
 
   it("removes queued messages through generation manager", async () => {

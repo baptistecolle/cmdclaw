@@ -305,10 +305,18 @@ const listConversationQueuedMessages = protectedProcedure
     ),
   )
   .handler(async ({ input, context }) => {
-    const queued = await generationManager.listConversationQueuedMessages(
-      input.conversationId,
-      context.user.id,
-    );
+    let queued;
+    try {
+      queued = await generationManager.listConversationQueuedMessages(
+        input.conversationId,
+        context.user.id,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "Conversation not found") {
+        return [];
+      }
+      throw error;
+    }
     return queued.map((item) => ({
       id: item.id,
       content: item.content,
@@ -565,7 +573,12 @@ const getActiveGeneration = protectedProcedure
     });
 
     if (!conv) {
-      throw new Error("Conversation not found");
+      return {
+        generationId: null,
+        startedAt: null,
+        errorMessage: null,
+        status: null,
+      };
     }
 
     if (conv.userId !== context.user.id) {

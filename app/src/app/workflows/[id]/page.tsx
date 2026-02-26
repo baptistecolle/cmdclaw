@@ -11,8 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
-  Check,
-  ChevronsUpDown,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
@@ -33,16 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -227,7 +216,6 @@ export default function WorkflowEditorPage() {
   } | null>(null);
   const [testRunId, setTestRunId] = useState<string | null>(null);
   const [isTestPanelExpanded, setIsTestPanelExpanded] = useState(false);
-  const [isRunSelectorOpen, setIsRunSelectorOpen] = useState(false);
   const [copiedForwardingField, setCopiedForwardingField] = useState<"workflowAlias" | null>(null);
   const {
     data: selectedRun,
@@ -547,7 +535,6 @@ export default function WorkflowEditorPage() {
 
   const handleSelectTestRun = useCallback((runId: string) => {
     setTestRunId(runId);
-    setIsRunSelectorOpen(false);
   }, []);
 
   const handleToggleTestPanel = useCallback(() => {
@@ -879,57 +866,30 @@ export default function WorkflowEditorPage() {
             <p className="text-muted-foreground text-xs">Live output for this workflow test.</p>
           </div>
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
-            <Popover open={isRunSelectorOpen} onOpenChange={setIsRunSelectorOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  aria-expanded={isRunSelectorOpen}
-                  className="h-8 max-w-[17rem] min-w-0 justify-between"
-                  disabled={!runs || runs.length === 0}
-                >
-                  <span className="truncate text-left text-xs">
-                    {selectedRunSummary
+            <Select
+              value={testRunId ?? undefined}
+              onValueChange={handleSelectTestRun}
+              disabled={!runs || runs.length === 0}
+            >
+              <SelectTrigger className="h-8 max-w-[17rem] min-w-0 text-xs">
+                <SelectValue
+                  placeholder={
+                    selectedRunSummary
                       ? `${formatRelativeTime(selectedRunSummary.startedAt)} • ${getWorkflowRunStatusLabel(selectedRunSummary.status)}`
-                      : "Load a previous run"}
-                  </span>
-                  <ChevronsUpDown className="text-muted-foreground ml-2 h-3.5 w-3.5 shrink-0" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="end">
-                <Command>
-                  <CommandInput placeholder="Search runs..." className="h-9 text-xs" />
-                  <CommandList>
-                    <CommandEmpty>No runs yet.</CommandEmpty>
-                    <CommandGroup>
-                      {(runs ?? []).map((run) => {
-                        const isSelected = run.id === testRunId;
-                        return (
-                          <CommandItem
-                            key={run.id}
-                            value={run.id}
-                            onSelect={handleSelectTestRun}
-                            className="gap-2 py-2"
-                          >
-                            <Check
-                              className={cn(
-                                "h-3.5 w-3.5",
-                                isSelected ? "opacity-100" : "opacity-0",
-                              )}
-                            />
-                            <div className="min-w-0">
-                              <div className="truncate text-xs font-medium">
-                                {formatRelativeTime(run.startedAt)} •{" "}
-                                {getWorkflowRunStatusLabel(run.status)}
-                              </div>
-                            </div>
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                      : "Load a previous run"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent align="end" position="popper" className="max-w-[17rem]">
+                {(runs ?? []).map((run) => (
+                  <SelectItem key={run.id} value={run.id}>
+                    <span className="truncate text-xs">
+                      {formatRelativeTime(run.startedAt)} • {getWorkflowRunStatusLabel(run.status)}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {selectedRun?.conversationId ? (
               <div className="flex items-center gap-2">
                 <ChatCopyButton conversationId={selectedRun.conversationId} />

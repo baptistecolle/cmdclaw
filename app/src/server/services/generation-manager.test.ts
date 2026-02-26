@@ -9,6 +9,7 @@ const {
   generationFindManyMock,
   messageFindFirstMock,
   conversationFindFirstMock,
+  conversationQueuedMessageFindManyMock,
   workflowRunFindFirstMock,
   workflowFindFirstMock,
   providerAuthFindFirstMock,
@@ -26,6 +27,7 @@ const {
   const generationFindManyMock = vi.fn();
   const messageFindFirstMock = vi.fn();
   const conversationFindFirstMock = vi.fn();
+  const conversationQueuedMessageFindManyMock = vi.fn();
   const workflowRunFindFirstMock = vi.fn();
   const workflowFindFirstMock = vi.fn();
   const providerAuthFindFirstMock = vi.fn();
@@ -36,6 +38,7 @@ const {
       generation: { findFirst: generationFindFirstMock, findMany: generationFindManyMock },
       message: { findFirst: messageFindFirstMock },
       conversation: { findFirst: conversationFindFirstMock },
+      conversationQueuedMessage: { findMany: conversationQueuedMessageFindManyMock },
       workflowRun: { findFirst: workflowRunFindFirstMock },
       workflow: { findFirst: workflowFindFirstMock },
       providerAuth: { findFirst: providerAuthFindFirstMock, findMany: vi.fn(() => []) },
@@ -55,6 +58,7 @@ const {
     generationFindManyMock,
     messageFindFirstMock,
     conversationFindFirstMock,
+    conversationQueuedMessageFindManyMock,
     workflowRunFindFirstMock,
     workflowFindFirstMock,
     providerAuthFindFirstMock,
@@ -269,6 +273,7 @@ describe("generationManager transitions", () => {
     generationFindManyMock.mockResolvedValue([]);
     messageFindFirstMock.mockResolvedValue(null);
     conversationFindFirstMock.mockResolvedValue(null);
+    conversationQueuedMessageFindManyMock.mockResolvedValue([]);
     workflowRunFindFirstMock.mockResolvedValue(null);
     workflowFindFirstMock.mockResolvedValue(null);
     providerAuthFindFirstMock.mockResolvedValue(null);
@@ -779,6 +784,15 @@ describe("generationManager transitions", () => {
       backendType: "opencode",
       userId: "user-1",
     });
+  });
+
+  it("returns an empty queued-message list when conversation no longer exists", async () => {
+    conversationFindFirstMock.mockResolvedValue(null);
+
+    const result = await generationManager.listConversationQueuedMessages("conv-missing", "user-1");
+
+    expect(result).toEqual([]);
+    expect(conversationQueuedMessageFindManyMock).not.toHaveBeenCalled();
   });
 
   it("forces opencode backend for OpenAI subscription models even when Daytona is preferred", async () => {
@@ -1707,6 +1721,8 @@ describe("generationManager transitions", () => {
     await mgr.runOpenCodeGeneration(ctx);
 
     expect(promptMock).toHaveBeenCalledTimes(1);
+    const promptArg = promptMock.mock.calls[0]?.[0] as { system?: string };
+    expect(promptArg.system).not.toContain("Act autonomously and complete the task end-to-end.");
     expect(vi.mocked(collectNewSandboxFiles)).toHaveBeenCalledWith(
       expect.anything(),
       expect.any(Number),
@@ -1715,6 +1731,77 @@ describe("generationManager transitions", () => {
     expect(vi.mocked(uploadSandboxFile)).toHaveBeenCalled();
     expect(finishSpy).toHaveBeenCalledWith(ctx, "completed");
     expect(ctx.uploadedSandboxFileIds?.has("sandbox-file-1")).toBe(true);
+  });
+
+  it("adds workflow autonomy behavior prompt only for workflow runs", async () => {
+    Object.defineProperty(env, "ANTHROPIC_API_KEY", { value: "test-key", configurable: true });
+
+    vi.mocked(getCliEnvForUser).mockResolvedValue({});
+    vi.mocked(getEnabledIntegrationTypes).mockResolvedValue([]);
+    vi.mocked(getCliInstructionsWithCustom).mockResolvedValue("");
+    vi.mocked(writeSkillsToSandbox).mockResolvedValue([]);
+    vi.mocked(getSkillsSystemPrompt).mockReturnValue("");
+    vi.mocked(writeResolvedIntegrationSkillsToSandbox).mockResolvedValue([]);
+    vi.mocked(getIntegrationSkillsSystemPrompt).mockReturnValue("");
+    vi.mocked(syncMemoryToSandbox).mockResolvedValue([]);
+    vi.mocked(buildMemorySystemPrompt).mockReturnValue("");
+    vi.mocked(collectNewSandboxFiles).mockResolvedValue([]);
+
+    conversationFindFirstMock.mockResolvedValue({
+      id: "conv-workflow",
+      title: "Workflow Conversation",
+      opencodeSessionId: "session-existing",
+    });
+
+    const promptMock = vi.fn().mockResolvedValue(undefined);
+    const subscribeMock = vi.fn().mockResolvedValue({
+      stream: asAsyncIterable([
+        { type: "server.connected", properties: {} },
+        { type: "session.idle", properties: {} },
+      ]),
+    });
+    vi.mocked(getOrCreateSession).mockResolvedValue({
+      client: {
+        event: { subscribe: subscribeMock },
+        session: { prompt: promptMock },
+      },
+      sessionId: "session-1",
+      sandbox: {
+        sandboxId: "sandbox-1",
+        files: {
+          write: vi.fn().mockResolvedValue(undefined),
+          read: vi.fn().mockRejectedValue(new Error("no cache")),
+        },
+        commands: {
+          run: vi.fn().mockResolvedValue({}),
+        },
+      },
+    } as unknown as Awaited<ReturnType<typeof getOrCreateSession>>);
+
+    const mgr = asTestManager();
+    const finishSpy = vi.spyOn(mgr, "finishGeneration").mockResolvedValue(undefined);
+    vi.spyOn(mgr, "importIntegrationSkillDraftsFromSandbox").mockResolvedValue(undefined);
+    vi.spyOn(mgr, "processOpencodeEvent").mockResolvedValue(undefined);
+    vi.spyOn(mgr, "handleOpenCodeActionableEvent").mockResolvedValue({
+      type: "none",
+    });
+
+    const ctx = createCtx({
+      id: "gen-workflow-opencode",
+      conversationId: "conv-workflow",
+      backendType: "opencode",
+      model: "anthropic/claude-sonnet-4-6",
+      workflowRunId: "wf-run-1",
+      userMessageContent: "Execute scheduled workflow task",
+    });
+
+    await mgr.runOpenCodeGeneration(ctx);
+
+    expect(promptMock).toHaveBeenCalledTimes(1);
+    const promptArg = promptMock.mock.calls[0]?.[0] as { system?: string };
+    expect(promptArg.system).toContain("Act autonomously and complete the task end-to-end.");
+    expect(promptArg.system).toContain("Do not ask clarifying questions.");
+    expect(finishSpy).toHaveBeenCalledWith(ctx, "completed");
   });
 
   it("streams OpenCode reasoning parts as thinking events", async () => {
