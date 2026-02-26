@@ -43,6 +43,8 @@ import {
   getCliInstructionsWithCustom,
   getEnabledIntegrationTypes,
 } from "@/server/integrations/cli-env";
+import { getChatSystemBehaviorPrompt } from "@/server/prompts/chat-system-behavior-prompt";
+import { getWorkflowSystemBehaviorPrompt } from "@/server/prompts/workflow-system-behavior-prompt";
 import {
   buildQueueJobId,
   CHAT_GENERATION_JOB_NAME,
@@ -361,12 +363,13 @@ const AGENT_PREPARING_TIMEOUT_MS = (() => {
   return Math.floor(seconds * 1000);
 })();
 const OPENCODE_PROMPT_TIMEOUT_MS = (() => {
-  const seconds = Number(process.env.OPENCODE_PROMPT_TIMEOUT_SECONDS ?? "180");
+  const seconds = Number(process.env.OPENCODE_PROMPT_TIMEOUT_SECONDS ?? "1500");
   if (!Number.isFinite(seconds) || seconds <= 0) {
-    return 3 * 60 * 1000;
+    return 30 * 1000;
   }
   return Math.floor(seconds * 1000);
 })();
+const OPENCODE_PROMPT_TIMEOUT_LABEL = `${Math.ceil(OPENCODE_PROMPT_TIMEOUT_MS / 1000)}s`;
 // Save debounce interval for text chunks
 const SAVE_DEBOUNCE_MS = 2000;
 const SESSION_RESET_COMMANDS = new Set(["/new"]);
@@ -712,7 +715,7 @@ class GenerationManager {
     });
 
     if (!conv) {
-      throw new Error("Conversation not found");
+      return [];
     }
 
     const rows = await db.query.conversationQueuedMessage.findMany({
@@ -3427,6 +3430,7 @@ class GenerationManager {
 
       // Build system prompt
       const baseSystemPrompt = "You are CmdClaw, an AI agent that helps do work.";
+      const modeBehaviorPrompt = this.buildModeBehaviorPrompt(ctx);
       const fileShareInstructions = [
         "## File Sharing",
         "When you create files that the user needs (PDFs, images, documents, code files, etc.), ",
@@ -3440,6 +3444,7 @@ class GenerationManager {
       );
       const systemPromptParts = [
         baseSystemPrompt,
+        modeBehaviorPrompt,
         fileShareInstructions,
         cliInstructions,
         skillsInstructions,
@@ -3559,6 +3564,7 @@ class GenerationManager {
         },
       );
       this.markPhase(ctx, "prompt_sent");
+      const promptSentAtMs = Date.now();
       const promptTimeoutId = setTimeout(() => {
         promptTimeoutTriggered = true;
         promptTimeoutController.abort();
@@ -3695,6 +3701,13 @@ class GenerationManager {
       // Wait for prompt to complete
       await promptPromise;
       clearPromptTimeout?.();
+      const promptElapsedMs = Date.now() - promptSentAtMs;
+      if (promptTimeoutTriggered || promptElapsedMs >= OPENCODE_PROMPT_TIMEOUT_MS) {
+        promptTimeoutTriggered = true;
+        throw new Error(
+          `We stopped this run because it exceeded the time limit (${OPENCODE_PROMPT_TIMEOUT_LABEL}).`,
+        );
+      }
       this.markPhase(ctx, "prompt_completed");
       await this.refreshCancellationSignal(ctx, { force: true });
       this.markPhase(ctx, "post_processing_started");
@@ -3776,8 +3789,12 @@ class GenerationManager {
       await this.finishGeneration(ctx, "completed");
     } catch (error) {
       clearPromptTimeout?.();
-      if (promptTimeoutTriggered && error instanceof Error && error.name === "AbortError") {
-        ctx.errorMessage = "OpenCode prompt timed out";
+      let promptTimeoutError: Error | null = null;
+      if (promptTimeoutTriggered) {
+        ctx.errorMessage = `We stopped this run because it exceeded the time limit (${OPENCODE_PROMPT_TIMEOUT_LABEL}).`;
+        promptTimeoutError = new Error(
+          `OpenCode prompt timed out after ${OPENCODE_PROMPT_TIMEOUT_MS}ms (${OPENCODE_PROMPT_TIMEOUT_LABEL}) for generation ${ctx.id}`,
+        );
       }
       console.error("[GenerationManager] Error:", error);
       if (!ctx.errorMessage) {
@@ -3787,6 +3804,9 @@ class GenerationManager {
         `[GenerationManager][SUMMARY] status=error generationId=${ctx.id} conversationId=${ctx.conversationId} durationMs=${Date.now() - ctx.startedAt.getTime()} error=${JSON.stringify(ctx.errorMessage)}`,
       );
       await this.finishGeneration(ctx, "error");
+      if (promptTimeoutError) {
+        throw promptTimeoutError;
+      }
     }
   }
 
@@ -5054,8 +5074,9 @@ class GenerationManager {
       // terminal event (done/cancelled/error). The status is set after broadcast below.
 
       let messageId: string | undefined;
+      const shouldPersistErrorAssistantMessage = status === "error";
 
-      if (status === "completed" || status === "cancelled") {
+      if (status === "completed" || status === "cancelled" || shouldPersistErrorAssistantMessage) {
         // Update session ID
         if (status === "completed" && ctx.sessionId) {
           await db
@@ -5141,7 +5162,7 @@ class GenerationManager {
         this.markPhase(ctx, "generation_completed");
         const messageTiming: MessageTiming = this.buildMessageTiming(ctx);
 
-        // Save assistant message for completed and cancelled generations
+        // Save assistant message for completed/cancelled and recoverable error generations.
         const [assistantMessage] = await db
           .insert(message)
           .values({
@@ -5150,7 +5171,9 @@ class GenerationManager {
             content:
               status === "cancelled"
                 ? ctx.assistantContent || interruptionText
-                : ctx.assistantContent || "I apologize, but I couldn't generate a response.",
+                : ctx.assistantContent ||
+                  ctx.errorMessage ||
+                  "I apologize, but I couldn't generate a response.",
             contentParts: cancelledParts.length > 0 ? cancelledParts : null,
             inputTokens: ctx.usage.inputTokens,
             outputTokens: ctx.usage.outputTokens,
@@ -5319,6 +5342,14 @@ class GenerationManager {
       return null;
     }
     return sections.join("\n\n");
+  }
+
+  private buildModeBehaviorPrompt(ctx: GenerationContext): string | null {
+    if (ctx.workflowRunId) {
+      return getWorkflowSystemBehaviorPrompt();
+    }
+
+    return getChatSystemBehaviorPrompt();
   }
 
   private async recordWorkflowRunEvent(
