@@ -312,6 +312,7 @@ const handleCallback = protectedProcedure
         .set({
           providerAccountId: userInfo.id,
           displayName: userInfo.displayName,
+          scopes: config.scopes,
           metadata: userInfo.metadata,
           enabled: stateData.type !== "dynamics",
           authStatus: "connected",

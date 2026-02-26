@@ -128,7 +128,13 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
-    scopes: ["https://www.googleapis.com/auth/documents", "openid", "email", "profile"],
+    scopes: [
+      "https://www.googleapis.com/auth/documents",
+      "https://www.googleapis.com/auth/drive.readonly",
+      "openid",
+      "email",
+      "profile",
+    ],
     getUserInfo: async (accessToken) => {
       const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -144,7 +150,13 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets", "openid", "email", "profile"],
+    scopes: [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/drive.readonly",
+      "openid",
+      "email",
+      "profile",
+    ],
     getUserInfo: async (accessToken) => {
       const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${accessToken}` },

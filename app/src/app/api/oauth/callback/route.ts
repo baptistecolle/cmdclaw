@@ -182,6 +182,7 @@ export async function GET(request: NextRequest) {
         .set({
           providerAccountId: userInfo.id,
           displayName: userInfo.displayName,
+          scopes: config.scopes,
           metadata: userInfo.metadata,
           enabled: stateData.type !== "dynamics",
         })
