@@ -433,7 +433,8 @@ async function requestApproval(params: {
         },
         body: JSON.stringify({
           generationId,
-          sandboxId: sandboxId || "unknown",
+          // Keep sandboxId optional; a placeholder value can break generation lookup.
+          sandboxId: sandboxId || undefined,
           conversationId,
           integration: params.integration,
           operation: params.operation,
