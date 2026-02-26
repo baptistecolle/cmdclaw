@@ -14,26 +14,26 @@ let s3Client: S3Client | null = null;
 
 export function getS3Client(): S3Client {
   if (!s3Client) {
-    if (!env.S3_ENDPOINT || !env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
+    if (!env.AWS_ENDPOINT_URL || !env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
       throw new Error(
-        "S3 configuration is incomplete. Check S3_ENDPOINT, S3_ACCESS_KEY_ID, and S3_SECRET_ACCESS_KEY.",
+        "S3 configuration is incomplete. Check AWS_ENDPOINT_URL, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY.",
       );
     }
 
     s3Client = new S3Client({
-      endpoint: env.S3_ENDPOINT,
-      region: env.S3_REGION,
+      endpoint: env.AWS_ENDPOINT_URL,
+      region: env.AWS_DEFAULT_REGION,
       credentials: {
-        accessKeyId: env.S3_ACCESS_KEY_ID,
-        secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+        accessKeyId: env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
       },
-      forcePathStyle: env.S3_FORCE_PATH_STYLE,
+      forcePathStyle: env.AWS_S3_FORCE_PATH_STYLE,
     });
   }
   return s3Client;
 }
 
-export const BUCKET_NAME = env.S3_BUCKET_NAME;
+export const BUCKET_NAME = env.AWS_S3_BUCKET_NAME;
 
 // Ensure bucket exists (call on startup or first upload)
 export async function ensureBucket(): Promise<void> {

@@ -72,13 +72,13 @@ export const env = createEnv({
     E2B_CALLBACK_BASE_URL: z.url().optional(),
     // BYOC WebSocket server port
     WS_PORT: z.string().default("4097"),
-    // S3/MinIO Configuration
-    S3_ENDPOINT: z.url(),
-    S3_REGION: z.string().default("us-east-1"),
-    S3_ACCESS_KEY_ID: z.string(),
-    S3_SECRET_ACCESS_KEY: z.string(),
-    S3_BUCKET_NAME: z.string().default("cmdclaw-documents"),
-    S3_FORCE_PATH_STYLE: z
+    // S3/MinIO Configuration (AWS SDK generic naming)
+    AWS_ENDPOINT_URL: z.url(),
+    AWS_DEFAULT_REGION: z.string().default("us-east-1"),
+    AWS_ACCESS_KEY_ID: z.string(),
+    AWS_SECRET_ACCESS_KEY: z.string(),
+    AWS_S3_BUCKET_NAME: z.string().default("cmdclaw-documents"),
+    AWS_S3_FORCE_PATH_STYLE: z
       .string()
       .transform((v) => v === "true")
       .default("true"),
@@ -165,12 +165,12 @@ export const env = createEnv({
     CMDCLAW_SERVER_SECRET: process.env.CMDCLAW_SERVER_SECRET ?? process.env.BAP_SERVER_SECRET,
     E2B_CALLBACK_BASE_URL: process.env.E2B_CALLBACK_BASE_URL,
     WS_PORT: process.env.WS_PORT,
-    S3_ENDPOINT: process.env.S3_ENDPOINT,
-    S3_REGION: process.env.S3_REGION,
-    S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
-    S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
-    S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
-    S3_FORCE_PATH_STYLE: process.env.S3_FORCE_PATH_STYLE,
+    AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL,
+    AWS_DEFAULT_REGION: process.env.AWS_DEFAULT_REGION,
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+    AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME,
+    AWS_S3_FORCE_PATH_STYLE: process.env.AWS_S3_FORCE_PATH_STYLE,
     AUTUMN_SECRET_KEY: process.env.AUTUMN_SECRET_KEY,
     SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,
     SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET,
