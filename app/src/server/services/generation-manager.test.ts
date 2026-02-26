@@ -130,6 +130,7 @@ vi.mock("@/server/queues", () => ({
       .join("-"),
   CHAT_GENERATION_JOB_NAME: "generation:chat-run",
   WORKFLOW_GENERATION_JOB_NAME: "generation:workflow-run",
+  CONVERSATION_QUEUED_MESSAGE_PROCESS_JOB_NAME: "conversation:queued-message-process",
   GENERATION_APPROVAL_TIMEOUT_JOB_NAME: "generation:approval-timeout",
   GENERATION_AUTH_TIMEOUT_JOB_NAME: "generation:auth-timeout",
   GENERATION_PREPARING_STUCK_CHECK_JOB_NAME: "generation:preparing-stuck-check",

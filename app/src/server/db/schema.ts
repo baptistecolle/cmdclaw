@@ -300,6 +300,12 @@ export type GenerationExecutionPolicy = {
   }>;
 };
 
+export type QueuedMessageAttachment = {
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+};
+
 export const generation = pgTable(
   "generation",
   {
@@ -336,6 +342,47 @@ export const generation = pgTable(
   (table) => [
     index("generation_conversation_id_idx").on(table.conversationId),
     index("generation_status_idx").on(table.status),
+  ],
+);
+
+export const conversationQueuedMessageStatusEnum = pgEnum("conversation_queued_message_status", [
+  "queued",
+  "processing",
+  "sent",
+  "failed",
+]);
+
+export const conversationQueuedMessage = pgTable(
+  "conversation_queued_message",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    fileAttachments: jsonb("file_attachments").$type<QueuedMessageAttachment[]>(),
+    selectedPlatformSkillSlugs: jsonb("selected_platform_skill_slugs").$type<string[]>(),
+    status: conversationQueuedMessageStatusEnum("status").default("queued").notNull(),
+    generationId: text("generation_id").references(() => generation.id, { onDelete: "set null" }),
+    errorMessage: text("error_message"),
+    processingStartedAt: timestamp("processing_started_at"),
+    sentAt: timestamp("sent_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("conversation_queued_message_conversation_id_idx").on(table.conversationId),
+    index("conversation_queued_message_user_id_idx").on(table.userId),
+    index("conversation_queued_message_status_idx").on(table.status),
+    index("conversation_queued_message_created_at_idx").on(table.createdAt),
   ],
 );
 
@@ -555,6 +602,7 @@ export const conversationRelations = relations(conversation, ({ one, many }) => 
   user: one(user, { fields: [conversation.userId], references: [user.id] }),
   messages: many(message),
   generations: many(generation),
+  queuedMessages: many(conversationQueuedMessage),
 }));
 
 export const messageAttachment = pgTable(
@@ -643,6 +691,24 @@ export const generationRelations = relations(generation, ({ one }) => ({
     references: [message.id],
   }),
 }));
+
+export const conversationQueuedMessageRelations = relations(
+  conversationQueuedMessage,
+  ({ one }) => ({
+    conversation: one(conversation, {
+      fields: [conversationQueuedMessage.conversationId],
+      references: [conversation.id],
+    }),
+    generation: one(generation, {
+      fields: [conversationQueuedMessage.generationId],
+      references: [generation.id],
+    }),
+    user: one(user, {
+      fields: [conversationQueuedMessage.userId],
+      references: [user.id],
+    }),
+  }),
+);
 
 export const workflowRelations = relations(workflow, ({ one, many }) => ({
   owner: one(user, { fields: [workflow.ownerId], references: [user.id] }),

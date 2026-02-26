@@ -244,6 +244,98 @@ const startGeneration = protectedProcedure
     }
   });
 
+const enqueueConversationMessage = protectedProcedure
+  .input(
+    z.object({
+      conversationId: z.string(),
+      content: z.string().min(1).max(100000),
+      selectedPlatformSkillSlugs: z.array(z.string().max(128)).max(50).optional(),
+      fileAttachments: z
+        .array(
+          z.object({
+            name: z.string(),
+            mimeType: z.string(),
+            dataUrl: z.string(),
+          }),
+        )
+        .optional(),
+      replaceExisting: z.boolean().optional(),
+    }),
+  )
+  .output(
+    z.object({
+      queuedMessageId: z.string(),
+    }),
+  )
+  .handler(async ({ input, context }) => {
+    return generationManager.enqueueConversationMessage({
+      conversationId: input.conversationId,
+      userId: context.user.id,
+      content: input.content,
+      fileAttachments: input.fileAttachments,
+      selectedPlatformSkillSlugs: input.selectedPlatformSkillSlugs,
+      replaceExisting: input.replaceExisting,
+    });
+  });
+
+const listConversationQueuedMessages = protectedProcedure
+  .input(
+    z.object({
+      conversationId: z.string(),
+    }),
+  )
+  .output(
+    z.array(
+      z.object({
+        id: z.string(),
+        content: z.string(),
+        fileAttachments: z
+          .array(
+            z.object({
+              name: z.string(),
+              mimeType: z.string(),
+              dataUrl: z.string(),
+            }),
+          )
+          .optional(),
+        selectedPlatformSkillSlugs: z.array(z.string()).optional(),
+        status: z.enum(["queued", "processing"]),
+        createdAt: z.string(),
+      }),
+    ),
+  )
+  .handler(async ({ input, context }) => {
+    const queued = await generationManager.listConversationQueuedMessages(
+      input.conversationId,
+      context.user.id,
+    );
+    return queued.map((item) => ({
+      id: item.id,
+      content: item.content,
+      fileAttachments: item.fileAttachments,
+      selectedPlatformSkillSlugs: item.selectedPlatformSkillSlugs,
+      status: item.status,
+      createdAt: item.createdAt.toISOString(),
+    }));
+  });
+
+const removeConversationQueuedMessage = protectedProcedure
+  .input(
+    z.object({
+      queuedMessageId: z.string(),
+      conversationId: z.string(),
+    }),
+  )
+  .output(z.object({ success: z.boolean() }))
+  .handler(async ({ input, context }) => {
+    const success = await generationManager.removeConversationQueuedMessage(
+      input.queuedMessageId,
+      input.conversationId,
+      context.user.id,
+    );
+    return { success };
+  });
+
 const listPlatformSkills = protectedProcedure
   .output(
     z.array(
@@ -504,6 +596,9 @@ const getActiveGeneration = protectedProcedure
 
 export const generationRouter = {
   startGeneration,
+  enqueueConversationMessage,
+  listConversationQueuedMessages,
+  removeConversationQueuedMessage,
   subscribeGeneration,
   cancelGeneration,
   resumeGeneration,

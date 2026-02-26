@@ -23,6 +23,7 @@ export const GENERATION_APPROVAL_TIMEOUT_JOB_NAME = "generation:approval-timeout
 export const GENERATION_AUTH_TIMEOUT_JOB_NAME = "generation:auth-timeout";
 export const GENERATION_PREPARING_STUCK_CHECK_JOB_NAME = "generation:preparing-stuck-check";
 export const GENERATION_STALE_REAPER_JOB_NAME = "generation:stale-reaper";
+export const CONVERSATION_QUEUED_MESSAGE_PROCESS_JOB_NAME = "conversation:queued-message-process";
 export const SLACK_EVENT_JOB_NAME = "slack:event-callback";
 
 export function buildQueueJobId(parts: Array<string | number | null | undefined>): string {
@@ -186,6 +187,15 @@ const handlers: Record<string, JobHandler> = {
         `[worker] stale generation reaper finalized ${summary.stale} generation(s) (${summary.finalizedRunningAsError} as error, ${summary.finalizedOtherAsCancelled} as cancelled)`,
       );
     }
+  },
+  [CONVERSATION_QUEUED_MESSAGE_PROCESS_JOB_NAME]: async (job) => {
+    const conversationId = job.data?.conversationId;
+    if (!conversationId || typeof conversationId !== "string") {
+      throw new Error(`Missing conversationId in queued message process job "${job.id}"`);
+    }
+
+    const { generationManager } = await import("@/server/services/generation-manager");
+    await generationManager.processConversationQueuedMessages(conversationId);
   },
   [SLACK_EVENT_JOB_NAME]: async (job) => {
     const payload = job.data?.payload;

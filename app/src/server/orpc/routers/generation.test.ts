@@ -29,6 +29,9 @@ const { generationFindFirstMock, conversationFindFirstMock, dbMock, generationMa
 
     const generationManagerMock = {
       startGeneration: vi.fn(),
+      enqueueConversationMessage: vi.fn(),
+      listConversationQueuedMessages: vi.fn(),
+      removeConversationQueuedMessage: vi.fn(),
       subscribeToGeneration: vi.fn(),
       cancelGeneration: vi.fn(),
       submitApproval: vi.fn(),
@@ -75,6 +78,20 @@ describe("generationRouter", () => {
     generationManagerMock.cancelGeneration.mockResolvedValue(true);
     generationManagerMock.submitApproval.mockResolvedValue(true);
     generationManagerMock.submitAuthResult.mockResolvedValue(true);
+    generationManagerMock.enqueueConversationMessage.mockResolvedValue({
+      queuedMessageId: "queue-1",
+    });
+    generationManagerMock.listConversationQueuedMessages.mockResolvedValue([
+      {
+        id: "queue-1",
+        content: "next message",
+        fileAttachments: [],
+        selectedPlatformSkillSlugs: ["slack"],
+        status: "queued",
+        createdAt: new Date("2026-02-25T07:40:22.751Z"),
+      },
+    ]);
+    generationManagerMock.removeConversationQueuedMessage.mockResolvedValue(true);
     generationManagerMock.getGenerationStatus.mockResolvedValue({
       status: "running",
       contentParts: [],
@@ -197,6 +214,76 @@ describe("generationRouter", () => {
       "gen-1",
       "slack",
       true,
+      "user-1",
+    );
+  });
+
+  it("queues a follow-up conversation message", async () => {
+    const result = await generationRouterAny.enqueueConversationMessage({
+      input: {
+        conversationId: "conv-1",
+        content: "follow up",
+        selectedPlatformSkillSlugs: ["slack"],
+        fileAttachments: [
+          {
+            name: "brief.txt",
+            mimeType: "text/plain",
+            dataUrl: "data:text/plain;base64,Zm9v",
+          },
+        ],
+      },
+      context,
+    });
+
+    expect(result).toEqual({ queuedMessageId: "queue-1" });
+    expect(generationManagerMock.enqueueConversationMessage).toHaveBeenCalledWith({
+      conversationId: "conv-1",
+      userId: "user-1",
+      content: "follow up",
+      selectedPlatformSkillSlugs: ["slack"],
+      fileAttachments: [
+        {
+          name: "brief.txt",
+          mimeType: "text/plain",
+          dataUrl: "data:text/plain;base64,Zm9v",
+        },
+      ],
+      replaceExisting: undefined,
+    });
+  });
+
+  it("lists queued messages with ISO timestamps", async () => {
+    const result = await generationRouterAny.listConversationQueuedMessages({
+      input: { conversationId: "conv-1" },
+      context,
+    });
+
+    expect(result).toEqual([
+      {
+        id: "queue-1",
+        content: "next message",
+        fileAttachments: [],
+        selectedPlatformSkillSlugs: ["slack"],
+        status: "queued",
+        createdAt: "2026-02-25T07:40:22.751Z",
+      },
+    ]);
+    expect(generationManagerMock.listConversationQueuedMessages).toHaveBeenCalledWith(
+      "conv-1",
+      "user-1",
+    );
+  });
+
+  it("removes queued messages through generation manager", async () => {
+    const result = await generationRouterAny.removeConversationQueuedMessage({
+      input: { queuedMessageId: "queue-1", conversationId: "conv-1" },
+      context,
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(generationManagerMock.removeConversationQueuedMessage).toHaveBeenCalledWith(
+      "queue-1",
+      "conv-1",
       "user-1",
     );
   });

@@ -58,6 +58,9 @@ import {
   useActiveGeneration,
   useCancelGeneration,
   useDetectUserMessageLanguage,
+  useConversationQueuedMessages,
+  useEnqueueConversationMessage,
+  useRemoveConversationQueuedMessage,
   usePlatformSkillList,
   useSkillList,
   useUpdateAutoApprove,
@@ -89,8 +92,9 @@ type Props = {
 type QueuedMessage = {
   id: string;
   content: string;
+  status: "queued" | "processing";
   attachments?: AttachmentData[];
-  selectedSkillKeys?: string[];
+  selectedPlatformSkillSlugs?: string[];
 };
 
 type InputPrefillRequest = {
@@ -335,6 +339,8 @@ export function ChatArea({ conversationId }: Props) {
   const { mutateAsync: getAuthUrl } = useGetAuthUrl();
   const { mutateAsync: cancelGeneration } = useCancelGeneration();
   const { mutateAsync: detectUserMessageLanguage } = useDetectUserMessageLanguage();
+  const { mutateAsync: enqueueConversationMessage } = useEnqueueConversationMessage();
+  const { mutateAsync: removeConversationQueuedMessage } = useRemoveConversationQueuedMessage();
   const { data: activeGeneration } = useActiveGeneration(conversationId);
   const { data: providerAuthStatus } = useProviderAuthStatus();
   const { data: opencodeFreeModelsData } = useOpencodeFreeModels();
@@ -352,7 +358,6 @@ export function ChatArea({ conversationId }: Props) {
   const selectedModel = useChatModelStore((state) => state.selectedModel);
   const setSelectedModel = useChatModelStore((state) => state.setSelectedModel);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
-  const [queuedMessage, setQueuedMessage] = useState<QueuedMessage | null>(null);
   const [queueingEnabled, setQueueingEnabled] = useState(true);
   const [skillsMenuOpen, setSkillsMenuOpen] = useState(false);
   const [skillSearchQuery, setSkillSearchQuery] = useState("");
@@ -385,10 +390,22 @@ export function ChatArea({ conversationId }: Props) {
   const currentConversationIdRef = useRef<string | undefined>(conversationId);
   const viewedConversationIdRef = useRef<string | undefined>(conversationId);
   const streamScopeRef = useRef(0);
+  const queueConversationId = draftConversationId ?? conversationId;
+  const { data: queuedMessages } = useConversationQueuedMessages(queueConversationId);
+  const queuedMessage = useMemo<QueuedMessage | null>(() => {
+    const first = queuedMessages?.[0];
+    if (!first) {
+      return null;
+    }
+    return {
+      id: first.id,
+      content: first.content,
+      status: first.status,
+      attachments: first.fileAttachments,
+      selectedPlatformSkillSlugs: first.selectedPlatformSkillSlugs,
+    };
+  }, [queuedMessages]);
   const queuedMessageRef = useRef<QueuedMessage | null>(null);
-  const runGenerationRef = useRef<(content: string, attachments?: AttachmentData[]) => void>(
-    () => {},
-  );
   const autoApproveEnabled = useMemo(() => localAutoApprove, [localAutoApprove]);
   const isOpenAIConnected = Boolean(connectedProviders?.openai);
   const resolvedDefaultModel = useMemo(
@@ -494,15 +511,6 @@ export function ChatArea({ conversationId }: Props) {
   useEffect(() => {
     queuedMessageRef.current = queuedMessage;
   }, [queuedMessage]);
-
-  const maybeSendQueuedWhenReady = useCallback(() => {
-    const queued = queuedMessageRef.current;
-    if (!queued) {
-      return;
-    }
-    setQueuedMessage(null);
-    runGenerationRef.current(queued.content, queued.attachments);
-  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1092,7 +1100,6 @@ export function ChatArea({ conversationId }: Props) {
           if (!conversationId && newConversationId) {
             syncConversationForNewChat(newConversationId);
           }
-          maybeSendQueuedWhenReady();
         },
         onError: (message) => {
           if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
@@ -1147,7 +1154,6 @@ export function ChatArea({ conversationId }: Props) {
     syncFromRuntime,
     syncConversationForNewChat,
     hydrateAssistantMessage,
-    maybeSendQueuedWhenReady,
     isStreamEventForActiveScope,
     upsertMessageById,
   ]);
@@ -1512,7 +1518,6 @@ export function ChatArea({ conversationId }: Props) {
             if (!conversationId && newConversationId) {
               syncConversationForNewChat(newConversationId);
             }
-            maybeSendQueuedWhenReady();
           },
           onError: (message) => {
             if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
@@ -1578,17 +1583,10 @@ export function ChatArea({ conversationId }: Props) {
       syncFromRuntime,
       syncConversationForNewChat,
       hydrateAssistantMessage,
-      maybeSendQueuedWhenReady,
       isStreamEventForActiveScope,
       upsertMessageById,
     ],
   );
-
-  useEffect(() => {
-    runGenerationRef.current = (content: string, attachments?: AttachmentData[]) => {
-      void runGeneration(content, attachments);
-    };
-  }, [runGeneration]);
 
   const buildOutgoingContent = useCallback(
     async (content: string, selectedSkillNames: string[]): Promise<string> => {
@@ -1614,6 +1612,9 @@ export function ChatArea({ conversationId }: Props) {
     (content: string, attachments?: AttachmentData[]) => {
       const send = async () => {
         const selectedSkillKeysSnapshot = [...selectedSkillKeys];
+        const selectedPlatformSkillSlugs = selectedSkillKeysSnapshot.filter(
+          (key) => !key.startsWith(CUSTOM_SKILL_PREFIX),
+        );
         const selectedSkillNamesSnapshot = selectedSkillKeysSnapshot.map((key) =>
           key.startsWith(CUSTOM_SKILL_PREFIX) ? key.slice(CUSTOM_SKILL_PREFIX.length) : key,
         );
@@ -1624,12 +1625,18 @@ export function ChatArea({ conversationId }: Props) {
             setStreamError("Queueing is off. Wait for the current response or stop it first.");
             return;
           }
-          setQueuedMessage((prev) => ({
-            id: prev?.id ?? `queued-${Date.now()}`,
+          const targetConversationId = currentConversationIdRef.current ?? queueConversationId;
+          if (!targetConversationId) {
+            setStreamError("Queue is not ready yet for this new chat. Please retry in a second.");
+            return;
+          }
+          await enqueueConversationMessage({
+            conversationId: targetConversationId,
             content: outgoingContent,
-            attachments,
-            selectedSkillKeys: selectedSkillKeysSnapshot,
-          }));
+            selectedPlatformSkillSlugs,
+            fileAttachments: attachments,
+            replaceExisting: true,
+          });
           clearSelectedSkillSlugs(skillSelectionScopeKey);
           return;
         }
@@ -1643,7 +1650,9 @@ export function ChatArea({ conversationId }: Props) {
     [
       buildOutgoingContent,
       clearSelectedSkillSlugs,
+      enqueueConversationMessage,
       isStreaming,
+      queueConversationId,
       queueingEnabled,
       runGeneration,
       selectedSkillKeys,
@@ -1652,29 +1661,55 @@ export function ChatArea({ conversationId }: Props) {
   );
 
   const handleSendQueuedNow = useCallback(() => {
-    const queued = queuedMessageRef.current;
-    if (!queued) {
-      return;
-    }
-    setQueuedMessage(null);
-    void runGeneration(queued.content, queued.attachments, queued.selectedSkillKeys);
-  }, [runGeneration]);
+    const send = async () => {
+      const queued = queuedMessageRef.current;
+      if (!queued || !queueConversationId) {
+        return;
+      }
+      if (isStreaming) {
+        setStreamError("Queued message will run automatically when this response is finished.");
+        return;
+      }
+      await removeConversationQueuedMessage({
+        queuedMessageId: queued.id,
+        conversationId: queueConversationId,
+      });
+      await runGeneration(queued.content, queued.attachments, queued.selectedPlatformSkillSlugs);
+    };
+    void send();
+  }, [isStreaming, queueConversationId, removeConversationQueuedMessage, runGeneration]);
 
   const handleClearQueued = useCallback(() => {
-    setQueuedMessage(null);
-  }, []);
+    const clear = async () => {
+      const queued = queuedMessageRef.current;
+      if (!queued || !queueConversationId) {
+        return;
+      }
+      await removeConversationQueuedMessage({
+        queuedMessageId: queued.id,
+        conversationId: queueConversationId,
+      });
+    };
+    void clear();
+  }, [queueConversationId, removeConversationQueuedMessage]);
 
   const handleEditQueuedMessage = useCallback(() => {
-    const queued = queuedMessageRef.current;
-    if (!queued) {
-      return;
-    }
-    setQueuedMessage(null);
-    setInputPrefillRequest({
-      id: `prefill-${Date.now()}`,
-      text: queued.content,
-    });
-  }, []);
+    const edit = async () => {
+      const queued = queuedMessageRef.current;
+      if (!queued || !queueConversationId) {
+        return;
+      }
+      await removeConversationQueuedMessage({
+        queuedMessageId: queued.id,
+        conversationId: queueConversationId,
+      });
+      setInputPrefillRequest({
+        id: `prefill-${Date.now()}`,
+        text: queued.content,
+      });
+    };
+    void edit();
+  }, [queueConversationId, removeConversationQueuedMessage]);
 
   const handleToggleQueueingEnabled = useCallback(() => {
     setQueueingEnabled((prev) => !prev);

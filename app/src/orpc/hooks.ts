@@ -1094,6 +1094,71 @@ export function useDetectUserMessageLanguage() {
   });
 }
 
+export function useConversationQueuedMessages(conversationId: string | undefined) {
+  return useQuery({
+    queryKey: ["generation", "queuedMessages", conversationId],
+    queryFn: () =>
+      client.generation.listConversationQueuedMessages({
+        conversationId: conversationId!,
+      }),
+    enabled: !!conversationId,
+    refetchInterval: 2000,
+  });
+}
+
+export function useEnqueueConversationMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      content,
+      selectedPlatformSkillSlugs,
+      fileAttachments,
+      replaceExisting,
+    }: {
+      conversationId: string;
+      content: string;
+      selectedPlatformSkillSlugs?: string[];
+      fileAttachments?: { name: string; mimeType: string; dataUrl: string }[];
+      replaceExisting?: boolean;
+    }) =>
+      client.generation.enqueueConversationMessage({
+        conversationId,
+        content,
+        selectedPlatformSkillSlugs,
+        fileAttachments,
+        replaceExisting,
+      }),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["generation", "queuedMessages", variables.conversationId],
+      });
+    },
+  });
+}
+
+export function useRemoveConversationQueuedMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      queuedMessageId,
+      conversationId,
+    }: {
+      queuedMessageId: string;
+      conversationId: string;
+    }) =>
+      client.generation.removeConversationQueuedMessage({
+        queuedMessageId,
+        conversationId,
+      }),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["generation", "queuedMessages", variables.conversationId],
+      });
+    },
+  });
+}
+
 // Hook for canceling a generation
 export function useCancelGeneration() {
   return useMutation({
