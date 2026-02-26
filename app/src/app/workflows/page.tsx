@@ -269,6 +269,24 @@ export default function WorkflowsPage() {
     event.stopPropagation();
   }, []);
 
+  useEffect(() => {
+    if (!workflowToDelete) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (deleteWorkflow.isPending) {
+        return;
+      }
+      if (event.key !== "Enter" && event.key !== "NumpadEnter") {
+        return;
+      }
+      event.preventDefault();
+      void handleDelete();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deleteWorkflow.isPending, handleDelete, workflowToDelete]);
+
   const workflowList = Array.isArray(workflows) ? workflows : [];
   return (
     <div>
