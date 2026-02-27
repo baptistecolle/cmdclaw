@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { ensureWhatsAppSocket, getWhatsAppStatus } from "@/server/services/whatsapp-bot";
+import { getWhatsAppStatus } from "@/server/services/whatsapp-bot";
 
 export async function POST(request: Request) {
   const sessionData = await auth.api.getSession({ headers: request.headers });
@@ -7,7 +7,8 @@ export async function POST(request: Request) {
     return new Response("Forbidden", { status: 403 });
   }
 
-  await ensureWhatsAppSocket();
+  // Disabled for now: avoid starting Baileys while WhatsApp integration is unused.
+  // await ensureWhatsAppSocket();
   const status = getWhatsAppStatus();
   return Response.json(status);
 }
