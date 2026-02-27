@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getSessionMock, findFirstMock, updateWhereMock, submitAuthResultMock } = vi.hoisted(() => {
+const { getSessionMock, findFirstMock, updateWhereMock, getOAuthConfigMock } = vi.hoisted(() => {
   const getSessionMock = vi.fn();
   const findFirstMock = vi.fn();
   const updateWhereMock = vi.fn();
   const updateSetMock = vi.fn(() => ({ where: updateWhereMock }));
   const updateMock = vi.fn(() => ({ set: updateSetMock }));
-  const submitAuthResultMock = vi.fn();
+  const getOAuthConfigMock = vi.fn();
 
   return {
     getSessionMock,
     findFirstMock,
     updateWhereMock,
-    submitAuthResultMock,
+    getOAuthConfigMock,
     dbMock: {
       query: {
         integration: {
@@ -45,10 +45,8 @@ vi.mock("@/server/db/client", () => ({
   },
 }));
 
-vi.mock("@/server/services/generation-manager", () => ({
-  generationManager: {
-    submitAuthResult: submitAuthResultMock,
-  },
+vi.mock("@/server/oauth/config", () => ({
+  getOAuthConfig: getOAuthConfigMock,
 }));
 
 import { GET, POST } from "./route";
@@ -72,7 +70,15 @@ describe("Dynamics pending selection route", () => {
       },
     });
     updateWhereMock.mockResolvedValue(undefined);
-    submitAuthResultMock.mockResolvedValue(true);
+    getOAuthConfigMock.mockReturnValue({
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      redirectUri: "https://app.example.com/api/oauth/callback",
+      scopes: ["scope:one"],
+      getUserInfo: vi.fn(),
+    });
   });
 
   it("returns unauthorized when there is no session", async () => {
@@ -92,7 +98,7 @@ describe("Dynamics pending selection route", () => {
     expect(payload.instances[0]?.id).toBe("env-1");
   });
 
-  it("completes selection and resumes auth when generation is provided", async () => {
+  it("completes selection by starting instance-scoped reauth", async () => {
     const response = await POST(
       new Request("https://app.example.com/api/oauth/dynamics/pending", {
         method: "POST",
@@ -105,7 +111,14 @@ describe("Dynamics pending selection route", () => {
       }),
     );
 
+    const payload = (await response.json()) as { requiresReauth: boolean; authUrl: string };
     expect(response.status).toBe(200);
-    expect(submitAuthResultMock).toHaveBeenCalledWith("gen-1", "dynamics", true, "user-1");
+    expect(payload.requiresReauth).toBe(true);
+    expect(payload.authUrl).toContain(
+      "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?",
+    );
+    expect(payload.authUrl).toContain(
+      encodeURIComponent("https://acme.crm.dynamics.com/user_impersonation"),
+    );
   });
 });

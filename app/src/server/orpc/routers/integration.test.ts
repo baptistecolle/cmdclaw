@@ -165,9 +165,51 @@ describe("integrationRouter", () => {
         displayName: "GitHub",
         enabled: true,
         setupRequired: false,
+        instanceName: null,
+        instanceUrl: null,
         authStatus: "connected",
         authErrorCode: null,
         scopes: ["repo"],
+        createdAt: now,
+      },
+    ]);
+  });
+
+  it("includes Dynamics environment details in integration list", async () => {
+    const context = createContext();
+    const now = new Date("2026-02-12T00:00:00.000Z");
+    context.db.query.integration.findMany.mockResolvedValue([
+      {
+        id: "integration-dyn-1",
+        type: "dynamics",
+        displayName: "user@contoso.com",
+        enabled: true,
+        authStatus: "connected",
+        authErrorCode: null,
+        scopes: ["offline_access"],
+        createdAt: now,
+        metadata: {
+          pendingInstanceSelection: false,
+          instanceName: "Contoso Prod",
+          instanceUrl: "https://org123.api.crm4.dynamics.com",
+        },
+      },
+    ]);
+
+    const result = await integrationRouterAny.list({ context });
+
+    expect(result).toEqual([
+      {
+        id: "integration-dyn-1",
+        type: "dynamics",
+        displayName: "user@contoso.com",
+        enabled: true,
+        setupRequired: false,
+        instanceName: "Contoso Prod",
+        instanceUrl: "https://org123.api.crm4.dynamics.com",
+        authStatus: "connected",
+        authErrorCode: null,
+        scopes: ["offline_access"],
         createdAt: now,
       },
     ]);

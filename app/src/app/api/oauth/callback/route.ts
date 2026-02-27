@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
     type: IntegrationType;
     redirectUrl: string;
     codeVerifier?: string;
+    dynamicsInstanceUrl?: string;
+    dynamicsInstanceName?: string;
   };
 
   try {
@@ -75,6 +77,22 @@ export async function GET(request: NextRequest) {
 
   try {
     const config = getOAuthConfig(stateData.type);
+    const normalizedDynamicsInstanceUrl =
+      typeof stateData.dynamicsInstanceUrl === "string"
+        ? stateData.dynamicsInstanceUrl.trim().replace(/\/+$/, "")
+        : "";
+    const isDynamicsInstanceScopedAuth =
+      stateData.type === "dynamics" && normalizedDynamicsInstanceUrl.length > 0;
+    const integrationScopes =
+      isDynamicsInstanceScopedAuth && stateData.type === "dynamics"
+        ? [
+            "offline_access",
+            "openid",
+            "profile",
+            "email",
+            `${normalizedDynamicsInstanceUrl}/user_impersonation`,
+          ]
+        : config.scopes;
 
     // Exchange code for tokens
     const tokenBody = new URLSearchParams({
@@ -158,15 +176,27 @@ export async function GET(request: NextRequest) {
 
     // Dynamics: require environment selection before enabling integration
     if (stateData.type === "dynamics") {
-      const instances = await fetchDynamicsInstances(accessToken);
-      if (instances.length === 0) {
-        return NextResponse.redirect(buildRedirectUrl("error=dynamics_no_environments"));
+      if (isDynamicsInstanceScopedAuth) {
+        userInfo.metadata = {
+          ...userInfo.metadata,
+          pendingInstanceSelection: false,
+          pendingInstanceReauth: false,
+          availableInstances: [],
+          instanceUrl: normalizedDynamicsInstanceUrl,
+          instanceName: stateData.dynamicsInstanceName ?? normalizedDynamicsInstanceUrl,
+        };
+      } else {
+        const instances = await fetchDynamicsInstances(accessToken);
+        if (instances.length === 0) {
+          return NextResponse.redirect(buildRedirectUrl("error=dynamics_no_environments"));
+        }
+        userInfo.metadata = {
+          ...userInfo.metadata,
+          pendingInstanceSelection: true,
+          pendingInstanceReauth: false,
+          availableInstances: instances,
+        };
       }
-      userInfo.metadata = {
-        ...userInfo.metadata,
-        pendingInstanceSelection: true,
-        availableInstances: instances,
-      };
     }
 
     // Create or update integration
@@ -182,9 +212,9 @@ export async function GET(request: NextRequest) {
         .set({
           providerAccountId: userInfo.id,
           displayName: userInfo.displayName,
-          scopes: config.scopes,
+          scopes: integrationScopes,
           metadata: userInfo.metadata,
-          enabled: stateData.type !== "dynamics",
+          enabled: stateData.type !== "dynamics" || isDynamicsInstanceScopedAuth,
         })
         .where(eq(integration.id, existingIntegration.id));
       integId = existingIntegration.id;
@@ -196,9 +226,9 @@ export async function GET(request: NextRequest) {
           type: stateData.type,
           providerAccountId: userInfo.id,
           displayName: userInfo.displayName,
-          scopes: config.scopes,
+          scopes: integrationScopes,
           metadata: userInfo.metadata,
-          enabled: stateData.type !== "dynamics",
+          enabled: stateData.type !== "dynamics" || isDynamicsInstanceScopedAuth,
         })
         .returning();
       integId = newInteg.id;
@@ -215,7 +245,7 @@ export async function GET(request: NextRequest) {
       idToken: tokens.id_token,
     });
 
-    if (stateData.type === "dynamics") {
+    if (stateData.type === "dynamics" && !isDynamicsInstanceScopedAuth) {
       const dynamicsRedirect = new URL("/integrations", request.url);
       dynamicsRedirect.searchParams.set("dynamics_select", "true");
       const authResume = resolveAuthResumeContext();

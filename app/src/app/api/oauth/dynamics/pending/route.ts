@@ -3,7 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { integration } from "@/server/db/schema";
-import { generationManager } from "@/server/services/generation-manager";
+import { getOAuthConfig } from "@/server/oauth/config";
 
 type DynamicsInstance = {
   id: string;
@@ -14,6 +14,7 @@ type DynamicsInstance = {
 
 type DynamicsMetadata = {
   pendingInstanceSelection?: boolean;
+  pendingInstanceReauth?: boolean;
   availableInstances?: DynamicsInstance[];
   instanceUrl?: string;
   instanceName?: string;
@@ -35,6 +36,10 @@ async function findPendingIntegration(userId: string) {
   return db.query.integration.findFirst({
     where: and(eq(integration.userId, userId), eq(integration.type, "dynamics")),
   });
+}
+
+function buildInstanceScope(instanceUrl: string): string {
+  return `${instanceUrl.replace(/\/+$/, "")}/user_impersonation`;
 }
 
 export async function GET(request: Request) {
@@ -89,13 +94,47 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid_instance" }, { status: 400 });
   }
 
+  const config = getOAuthConfig("dynamics");
+  const redirectUrl = new URL("/integrations", request.url);
+  if (parsed.data.generationId) {
+    redirectUrl.searchParams.set("generation_id", parsed.data.generationId);
+  }
+  if (parsed.data.integration) {
+    redirectUrl.searchParams.set("auth_complete", parsed.data.integration);
+  }
+
+  const state = Buffer.from(
+    JSON.stringify({
+      userId,
+      type: "dynamics",
+      redirectUrl: redirectUrl.toString(),
+      dynamicsInstanceUrl: selected.instanceUrl,
+      dynamicsInstanceName: selected.friendlyName,
+    }),
+  ).toString("base64url");
+  const authParams = new URLSearchParams({
+    client_id: config.clientId,
+    response_type: "code",
+    redirect_uri: config.redirectUri,
+    response_mode: "query",
+    scope: [
+      "offline_access",
+      "openid",
+      "profile",
+      "email",
+      buildInstanceScope(selected.instanceUrl),
+    ].join(" "),
+    state,
+  });
+
   await db
     .update(integration)
     .set({
-      enabled: true,
+      enabled: false,
       metadata: {
         ...metadata,
         pendingInstanceSelection: false,
+        pendingInstanceReauth: true,
         availableInstances: [],
         instanceUrl: selected.instanceUrl,
         instanceName: selected.friendlyName,
@@ -103,18 +142,8 @@ export async function POST(request: Request) {
     })
     .where(eq(integration.id, dynamicsIntegration.id));
 
-  if (parsed.data.generationId) {
-    try {
-      await generationManager.submitAuthResult(
-        parsed.data.generationId,
-        parsed.data.integration ?? "dynamics",
-        true,
-        userId,
-      );
-    } catch (error) {
-      console.warn("[Dynamics pending] Failed to auto-submit auth result:", error);
-    }
-  }
-
-  return Response.json({ success: true });
+  return Response.json({
+    requiresReauth: true,
+    authUrl: `${config.authUrl}?${authParams.toString()}`,
+  });
 }

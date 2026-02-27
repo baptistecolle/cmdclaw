@@ -10,14 +10,23 @@ import {
   Plus,
   Trash2,
   Puzzle,
+  Info,
 } from "lucide-react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useRef } from "react";
 import { useEffect, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import {
   isUnipileMissingCredentialsError,
@@ -395,6 +404,12 @@ function IntegrationsPageContent() {
     setDynamicsPickerLoading(true);
     try {
       const response = await fetch("/api/oauth/dynamics/pending");
+      if (response.status === 404) {
+        setDynamicsPickerOpen(false);
+        setDynamicsInstances([]);
+        setSelectedDynamicsInstance("");
+        return;
+      }
       if (!response.ok) {
         throw new Error("Failed to load Dynamics environments");
       }
@@ -556,6 +571,16 @@ function IntegrationsPageContent() {
 
       if (!response.ok) {
         throw new Error("Failed to complete Dynamics connection");
+      }
+
+      const payload = (await response.json()) as {
+        success?: boolean;
+        requiresReauth?: boolean;
+        authUrl?: string;
+      };
+      if (payload.requiresReauth && payload.authUrl) {
+        window.location.assign(payload.authUrl);
+        return;
       }
 
       setDynamicsPickerOpen(false);
@@ -893,13 +918,15 @@ function IntegrationsPageContent() {
       )}
 
       {dynamicsPickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-background w-full max-w-lg rounded-lg border p-6 shadow-xl">
-            <h3 className="text-lg font-semibold">Select Dynamics Environment</h3>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Choose the Microsoft Dynamics 365 environment to finish connecting.
-            </p>
-            <div className="mt-4 space-y-2">
+        <AlertDialog open={dynamicsPickerOpen}>
+          <AlertDialogContent className="p-6">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Select Dynamics Environment</AlertDialogTitle>
+              <AlertDialogDescription>
+                Choose the Microsoft Dynamics 365 environment to finish connecting.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2">
               {dynamicsInstances.map((instance) => (
                 <label
                   key={instance.id}
@@ -925,7 +952,7 @@ function IntegrationsPageContent() {
                 </label>
               ))}
             </div>
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="flex justify-end gap-2">
               <Button
                 onClick={handleCompleteDynamicsSelection}
                 disabled={dynamicsPickerLoading || !selectedDynamicsInstance}
@@ -933,8 +960,8 @@ function IntegrationsPageContent() {
                 {dynamicsPickerLoading ? "Saving..." : "Continue"}
               </Button>
             </div>
-          </div>
-        </div>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1038,10 +1065,35 @@ function IntegrationsPageContent() {
                           Finish environment selection to complete connection.
                         </p>
                       ) : integration ? (
-                        <p className="text-muted-foreground truncate text-sm">
-                          Connected as{" "}
-                          <span className="font-medium">{integration.displayName}</span>
-                        </p>
+                        <div className="text-muted-foreground text-sm">
+                          <p className="truncate">
+                            Connected as{" "}
+                            <span className="font-medium">{integration.displayName}</span>
+                          </p>
+                          {type === "dynamics" &&
+                            (integration.instanceName || integration.instanceUrl) && (
+                              <p className="inline-flex max-w-full items-center gap-1 truncate">
+                                <span className="shrink-0">Environment:</span>
+                                <span className="min-w-0 truncate font-medium">
+                                  {integration.instanceName ?? integration.instanceUrl}
+                                </span>
+                                {integration.instanceUrl && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center"
+                                        aria-label="Show Dynamics environment URL"
+                                      >
+                                        <Info className="h-3.5 w-3.5" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{integration.instanceUrl}</TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </p>
+                            )}
+                        </div>
                       ) : isWhatsAppConnected ? (
                         <p className="text-muted-foreground text-sm">
                           Bridge is connected. Open to manage QR/linking.

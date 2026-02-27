@@ -58,21 +58,35 @@ const list = protectedProcedure.handler(async ({ context }) => {
     where: eq(integration.userId, context.user.id),
   });
 
-  return integrations.map((i) => ({
-    id: i.id,
-    type: i.type,
-    displayName: i.displayName,
-    enabled: i.enabled,
-    setupRequired:
-      i.type === "dynamics" &&
-      typeof i.metadata === "object" &&
-      i.metadata !== null &&
-      (i.metadata as Record<string, unknown>).pendingInstanceSelection === true,
-    authStatus: i.authStatus,
-    authErrorCode: i.authErrorCode,
-    scopes: i.scopes,
-    createdAt: i.createdAt,
-  }));
+  return integrations.map((i) => {
+    const metadata =
+      typeof i.metadata === "object" && i.metadata !== null
+        ? (i.metadata as Record<string, unknown>)
+        : null;
+
+    const instanceName =
+      i.type === "dynamics" && typeof metadata?.instanceName === "string"
+        ? metadata.instanceName
+        : null;
+    const instanceUrl =
+      i.type === "dynamics" && typeof metadata?.instanceUrl === "string"
+        ? metadata.instanceUrl
+        : null;
+
+    return {
+      id: i.id,
+      type: i.type,
+      displayName: i.displayName,
+      enabled: i.enabled,
+      setupRequired: i.type === "dynamics" && metadata?.pendingInstanceSelection === true,
+      instanceName,
+      instanceUrl,
+      authStatus: i.authStatus,
+      authErrorCode: i.authErrorCode,
+      scopes: i.scopes,
+      createdAt: i.createdAt,
+    };
+  });
 });
 
 // Get OAuth authorization URL

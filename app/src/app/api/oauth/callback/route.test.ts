@@ -367,4 +367,51 @@ describe("GET /api/oauth/callback", () => {
     );
     expect(submitAuthResultMock).not.toHaveBeenCalled();
   });
+
+  it("completes dynamics instance-scoped callback and enables integration", async () => {
+    mswServer.use(
+      http.post("https://oauth.example.com/token", () =>
+        HttpResponse.json({
+          access_token: "dyn-instance-access",
+          refresh_token: "dyn-instance-refresh",
+          expires_in: 3600,
+        }),
+      ),
+    );
+
+    const state = encodeState({
+      userId: "user-1",
+      type: "dynamics",
+      redirectUrl: "/integrations?auth_complete=dynamics&generation_id=gen-1",
+      dynamicsInstanceUrl: "https://org123.api.crm4.dynamics.com",
+      dynamicsInstanceName: "Contoso Prod",
+    });
+
+    const request = new NextRequest(
+      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`,
+    );
+
+    const response = await GET(request);
+
+    expect(getLocation(response)).toBe(
+      "https://app.example.com/integrations?auth_complete=dynamics&generation_id=gen-1&success=true",
+    );
+    expect(fetchDynamicsInstancesMock).not.toHaveBeenCalled();
+    const integrationInsertCall = (
+      insertValuesMock.mock.calls as unknown as Array<[Record<string, unknown>]>
+    ).find((call) => call[0] && typeof call[0] === "object" && "providerAccountId" in call[0]);
+
+    expect(integrationInsertCall?.[0]).toEqual(
+      expect.objectContaining({
+        enabled: true,
+        scopes: expect.arrayContaining(["https://org123.api.crm4.dynamics.com/user_impersonation"]),
+        metadata: expect.objectContaining({
+          pendingInstanceSelection: false,
+          instanceUrl: "https://org123.api.crm4.dynamics.com",
+          instanceName: "Contoso Prod",
+        }),
+      }),
+    );
+    expect(submitAuthResultMock).toHaveBeenCalledWith("gen-1", "dynamics", true, "user-1");
+  });
 });
