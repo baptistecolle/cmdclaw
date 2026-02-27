@@ -1120,7 +1120,7 @@ export const providerAuth = pgTable(
       .notNull(),
   },
   (table) => [
-    unique("provider_auth_user_provider_idx").on(table.userId, table.provider),
+    unique("provider_auth_user_provider_idx").on(table.provider, table.userId),
     index("provider_auth_user_id_idx").on(table.userId),
   ],
 );
