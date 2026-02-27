@@ -53,6 +53,17 @@ const generationEventSchema = z.discriminatedUnion("type", [
     decision: z.enum(["approved", "denied"]),
   }),
   z.object({
+    type: z.literal("approval"),
+    toolUseId: z.string(),
+    toolName: z.string(),
+    toolInput: z.unknown(),
+    integration: z.string(),
+    operation: z.string(),
+    command: z.string().optional(),
+    status: z.enum(["approved", "denied"]),
+    questionAnswers: z.array(z.array(z.string())).optional(),
+  }),
+  z.object({
     type: z.literal("auth_needed"),
     generationId: z.string(),
     conversationId: z.string(),

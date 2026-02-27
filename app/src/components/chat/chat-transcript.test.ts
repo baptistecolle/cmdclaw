@@ -113,6 +113,16 @@ describe("formatChatTranscript", () => {
             input: { q: "foo" },
           },
           { type: "tool_result", tool_use_id: "tool-1", content: { ok: true } },
+          {
+            type: "approval",
+            tool_use_id: "tool-1",
+            tool_name: "question",
+            tool_input: { questions: [{ header: "Focus", question: "Pick one", options: [] }] },
+            integration: "question",
+            operation: "question",
+            status: "approved",
+            question_answers: [["Coding"]],
+          },
         ],
       },
     ]);
@@ -122,6 +132,8 @@ describe("formatChatTranscript", () => {
     expect(transcript).toContain("Done.");
     expect(transcript).toContain("[tool_call] web.search");
     expect(transcript).toContain('result: {\n  "ok": true\n}');
+    expect(transcript).toContain("[approval:approved] question");
+    expect(transcript).toContain('answers: [\n  [\n    "Coding"\n  ]\n]');
   });
 
   it("includes persisted performance metrics when enabled", () => {

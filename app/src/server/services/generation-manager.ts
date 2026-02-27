@@ -122,6 +122,17 @@ export type GenerationEvent =
       decision: "approved" | "denied";
     }
   | {
+      type: "approval";
+      toolUseId: string;
+      toolName: string;
+      toolInput: unknown;
+      integration: string;
+      operation: string;
+      command?: string;
+      status: "approved" | "denied";
+      questionAnswers?: string[][];
+    }
+  | {
       type: "auth_needed";
       generationId: string;
       conversationId: string;
@@ -2033,6 +2044,19 @@ class GenerationManager {
           type: "thinking",
           content: part.content,
           thinkingId: part.id,
+        };
+      }
+      if (part.type === "approval") {
+        return {
+          type: "approval",
+          toolUseId: part.tool_use_id,
+          toolName: part.tool_name,
+          toolInput: part.tool_input,
+          integration: part.integration,
+          operation: part.operation,
+          command: part.command,
+          status: part.status,
+          questionAnswers: part.question_answers,
         };
       }
       return null;
@@ -4171,11 +4195,46 @@ class GenerationManager {
       }
     }
 
+    const normalizedQuestionAnswers =
+      questionAnswers
+        ?.map((answers) =>
+          answers.map((answer) => answer.trim()).filter((answer) => answer.length > 0),
+        )
+        .filter((answers) => answers.length > 0) ?? [];
+    const resolvedQuestionAnswers =
+      decision === "allow"
+        ? normalizedQuestionAnswers.length > 0
+          ? normalizedQuestionAnswers
+          : defaultAnswers
+        : undefined;
+    const approvalStatus = decision === "allow" ? "approved" : "denied";
+    const existingApprovalIndex = ctx.contentParts.findIndex(
+      (part): part is ContentPart & { type: "approval" } =>
+        part.type === "approval" && part.tool_use_id === toolUseId,
+    );
+    const approvalPart: ContentPart = {
+      type: "approval",
+      tool_use_id: toolUseId,
+      tool_name: pendingApproval?.toolName ?? "question",
+      tool_input: pendingApproval?.toolInput ?? {},
+      integration: pendingApproval?.integration ?? "opencode",
+      operation: pendingApproval?.operation ?? "question",
+      command: pendingApproval?.command,
+      status: approvalStatus,
+      question_answers: resolvedQuestionAnswers,
+    };
+    if (existingApprovalIndex >= 0) {
+      ctx.contentParts[existingApprovalIndex] = approvalPart;
+    } else {
+      ctx.contentParts.push(approvalPart);
+    }
+
     await db
       .update(generation)
       .set({
         status: "running",
         pendingApproval: null,
+        contentParts: ctx.contentParts.length > 0 ? ctx.contentParts : null,
       })
       .where(eq(generation.id, ctx.id));
 
@@ -4197,6 +4256,17 @@ class GenerationManager {
       type: "approval_result",
       toolUseId,
       decision: decision === "allow" ? "approved" : "denied",
+    });
+    this.broadcast(ctx, {
+      type: "approval",
+      toolUseId,
+      toolName: approvalPart.tool_name,
+      toolInput: approvalPart.tool_input,
+      integration: approvalPart.integration,
+      operation: approvalPart.operation,
+      command: approvalPart.command,
+      status: approvalPart.status,
+      questionAnswers: approvalPart.question_answers,
     });
   }
 
@@ -5361,6 +5431,7 @@ class GenerationManager {
       "tool_result",
       "pending_approval",
       "approval_result",
+      "approval",
       "auth_needed",
       "auth_progress",
       "auth_result",

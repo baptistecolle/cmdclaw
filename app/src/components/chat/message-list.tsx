@@ -26,6 +26,7 @@ export type MessagePart =
       operation: string;
       command?: string;
       status: "approved" | "denied";
+      questionAnswers?: string[][];
     };
 
 export type AttachmentData = {

@@ -33,6 +33,7 @@ export interface ToolApprovalCardProps {
   integration: string;
   operation: string;
   command?: string;
+  questionAnswers?: string[][];
   onApprove: (questionAnswers?: string[][]) => void;
   onDeny: () => void;
   status: "pending" | "approved" | "denied";
@@ -150,6 +151,7 @@ export function ToolApprovalCard({
   integration,
   operation,
   command,
+  questionAnswers,
   onApprove,
   onDeny,
   status,
@@ -640,6 +642,23 @@ export function ToolApprovalCard({
             })}
           </div>
         )}
+
+        {status !== "pending" &&
+          isQuestionRequest &&
+          questionAnswers &&
+          questionAnswers.length > 0 && (
+            <div className="mb-3 space-y-2">
+              <p className="text-sm font-medium">Saved answers</p>
+              {questionAnswers.map((answers) => (
+                <p
+                  key={`saved-answer-${answers.join("::")}`}
+                  className="text-muted-foreground text-sm"
+                >
+                  {answers.join(", ")}
+                </p>
+              ))}
+            </div>
+          )}
 
         {status === "pending" && !questionPayload && (
           <div className="flex justify-end gap-2">

@@ -12,6 +12,17 @@ type PersistedContentPart =
       operation?: string;
     }
   | { type: "tool_result"; tool_use_id: string; content: unknown }
+  | {
+      type: "approval";
+      tool_use_id: string;
+      tool_name: string;
+      tool_input: unknown;
+      integration: string;
+      operation: string;
+      command?: string;
+      status: "approved" | "denied";
+      question_answers?: string[][];
+    }
   | { type: "thinking"; id: string; content: string }
   | { type: "system"; content: string };
 
@@ -63,6 +74,19 @@ export function mapPersistedMessagesToChatMessages(
           }
           if (part.type === "system") {
             return { type: "system", content: part.content } as MessagePart;
+          }
+          if (part.type === "approval") {
+            return {
+              type: "approval",
+              toolUseId: part.tool_use_id,
+              toolName: part.tool_name,
+              toolInput: part.tool_input,
+              integration: part.integration,
+              operation: part.operation,
+              command: part.command,
+              status: part.status,
+              questionAnswers: part.question_answers,
+            } as MessagePart;
           }
 
           return {

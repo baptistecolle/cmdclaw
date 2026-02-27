@@ -26,6 +26,17 @@ export type GenerationPendingApprovalData = {
   command?: string;
 };
 
+export type GenerationApprovalData = {
+  toolUseId: string;
+  toolName: string;
+  toolInput: unknown;
+  integration: string;
+  operation: string;
+  command?: string;
+  status: "approved" | "denied";
+  questionAnswers?: string[][];
+};
+
 export type AuthNeededData = {
   generationId: string;
   conversationId: string;
@@ -89,6 +100,7 @@ export type GenerationCallbacks = {
   onToolResult?: (toolName: string, result: unknown, toolUseId?: string) => void | Promise<void>;
   onPendingApproval?: (data: GenerationPendingApprovalData) => void | Promise<void>;
   onApprovalResult?: (toolUseId: string, decision: "approved" | "denied") => void | Promise<void>;
+  onApproval?: (data: GenerationApprovalData) => void | Promise<void>;
   onAuthNeeded?: (data: AuthNeededData) => void | Promise<void>;
   onAuthProgress?: (connected: string, remaining: string[]) => void | Promise<void>;
   onAuthResult?: (success: boolean, integrations?: string[]) => void | Promise<void>;
@@ -187,6 +199,18 @@ export async function runGenerationStream(
         break;
       case "approval_result":
         await callbacks.onApprovalResult?.(event.toolUseId, event.decision);
+        break;
+      case "approval":
+        await callbacks.onApproval?.({
+          toolUseId: event.toolUseId,
+          toolName: event.toolName,
+          toolInput: event.toolInput,
+          integration: event.integration,
+          operation: event.operation,
+          command: event.command,
+          status: event.status,
+          questionAnswers: event.questionAnswers,
+        });
         break;
       case "auth_needed":
         conversationId = event.conversationId;

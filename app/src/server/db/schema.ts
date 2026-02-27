@@ -207,6 +207,17 @@ export type ContentPart =
       operation?: string;
     }
   | { type: "tool_result"; tool_use_id: string; content: unknown }
+  | {
+      type: "approval";
+      tool_use_id: string;
+      tool_name: string;
+      tool_input: unknown;
+      integration: string;
+      operation: string;
+      command?: string;
+      status: "approved" | "denied";
+      question_answers?: string[][];
+    }
   | { type: "thinking"; id: string; content: string }
   | { type: "system"; content: string };
 

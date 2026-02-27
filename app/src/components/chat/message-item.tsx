@@ -25,6 +25,7 @@ type DisplaySegment = {
     operation: string;
     command?: string;
     status: "approved" | "denied";
+    questionAnswers?: string[][];
   } | null;
 };
 
@@ -166,6 +167,7 @@ export function MessageItem({
           operation: part.operation,
           command: part.command,
           status: part.status,
+          questionAnswers: part.questionAnswers,
         };
         result.push(currentSegment);
         segmentIndex++;
@@ -469,6 +471,7 @@ export function MessageItem({
                         operation={deferredApproval.operation}
                         command={deferredApproval.command}
                         status={deferredApproval.status}
+                        questionAnswers={deferredApproval.questionAnswers}
                         onApprove={NOOP}
                         onDeny={NOOP}
                         readonly
@@ -511,6 +514,7 @@ export function MessageItem({
                         operation={segment.approval.operation}
                         command={segment.approval.command}
                         status={segment.approval.status}
+                        questionAnswers={segment.approval.questionAnswers}
                         onApprove={NOOP}
                         onDeny={NOOP}
                         readonly

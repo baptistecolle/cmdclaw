@@ -118,6 +118,17 @@ type PersistedContentPart =
       operation?: string;
     }
   | { type: "tool_result"; tool_use_id: string; content: unknown }
+  | {
+      type: "approval";
+      tool_use_id: string;
+      tool_name: string;
+      tool_input: unknown;
+      integration: string;
+      operation: string;
+      command?: string;
+      status: "approved" | "denied";
+      question_answers?: string[][];
+    }
   | { type: "thinking"; id: string; content: string }
   | { type: "system"; content: string };
 
@@ -194,6 +205,19 @@ function mapPersistedMessageToChatMessage(m: PersistedConversationMessage): Mess
         }
         if (p.type === "system") {
           return { type: "system" as const, content: p.content };
+        }
+        if (p.type === "approval") {
+          return {
+            type: "approval" as const,
+            toolUseId: p.tool_use_id,
+            toolName: p.tool_name,
+            toolInput: p.tool_input,
+            integration: p.integration,
+            operation: p.operation,
+            command: p.command,
+            status: p.status,
+            questionAnswers: p.question_answers,
+          };
         }
         return {
           type: "tool_call" as const,
@@ -842,6 +866,7 @@ export function ChatArea({ conversationId }: Props) {
 
     if (!conversationId) {
       setMessages([]);
+      setLocalAutoApprove(false);
     }
   }, [abort, conversationId, resetInitTracking]);
 
@@ -863,6 +888,7 @@ export function ChatArea({ conversationId }: Props) {
       currentConversationIdRef.current = undefined;
       viewedConversationIdRef.current = undefined;
       setDraftConversationId(undefined);
+      setLocalAutoApprove(false);
       resetInitTracking();
     };
     window.addEventListener("new-chat", handleNewChat);
@@ -987,6 +1013,13 @@ export function ChatArea({ conversationId }: Props) {
             return;
           }
           runtime.handleApprovalResult(toolUseId, decision);
+          syncFromRuntime(runtime);
+        },
+        onApproval: (data) => {
+          if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+            return;
+          }
+          runtime.handleApproval(data);
           syncFromRuntime(runtime);
         },
         onAuthNeeded: (data) => {
@@ -1395,6 +1428,13 @@ export function ChatArea({ conversationId }: Props) {
               return;
             }
             runtime.handleApprovalResult(toolUseId, decision);
+            syncFromRuntime(runtime);
+          },
+          onApproval: (data) => {
+            if (!isStreamEventForActiveScope({ scope: streamScope, streamGenerationId })) {
+              return;
+            }
+            runtime.handleApproval(data);
             syncFromRuntime(runtime);
           },
           onAuthNeeded: (data) => {

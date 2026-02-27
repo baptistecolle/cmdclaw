@@ -23,6 +23,7 @@ export type RuntimeMessagePart =
       operation: string;
       command?: string;
       status: "approved" | "denied";
+      questionAnswers?: string[][];
     };
 
 export type RuntimeActivityItem = {
@@ -139,6 +140,17 @@ export type RuntimeServerEvent =
       type: "approval_result";
       toolUseId: string;
       decision: "approved" | "denied";
+    }
+  | {
+      type: "approval";
+      toolUseId: string;
+      toolName: string;
+      toolInput: unknown;
+      integration: string;
+      operation: string;
+      command?: string;
+      status: "approved" | "denied";
+      questionAnswers?: string[][];
     }
   | {
       type: "auth_needed";
@@ -419,6 +431,71 @@ export class GenerationRuntime {
     this.traceStatus = "streaming";
   }
 
+  handleApproval(data: {
+    toolUseId: string;
+    toolName: string;
+    toolInput: unknown;
+    integration: string;
+    operation: string;
+    command?: string;
+    status: "approved" | "denied";
+    questionAnswers?: string[][];
+  }): void {
+    const approvalPart: RuntimeMessagePart & { type: "approval" } = {
+      type: "approval",
+      toolUseId: data.toolUseId,
+      toolName: data.toolName,
+      toolInput: data.toolInput,
+      integration: data.integration,
+      operation: data.operation,
+      command: data.command,
+      status: data.status,
+      questionAnswers: data.questionAnswers,
+    };
+
+    let updatedExistingSegment = false;
+    for (const segment of this.segments) {
+      if (segment.approval?.toolUseId === data.toolUseId) {
+        segment.approval = {
+          toolUseId: data.toolUseId,
+          toolName: data.toolName,
+          toolInput: data.toolInput,
+          integration: data.integration,
+          operation: data.operation,
+          command: data.command,
+          status: data.status,
+        };
+        updatedExistingSegment = true;
+        break;
+      }
+    }
+
+    if (!updatedExistingSegment) {
+      const currentSeg = this.getCurrentSegment();
+      currentSeg.approval = {
+        toolUseId: data.toolUseId,
+        toolName: data.toolName,
+        toolInput: data.toolInput,
+        integration: data.integration,
+        operation: data.operation,
+        command: data.command,
+        status: data.status,
+      };
+      currentSeg.isExpanded = false;
+      this.segments.push({
+        id: `seg-${this.segmentCounter++}`,
+        items: [],
+        isExpanded: true,
+      });
+    }
+
+    this.parts = this.parts.filter(
+      (part): boolean => part.type !== "approval" || part.toolUseId !== data.toolUseId,
+    );
+    this.parts.push(approvalPart);
+    this.traceStatus = "streaming";
+  }
+
   handleAuthNeeded(data: RuntimeAuthNeededData): void {
     this.currentGenerationId = data.generationId;
     this.currentConversationId = data.conversationId;
@@ -577,6 +654,9 @@ export class GenerationRuntime {
       case "approval_result":
         this.handleApprovalResult(event.toolUseId, event.decision);
         return;
+      case "approval":
+        this.handleApproval(event);
+        return;
       case "auth_needed":
         this.handleAuthNeeded(event);
         return;
@@ -623,6 +703,10 @@ export class GenerationRuntime {
         operation: seg.approval.operation,
         command: seg.approval.command,
         status: seg.approval.status,
+        questionAnswers: this.parts.find(
+          (part): part is RuntimeMessagePart & { type: "approval" } =>
+            part.type === "approval" && part.toolUseId === seg.approval?.toolUseId,
+        )?.questionAnswers,
       });
     }
 

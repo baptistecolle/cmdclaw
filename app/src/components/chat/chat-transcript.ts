@@ -40,6 +40,7 @@ function formatPart(part: MessagePart): string {
       `integration: ${part.integration}`,
       `operation: ${part.operation}`,
       `input: ${formatValue(part.toolInput)}`,
+      part.questionAnswers ? `answers: ${formatValue(part.questionAnswers)}` : null,
       part.command ? `command: ${part.command}` : null,
     ]
       .filter(Boolean)
