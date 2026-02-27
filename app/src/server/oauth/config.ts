@@ -34,6 +34,32 @@ export type OAuthConfig = {
   }>;
 };
 
+type JwtClaims = {
+  sub?: unknown;
+  oid?: unknown;
+  name?: unknown;
+  preferred_username?: unknown;
+  upn?: unknown;
+  email?: unknown;
+};
+
+function parseJwtClaims(token: string): JwtClaims | null {
+  const parts = token.split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+
+  try {
+    const payload = parts[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const claims = JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as JwtClaims;
+    return claims;
+  } catch {
+    return null;
+  }
+}
+
 const getAppUrl = () => env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
 
 const configs: Record<IntegrationType, () => OAuthConfig> = {
@@ -384,21 +410,42 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
       "openid",
       "profile",
       "email",
-      "User.Read",
       "https://globaldisco.crm.dynamics.com/user_impersonation",
     ],
     getUserInfo: async (accessToken: string) => {
-      const res = await fetch("https://graph.microsoft.com/v1.0/me", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const data = await res.json();
+      const claims = parseJwtClaims(accessToken);
+      const providerId =
+        typeof claims?.oid === "string"
+          ? claims.oid
+          : typeof claims?.sub === "string"
+            ? claims.sub
+            : "dynamics-user";
+      const displayName =
+        typeof claims?.preferred_username === "string"
+          ? claims.preferred_username
+          : typeof claims?.email === "string"
+            ? claims.email
+            : typeof claims?.upn === "string"
+              ? claims.upn
+              : typeof claims?.name === "string"
+                ? claims.name
+                : "Microsoft Dynamics User";
       return {
-        id: data.id,
-        displayName:
-          data.mail ?? data.userPrincipalName ?? data.displayName ?? "Microsoft Dynamics User",
+        id: providerId,
+        displayName,
         metadata: {
-          userPrincipalName: data.userPrincipalName,
-          email: data.mail ?? data.userPrincipalName,
+          userPrincipalName:
+            typeof claims?.preferred_username === "string"
+              ? claims.preferred_username
+              : typeof claims?.upn === "string"
+                ? claims.upn
+                : undefined,
+          email:
+            typeof claims?.email === "string"
+              ? claims.email
+              : typeof claims?.preferred_username === "string"
+                ? claims.preferred_username
+                : undefined,
         },
       };
     },
