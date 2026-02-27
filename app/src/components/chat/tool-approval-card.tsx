@@ -453,6 +453,40 @@ export function ToolApprovalCard({
       typedMode,
     ],
   );
+  const handleTypedAnswerSubmitClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      if (isLoading || !questionPayload || requiresExplicitSubmit) {
+        return;
+      }
+
+      const { questionIndex } = event.currentTarget.dataset;
+      if (!questionIndex) {
+        return;
+      }
+      const index = Number(questionIndex);
+      if (Number.isNaN(index)) {
+        return;
+      }
+
+      if (!isQuestionAnswered(selectedOptions, typedAnswers, typedMode)) {
+        return;
+      }
+
+      onApprove(buildQuestionAnswers(selectedOptions, typedAnswers, typedMode));
+    },
+    [
+      buildQuestionAnswers,
+      isLoading,
+      isQuestionAnswered,
+      onApprove,
+      questionPayload,
+      requiresExplicitSubmit,
+      selectedOptions,
+      typedAnswers,
+      typedMode,
+    ],
+  );
   const handleStopPropagation = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
     event.stopPropagation();
   }, []);
@@ -574,16 +608,30 @@ export function ToolApprovalCard({
                         <div className="font-medium">Type your own answer</div>
                       </button>
                       {useTypedAnswer && (
-                        <Input
-                          data-question-index={String(index)}
-                          data-testid={`question-typed-input-${index}`}
-                          value={typedAnswers[index] ?? ""}
-                          onChange={handleTypedAnswerChange}
-                          onKeyDown={handleTypedAnswerKeyDown}
-                          placeholder="Type your answer"
-                          onClick={handleStopPropagation}
-                          className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            data-question-index={String(index)}
+                            data-testid={`question-typed-input-${index}`}
+                            value={typedAnswers[index] ?? ""}
+                            onChange={handleTypedAnswerChange}
+                            onKeyDown={handleTypedAnswerKeyDown}
+                            placeholder="Type your answer"
+                            onClick={handleStopPropagation}
+                            className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                          />
+                          {!requiresExplicitSubmit && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              data-question-index={String(index)}
+                              data-testid={`question-typed-submit-${index}`}
+                              onClick={handleTypedAnswerSubmitClick}
+                              disabled={isLoading || !(typedAnswers[index]?.trim()?.length > 0)}
+                            >
+                              Submit
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
