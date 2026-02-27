@@ -20,7 +20,7 @@ import * as schema from "../src/server/db/schema";
 void dotenvConfig;
 
 const TEMPLATE_NAME = process.env.E2B_DAYTONA_SANDBOX_NAME || "cmdclaw-agent-dev";
-const SANDBOX_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const SANDBOX_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const TEST_USER_EMAIL = "collebaptiste@gmail.com";
 
 type IntegrationType = "gmail" | "slack" | "notion" | "linear" | "github" | "airtable";
