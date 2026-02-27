@@ -42,6 +42,10 @@ function buildInstanceScope(instanceUrl: string): string {
   return `${instanceUrl.replace(/\/+$/, "")}/user_impersonation`;
 }
 
+function getRedirectBaseUrl(request: Request): string {
+  return process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+}
+
 export async function GET(request: Request) {
   const userId = await getAuthedUserId(request.headers);
   if (!userId) {
@@ -95,7 +99,7 @@ export async function POST(request: Request) {
   }
 
   const config = getOAuthConfig("dynamics");
-  const redirectUrl = new URL("/integrations", request.url);
+  const redirectUrl = new URL("/integrations", getRedirectBaseUrl(request));
   if (parsed.data.generationId) {
     redirectUrl.searchParams.set("generation_id", parsed.data.generationId);
   }

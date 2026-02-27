@@ -54,6 +54,8 @@ import { GET, POST } from "./route";
 describe("Dynamics pending selection route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.APP_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
     getSessionMock.mockResolvedValue({ user: { id: "user-1" } });
     findFirstMock.mockResolvedValue({
       id: "integration-1",
@@ -120,5 +122,31 @@ describe("Dynamics pending selection route", () => {
     expect(payload.authUrl).toContain(
       encodeURIComponent("https://acme.crm.dynamics.com/user_impersonation"),
     );
+  });
+
+  it("uses APP_URL instead of request host for the post-reauth redirect target", async () => {
+    process.env.APP_URL = "https://app.example.com";
+
+    const response = await POST(
+      new Request("https://0.0.0.0:8080/api/oauth/dynamics/pending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instanceUrl: "https://acme.crm.dynamics.com",
+        }),
+      }),
+    );
+
+    const payload = (await response.json()) as { authUrl: string };
+    expect(response.status).toBe(200);
+
+    const authUrl = new URL(payload.authUrl);
+    const state = authUrl.searchParams.get("state");
+    expect(state).toBeTruthy();
+
+    const decodedState = JSON.parse(Buffer.from(state!, "base64url").toString("utf8")) as {
+      redirectUrl: string;
+    };
+    expect(decodedState.redirectUrl).toBe("https://app.example.com/integrations");
   });
 });
