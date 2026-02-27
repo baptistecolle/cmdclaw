@@ -7,6 +7,17 @@ import { fetchDynamicsInstances } from "@/server/integrations/dynamics";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
 import { generationManager } from "@/server/services/generation-manager";
 
+function getRequestAwareBaseUrl(request: NextRequest): string {
+  const requestOrigin = new URL(request.url).origin;
+  const hostname = request.nextUrl.hostname;
+  const isInternalHost =
+    hostname === "0.0.0.0" || hostname === "127.0.0.1" || hostname === "localhost";
+  if (!isInternalHost) {
+    return requestOrigin;
+  }
+  return process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? requestOrigin;
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
@@ -246,7 +257,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (stateData.type === "dynamics" && !isDynamicsInstanceScopedAuth) {
-      const dynamicsRedirect = new URL("/integrations", request.url);
+      const dynamicsRedirect = new URL("/integrations", getRequestAwareBaseUrl(request));
       dynamicsRedirect.searchParams.set("dynamics_select", "true");
       const authResume = resolveAuthResumeContext();
       if (authResume.generationId) {

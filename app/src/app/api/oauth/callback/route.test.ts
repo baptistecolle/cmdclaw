@@ -368,6 +368,34 @@ describe("GET /api/oauth/callback", () => {
     expect(submitAuthResultMock).not.toHaveBeenCalled();
   });
 
+  it("uses APP_URL for dynamics selection redirect when request host is internal", async () => {
+    process.env.APP_URL = "https://app.example.com";
+
+    mswServer.use(
+      http.post("https://oauth.example.com/token", () =>
+        HttpResponse.json({
+          access_token: "dyn-access",
+          refresh_token: "dyn-refresh",
+          expires_in: 3600,
+        }),
+      ),
+    );
+
+    const state = encodeState({
+      userId: "user-1",
+      type: "dynamics",
+      redirectUrl: "/integrations",
+    });
+
+    const request = new NextRequest(
+      `https://0.0.0.0:8080/api/oauth/callback?code=abc&state=${state}`,
+    );
+
+    const response = await GET(request);
+
+    expect(getLocation(response)).toBe("https://app.example.com/integrations?dynamics_select=true");
+  });
+
   it("completes dynamics instance-scoped callback and enables integration", async () => {
     mswServer.use(
       http.post("https://oauth.example.com/token", () =>
