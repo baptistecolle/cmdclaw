@@ -6,11 +6,13 @@
  * Supports SOQL queries, SOSL searches, and CRUD operations on all standard and custom objects.
  */
 
-const TOKEN = process.env.SALESFORCE_ACCESS_TOKEN;
-const INSTANCE_URL = process.env.SALESFORCE_INSTANCE_URL;
+const CLI_ARGS = process.argv.slice(2);
+const IS_HELP_REQUEST = CLI_ARGS.includes("--help") || CLI_ARGS.includes("-h");
+const TOKEN = process.env.SALESFORCE_ACCESS_TOKEN ?? "";
+const INSTANCE_URL = process.env.SALESFORCE_INSTANCE_URL ?? "";
 const API_VERSION = "v59.0";
 
-if (!TOKEN || !INSTANCE_URL) {
+if ((!TOKEN || !INSTANCE_URL) && !IS_HELP_REQUEST) {
   console.log(
     JSON.stringify({
       error: {
@@ -197,9 +199,30 @@ const commands = {
   },
 };
 
+function showHelp() {
+  console.log(`Salesforce CLI
+
+Usage:
+  salesforce query <SOQL>
+  salesforce get <ObjectType> <RecordId> [field1,field2,...]
+  salesforce create <ObjectType> '{"Field":"Value"}'
+  salesforce update <ObjectType> <RecordId> '{"Field":"Value"}'
+  salesforce describe <ObjectType>
+  salesforce objects
+  salesforce search <SOSL>
+
+Options:
+  -h, --help  Show this help message`);
+}
+
 // CLI argument parsing
 async function main() {
-  const args = process.argv.slice(2);
+  if (IS_HELP_REQUEST) {
+    showHelp();
+    return;
+  }
+
+  const args = CLI_ARGS;
   const command = args[0];
 
   try {

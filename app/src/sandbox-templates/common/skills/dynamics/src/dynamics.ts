@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
-const TOKEN = process.env.DYNAMICS_ACCESS_TOKEN;
-const INSTANCE_URL = process.env.DYNAMICS_INSTANCE_URL;
+const CLI_ARGS = process.argv.slice(2);
+const IS_HELP_REQUEST = CLI_ARGS.includes("--help") || CLI_ARGS.includes("-h");
+const TOKEN = process.env.DYNAMICS_ACCESS_TOKEN ?? "";
+const INSTANCE_URL = process.env.DYNAMICS_INSTANCE_URL ?? "";
 const API_VERSION = "v9.2";
 
-if (!TOKEN || !INSTANCE_URL) {
+if ((!TOKEN || !INSTANCE_URL) && !IS_HELP_REQUEST) {
   console.log(
     JSON.stringify({
       error: {
@@ -99,8 +101,30 @@ function buildQuery(args: string[]): string {
   return query ? `?${query}` : "";
 }
 
+function showHelp() {
+  console.log(`Dynamics CLI
+
+Usage:
+  dynamics whoami
+  dynamics tables list [--top N]
+  dynamics tables get <logicalName>
+  dynamics rows list <table> [--select col1,col2] [--filter expr] [--orderby expr] [--top N]
+  dynamics rows get <table> <rowId> [--select col1,col2]
+  dynamics rows create <table> '{"field":"value"}'
+  dynamics rows update <table> <rowId> '{"field":"value"}'
+  dynamics rows delete <table> <rowId>
+
+Options:
+  -h, --help  Show this help message`);
+}
+
 async function main() {
-  const args = process.argv.slice(2);
+  if (IS_HELP_REQUEST) {
+    showHelp();
+    return;
+  }
+
+  const args = CLI_ARGS;
   const resource = args[0];
   const action = args[1];
 

@@ -1,11 +1,11 @@
 ---
 name: google-gmail
-description: Read and send Gmail emails. Use for listing emails, reading content, counting unread, and sending messages.
+description: Read, draft, and send Gmail emails. Use for listing emails, reading content, counting unread, drafting messages, and sending messages.
 ---
 
 # Google Gmail
 
-Read inbox, get email content, count unread, fetch latest email, and send emails via Gmail API.
+Read inbox, get email content, count unread, fetch latest email, draft emails, and send emails via Gmail API.
 
 ## Environment Variables
 
@@ -25,6 +25,9 @@ google-gmail get <messageId>
 
 # Count unread emails (defaults to Inbox)
 google-gmail unread [-q "from:boss"] [--scope inbox|all|strict-all] [--include-spam-trash]
+
+# Draft an email
+google-gmail draft --to "user@example.com" --subject "Hello" --body "Message text" [--cc "cc@example.com"]
 
 # Send an email
 google-gmail send --to "user@example.com" --subject "Hello" --body "Message text" [--cc "cc@example.com"]

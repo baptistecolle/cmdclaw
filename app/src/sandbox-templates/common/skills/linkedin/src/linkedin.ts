@@ -2,11 +2,13 @@ import { parseArgs } from "util";
 
 type JsonValue = ReturnType<typeof JSON.parse>;
 
-const UNIPILE_API_KEY = process.env.UNIPILE_API_KEY;
-const UNIPILE_DSN = process.env.UNIPILE_DSN;
-const LINKEDIN_ACCOUNT_ID = process.env.LINKEDIN_ACCOUNT_ID;
+const CLI_ARGS = process.argv.slice(2);
+const IS_HELP_REQUEST = CLI_ARGS.includes("--help") || CLI_ARGS.includes("-h");
+const UNIPILE_API_KEY = process.env.UNIPILE_API_KEY ?? "";
+const UNIPILE_DSN = process.env.UNIPILE_DSN ?? "";
+const LINKEDIN_ACCOUNT_ID = process.env.LINKEDIN_ACCOUNT_ID ?? "";
 
-if (!UNIPILE_API_KEY || !LINKEDIN_ACCOUNT_ID) {
+if ((!UNIPILE_API_KEY || !LINKEDIN_ACCOUNT_ID) && !IS_HELP_REQUEST) {
   console.error("Error: UNIPILE_API_KEY and LINKEDIN_ACCOUNT_ID environment variables required");
   process.exit(1);
 }
@@ -34,7 +36,7 @@ async function api<T = JsonValue>(endpoint: string, options?: RequestInit): Prom
 }
 
 const { positionals, values } = parseArgs({
-  args: process.argv.slice(2),
+  args: CLI_ARGS,
   allowPositionals: true,
   options: {
     help: { type: "boolean", short: "h" },

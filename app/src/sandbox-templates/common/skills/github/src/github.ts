@@ -1,7 +1,9 @@
 import { parseArgs } from "util";
 
+const CLI_ARGS = process.argv.slice(2);
+const IS_HELP_REQUEST = CLI_ARGS.includes("--help") || CLI_ARGS.includes("-h");
 const TOKEN = process.env.GITHUB_ACCESS_TOKEN;
-if (!TOKEN) {
+if (!TOKEN && !IS_HELP_REQUEST) {
   console.error("Error: GITHUB_ACCESS_TOKEN environment variable required");
   process.exit(1);
 }
@@ -24,7 +26,7 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 const { positionals, values } = parseArgs({
-  args: process.argv.slice(2),
+  args: CLI_ARGS,
   allowPositionals: true,
   options: {
     help: { type: "boolean", short: "h" },

@@ -1,7 +1,9 @@
 import { parseArgs } from "util";
 
+const CLI_ARGS = process.argv.slice(2);
+const IS_HELP_REQUEST = CLI_ARGS.includes("--help") || CLI_ARGS.includes("-h");
 const TOKEN = process.env.TWITTER_ACCESS_TOKEN;
-if (!TOKEN) {
+if (!TOKEN && !IS_HELP_REQUEST) {
   console.error("Error: TWITTER_ACCESS_TOKEN environment variable required");
   process.exit(1);
 }
@@ -46,7 +48,7 @@ async function api(
 }
 
 const { positionals, values } = parseArgs({
-  args: process.argv.slice(2),
+  args: CLI_ARGS,
   allowPositionals: true,
   options: {
     help: { type: "boolean", short: "h" },
@@ -233,6 +235,284 @@ async function getFollowing() {
   console.log(JSON.stringify(data.data || [], null, 2));
 }
 
+const DM_EVENT_FIELDS =
+  "id,event_type,text,sender_id,participant_ids,dm_conversation_id,created_at";
+const DM_EXPANSIONS = "sender_id,participant_ids,referenced_tweets.id,attachments.media_keys";
+
+type DmUser = Record<string, unknown> & { id?: string };
+type DmEvent = Record<string, unknown> & {
+  id?: string;
+  event_type?: string;
+  created_at?: string;
+  dm_conversation_id?: string;
+  text?: string;
+  sender_id?: string;
+  participant_ids?: string[];
+  referenced_tweets?: unknown[];
+  attachments?: unknown;
+};
+type DmApiResponse = {
+  data?: DmEvent[];
+  includes?: {
+    users?: DmUser[];
+    media?: unknown[];
+    tweets?: unknown[];
+  };
+  meta?: {
+    result_count?: number;
+    next_token?: string;
+    previous_token?: string;
+  };
+};
+
+function dmParams(limit: string, paginationToken?: string) {
+  const params: Record<string, string> = {
+    max_results: limit,
+    "dm_event.fields": DM_EVENT_FIELDS,
+    expansions: DM_EXPANSIONS,
+    "user.fields": "id,name,username,profile_image_url,verified",
+    "tweet.fields": "id,text,author_id,created_at",
+    "media.fields": "media_key,type,url,preview_image_url",
+  };
+  if (paginationToken) {
+    params.pagination_token = paginationToken;
+  }
+  return params;
+}
+
+function formatDmResponse(data: DmApiResponse) {
+  const users = new Map((data.includes?.users || []).map((u) => [u.id, u]));
+
+  const mapParticipants = (participantIds: string[] | undefined) =>
+    (participantIds || []).map(
+      (participantId) => users.get(participantId) || { id: participantId },
+    );
+
+  const events = (data.data || []).map((event) => ({
+    id: event.id,
+    event_type: event.event_type,
+    created_at: event.created_at,
+    dm_conversation_id: event.dm_conversation_id,
+    text: event.text,
+    sender: event.sender_id ? users.get(event.sender_id) || { id: event.sender_id } : null,
+    participants: mapParticipants(event.participant_ids),
+    referenced_tweets: event.referenced_tweets || [],
+    attachments: event.attachments || null,
+  }));
+
+  return {
+    meta: data.meta || null,
+    events,
+    includes: {
+      media: data.includes?.media || [],
+      tweets: data.includes?.tweets || [],
+    },
+  };
+}
+
+async function getDmEvents() {
+  const data = (await api("/dm_events", {
+    params: dmParams(values.limit || "10"),
+  })) as DmApiResponse;
+
+  console.log(JSON.stringify(formatDmResponse(data), null, 2));
+}
+
+async function getDmEventsWithParticipant(participantId: string) {
+  const data = (await api(`/dm_conversations/with/${participantId}/dm_events`, {
+    params: dmParams(values.limit || "10"),
+  })) as DmApiResponse;
+
+  console.log(JSON.stringify(formatDmResponse(data), null, 2));
+}
+
+async function getDmConversationEvents(dmConversationId: string) {
+  const data = (await api(`/dm_conversations/${dmConversationId}/dm_events`, {
+    params: dmParams(values.limit || "10"),
+  })) as DmApiResponse;
+
+  console.log(JSON.stringify(formatDmResponse(data), null, 2));
+}
+
+async function getDmEvent(eventId: string) {
+  const data = (await api(`/dm_events/${eventId}`, {
+    params: {
+      "dm_event.fields": DM_EVENT_FIELDS,
+      expansions: DM_EXPANSIONS,
+      "user.fields": "id,name,username,profile_image_url,verified",
+      "tweet.fields": "id,text,author_id,created_at",
+      "media.fields": "media_key,type,url,preview_image_url",
+    },
+  })) as { data: DmEvent; includes?: DmApiResponse["includes"] };
+
+  const users = new Map((data.includes?.users || []).map((u) => [u.id, u]));
+  const event = data.data;
+
+  console.log(
+    JSON.stringify(
+      {
+        event: {
+          id: event.id,
+          event_type: event.event_type,
+          created_at: event.created_at,
+          dm_conversation_id: event.dm_conversation_id,
+          text: event.text,
+          sender: event.sender_id ? users.get(event.sender_id) || { id: event.sender_id } : null,
+          participants: (event.participant_ids || []).map(
+            (participantId: string) => users.get(participantId) || { id: participantId },
+          ),
+          referenced_tweets: event.referenced_tweets || [],
+          attachments: event.attachments || null,
+        },
+        includes: {
+          media: data.includes?.media || [],
+          tweets: data.includes?.tweets || [],
+        },
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+function parseScanLimit(rawLimit: string | undefined, fallback = 200) {
+  const parsed = Number.parseInt(rawLimit || "", 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.min(parsed, 1000);
+}
+
+async function getLatestAnsweredDm() {
+  const me = await api("/users/me", {
+    params: { "user.fields": "id,username,name" },
+  });
+  const myUserId = me.data.id as string;
+
+  const maxEventsToScan = parseScanLimit(values.limit, 200);
+  const events: DmEvent[] = [];
+  const usersById = new Map<string, DmUser>();
+  let hasMorePages = false;
+
+  async function collectPages(scannedEvents: number, paginationToken?: string): Promise<number> {
+    if (scannedEvents >= maxEventsToScan) {
+      if (paginationToken) {
+        hasMorePages = true;
+      }
+      return scannedEvents;
+    }
+
+    const pageSize = String(Math.min(100, maxEventsToScan - scannedEvents));
+    const page = (await api("/dm_events", {
+      params: dmParams(pageSize, paginationToken),
+    })) as DmApiResponse;
+
+    for (const user of page.includes?.users || []) {
+      if (user.id) {
+        usersById.set(user.id, user);
+      }
+    }
+
+    const pageEvents = page.data || [];
+    events.push(...pageEvents);
+    const updatedScannedEvents = scannedEvents + pageEvents.length;
+    const nextToken = page.meta?.next_token;
+
+    if (!nextToken || pageEvents.length === 0) {
+      hasMorePages = false;
+      return updatedScannedEvents;
+    }
+
+    return collectPages(updatedScannedEvents, nextToken);
+  }
+
+  const scannedEvents = await collectPages(0);
+
+  const conversationEvents = new Map<string, DmEvent[]>();
+  for (const event of events) {
+    if (!event.dm_conversation_id || !event.created_at || event.event_type !== "MessageCreate") {
+      continue;
+    }
+    const existing = conversationEvents.get(event.dm_conversation_id) || [];
+    existing.push(event);
+    conversationEvents.set(event.dm_conversation_id, existing);
+  }
+
+  for (const convo of conversationEvents.values()) {
+    convo.sort((a, b) => (a.created_at! < b.created_at! ? 1 : -1));
+  }
+
+  const candidates: Array<{
+    reply: DmEvent;
+    yourLatestMessage: DmEvent;
+  }> = [];
+
+  for (const convo of conversationEvents.values()) {
+    const yourLatestMessage = convo.find((event) => event.sender_id === myUserId);
+    const latestReply = convo.find((event) => event.sender_id && event.sender_id !== myUserId);
+
+    if (
+      !yourLatestMessage ||
+      !latestReply ||
+      !yourLatestMessage.created_at ||
+      !latestReply.created_at
+    ) {
+      continue;
+    }
+
+    if (latestReply.created_at > yourLatestMessage.created_at) {
+      candidates.push({ reply: latestReply, yourLatestMessage });
+    }
+  }
+
+  candidates.sort((a, b) => (a.reply.created_at! < b.reply.created_at! ? 1 : -1));
+  const latest = candidates[0];
+
+  if (!latest) {
+    console.log(
+      JSON.stringify(
+        {
+          found: false,
+          scanned_events: scannedEvents,
+          max_events_to_scan: maxEventsToScan,
+          has_more: hasMorePages,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  const replySenderId = latest.reply.sender_id as string;
+  const replySender = usersById.get(replySenderId) || { id: replySenderId };
+  console.log(
+    JSON.stringify(
+      {
+        found: true,
+        conversation_id: latest.reply.dm_conversation_id,
+        answered_at: latest.reply.created_at,
+        participant: replySender,
+        your_latest_message: {
+          id: latest.yourLatestMessage.id,
+          created_at: latest.yourLatestMessage.created_at,
+          text: latest.yourLatestMessage.text,
+        },
+        latest_reply: {
+          id: latest.reply.id,
+          created_at: latest.reply.created_at,
+          text: latest.reply.text,
+        },
+        scanned_events: scannedEvents,
+        max_events_to_scan: maxEventsToScan,
+        has_more: hasMorePages,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
 // Post a tweet
 async function postTweet() {
   if (!values.text) {
@@ -390,6 +670,11 @@ Reading:
   mentions [-l limit]                   Get mentions
   search -q <query> [-l limit]          Search tweets
   likes [-l limit]                      Get liked tweets
+  dms [-l limit]                        Get recent DM events
+  dms-latest-answered [-l limit]        Get latest DM where your message got a reply
+  dms-with <participantId> [-l limit]   Get DMs with a specific user
+  dms-conversation <id> [-l limit]      Get DMs by conversation ID
+  dm-event <eventId>                    Get a DM event by ID
   followers [-l limit]                  List followers
   following [-l limit]                  List following
 
@@ -451,6 +736,33 @@ async function main() {
         break;
       case "likes":
         await getLikes();
+        break;
+      case "dms":
+        await getDmEvents();
+        break;
+      case "dms-latest-answered":
+        await getLatestAnsweredDm();
+        break;
+      case "dms-with":
+        if (!args[0]) {
+          console.error("Usage: twitter dms-with <participantId> [-l limit]");
+          process.exit(1);
+        }
+        await getDmEventsWithParticipant(args[0]);
+        break;
+      case "dms-conversation":
+        if (!args[0]) {
+          console.error("Usage: twitter dms-conversation <id> [-l limit]");
+          process.exit(1);
+        }
+        await getDmConversationEvents(args[0]);
+        break;
+      case "dm-event":
+        if (!args[0]) {
+          console.error("Usage: twitter dm-event <eventId>");
+          process.exit(1);
+        }
+        await getDmEvent(args[0]);
         break;
       case "followers":
         await getFollowers();

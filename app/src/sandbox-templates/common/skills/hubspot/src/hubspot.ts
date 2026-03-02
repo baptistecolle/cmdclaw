@@ -2,8 +2,10 @@ import { parseArgs } from "util";
 
 type JsonValue = ReturnType<typeof JSON.parse>;
 
+const CLI_ARGS = process.argv.slice(2);
+const IS_HELP_REQUEST = CLI_ARGS.includes("--help") || CLI_ARGS.includes("-h");
 const TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
-if (!TOKEN) {
+if (!TOKEN && !IS_HELP_REQUEST) {
   console.error("Error: HUBSPOT_ACCESS_TOKEN environment variable required");
   process.exit(1);
 }
@@ -27,7 +29,7 @@ async function api<T = JsonValue>(path: string, options?: RequestInit): Promise<
 }
 
 const { positionals, values } = parseArgs({
-  args: process.argv.slice(2),
+  args: CLI_ARGS,
   allowPositionals: true,
   options: {
     help: { type: "boolean", short: "h" },

@@ -26,6 +26,11 @@ twitter timeline [-l limit]         # Home timeline
 twitter mentions [-l limit]         # Your mentions
 twitter search -q "query" [-l limit] # Search recent tweets
 twitter likes [-l limit]            # Your liked tweets
+twitter dms [-l limit]              # Recent DM events
+twitter dms-latest-answered [-l limit] # Latest DM where your message got a reply
+twitter dms-with <participantId> [-l limit] # DMs with a specific user
+twitter dms-conversation <id> [-l limit] # DMs for a conversation ID
+twitter dm-event <eventId>          # Get one DM event
 twitter followers [-l limit]
 twitter following [-l limit]
 ```

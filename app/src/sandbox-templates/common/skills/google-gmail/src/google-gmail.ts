@@ -1,7 +1,9 @@
 import { parseArgs } from "util";
 
+const CLI_ARGS = process.argv.slice(2);
+const IS_HELP_REQUEST = CLI_ARGS.includes("--help") || CLI_ARGS.includes("-h");
 const TOKEN = process.env.GMAIL_ACCESS_TOKEN;
-if (!TOKEN) {
+if (!TOKEN && !IS_HELP_REQUEST) {
   console.error("Error: GMAIL_ACCESS_TOKEN environment variable required");
   process.exit(1);
 }
@@ -9,7 +11,7 @@ if (!TOKEN) {
 const headers = { Authorization: `Bearer ${TOKEN}` };
 
 const { positionals, values } = parseArgs({
-  args: process.argv.slice(2),
+  args: CLI_ARGS,
   allowPositionals: true,
   options: {
     help: { type: "boolean", short: "h" },
@@ -196,7 +198,7 @@ async function countUnread() {
   console.log(`Unread emails: ${resultSizeEstimate}`);
 }
 
-async function sendEmail() {
+function buildRawEmail() {
   if (!values.to || !values.subject || !values.body) {
     console.error("Required: --to, --subject, --body");
     process.exit(1);
@@ -213,7 +215,11 @@ async function sendEmail() {
     .filter(Boolean)
     .join("\r\n");
 
-  const raw = Buffer.from(emailLines).toString("base64url");
+  return Buffer.from(emailLines).toString("base64url");
+}
+
+async function sendEmail() {
+  const raw = buildRawEmail();
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
@@ -227,6 +233,21 @@ async function sendEmail() {
   console.log(`Email sent. Message ID: ${id}`);
 }
 
+async function draftEmail() {
+  const raw = buildRawEmail();
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/drafts`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ message: { raw } }),
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+  const { id } = (await res.json()) as { id?: string };
+  console.log(`Email draft created. Draft ID: ${id}`);
+}
+
 function showHelp() {
   console.log(`Google Gmail CLI - Commands:
   list [-q query] [-l limit] [--scope inbox|all|strict-all] [--include-spam-trash]
@@ -237,6 +258,7 @@ function showHelp() {
   unread [-q query] [--scope inbox|all|strict-all] [--include-spam-trash]
                               Count unread emails (default scope: inbox)
   send --to <email> --subject <subject> --body <body> [--cc <email>]
+  draft --to <email> --subject <subject> --body <body> [--cc <email>]
 
 Options:
   -h, --help                  Show this help message`);
@@ -264,6 +286,9 @@ async function main() {
         break;
       case "send":
         await sendEmail();
+        break;
+      case "draft":
+        await draftEmail();
         break;
       default:
         showHelp();
