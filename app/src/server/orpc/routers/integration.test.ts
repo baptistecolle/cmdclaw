@@ -78,12 +78,23 @@ function createContext() {
   const deleteMock = vi.fn(() => ({ where: deleteWhereMock }));
 
   return {
-    user: { id: "user-1" },
+    user: { id: "user-1", email: "user@example.com" },
     db: {
       query: {
+        user: {
+          findFirst: vi.fn().mockResolvedValue({
+            role: "admin",
+            email: "user@example.com",
+            name: "Test User",
+          }),
+        },
         integration: {
           findMany: vi.fn(),
           findFirst: vi.fn(),
+        },
+        googleIntegrationAccessAllowlist: {
+          findFirst: vi.fn().mockResolvedValue(null),
+          findMany: vi.fn(),
         },
         customIntegration: {
           findFirst: vi.fn(),
@@ -312,6 +323,51 @@ describe("integrationRouter", () => {
     })) as { authUrl: string };
     const notionUrl = new URL(notion.authUrl);
     expect(notionUrl.searchParams.get("owner")).toBe("user");
+  });
+
+  it("blocks google auth URL generation for non-allowlisted non-admin users", async () => {
+    const context = createContext();
+    context.db.query.user.findFirst.mockResolvedValueOnce({
+      role: "user",
+      email: "blocked@example.com",
+      name: "Blocked User",
+    });
+    context.db.query.googleIntegrationAccessAllowlist.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      integrationRouterAny.getAuthUrl({
+        input: {
+          type: "gmail",
+          redirectUrl: "https://app.example.com/integrations",
+        },
+        context,
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "Google integrations require admin approval. Request access first.",
+    });
+  });
+
+  it("allows google auth URL generation for allowlisted users", async () => {
+    const context = createContext();
+    context.db.query.user.findFirst.mockResolvedValueOnce({
+      role: "user",
+      email: "allowed@example.com",
+      name: "Allowed User",
+    });
+    context.db.query.googleIntegrationAccessAllowlist.findFirst.mockResolvedValueOnce({
+      id: "allow-entry-1",
+    });
+
+    const result = (await integrationRouterAny.getAuthUrl({
+      input: {
+        type: "gmail",
+        redirectUrl: "https://app.example.com/integrations",
+      },
+      context,
+    })) as { authUrl: string };
+
+    expect(result.authUrl).toContain("oauth.example.com/authorize");
   });
 
   it("rejects callback with invalid state and user mismatch", async () => {

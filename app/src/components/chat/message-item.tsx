@@ -46,6 +46,45 @@ function getAttachmentKey(a: AttachmentData): string {
   return a.id ?? `${a.name}-${a.mimeType}-${a.dataUrl}`;
 }
 
+function parseQuestionAnswersFromResult(result: unknown): string[][] | undefined {
+  if (typeof result !== "string" || result.length === 0) {
+    return undefined;
+  }
+
+  const matches = Array.from(result.matchAll(/"[^"]+"="([^"]+)"/g))
+    .map((match) => match[1]?.trim())
+    .filter((answer): answer is string => !!answer && answer.length > 0);
+
+  if (matches.length === 0) {
+    return undefined;
+  }
+
+  return matches.map((answer) => [answer]);
+}
+
+function extractApprovalLinkedToolUseId(input: unknown): string | undefined {
+  if (typeof input !== "object" || input === null) {
+    return undefined;
+  }
+
+  const tool = (input as { tool?: unknown }).tool;
+  if (typeof tool !== "object" || tool === null) {
+    return undefined;
+  }
+
+  const candidateCallId = (tool as { callID?: unknown; callId?: unknown }).callID;
+  if (typeof candidateCallId === "string" && candidateCallId.length > 0) {
+    return candidateCallId;
+  }
+
+  const fallbackCallId = (tool as { callID?: unknown; callId?: unknown }).callId;
+  if (typeof fallbackCallId === "string" && fallbackCallId.length > 0) {
+    return fallbackCallId;
+  }
+
+  return undefined;
+}
+
 export function MessageItem({
   id,
   role,
@@ -145,6 +184,17 @@ export function MessageItem({
     }
 
     const result: DisplaySegment[] = [];
+    const explicitApprovalToolUseIds = new Set<string>();
+    for (const part of parts) {
+      if (part.type !== "approval") {
+        continue;
+      }
+      explicitApprovalToolUseIds.add(part.toolUseId);
+      const linkedToolUseId = extractApprovalLinkedToolUseId(part.toolInput);
+      if (linkedToolUseId) {
+        explicitApprovalToolUseIds.add(linkedToolUseId);
+      }
+    }
     const activityTimingByToolUseId = timing?.activityDurationsMs?.perToolUseIdMs ?? {};
     let currentSegment: DisplaySegment = {
       id: "seg-0",
@@ -197,6 +247,32 @@ export function MessageItem({
           elapsedMs: activityTimingByToolUseId[part.id],
         });
         activityIndex++;
+
+        const isQuestionTool =
+          part.operation === "question" || part.name.toLowerCase() === "question";
+        if (
+          isQuestionTool &&
+          part.result !== undefined &&
+          !explicitApprovalToolUseIds.has(part.id) &&
+          !currentSegment.approval
+        ) {
+          currentSegment.approval = {
+            toolUseId: part.id,
+            toolName: part.name,
+            toolInput: part.input,
+            integration: part.integration ?? "cmdclaw",
+            operation: part.operation ?? "question",
+            status: "approved",
+            questionAnswers: parseQuestionAnswersFromResult(part.result),
+          };
+          result.push(currentSegment);
+          segmentIndex++;
+          currentSegment = {
+            id: `seg-${segmentIndex}`,
+            items: [],
+            approval: null,
+          };
+        }
       } else if (part.type === "thinking") {
         currentSegment.items.push({
           id: `activity-${part.id}`,

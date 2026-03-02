@@ -118,8 +118,13 @@ export async function GET(request: NextRequest) {
       "Content-Type": "application/x-www-form-urlencoded",
     };
 
-    // Notion and Airtable require Basic auth header
-    if (stateData.type === "notion" || stateData.type === "airtable") {
+    // Notion, Airtable, Reddit, and Twitter require Basic auth header
+    if (
+      stateData.type === "notion" ||
+      stateData.type === "airtable" ||
+      stateData.type === "reddit" ||
+      stateData.type === "twitter"
+    ) {
       headers["Authorization"] = `Basic ${Buffer.from(
         `${config.clientId}:${config.clientSecret}`,
       ).toString("base64")}`;

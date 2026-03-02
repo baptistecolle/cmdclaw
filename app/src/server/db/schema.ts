@@ -130,6 +130,19 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
+export const googleIntegrationAccessAllowlist = pgTable(
+  "google_integration_access_allowlist",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    email: text("email").notNull(),
+    createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("google_integration_access_allowlist_email_idx").on(table.email)],
+);
+
 // ========== CHAT SCHEMA ==========
 
 export const messageRoleEnum = pgEnum("message_role", ["user", "assistant", "system", "tool"]);

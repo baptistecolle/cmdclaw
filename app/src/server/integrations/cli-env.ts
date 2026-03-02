@@ -214,6 +214,7 @@ export function getCliInstructions(connectedIntegrations: IntegrationType[]): st
 - google-gmail list [-q query] [-l limit] - List emails
 - google-gmail get <messageId> - Get full email content
 - google-gmail unread - Count unread emails
+- google-gmail draft --to <email> --subject <subject> --body <body>
 - google-gmail send --to <email> --subject <subject> --body <body>
 - Example: google-gmail list -q "is:unread" -l 5
 

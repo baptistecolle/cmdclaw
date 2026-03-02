@@ -490,7 +490,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
   twitter: () => ({
     clientId: env.TWITTER_CLIENT_ID ?? "",
     clientSecret: env.TWITTER_CLIENT_SECRET ?? "",
-    authUrl: "https://twitter.com/i/oauth2/authorize",
+    authUrl: "https://x.com/i/oauth2/authorize",
     tokenUrl: "https://api.twitter.com/2/oauth2/token",
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
     scopes: [

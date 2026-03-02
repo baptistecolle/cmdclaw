@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import {
   useIntegrationList,
   useGetAuthUrl,
+  useGoogleAccessStatus,
   useToggleIntegration,
   useDisconnectIntegration,
   useLinkLinkedIn,
@@ -46,6 +47,7 @@ import {
   useToggleCustomIntegration,
   useDeleteCustomIntegration,
   useGetCustomAuthUrl,
+  useRequestGoogleAccess,
 } from "@/orpc/hooks";
 
 type FilterTab = "all" | "connected" | "not_connected";
@@ -183,11 +185,28 @@ const defaultCustomForm: CustomFormState = {
 
 type IntegrationType = keyof typeof integrationConfig;
 type OAuthIntegrationType = Exclude<IntegrationType, "whatsapp">;
+type GoogleIntegrationType =
+  | "gmail"
+  | "google_calendar"
+  | "google_docs"
+  | "google_sheets"
+  | "google_drive";
 const adminPreviewOnlyIntegrations = new Set<IntegrationType>(
   (Object.keys(integrationConfig) as IntegrationType[]).filter(
     (type) => type === "whatsapp" || isComingSoonIntegration(type as OAuthIntegrationType),
   ),
 );
+const googleIntegrationTypes = new Set<GoogleIntegrationType>([
+  "gmail",
+  "google_calendar",
+  "google_docs",
+  "google_sheets",
+  "google_drive",
+]);
+
+function isGoogleIntegrationType(type: OAuthIntegrationType): type is GoogleIntegrationType {
+  return googleIntegrationTypes.has(type as GoogleIntegrationType);
+}
 type CustomAuthType = "oauth2" | "api_key" | "bearer_token";
 type DynamicsInstanceOption = {
   id: string;
@@ -368,8 +387,10 @@ function IntegrationsPageContent() {
   const { isAdmin } = useIsAdmin();
   const searchParams = useSearchParams();
   const { data: integrations, isLoading, refetch } = useIntegrationList();
+  const { data: googleAccessStatus } = useGoogleAccessStatus();
   const { data: customIntegrations, refetch: refetchCustom } = useCustomIntegrationList();
   const getAuthUrl = useGetAuthUrl();
+  const requestGoogleAccess = useRequestGoogleAccess();
   const toggleIntegration = useToggleIntegration();
   const disconnectIntegration = useDisconnectIntegration();
   const linkLinkedIn = useLinkLinkedIn();
@@ -399,6 +420,7 @@ function IntegrationsPageContent() {
   const [dynamicsPickerOpen, setDynamicsPickerOpen] = useState(false);
   const [dynamicsPickerLoading, setDynamicsPickerLoading] = useState(false);
   const [selectedDynamicsInstance, setSelectedDynamicsInstance] = useState<string>("");
+  const lacksGoogleAccess = googleAccessStatus?.allowed === false;
 
   const loadDynamicsPicker = useCallback(async () => {
     setDynamicsPickerLoading(true);
@@ -512,12 +534,15 @@ function IntegrationsPageContent() {
         window.location.assign(result.authUrl);
       } catch (error) {
         console.error("Failed to get auth URL:", error);
+        const message = toErrorMessage(error, "");
         setConnectingType(null);
         setIntegrationConnectErrors((prev) => ({
           ...prev,
           [type]: isUnipileMissingCredentialsError(error)
             ? UNIPILE_MISSING_CREDENTIALS_MESSAGE
-            : "Failed to start connection. Please try again.",
+            : message.includes("admin approval")
+              ? "Google access is restricted. Use Request access first."
+              : "Failed to start connection. Please try again.",
         }));
       }
     },
@@ -610,6 +635,46 @@ function IntegrationsPageContent() {
   const handleOpenDynamicsSetup = useCallback(() => {
     void loadDynamicsPicker();
   }, [loadDynamicsPicker]);
+
+  const handleRequestGoogleIntegrationAccess = useCallback(
+    async (type: GoogleIntegrationType) => {
+      try {
+        await requestGoogleAccess.mutateAsync({
+          integration: type,
+          source: "integrations",
+        });
+        setNotification({
+          type: "success",
+          message:
+            "Access request sent. We notified the team on Slack and will approve your Google access.",
+        });
+      } catch (error) {
+        console.error("Failed to request Google integration access:", error);
+        setNotification({
+          type: "error",
+          message: "Failed to send access request. Please try again.",
+        });
+      }
+    },
+    [requestGoogleAccess],
+  );
+
+  const handleRequestGoogleIntegrationAccessClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      const integrationType = event.currentTarget.dataset.integrationType;
+      if (!integrationType) {
+        return;
+      }
+
+      const integration = integrationType as OAuthIntegrationType;
+      if (!isGoogleIntegrationType(integration)) {
+        return;
+      }
+
+      void handleRequestGoogleIntegrationAccess(integration);
+    },
+    [handleRequestGoogleIntegrationAccess],
+  );
 
   const handleToggleCustom = useCallback(
     async (customIntegrationId: string, enabled: boolean) => {
@@ -1027,6 +1092,10 @@ function IntegrationsPageContent() {
             const connectError = !integration
               ? integrationConnectErrors[type as OAuthIntegrationType]
               : undefined;
+            const isGoogleIntegration =
+              !isWhatsApp && isGoogleIntegrationType(type as OAuthIntegrationType);
+            const shouldShowGoogleAccessRequest =
+              !integration && isGoogleIntegration && lacksGoogleAccess;
 
             return (
               <div key={type} className="relative overflow-hidden rounded-lg border">
@@ -1165,12 +1234,25 @@ function IntegrationsPageContent() {
                         )}
                       </>
                     ) : (
-                      <IntegrationConnectButton
-                        integrationType={type as OAuthIntegrationType}
-                        isConnecting={isConnecting}
-                        hasError={Boolean(connectError)}
-                        onConnect={handleConnect}
-                      />
+                      <>
+                        {shouldShowGoogleAccessRequest ? (
+                          <Button
+                            onClick={handleRequestGoogleIntegrationAccessClick}
+                            data-integration-type={type}
+                            disabled={requestGoogleAccess.isPending}
+                            variant={connectError ? "destructive" : "default"}
+                          >
+                            {requestGoogleAccess.isPending ? "Requesting..." : "Request access"}
+                          </Button>
+                        ) : (
+                          <IntegrationConnectButton
+                            integrationType={type as OAuthIntegrationType}
+                            isConnecting={isConnecting}
+                            hasError={Boolean(connectError)}
+                            onConnect={handleConnect}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

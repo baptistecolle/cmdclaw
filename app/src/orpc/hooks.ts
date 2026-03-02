@@ -177,6 +177,63 @@ export function useIntegrationList() {
   });
 }
 
+export function useGoogleAccessStatus() {
+  return useQuery({
+    queryKey: ["integration", "google-access-status"],
+    queryFn: () => client.integration.getGoogleAccessStatus(),
+  });
+}
+
+export function useGoogleAccessAllowlist() {
+  return useQuery({
+    queryKey: ["integration", "google-access-allowlist"],
+    queryFn: () => client.integration.listGoogleAccessAllowlist(),
+  });
+}
+
+export function useAddGoogleAccessAllowlistEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ email }: { email: string }) =>
+      client.integration.addGoogleAccessAllowlistEntry({ email }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["integration", "google-access-allowlist"] });
+      queryClient.invalidateQueries({ queryKey: ["integration", "google-access-status"] });
+    },
+  });
+}
+
+export function useRemoveGoogleAccessAllowlistEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      client.integration.removeGoogleAccessAllowlistEntry({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["integration", "google-access-allowlist"] });
+      queryClient.invalidateQueries({ queryKey: ["integration", "google-access-status"] });
+    },
+  });
+}
+
+export function useRequestGoogleAccess() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      integration,
+      source,
+    }: {
+      integration?: "gmail" | "google_calendar" | "google_docs" | "google_sheets" | "google_drive";
+      source?: "integrations" | "chat" | "onboarding";
+    }) => client.integration.requestGoogleAccess({ integration, source }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["integration", "google-access-status"] });
+    },
+  });
+}
+
 // Hook for toggling integration
 export function useToggleIntegration() {
   const queryClient = useQueryClient();

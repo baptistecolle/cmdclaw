@@ -244,6 +244,42 @@ describe("GET /api/oauth/callback", () => {
     );
   });
 
+  it("uses Basic auth and omits client credentials in body for twitter token exchange", async () => {
+    let authHeader: string | null = null;
+    let bodyClientId: string | null = null;
+    let bodyClientSecret: string | null = null;
+
+    mswServer.use(
+      http.post("https://oauth.example.com/token", async ({ request }) => {
+        authHeader = request.headers.get("authorization");
+        const body = await request.formData();
+        bodyClientId = body.get("client_id")?.toString() ?? null;
+        bodyClientSecret = body.get("client_secret")?.toString() ?? null;
+        return HttpResponse.json({
+          access_token: "twitter-access",
+          refresh_token: "twitter-refresh",
+        });
+      }),
+    );
+
+    const state = encodeState({
+      userId: "user-1",
+      type: "twitter",
+      redirectUrl: "/integrations",
+    });
+
+    const request = new NextRequest(
+      `https://app.example.com/api/oauth/callback?code=abc&state=${state}`,
+    );
+
+    const response = await GET(request);
+
+    expect(getLocation(response)).toBe("https://app.example.com/integrations?success=true");
+    expect(authHeader).toBe("Basic Y2xpZW50LWlkOmNsaWVudC1zZWNyZXQ=");
+    expect(bodyClientId).toBeNull();
+    expect(bodyClientSecret).toBeNull();
+  });
+
   it("preserves existing redirect query params when appending success", async () => {
     const state = encodeState({
       userId: "user-1",

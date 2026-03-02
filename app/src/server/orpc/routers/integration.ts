@@ -1,7 +1,8 @@
 import { ORPCError } from "@orpc/server";
 import { createHash, randomBytes } from "crypto";
-import { eq, and, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { z } from "zod";
+import { env } from "@/env";
 import {
   isUnipileMissingCredentialsError,
   UNIPILE_MISSING_CREDENTIALS_MESSAGE,
@@ -11,6 +12,8 @@ import {
   integrationToken,
   customIntegration,
   customIntegrationCredential,
+  googleIntegrationAccessAllowlist,
+  user,
 } from "@/server/db/schema";
 import { fetchDynamicsInstances } from "@/server/integrations/dynamics";
 import {
@@ -20,7 +23,130 @@ import {
 } from "@/server/integrations/unipile";
 import { encrypt, decrypt } from "@/server/lib/encryption";
 import { getOAuthConfig, type IntegrationType } from "@/server/oauth/config";
-import { protectedProcedure } from "../middleware";
+import { protectedProcedure, type AuthenticatedContext } from "../middleware";
+
+const GOOGLE_INTEGRATION_TYPES = new Set<IntegrationType>([
+  "gmail",
+  "google_calendar",
+  "google_docs",
+  "google_sheets",
+  "google_drive",
+]);
+const GOOGLE_ACCESS_REQUEST_SLACK_CHANNEL_NAME = "google-oauth-access-for-users";
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function normalizeSlackChannelName(value: string): string {
+  return value.trim().replace(/^#/, "").toLowerCase();
+}
+
+async function ensureAdmin(context: AuthenticatedContext) {
+  const dbUser = await context.db.query.user.findFirst({
+    where: eq(user.id, context.user.id),
+    columns: { role: true },
+  });
+
+  if (dbUser?.role !== "admin") {
+    throw new ORPCError("FORBIDDEN", { message: "Admin access required" });
+  }
+}
+
+async function canUserAccessGoogleIntegrations(context: AuthenticatedContext) {
+  const dbUser = await context.db.query.user.findFirst({
+    where: eq(user.id, context.user.id),
+    columns: { role: true, email: true },
+  });
+
+  if (dbUser?.role === "admin") {
+    return true;
+  }
+
+  const normalizedEmail =
+    typeof dbUser?.email === "string" && dbUser.email.length > 0
+      ? normalizeEmail(dbUser.email)
+      : null;
+
+  if (!normalizedEmail) {
+    return false;
+  }
+
+  const allowlisted = await context.db.query.googleIntegrationAccessAllowlist.findFirst({
+    where: eq(googleIntegrationAccessAllowlist.email, normalizedEmail),
+    columns: { id: true },
+  });
+
+  return Boolean(allowlisted);
+}
+
+async function lookupSlackChannelIdByName(channelName: string): Promise<string> {
+  const targetName = normalizeSlackChannelName(channelName);
+  const lookupPage = async (cursor?: string): Promise<string> => {
+    const params = new URLSearchParams({
+      exclude_archived: "true",
+      limit: "200",
+      types: "public_channel,private_channel,mpim",
+    });
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+
+    const response = await fetch(`https://slack.com/api/conversations.list?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`,
+      },
+    });
+
+    const result = (await response.json()) as {
+      ok: boolean;
+      error?: string;
+      channels?: Array<{ id: string; name?: string; name_normalized?: string }>;
+      response_metadata?: { next_cursor?: string };
+    };
+
+    if (!result.ok) {
+      throw new Error(result.error ?? "Could not list Slack channels");
+    }
+
+    const match = result.channels?.find((channel) => {
+      const name = channel.name_normalized ?? channel.name;
+      if (!name) {
+        return false;
+      }
+      return normalizeSlackChannelName(name) === targetName;
+    });
+    if (match?.id) {
+      return match.id;
+    }
+
+    const nextCursor = result.response_metadata?.next_cursor?.trim();
+    if (!nextCursor) {
+      throw new Error(`Slack channel not found: ${channelName}`);
+    }
+
+    return lookupPage(nextCursor);
+  };
+
+  return lookupPage();
+}
+
+async function postSlackMessage(channelId: string, text: string) {
+  const response = await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      channel: channelId,
+      text,
+    }),
+  });
+
+  return response.json() as Promise<{ ok: boolean; error?: string }>;
+}
 
 // PKCE helpers for Airtable OAuth
 function generateCodeVerifier(): string {
@@ -50,6 +176,14 @@ const integrationTypeSchema = z.enum([
   "dynamics",
   "reddit",
   "twitter",
+]);
+
+const googleIntegrationTypeSchema = z.enum([
+  "gmail",
+  "google_calendar",
+  "google_docs",
+  "google_sheets",
+  "google_drive",
 ]);
 
 // List user's integrations
@@ -89,6 +223,144 @@ const list = protectedProcedure.handler(async ({ context }) => {
   });
 });
 
+const getGoogleAccessStatus = protectedProcedure.handler(async ({ context }) => {
+  const allowed = await canUserAccessGoogleIntegrations(context);
+  return { allowed };
+});
+
+const listGoogleAccessAllowlist = protectedProcedure.handler(async ({ context }) => {
+  await ensureAdmin(context);
+
+  return context.db.query.googleIntegrationAccessAllowlist.findMany({
+    columns: {
+      id: true,
+      email: true,
+      createdByUserId: true,
+      createdAt: true,
+    },
+    orderBy: (fields, { desc: orderDesc }) => [orderDesc(fields.createdAt)],
+  });
+});
+
+const addGoogleAccessAllowlistEntry = protectedProcedure
+  .input(
+    z.object({
+      email: z.string().email(),
+    }),
+  )
+  .handler(async ({ input, context }) => {
+    await ensureAdmin(context);
+
+    const normalizedEmail = normalizeEmail(input.email);
+    const inserted = await context.db
+      .insert(googleIntegrationAccessAllowlist)
+      .values({
+        email: normalizedEmail,
+        createdByUserId: context.user.id,
+      })
+      .onConflictDoNothing({
+        target: [googleIntegrationAccessAllowlist.email],
+      })
+      .returning({
+        id: googleIntegrationAccessAllowlist.id,
+        email: googleIntegrationAccessAllowlist.email,
+        createdByUserId: googleIntegrationAccessAllowlist.createdByUserId,
+        createdAt: googleIntegrationAccessAllowlist.createdAt,
+      });
+
+    if (inserted[0]) {
+      return inserted[0];
+    }
+
+    const existing = await context.db.query.googleIntegrationAccessAllowlist.findFirst({
+      where: eq(googleIntegrationAccessAllowlist.email, normalizedEmail),
+      columns: {
+        id: true,
+        email: true,
+        createdByUserId: true,
+        createdAt: true,
+      },
+    });
+
+    if (!existing) {
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Failed to add Google access entry",
+      });
+    }
+
+    return existing;
+  });
+
+const removeGoogleAccessAllowlistEntry = protectedProcedure
+  .input(
+    z.object({
+      id: z.string(),
+    }),
+  )
+  .handler(async ({ input, context }) => {
+    await ensureAdmin(context);
+
+    const removed = await context.db
+      .delete(googleIntegrationAccessAllowlist)
+      .where(eq(googleIntegrationAccessAllowlist.id, input.id))
+      .returning({
+        id: googleIntegrationAccessAllowlist.id,
+      });
+
+    if (!removed[0]) {
+      throw new ORPCError("NOT_FOUND", {
+        message: "Google access entry not found",
+      });
+    }
+
+    return { success: true as const };
+  });
+
+const requestGoogleAccess = protectedProcedure
+  .input(
+    z.object({
+      integration: googleIntegrationTypeSchema.optional(),
+      source: z.enum(["integrations", "chat", "onboarding"]).optional(),
+    }),
+  )
+  .handler(async ({ input, context }) => {
+    const alreadyAllowed = await canUserAccessGoogleIntegrations(context);
+    if (alreadyAllowed) {
+      return { ok: true as const, alreadyAllowed: true as const };
+    }
+
+    if (!env.SLACK_BOT_TOKEN) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Slack notifications are not configured",
+      });
+    }
+
+    const dbUser = await context.db.query.user.findFirst({
+      where: eq(user.id, context.user.id),
+      columns: { email: true, name: true },
+    });
+
+    const channelId = await lookupSlackChannelIdByName(GOOGLE_ACCESS_REQUEST_SLACK_CHANNEL_NAME);
+    const message = [
+      ":lock: *Google Access Request*",
+      `*User:* ${dbUser?.email ?? context.user.id}`,
+      `*Name:* ${dbUser?.name ?? "unknown"}`,
+      `*User ID:* ${context.user.id}`,
+      `*Integration:* ${input.integration ?? "not specified"}`,
+      `*Source:* ${input.source ?? "unknown"}`,
+      `*Requested at:* ${new Date().toISOString()}`,
+    ].join("\n");
+
+    const slackResult = await postSlackMessage(channelId, message);
+    if (!slackResult.ok) {
+      throw new ORPCError("BAD_GATEWAY", {
+        message: slackResult.error ?? "Failed to send Slack notification",
+      });
+    }
+
+    return { ok: true as const, alreadyAllowed: false as const };
+  });
+
 // Get OAuth authorization URL
 const getAuthUrl = protectedProcedure
   .input(
@@ -112,6 +384,15 @@ const getAuthUrl = protectedProcedure
         throw error;
       }
       return { authUrl: url };
+    }
+
+    if (GOOGLE_INTEGRATION_TYPES.has(input.type as IntegrationType)) {
+      const allowed = await canUserAccessGoogleIntegrations(context);
+      if (!allowed) {
+        throw new ORPCError("FORBIDDEN", {
+          message: "Google integrations require admin approval. Request access first.",
+        });
+      }
     }
 
     const config = getOAuthConfig(input.type as IntegrationType);
@@ -929,6 +1210,11 @@ const handleCustomCallback = protectedProcedure
 
 export const integrationRouter = {
   list,
+  getGoogleAccessStatus,
+  listGoogleAccessAllowlist,
+  addGoogleAccessAllowlistEntry,
+  removeGoogleAccessAllowlistEntry,
+  requestGoogleAccess,
   getAuthUrl,
   handleCallback,
   toggle,

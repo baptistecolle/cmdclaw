@@ -2890,6 +2890,29 @@ class GenerationManager {
           answers.map((answer) => answer.trim()).filter((answer) => answer.length > 0),
         )
         .filter((answers) => answers.length > 0) ?? [];
+    const approvalPart: ContentPart = {
+      type: "approval",
+      tool_use_id: pending.toolUseId,
+      tool_name: pending.toolName,
+      tool_input: pending.toolInput,
+      integration: pending.integration,
+      operation: pending.operation,
+      command: pending.command,
+      status: decision === "approve" ? "approved" : "denied",
+      question_answers:
+        normalizedQuestionAnswers.length > 0 ? normalizedQuestionAnswers : pending.questionAnswers,
+    };
+    const baseContentParts = (genRecord.contentParts as ContentPart[] | null) ?? [];
+    const nextContentParts = [...baseContentParts];
+    const existingApprovalIndex = nextContentParts.findIndex(
+      (part): part is ContentPart & { type: "approval" } =>
+        part.type === "approval" && part.tool_use_id === pending.toolUseId,
+    );
+    if (existingApprovalIndex >= 0) {
+      nextContentParts[existingApprovalIndex] = approvalPart;
+    } else {
+      nextContentParts.push(approvalPart);
+    }
 
     await db
       .update(generation)
@@ -2900,8 +2923,33 @@ class GenerationManager {
           questionAnswers:
             normalizedQuestionAnswers.length > 0 ? normalizedQuestionAnswers : undefined,
         },
+        contentParts: nextContentParts.length > 0 ? nextContentParts : null,
       })
       .where(eq(generation.id, generationId));
+
+    const activeCtx = this.activeGenerations.get(generationId);
+    if (activeCtx) {
+      activeCtx.contentParts = nextContentParts;
+      this.broadcast(activeCtx, {
+        type: "approval_result",
+        toolUseId: pending.toolUseId,
+        decision: decision === "approve" ? "approved" : "denied",
+      });
+      this.broadcast(activeCtx, {
+        type: "approval",
+        toolUseId: pending.toolUseId,
+        toolName: pending.toolName,
+        toolInput: pending.toolInput,
+        integration: pending.integration,
+        operation: pending.operation,
+        command: pending.command,
+        status: decision === "approve" ? "approved" : "denied",
+        questionAnswers:
+          normalizedQuestionAnswers.length > 0
+            ? normalizedQuestionAnswers
+            : pending.questionAnswers,
+      });
+    }
 
     return true;
   }
@@ -4971,12 +5019,41 @@ class GenerationManager {
 
       if (latestApproval.decision) {
         const resolvedDecision = latestApproval.decision;
+        const approvalPart: ContentPart = {
+          type: "approval",
+          tool_use_id: latestApproval.toolUseId,
+          tool_name: latestApproval.toolName,
+          tool_input: latestApproval.toolInput,
+          integration: latestApproval.integration,
+          operation: latestApproval.operation,
+          command: latestApproval.command,
+          status: resolvedDecision === "allow" ? "approved" : "denied",
+          question_answers: latestApproval.questionAnswers,
+        };
+        const activeCtx = this.activeGenerations.get(generationId);
+        const baseContentParts =
+          activeCtx?.contentParts ?? (latest.contentParts as ContentPart[] | null) ?? [];
+        const nextContentParts = [...baseContentParts];
+        const existingApprovalIndex = nextContentParts.findIndex(
+          (part): part is ContentPart & { type: "approval" } =>
+            part.type === "approval" && part.tool_use_id === latestApproval.toolUseId,
+        );
+        if (existingApprovalIndex >= 0) {
+          nextContentParts[existingApprovalIndex] = approvalPart;
+        } else {
+          nextContentParts.push(approvalPart);
+        }
+        if (activeCtx) {
+          activeCtx.contentParts = nextContentParts;
+        }
+
         // eslint-disable-next-line no-await-in-loop -- decision must be persisted before returning
         await db
           .update(generation)
           .set({
             status: "running",
             pendingApproval: null,
+            contentParts: nextContentParts.length > 0 ? nextContentParts : null,
           })
           .where(eq(generation.id, generationId));
         // eslint-disable-next-line no-await-in-loop -- decision must be persisted before returning
@@ -4984,6 +5061,24 @@ class GenerationManager {
           .update(conversation)
           .set({ generationStatus: "generating" })
           .where(eq(conversation.id, genRecord.conversationId));
+        if (activeCtx) {
+          this.broadcast(activeCtx, {
+            type: "approval_result",
+            toolUseId: latestApproval.toolUseId,
+            decision: resolvedDecision === "allow" ? "approved" : "denied",
+          });
+          this.broadcast(activeCtx, {
+            type: "approval",
+            toolUseId: latestApproval.toolUseId,
+            toolName: latestApproval.toolName,
+            toolInput: latestApproval.toolInput,
+            integration: latestApproval.integration,
+            operation: latestApproval.operation,
+            command: latestApproval.command,
+            status: resolvedDecision === "allow" ? "approved" : "denied",
+            questionAnswers: latestApproval.questionAnswers,
+          });
+        }
         resolved = resolvedDecision;
         break;
       }
