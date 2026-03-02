@@ -10,6 +10,12 @@ function encodeBase64Url(value: string): string {
 }
 
 describe("OAuth config", () => {
+  it("includes compose scope for Gmail draft creation", () => {
+    const config = getOAuthConfig("gmail");
+
+    expect(config.scopes).toContain("https://www.googleapis.com/auth/gmail.compose");
+  });
+
   it("uses Dynamics scopes without mixing in Microsoft Graph resource scopes", () => {
     const config = getOAuthConfig("dynamics");
 

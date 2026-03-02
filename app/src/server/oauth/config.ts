@@ -71,6 +71,7 @@ const configs: Record<IntegrationType, () => OAuthConfig> = {
     redirectUri: `${getAppUrl()}/api/oauth/callback`,
     scopes: [
       "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.compose",
       "https://www.googleapis.com/auth/gmail.send",
       "openid",
       "email",
